@@ -1,0 +1,1 @@
+This is a fork of the main Gromacs project in which interface, API, and extensibility issues are being investigated
