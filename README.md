@@ -1,1 +1,2 @@
-This is a fork of the main Gromacs project in which interface, API, and extensibility issues are being investigated
+This is a fork of the main Gromacs project in which interface, API, and extensibility issues are being investigated.
+This README.md file supplants the main README file to avoid merge conflicts while providing convenient documentation to the BitBucket repository browser.
