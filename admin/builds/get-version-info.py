@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2014,2016, by the GROMACS development team, led by
+# Copyright (c) 2016, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -32,36 +32,10 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 
-# "tests" target builds all the separate test binaries.
-add_custom_target(tests)
-# "run-ctest" is an internal target that actually runs the tests.
-# This is necessary to be able to add separate targets that execute as part
-# of 'make check', but are ensured to be executed after the actual tests.
-add_custom_target(run-ctest
-                  COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-                  COMMENT "Running all tests"
-                  USES_TERMINAL VERBATIM)
-add_dependencies(run-ctest tests)
-# "check" target builds and runs all tests.
-add_custom_target(check DEPENDS run-ctest)
+import json
 
-# Global property for collecting notices to show at the end of the "check"
-# target.
-set_property(GLOBAL PROPERTY GMX_TESTS_NOTICE)
-
-function (gmx_add_missing_tests_notice TEXT)
-    set_property(GLOBAL APPEND PROPERTY GMX_TESTS_NOTICE ${TEXT})
-endfunction()
-
-function (gmx_create_missing_tests_notice_target)
-    get_property(_text GLOBAL PROPERTY GMX_TESTS_NOTICE)
-    set(_cmds)
-    foreach (_line ${_text})
-        list(APPEND _cmds COMMAND ${CMAKE_COMMAND} -E echo "NOTE: ${_line}")
-    endforeach()
-    add_custom_target(missing-tests-notice
-        ${_cmds}
-        DEPENDS run-ctest
-        COMMENT "Some tests not available" VERBATIM)
-    add_dependencies(check missing-tests-notice)
-endfunction()
+def do_build(context):
+    cmd = [context.env.cmake_command, '-P', 'cmake/gmxVersionInfo.cmake']
+    info_json = context.run_cmd(cmd, use_output=True)
+    values = json.loads(info_json)
+    context.set_version_info(values['version'], values['regressiontest-md5sum'])

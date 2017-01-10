@@ -1,8 +1,6 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
- * Copyright (c) 2001-2004, The GROMACS development team.
  * Copyright (c) 2012,2014,2015,2016, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
@@ -34,44 +32,50 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+/*! \libinternal \file
+ * \brief
+ * Declares gmx::unique_cptr and gmx::sfree_guard.
+ *
+ * \author Teemu Murtola <teemu.murtola@gmail.com>
+ * \inlibraryapi
+ * \ingroup module_utility
+ */
+#ifndef GMX_UTILITY_UNIQUE_PTR_SFREE_H
+#define GMX_UTILITY_UNIQUE_PTR_SFREE_H
 
-#ifndef GMX_GMXPREPROCESS_TOPIO_H
-#define GMX_GMXPREPROCESS_TOPIO_H
+#include <memory>
 
-#include "gromacs/gmxpreprocess/gpp_atomtype.h"
-#include "gromacs/gmxpreprocess/grompp-impl.h"
+#include "gromacs/utility/smalloc.h"
 
-struct gmx_molblock_t;
-struct gmx_mtop_t;
-struct t_gromppopts;
-struct t_inputrec;
-struct warninp;
-typedef warninp *warninp_t;
+namespace gmx
+{
 
-double check_mol(gmx_mtop_t *mtop, warninp_t wi);
-/* Check mass and charge */
+//! sfree wrapper to be used as unique_cptr deleter
+template <class T>
+inline void sfree_wrapper(T *p)
+{
+    sfree(p);
+}
 
-char **do_top(gmx_bool          bVerbose,
-              const char       *topfile,
-              const char       *topppfile,
-              t_gromppopts     *opts,
-              gmx_bool          bZero,
-              struct t_symtab  *symtab,
-              t_params          plist[],
-              int              *combination_rule,
-              double           *repulsion_power,
-              real             *fudgeQQ,
-              gpp_atomtype_t    atype,
-              int              *nrmols,
-              t_molinfo       **molinfo,
-              t_molinfo       **intermolecular_interactions,
-              const t_inputrec *ir,
-              int              *nmolblock,
-              gmx_molblock_t  **molblock,
-              gmx_bool          bGB,
-              warninp_t         wi);
+//! \internal \brief wrap function into functor to be used as deleter
+template<class T, void D(T *)>
+struct functor_wrapper {
+    //! call wrapped function
+    void operator()(T* t) { D(t); }
+};
 
-/* This routine expects sys->molt[m].ilist to be of size F_NRE and ordered. */
-void generate_qmexcl(gmx_mtop_t *sys, t_inputrec *ir, warninp_t    wi);
+//! unique_ptr which takes function pointer (has to return void) as template argument
+template<typename T, void D(T *) = sfree_wrapper>
+using unique_cptr                = std::unique_ptr<T, functor_wrapper<T, D> >;
+
+//! Simple guard which calls sfree. See unique_cptr for details.
+typedef unique_cptr<void> sfree_guard;
+
+
+//! Create unique_ptr with any deleter function or lambda
+template<typename T, typename D>
+std::unique_ptr<T, D> create_unique_with_deleter(T *t, D d) { return std::unique_ptr<T, D>(t, d); }
+
+}      // namespace gmx
 
 #endif

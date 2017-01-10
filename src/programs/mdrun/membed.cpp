@@ -42,6 +42,7 @@
 #include "gromacs/commandline/filenm.h"
 #include "gromacs/essentialdynamics/edsam.h"
 #include "gromacs/fileio/readinp.h"
+#include "gromacs/fileio/warninp.h"
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdtypes/commrec.h"
@@ -232,8 +233,9 @@ static void get_input(const char *membed_input, real *xy_fac, real *xy_max, real
     ITYPE ("maxwarn", *maxwarn, 0);
     ITYPE ("pieces", *pieces, 1);
     EETYPE("asymmetry", *bALLOW_ASYMMETRY, yesno_names);
-
+    check_warning_error(wi, FARGS);
     write_inpfile(membed_input, ninp, inp, FALSE, wi);
+    done_warning(wi, FARGS);
 }
 
 /* Obtain the maximum and minimum coordinates of the group to be embedded */
