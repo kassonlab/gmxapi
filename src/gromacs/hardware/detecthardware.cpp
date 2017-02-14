@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014,2015,2016, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015,2016,2017, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -140,8 +140,8 @@ static tMPI_Thread_mutex_t hw_info_lock = TMPI_THREAD_MUTEX_INITIALIZER;
 #define HOSTNAMELEN 80
 
 /* FW decl. */
-static int gmx_count_gpu_dev_unique(const gmx_gpu_info_t *gpu_info,
-                                    const gmx_gpu_opt_t  *gpu_opt);
+static size_t gmx_count_gpu_dev_unique(const gmx_gpu_info_t *gpu_info,
+                                       const gmx_gpu_opt_t  *gpu_opt);
 
 gmx_bool gmx_multiple_gpu_per_node_supported()
 {
@@ -227,14 +227,14 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
         }
         std::string gpuIdsString =
             formatAndJoin(gpuIdsInUse, ",", gmx::StringFormatter("%d"));
-        int         numGpusInUse = gmx_count_gpu_dev_unique(gpu_info, gpu_opt);
+        size_t      numGpusInUse = gmx_count_gpu_dev_unique(gpu_info, gpu_opt);
         bool        bPluralGpus  = numGpusInUse > 1;
 
         if (bPrintHostName)
         {
             output += gmx::formatString("On host %s ", host);
         }
-        output += gmx::formatString("%d GPU%s %sselected for this run.\n"
+        output += gmx::formatString("%zu GPU%s %sselected for this run.\n"
                                     "Mapping of GPU ID%s to the %d PP rank%s in this node: %s\n",
                                     numGpusInUse, bPluralGpus ? "s" : "",
                                     gpu_opt->bUserSet ? "user-" : "auto-",
@@ -334,7 +334,7 @@ void gmx_check_hw_runconf_consistency(const gmx::MDLogger &mdlog,
 
     /* GPU emulation detection is done later, but we need here as well
      * -- uncool, but there's no elegant workaround */
-    bEmulateGPU       = (getenv("GMX_EMULATE_GPU") != NULL);
+    bEmulateGPU       = (getenv("GMX_EMULATE_GPU") != nullptr);
 
     if (hwinfo->gpu_info.n_dev_compatible > 0)
     {
@@ -547,39 +547,19 @@ int gmx_count_gpu_dev_shared(const gmx_gpu_opt_t *gpu_opt)
  * GPU IDs, the number of GPUs user (per node) can be different from the
  * number of GPU IDs selected.
  */
-static int gmx_count_gpu_dev_unique(const gmx_gpu_info_t *gpu_info,
-                                    const gmx_gpu_opt_t  *gpu_opt)
+static size_t gmx_count_gpu_dev_unique(const gmx_gpu_info_t *gpu_info,
+                                       const gmx_gpu_opt_t  *gpu_opt)
 {
-    int  i, uniq_count, ngpu;
-    int *uniq_ids;
-
     GMX_RELEASE_ASSERT(gpu_info, "gpu_info must be a non-NULL pointer");
     GMX_RELEASE_ASSERT(gpu_opt, "gpu_opt must be a non-NULL pointer");
 
-    ngpu = gpu_info->n_dev;
-
-    uniq_count  = 0;
-
-    snew(uniq_ids, ngpu);
-
-    /* Each element in uniq_ids will be set to 0 or 1. The n-th element set
-     * to 1 indicates that the respective GPU was selected to be used. */
-    for (i = 0; i < gpu_opt->n_dev_use; i++)
+    std::set<int> uniqIds;
+    for (int i = 0; i < gpu_opt->n_dev_use; i++)
     {
-        int device_id;
-
-        device_id           = gmx_gpu_sharing_supported() ? get_gpu_device_id(gpu_info, gpu_opt, i) : i;
-        uniq_ids[device_id] = 1;
+        int deviceId = get_gpu_device_id(gpu_info, gpu_opt, i);
+        uniqIds.insert(deviceId);
     }
-    /* Count the devices used. */
-    for (i = 0; i < ngpu; i++)
-    {
-        uniq_count += uniq_ids[i];
-    }
-
-    sfree(uniq_ids);
-
-    return uniq_count;
+    return uniqIds.size();
 }
 
 static void gmx_detect_gpus(const gmx::MDLogger &mdlog, const t_commrec *cr)
@@ -958,14 +938,14 @@ gmx_hw_info_t *gmx_detect_hardware(const gmx::MDLogger &mdlog, const t_commrec *
         /* detect GPUs */
         hwinfo_g->gpu_info.n_dev            = 0;
         hwinfo_g->gpu_info.n_dev_compatible = 0;
-        hwinfo_g->gpu_info.gpu_dev          = NULL;
+        hwinfo_g->gpu_info.gpu_dev          = nullptr;
 
         /* Run the detection if the binary was compiled with GPU support
          * and we requested detection.
          */
         hwinfo_g->gpu_info.bDetectGPUs =
             (bGPUBinary && bDetectGPUs &&
-             getenv("GMX_DISABLE_GPU_DETECTION") == NULL);
+             getenv("GMX_DISABLE_GPU_DETECTION") == nullptr);
         if (hwinfo_g->gpu_info.bDetectGPUs)
         {
             gmx_detect_gpus(mdlog, cr);
@@ -1220,7 +1200,7 @@ void gmx_print_detected_hardware(FILE *fplog, const t_commrec *cr,
 {
     const gmx::CpuInfo &cpuInfo = *hwinfo_g->cpuInfo;
 
-    if (fplog != NULL)
+    if (fplog != nullptr)
     {
         std::string detected;
 
@@ -1275,24 +1255,24 @@ void gmx_parse_gpu_ids(gmx_gpu_opt_t *gpu_opt)
 {
     char *env;
 
-    if (gpu_opt->gpu_id != NULL && !bGPUBinary)
+    if (gpu_opt->gpu_id != nullptr && !bGPUBinary)
     {
         gmx_fatal(FARGS, "GPU ID string set, but %s was compiled without GPU support!",
                   gmx::getProgramContext().displayName());
     }
 
     env = getenv("GMX_GPU_ID");
-    if (env != NULL && gpu_opt->gpu_id != NULL)
+    if (env != nullptr && gpu_opt->gpu_id != nullptr)
     {
         gmx_fatal(FARGS, "GMX_GPU_ID and -gpu_id can not be used at the same time");
     }
-    if (env == NULL)
+    if (env == nullptr)
     {
         env = gpu_opt->gpu_id;
     }
 
     /* parse GPU IDs if the user passed any */
-    if (env != NULL)
+    if (env != nullptr)
     {
         /* Parse a "plain" or comma-separated GPU ID string which contains a
          * sequence of digits corresponding to GPU IDs; the order will
