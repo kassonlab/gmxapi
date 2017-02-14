@@ -1,3 +1,6 @@
 [submodule "wiki"]
 	path = wiki
 	url = git@bitbucket.org:kassonlab/gromacs_api.git/wiki
+[submodule "src/external/pybind11"]
+	path = src/external/pybind11
+	url = https://github.com/pybind/pybind11
