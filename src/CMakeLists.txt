@@ -64,3 +64,6 @@ add_subdirectory(programs)
 if (NOT GMX_FAHCORE)
     add_subdirectory(contrib)
 endif()
+
+add_subdirectory(external/pybind11)
+add_subdirectory(python)
