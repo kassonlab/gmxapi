@@ -10,7 +10,8 @@ PYBIND11_PLUGIN(pygmx) {
     // Declare classes
     py::class_<pygmx::TrajectoryFrame>(m, "TrajectoryFrame")
         .def(py::init<const gmx_trr_header_t&>())
-        .def_property_readonly("box", &pygmx::TrajectoryFrame::box, "box matrix");
+        //.def("box", &pygmx::TrajectoryFrame::box, "box matrix");
+        .def("position", &pygmx::TrajectoryFrame::x_size, "position");
     py::class_<pygmx::Trajectory>(m, "Trajectory")
         .def(py::init<const std::string &>())
         .def("dump", &pygmx::Trajectory::dump, "Dump trajectory")

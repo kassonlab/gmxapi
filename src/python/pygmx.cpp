@@ -22,7 +22,7 @@ TrajectoryFrame::TrajectoryFrame(const gmx_trr_header_t& trrheader) :
     time_{trrheader.t},
     lambda_{trrheader.lambda},
     fep_state_{trrheader.fep_state},
-    box_{},
+    box_{{0,0,0},{0,0,0},{0,0,0}},
     position_{nullptr},
     velocity_{nullptr},
     force_{nullptr}
@@ -83,7 +83,32 @@ std::unique_ptr< TrajectoryFrame > Trajectory::nextFrame() noexcept(false)
 #else
         std::unique_ptr<TrajectoryFrame> frame(new TrajectoryFrame(trrheader));
 #endif
-
+        rvec* position{nullptr};
+        rvec* velocity{nullptr};
+        rvec* force{nullptr};
+        static_assert(sizeof(rvec) == sizeof(*frame->position_->data()), "wrong size\n");
+        if (trrheader.x_size)
+        {
+            position = reinterpret_cast<rvec(*)>(frame->position_->data());
+            //position_ = std::make_shared< vecvec >(trrheader.natoms);
+        }
+        if (trrheader.v_size)
+        {
+            velocity = reinterpret_cast<rvec(*)>(frame->velocity_->data());
+            //velocity_ = std::make_shared< vecvec >(trrheader.natoms);
+        }
+        if (trrheader.f_size)
+        {
+            force = reinterpret_cast<rvec(*)>(frame->force_->data());
+            //force_ = std::make_shared< vecvec >(trrheader.natoms);
+        }
+        if (gmx_trr_read_frame_data(fpread_,
+                                    &trrheader,
+                                    reinterpret_cast<rvec(*)>(frame->box_),
+                                    position,
+                                    velocity,
+                                    force) )
+/*
         // gmx_trr_read_frame_data calls do_trr_frame, which calls
         // do_trr_frame_header and do_trr_frame_data, which use stderr, etc.,
         // and use various gmx_fio_... macros
@@ -93,7 +118,7 @@ std::unique_ptr< TrajectoryFrame > Trajectory::nextFrame() noexcept(false)
                                     reinterpret_cast<rvec(*)>(frame->position_->data()),
                                     reinterpret_cast<rvec(*)>(frame->velocity_->data()),
                                     reinterpret_cast<rvec(*)>(frame->force_->data()) ))
-        {
+*/        {
             //natoms_ = trrheader.natoms;
             //step_ = trrheader.step;
             //time_ = trrheader.t;

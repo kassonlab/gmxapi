@@ -87,7 +87,7 @@ public:
 
     unsigned int natoms() const { return natoms_; };
 
-    auto box() const { return box_; };
+    //auto box() { return Matrix(box); };
     auto position() {return position_;};
     auto velocity() {return velocity_;};
     auto force() {return force_;};
@@ -106,7 +106,7 @@ private:
     const real        lambda_;    //!< Current value of lambda
     const int         fep_state_; //!< Current value of alchemical state
 
-    std::array< std::array<real, 3>, 3 >      box_;
+    real      box_[3][3];
     std::shared_ptr< vecvec > position_;
     std::shared_ptr< vecvec > velocity_;
     std::shared_ptr< vecvec > force_;
