@@ -72,6 +72,7 @@ std::unique_ptr< TrajectoryFrame > Trajectory::nextFrame() noexcept(false)
 {
     gmx_trr_header_t trrheader;
 
+    // calls do_trr_frame_header which prints with cstdio
     if (gmx_trr_read_frame_header(fpread_, &trrheader, &bOK_))
     {
         // we will return a pointer to a new frame if even a partial
@@ -82,12 +83,16 @@ std::unique_ptr< TrajectoryFrame > Trajectory::nextFrame() noexcept(false)
 #else
         std::unique_ptr<TrajectoryFrame> frame(new TrajectoryFrame(trrheader));
 #endif
+
+        // gmx_trr_read_frame_data calls do_trr_frame, which calls
+        // do_trr_frame_header and do_trr_frame_data, which use stderr, etc.,
+        // and use various gmx_fio_... macros
         if (gmx_trr_read_frame_data(fpread_,
                                     &trrheader,
-                                    (rvec(*))frame->box_.data(),
-                                    (rvec(*))frame->position_->data(),
-                                    (rvec(*))frame->velocity_->data(),
-                                    (rvec(*))frame->force_->data() ))
+                                    reinterpret_cast<rvec(*)>(frame->box_.data()),
+                                    reinterpret_cast<rvec(*)>(frame->position_->data()),
+                                    reinterpret_cast<rvec(*)>(frame->velocity_->data()),
+                                    reinterpret_cast<rvec(*)>(frame->force_->data()) ))
         {
             //natoms_ = trrheader.natoms;
             //step_ = trrheader.step;
