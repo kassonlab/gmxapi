@@ -16,80 +16,44 @@
 namespace pygmx
 {
 
-int version()
+TrajectoryFrame::TrajectoryFrame(const gmx_trr_header_t& trrheader) :
+    natoms_{trrheader.natoms},
+    step_{trrheader.step},
+    time_{trrheader.t},
+    lambda_{trrheader.lambda},
+    fep_state_{trrheader.fep_state},
+    box_{},
+    position_{nullptr},
+    velocity_{nullptr},
+    force_{nullptr}
 {
-    return int(gmx_version);
+    // We want to allocate new memory if data is available
+    // because the arrays will be wrapped in a Frame object
+    // and returned. Otherwise, do_trr_frame_data won't do
+    // anything with the pointer passed, but we shouldn't rely
+    // on those semantics and the behavior of gmx_trr_read_frame_header
+    // is unspecified.
+    // TODO: don't rely on unspecified semantics
+    if (trrheader.x_size)
+    {
+        position_ = std::make_shared< vecvec >(trrheader.natoms);
+    }
+    if (trrheader.v_size)
+    {
+        velocity_ = std::make_shared< vecvec >(trrheader.natoms);
+    }
+    if (trrheader.f_size)
+    {
+        force_ = std::make_shared< vecvec >(trrheader.natoms);
+    }
 }
 
-// Only implements trr reading
-// list_trr() is hidden in file scope of dump.cpp
-void list_trx(const std::string& fn)
-{
-    t_fileio          *fpread;
-    int               nframe, indent;
-    char              buf[256];
-    rvec              *x, *v, *f;
-    matrix            box;
-    gmx_trr_header_t  trrheader;
-    gmx_bool          bOK;
+TrajectoryFrame::~TrajectoryFrame()
+{}
 
-    fpread  = gmx_trr_open(fn.c_str(), "r");
-
-    nframe = 0;
-    while (gmx_trr_read_frame_header(fpread, &trrheader, &bOK))
-    {
-        snew(x, trrheader.natoms);
-        snew(v, trrheader.natoms);
-        snew(f, trrheader.natoms);
-        // Need to look at ...read_frame_data to see what a frame object should look like
-        if (gmx_trr_read_frame_data(fpread, &trrheader,
-                                    trrheader.box_size ? box : nullptr,
-                                    trrheader.x_size   ? x : nullptr,
-                                    trrheader.v_size   ? v : nullptr,
-                                    trrheader.f_size   ? f : nullptr))
-        {
-            sprintf(buf, "%s frame %d", fn.c_str(), nframe);
-            indent = 0;
-            indent = pr_title(stdout, indent, buf);
-            pr_indent(stdout, indent);
-            fprintf(stdout, "natoms=%10d  step=%10" GMX_PRId64 "  time=%12.7e  lambda=%10g\n",
-                    trrheader.natoms, trrheader.step, trrheader.t, trrheader.lambda);
-            if (trrheader.box_size)
-            {
-                pr_rvecs(stdout, indent, "box", box, DIM);
-            }
-            if (trrheader.x_size)
-            {
-                pr_rvecs(stdout, indent, "x", x, trrheader.natoms);
-            }
-            if (trrheader.v_size)
-            {
-                pr_rvecs(stdout, indent, "v", v, trrheader.natoms);
-            }
-            if (trrheader.f_size)
-            {
-                pr_rvecs(stdout, indent, "f", f, trrheader.natoms);
-            }
-        }
-        else
-        {
-            fprintf(stderr, "\nWARNING: Incomplete frame: nr %d, t=%g\n",
-                    nframe, trrheader.t);
-        }
-
-        sfree(x);
-        sfree(v);
-        sfree(f);
-        nframe++;
-    }
-    if (!bOK)
-    {
-        fprintf(stderr, "\nWARNING: Incomplete frame header: nr %d, t=%g\n",
-                nframe, trrheader.t);
-    }
-    gmx_trr_close(fpread);
-}
-
+/*! \brief Construct from filename
+ * \param filename unicode string
+ */
 Trajectory::Trajectory(const std::string& filename) :
     filename_{filename},
     nframe_{0},
@@ -103,51 +67,97 @@ Trajectory::~Trajectory()
     gmx_trr_close(fpread_);
 }
 
+// gmx::RVec version of rvec is a typedef for gmx::BasicVector< real >
+std::unique_ptr< TrajectoryFrame > Trajectory::nextFrame() noexcept(false)
+{
+    gmx_trr_header_t trrheader;
+
+    if (gmx_trr_read_frame_header(fpread_, &trrheader, &bOK_))
+    {
+        // we will return a pointer to a new frame if even a partial
+        // frame exists or nullptr if not
+        // Note: std::make_unique is available in C++14 but not C++11
+#ifdef __cpp_lib_make_unique
+        auto frame = std::make_unique<TrajectoryFrame>(trrheader);
+#else
+        std::unique_ptr<TrajectoryFrame> frame(new TrajectoryFrame(trrheader));
+#endif
+        if (gmx_trr_read_frame_data(fpread_,
+                                    &trrheader,
+                                    (rvec(*))frame->box_.data(),
+                                    (rvec(*))frame->position_->data(),
+                                    (rvec(*))frame->velocity_->data(),
+                                    (rvec(*))frame->force_->data() ))
+        {
+            //natoms_ = trrheader.natoms;
+            //step_ = trrheader.step;
+            //time_ = trrheader.t;
+            //lambda_ = trrheader.lambda;
+        }
+        else
+        {
+            //error: "\nWARNING: Incomplete frame: nr %d, t=%g\n",
+            //        nframe_, trrheader.t
+        }
+
+        return frame;
+    }
+    else
+    {
+        // error: "\nWARNING: Incomplete frame header: nr %d, t=%g\n",
+        //        nframe_, trrheader.t)
+        return nullptr;
+    }
+}
+
 // can only dump once
+// Only implements trr reading
+// list_trr() is hidden in file scope of dump.cpp
 void Trajectory::dump()
 {
     int indent(0);
     char buf[256];
+    gmx_trr_header_t trrheader;
     nframe_ = 0;
-    while (gmx_trr_read_frame_header(fpread_, &trrheader_, &bOK_))
+    while (gmx_trr_read_frame_header(fpread_, &trrheader, &bOK_))
     {
-        snew(x_, trrheader_.natoms);
-        snew(v_, trrheader_.natoms);
-        snew(f_, trrheader_.natoms);
+        snew(x_, trrheader.natoms);
+        snew(v_, trrheader.natoms);
+        snew(f_, trrheader.natoms);
         // Need to look at ...read_frame_data to see what a frame object should look like
-        if (gmx_trr_read_frame_data(fpread_, &trrheader_,
-                                    trrheader_.box_size ? box_ : nullptr,
-                                    trrheader_.x_size   ? x_ : nullptr,
-                                    trrheader_.v_size   ? v_ : nullptr,
-                                    trrheader_.f_size   ? f_ : nullptr))
+        if (gmx_trr_read_frame_data(fpread_, &trrheader,
+                                    trrheader.box_size ? box_ : nullptr,
+                                    trrheader.x_size   ? x_ : nullptr,
+                                    trrheader.v_size   ? v_ : nullptr,
+                                    trrheader.f_size   ? f_ : nullptr))
         {
             sprintf(buf, "%s frame %d", filename_.c_str(), nframe_);
             indent = 0;
             indent = pr_title(stdout, indent, buf);
             pr_indent(stdout, indent);
             fprintf(stdout, "natoms=%10d  step=%10" GMX_PRId64 "  time=%12.7e  lambda=%10g\n",
-                    trrheader_.natoms, trrheader_.step, trrheader_.t, trrheader_.lambda);
-            if (trrheader_.box_size)
+                    trrheader.natoms, trrheader.step, trrheader.t, trrheader.lambda);
+            if (trrheader.box_size)
             {
                 pr_rvecs(stdout, indent, "box", box_, DIM);
             }
-            if (trrheader_.x_size)
+            if (trrheader.x_size)
             {
-                pr_rvecs(stdout, indent, "x", x_, trrheader_.natoms);
+                pr_rvecs(stdout, indent, "x", x_, trrheader.natoms);
             }
-            if (trrheader_.v_size)
+            if (trrheader.v_size)
             {
-                pr_rvecs(stdout, indent, "v", v_, trrheader_.natoms);
+                pr_rvecs(stdout, indent, "v", v_, trrheader.natoms);
             }
-            if (trrheader_.f_size)
+            if (trrheader.f_size)
             {
-                pr_rvecs(stdout, indent, "f", f_, trrheader_.natoms);
+                pr_rvecs(stdout, indent, "f", f_, trrheader.natoms);
             }
         }
         else
         {
             fprintf(stderr, "\nWARNING: Incomplete frame: nr %d, t=%g\n",
-                    nframe_, trrheader_.t);
+                    nframe_, trrheader.t);
         }
 
         sfree(x_);
@@ -158,7 +168,7 @@ void Trajectory::dump()
     if (!bOK_)
     {
         fprintf(stderr, "\nWARNING: Incomplete frame header: nr %d, t=%g\n",
-                nframe_, trrheader_.t);
+                nframe_, trrheader.t);
     }
 }
 
