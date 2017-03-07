@@ -36,15 +36,15 @@ TrajectoryFrame::TrajectoryFrame(const gmx_trr_header_t& trrheader) :
     // TODO: don't rely on unspecified semantics
     if (trrheader.x_size)
     {
-        position_ = std::make_shared< vecvec >(trrheader.natoms);
+        position_ = std::make_shared< TrajDataArray<real, 3> >(trrheader.natoms);
     }
     if (trrheader.v_size)
     {
-        velocity_ = std::make_shared< vecvec >(trrheader.natoms);
+        velocity_ = std::make_shared< TrajDataArray<real, 3> >(trrheader.natoms);
     }
     if (trrheader.f_size)
     {
-        force_ = std::make_shared< vecvec >(trrheader.natoms);
+        force_ = std::make_shared< TrajDataArray<real, 3> >(trrheader.natoms);
     }
 }
 
@@ -86,25 +86,25 @@ std::unique_ptr< TrajectoryFrame > Trajectory::nextFrame() noexcept(false)
         rvec* position{nullptr};
         rvec* velocity{nullptr};
         rvec* force{nullptr};
-        static_assert(sizeof(rvec) == sizeof(*frame->position_->data()), "wrong size\n");
+
         if (trrheader.x_size)
         {
-            position = reinterpret_cast<rvec(*)>(frame->position_->data());
+            position = reinterpret_cast<rvec(*)>(frame->position()->data());
             //position_ = std::make_shared< vecvec >(trrheader.natoms);
         }
         if (trrheader.v_size)
         {
-            velocity = reinterpret_cast<rvec(*)>(frame->velocity_->data());
+            velocity = reinterpret_cast<rvec(*)>(frame->velocity()->data());
             //velocity_ = std::make_shared< vecvec >(trrheader.natoms);
         }
         if (trrheader.f_size)
         {
-            force = reinterpret_cast<rvec(*)>(frame->force_->data());
+            force = reinterpret_cast<rvec(*)>(frame->force()->data());
             //force_ = std::make_shared< vecvec >(trrheader.natoms);
         }
         if (gmx_trr_read_frame_data(fpread_,
                                     &trrheader,
-                                    reinterpret_cast<rvec(*)>(frame->box_),
+                                    reinterpret_cast<rvec(*)>(frame->box()),
                                     position,
                                     velocity,
                                     force) )

@@ -41,6 +41,41 @@ const auto gmx_version{GMX_VERSION};
      return int(gmx_version);
  }
 
+/// Wrapper for flat data structure
+template<typename Scalar, size_t D>
+class TrajDataArray
+{
+public:
+    // Create empty container
+    TrajDataArray() :
+        data_{}
+    {};
+
+    // Allocate space for an NxD array
+    TrajDataArray(size_t N) :
+        data_(N*D)
+    {};
+
+    // Copy from raw data pointer.
+    TrajDataArray(Scalar* data, size_t N) :
+        data_(data, data + N*D)
+    {
+    };
+
+    // Move constructor
+    //TrajDataArray(TrajDataArray&& )
+
+    // The destructor cannot deallocate the memory pointed to.
+    ~TrajDataArray() {};
+
+    auto dim() const { return D; };
+    auto N() const { return data_.size(); };
+    Scalar* data() { return data_.data(); };
+
+private:
+    std::vector<Scalar> data_; // Flat
+};
+
 class TrajectoryFrame;
 
 class Trajectory
@@ -74,7 +109,8 @@ private:
 class TrajectoryFrame
 {
 public:
-    typedef std::vector< std::array<real, 3> > vecvec;
+    // I hope we can either move to Eigen or (from CUDA) vector<float3> for these.
+    //typedef std::vector< std::array<real, 3> > vecvec;
     // Let's make sure we allocate memory during construction
     TrajectoryFrame() = delete;
 
@@ -87,19 +123,19 @@ public:
 
     unsigned int natoms() const { return natoms_; };
 
-    //auto box() { return Matrix(box); };
+    auto box() { return &box_[0]; };
     auto position() {return position_;};
     auto velocity() {return velocity_;};
     auto force() {return force_;};
-    unsigned int x_size() const { return position_->size(); };
-    unsigned int v_size() const { return velocity_->size(); };
-    unsigned int f_size() const { return force_->size(); };
+    //unsigned int x_size() const { return position_->size(); };
+    //unsigned int v_size() const { return velocity_->size(); };
+    //unsigned int f_size() const { return force_->size(); };
     gmx_int64_t step() const { return step_; };
     real time() const { return time_; };
     real lambda() const { return lambda_; };
     int fep_state() const { return fep_state_; }
 private:
-    friend std::unique_ptr< TrajectoryFrame > Trajectory::nextFrame() noexcept(false);
+    //friend std::unique_ptr< TrajectoryFrame > Trajectory::nextFrame() noexcept(false);
     const int         natoms_;    //!< The total number of atoms
     const gmx_int64_t step_;      //!< Current step number
     const real        time_;         //!< Current time
@@ -107,9 +143,9 @@ private:
     const int         fep_state_; //!< Current value of alchemical state
 
     real      box_[3][3];
-    std::shared_ptr< vecvec > position_;
-    std::shared_ptr< vecvec > velocity_;
-    std::shared_ptr< vecvec > force_;
+    std::shared_ptr< TrajDataArray<real, 3> > position_;
+    std::shared_ptr< TrajDataArray<real, 3> > velocity_;
+    std::shared_ptr< TrajDataArray<real, 3> > force_;
 };
 
 } // end pygmx
