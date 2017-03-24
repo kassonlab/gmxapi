@@ -7,6 +7,8 @@
 #ifndef PYGMX_CORE_H
 #define PYGMX_CORE_H
 
+#include <memory>
+#include "gromacs/trajectoryanalysis/analysismodule.h"
 #include "gromacs/trajectoryanalysis/runner.h"
 
 namespace gmx
@@ -23,18 +25,11 @@ namespace pyapi
 class PyRunner : public gmx::trajectoryanalysis::Runner
 {
 public:
-    /*
     /// Empty constructor not yet used.
     PyRunner() = delete;
-    */
 
-    /// Empty constructor used for testing.
-    PyRunner();
-
-    /*
     /// Construct runner with a single bound module.
-    PyRunner(std::shared_ptr<gmx::TrajectoryAnalysisModule>);
-    */
+    PyRunner(std::shared_ptr<gmx::TrajectoryAnalysisModule> module);
 
     virtual ~PyRunner();
 
