@@ -22,7 +22,7 @@ namespace pyapi
  *
  * Exported to Python as gmx.core.TafRunner
  */
-class PyRunner : public gmx::trajectoryanalysis::Runner
+class PyRunner
 {
 public:
     /// Empty constructor not yet used.
@@ -38,9 +38,14 @@ public:
      * Returns when data dependencies on the next trajectory frame have been
      * satisfied.
      */
-    void next();
-private:
+    bool next();
 
+private:
+    /// has a common runner for most behavior
+    gmx::trajectoryanalysis::Runner runner_;
+
+    /// binds to one analysis module
+    std::shared_ptr<gmx::TrajectoryAnalysisModule> module_;
 };
 
 // class CachingTafModule;

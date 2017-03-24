@@ -42,13 +42,90 @@
 #ifndef GMX_TRAJECTORYANALYSIS_RUNNER_H
 #define GMX_TRAJECTORYANALYSIS_RUNNER_H
 
+#include "gromacs/trajectoryanalysis/analysissettings.h"
+#include "gromacs/trajectoryanalysis/runnercommon.h"
+#include "gromacs/selection/selectioncollection.h"
+
 namespace gmx
 {
+
 namespace trajectoryanalysis
 {
+using gmx::TrajectoryAnalysisModule;
 
+/*! \brief Generic runner for modules in Trajectory Analysis Framework
+ *
+ * The protocol described in the Trajectory Analysis Framework for a runner to
+ * drive analysis tools is not implemented generically and publicly for runner
+ * classes to use.
+ *
+ * The ultimate goal of this class is to provide a base behavior class for
+ * a runner implementing the protocol described in the Trajectory Analysis
+ * Framework to drive an analysis tool chain. The command-line runner and
+ * command-line analysis tool template can use the common behavior in this
+ * class. It is intended to incorporate behavior of the RunnerModule class (defined in an
+ * anonymous namespace in gromacs/trajectoryanalysis/cmdlinerunner.cpp)
+ * into a possible replacement for TrajectoryAnalysisRunnerCommon, which will
+ * initially simply be used.
+ *
+ * First revision handles only a single module and no parallelism.
+ *
+ * Implements the Trajectory Analysis Framework protocol to run analysis modules
+ * derived from gmx::TrajectoryAnalysisModule, registered with add_module().
+ *
+ * Usage: The runner is constructed, a module bound, the runner initialized with
+ * options, and then the user may either call next() to step one input frame or
+ * run() to process all remaining input. The analysis is finalized when the
+ * runner is destroyed, releasing the module(s).
+ *
+ * Runner objects are not assignable or copyable.
+ *
+ * Example:
+ *
+ *    # Assume Module is a class derived from TrajectoryAnalysisModule
+ *    auto mymodule = std::make_shared<Module>(Module());
+ *    auto runner = Runner();
+ *    runner.add_module(mymodule);
+ *    runner.initialize(options);
+ *    runner.next();
+ *    int frame_number = runner.next();
+ *    runner.run();
+ *    del runner;
+ *    do_something(mymodule);
+ *    del mymodule;
+ */
 class Runner
 {
+public:
+    Runner();
+    virtual ~Runner();
+
+    Runner(const Runner& runner) = delete;
+    Runner& operator=(const Runner& runner) = delete;
+
+    //void initialize();
+    std::shared_ptr<TrajectoryAnalysisModule> add_module(std::shared_ptr<TrajectoryAnalysisModule> module);
+
+    /// Advance one frame
+    unsigned int next();
+
+    /// Process all remaining available frames
+    int run();
+
+private:
+    std::shared_ptr<TrajectoryAnalysisModule> module_;
+    TrajectoryAnalysisSettings settings_;
+    TrajectoryAnalysisRunnerCommon common_;
+    SelectionCollection selections_;
+
+    // data object returned by module_->startFrames()
+    std::unique_ptr<TrajectoryAnalysisModuleData> pdata_;
+
+    /// Number of frames processed
+    unsigned int nframes_;
+    /// True if modules have been initialized and first frame read.
+    bool is_initialized_; // TODO: more complete taf_state enum
+    // Actual state machine can be hidden in implementation class.
 };
 
 } // end namespace trajectoryanalysis

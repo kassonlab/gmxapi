@@ -37,6 +37,7 @@
 #include "trajectoryframe.h"
 
 #include <cstdio>
+#include <memory>
 
 #include <algorithm>
 
@@ -104,4 +105,44 @@ void done_frame(t_trxframe *frame)
     sfree(frame->x);
     sfree(frame->v);
     sfree(frame->f);
+}
+
+std::shared_ptr<t_trxframe> trxframe_copy(const t_trxframe& frame)
+{
+    // Copy construct the trajectory frame struct.
+    // std::make_unique not available until C++14
+    auto frame_copy = std::make_shared<t_trxframe>(frame);
+
+    // Allocate memory and copy the available member arrays.
+    // Allow for addition of non-default copy constructor with
+    // deep copy.
+    // Note that struct t_trxframe definition is in trajectoryframe.h and there is no other documented interface to member data
+    if (frame.x && frame.x != frame_copy->x)
+    {
+        snew(frame_copy->x, frame.natoms);
+        for (auto i(0); i < frame.natoms; ++i)
+        {
+            std::copy(std::begin(frame.x[i]), std::end(frame.x[i]), frame_copy->x[i]);
+//            frame_copy->f[i] = frame.f[i];
+        }
+    }
+    if (frame.v && frame.v != frame_copy->v)
+    {
+        snew(frame_copy->v, frame.natoms);
+        for (auto i(0); i < frame.natoms; ++i)
+        {
+            std::copy(std::begin(frame.v[i]), std::end(frame.v[i]), frame_copy->v[i]);
+        }
+    }
+    if (frame.f && frame.f != frame_copy->f)
+    {
+        snew(frame_copy->f, frame.natoms);
+        for (auto i(0); i < frame.natoms; ++i)
+        {
+            std::copy(std::begin(frame.f[i]), std::end(frame.f[i]), frame_copy->f[i]);
+        }
+    }
+    // TODO: this is not a complete copy...
+
+    return frame_copy;
 }

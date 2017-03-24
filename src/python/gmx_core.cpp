@@ -18,10 +18,19 @@ namespace gmx
 namespace pyapi
 {
 
-PyRunner::PyRunner(std::shared_ptr<gmx::TrajectoryAnalysisModule> module) {}
+PyRunner::PyRunner(std::shared_ptr<gmx::TrajectoryAnalysisModule> module) :
+    runner_(),
+    module_(module)
+{
+    runner_.add_module(module_);
+}
+
 PyRunner::~PyRunner() {}
 
-void PyRunner::next() {}
+bool PyRunner::next()
+{
+    return runner_.next();
+}
 
 } // end namespace pyapi
 } // end namespace gmx
