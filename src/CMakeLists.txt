@@ -65,5 +65,6 @@ if (NOT GMX_FAHCORE)
     add_subdirectory(contrib)
 endif()
 
+find_package(PythonInterp REQUIRED)
 add_subdirectory(external/pybind11)
 add_subdirectory(python)
