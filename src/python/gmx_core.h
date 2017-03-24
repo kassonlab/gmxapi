@@ -2,11 +2,18 @@
 /*! \internal \file
  * \brief Declares symbols to be exported to gmx.core Python module.
  *
+ * Declares namespace gmx::pyapi
  */
 #ifndef PYGMX_CORE_H
 #define PYGMX_CORE_H
 
-namespace pygmx
+#include "gromacs/trajectoryanalysis/runner.h"
+
+namespace gmx
+{
+/*! \brief API wrappers for Python bindings
+ */
+namespace pyapi
 {
 
 /*! \brief Wraps Trajectory Analyis Runner for Python interface.
@@ -43,6 +50,7 @@ private:
 
 // class CachingTafModule;
 
-} // end namespace pygmx
+} // end namespace pyapi
+} // end namespace gmx
 
 #endif // PYGMX_CORE_H

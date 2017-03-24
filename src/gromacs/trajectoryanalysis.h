@@ -273,6 +273,8 @@
  * \brief
  * Public API convenience header for trajectory analysis framework
  *
+ * Declares gmx::trajectoryanalysis namespace
+ *
  * \author Teemu Murtola <teemu.murtola@gmail.com>
  * \inpublicapi
  * \ingroup module_trajectoryanalysis
@@ -291,5 +293,18 @@
 #include "gromacs/trajectoryanalysis/cmdlinerunner.h"
 #include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/exceptions.h"
+
+namespace gmx
+{
+/*! \brief Trajectory Analysis Framework
+ *
+ * Contains runners, modules, and data structures
+ * \ingroup module_trajectoryanalysis
+ */
+namespace trajectoryanalysis
+{
+
+} // end namespace trajectoryanalysis
+} // end namespace gmx
 
 #endif
