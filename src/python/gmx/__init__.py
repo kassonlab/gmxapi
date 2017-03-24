@@ -41,4 +41,5 @@
 #    for frame in mytraj.select(...):
 #        # do some other stuff
 
-import gmx.io
+import io
+import core

@@ -9,6 +9,8 @@
 // TODO: Tell doxygen to suggest quotes instead of angle brackets for headers.
 #include "gromacs/trajectoryanalysis/runner.h"
 #include "gromacs/trajectoryanalysis/analysismodule.h"
+#include "gromacs/trajectoryanalysis/modules/caching.h"
+
 #include "pybind11/pybind11.h"
 
 namespace gmx
@@ -45,12 +47,13 @@ PYBIND11_PLUGIN(core) {
         //.def("initialize")
         .def("next", &gmx::pyapi::PyRunner::next, "Advance the current frame one step.");
 
+    py::class_< gmx::trajectoryanalysis::CachingTafModule >(m, "CachingTafModule")
+        .def(py::init())
+        .def("frame", &gmx::trajectoryanalysis::CachingTafModule::frame, "Retrieve cached trajectory frame.");
 /*
     py::class_< gmx::Options >(m, "Options")
         .def(py::init<>()); // Need to figure out options passing...
 
-    py::class_< gmx::trajectoryanalysis::CachingTafModule >(m, "CachingTafModule")
-        .def("frame");
 
     py::class_< gmx::Selection >(m, "Selection");
 */

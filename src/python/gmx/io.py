@@ -1,5 +1,6 @@
 # provide the high-level interface to the trajectory module in the gmx package.
 
+# TODO: fix namespace polution
 import gmx.core
 
 class TrajectoryFile:
