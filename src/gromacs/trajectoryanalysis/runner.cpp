@@ -42,9 +42,12 @@
 #include "gromacs/trajectoryanalysis/runner.h"
 
 #include "gromacs/trajectoryanalysis/analysismodule.h"
-//#include "gromacs/trajectoryanalysis/analysissettings.h"
-//#include "gromacs/trajectoryanalysis/runnercommon.h"
-//#include "gromacs/selection/selectioncollection.h"
+#include "gromacs/trajectoryanalysis/analysissettings.h"
+#include "gromacs/trajectoryanalysis/runnercommon.h"
+#include "gromacs/selection/selectioncollection.h"
+#include "gromacs/analysisdata/paralleloptions.h"
+#include "gromacs/trajectory/trajectoryframe.h"
+#include "gromacs/pbcutil/pbc.h"
 
 namespace gmx
 {
@@ -54,13 +57,13 @@ namespace trajectoryanalysis
 using gmx::TrajectoryAnalysisModule;
 
 Runner::Runner() :
-    module_(nullptr),
-    settings_(),
-    common_(&settings_),
-    selections_(),
-    pdata_(nullptr),
-    nframes_(0),
-    is_initialized_(false)
+    module_{nullptr},
+    settings_{},
+    common_{&settings_},
+    selections_{},
+    pdata_{nullptr},
+    nframes_{0},
+    is_initialized_{false}
 {}
 
 Runner::~Runner()
@@ -69,7 +72,7 @@ Runner::~Runner()
 // The Runner will share ownership of the module argument.
 // TODO: clarify requirements and behavior for order of invocation of add_module()
 // and initialize()
-std::shared_ptr<TrajectoryAnalysisModule> Runner::add_module(std::shared_ptr<TrajectoryAnalysisModule> module)
+gmx::TrajectoryAnalysisModuleSharedPointer Runner::add_module(gmx::TrajectoryAnalysisModuleSharedPointer module)
 {
     if (is_initialized_)
     {
@@ -96,17 +99,17 @@ void Runner::initialize()
     common_.initFrameIndexGroup();
     module_->initAfterFirstFrame(settings_, common_.frame());
 
-    // Nothing seems to use this object and it is only the size of an int, so
+    // Nothing seems to use the AnalysisDataParallelOptions object and it is only the size of an int, so
     // I don't know why it is passed const ref all over the place...
     AnalysisDataParallelOptions dataOptions;
-    pdata_.swap(module_->startFrames(std::move(dataOptions), selections_));
+    pdata_ = decltype(pdata_)(module_->startFrames(std::move(dataOptions), selections_));
 
     is_initialized_ = true;
 }
 
 bool Runner::next()
 {
-    if (!is_initialized)
+    if (!is_initialized_)
     {
         // Can't run if not initialized...
         // TODO: raise exception.
@@ -119,15 +122,19 @@ bool Runner::next()
 
     const TopologyInformation &topology = common_.topologyInformation();
 
-    std::unique_ptr<t_pbc> ppbc_();
+    std::unique_ptr<t_pbc> ppbc_{nullptr};
     if (settings_.hasPBC())
     {
-        set_pbc(ppbc_, topology.ePBC(), frame.box);
+        t_pbc* pbc{nullptr};
+        set_pbc(pbc, topology.ePBC(), frame.box);
+        // Take ownership of any memory now pointed to by pbc
+        ppbc_ = std::unique_ptr<t_pbc>(pbc);
     }
+
 
     // TODO: convert the next two functions not to need non-const pointers to t_pbc
     selections_.evaluate(&frame, ppbc_.get());
-    module_->analyzeFrame(nframes_, frame, ppbc_.get(), pdata.get());
+    module_->analyzeFrame(nframes_, frame, ppbc_.get(), pdata_.get());
     module_->finishFrameSerial(nframes_);
 
     ++nframes_;
@@ -144,7 +151,7 @@ bool Runner::next()
     }
 }
 
-int run()
+int Runner::run()
 {
     while(next())
     {

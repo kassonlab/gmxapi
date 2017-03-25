@@ -42,6 +42,7 @@
 #ifndef GMX_TRAJECTORYANALYSIS_RUNNER_H
 #define GMX_TRAJECTORYANALYSIS_RUNNER_H
 
+#include "gromacs/trajectoryanalysis/analysismodule.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
 #include "gromacs/trajectoryanalysis/runnercommon.h"
 #include "gromacs/selection/selectioncollection.h"
@@ -51,7 +52,9 @@ namespace gmx
 
 namespace trajectoryanalysis
 {
-using gmx::TrajectoryAnalysisModule;
+//using gmx::TrajectoryAnalysisModule;
+// Force symbol availability
+//template class std::shared_ptr<gmx::TrajectoryAnalysisModule>;
 
 /*! \brief Generic runner for modules in Trajectory Analysis Framework
  *
@@ -103,17 +106,17 @@ public:
     Runner(const Runner& runner) = delete;
     Runner& operator=(const Runner& runner) = delete;
 
-    //void initialize();
-    std::shared_ptr<TrajectoryAnalysisModule> add_module(std::shared_ptr<TrajectoryAnalysisModule> module);
+    void initialize();
+    gmx::TrajectoryAnalysisModuleSharedPointer add_module(gmx::TrajectoryAnalysisModuleSharedPointer module);
 
     /// Advance one frame
-    unsigned int next();
+    bool next();
 
     /// Process all remaining available frames
     int run();
 
 private:
-    std::shared_ptr<TrajectoryAnalysisModule> module_;
+    gmx::TrajectoryAnalysisModuleSharedPointer module_;
     TrajectoryAnalysisSettings settings_;
     TrajectoryAnalysisRunnerCommon common_;
     SelectionCollection selections_;

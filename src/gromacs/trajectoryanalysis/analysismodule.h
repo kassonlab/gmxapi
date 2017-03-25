@@ -180,6 +180,8 @@ class TrajectoryAnalysisModuleData
 //! Smart pointer to manage a TrajectoryAnalysisModuleData object.
 typedef std::unique_ptr<TrajectoryAnalysisModuleData>
     TrajectoryAnalysisModuleDataPointer;
+typedef std::shared_ptr<TrajectoryAnalysisModuleData>
+    TrajectoryAnalysisModuleDataSharedPointer;
 
 /*! \brief
  * Base class for trajectory analysis modules.
@@ -498,6 +500,8 @@ class TrajectoryAnalysisModule
 //! Smart pointer to manage a TrajectoryAnalysisModule.
 typedef std::unique_ptr<TrajectoryAnalysisModule>
     TrajectoryAnalysisModulePointer;
+typedef std::shared_ptr<TrajectoryAnalysisModule>
+    TrajectoryAnalysisModuleSharedPointer;
 
 } // namespace gmx
 
