@@ -17,6 +17,26 @@ namespace gmx
  */
 namespace pyapi
 {
+using std::shared_ptr;
+
+/*! \brief Wraps an Options collection for exporting to Python.
+*/
+class PyOptions
+{
+public:
+    /// Create an empty options container.
+    PyOptions();
+    ~PyOptions();
+    PyOptions(const PyOptions&) = default;
+    // Copy semantics seem likely to involve multiple pointers to the same object rather than copies of the options object, but we'll see...
+    // gmx::Options objects have implementation members that look like they are not meant to be copied...
+
+    /// Get a raw pointer to the member data.
+    gmx::Options & data();
+
+private:
+    shared_ptr<gmx::Options> options_;
+};
 
 /*! \brief Wraps Trajectory Analyis Runner for Python interface.
  *
@@ -29,9 +49,12 @@ public:
     PyRunner() = delete;
 
     /// Construct runner with a single bound module.
-    PyRunner(std::shared_ptr<gmx::TrajectoryAnalysisModule> module);
+    PyRunner(shared_ptr<gmx::TrajectoryAnalysisModule> module);
 
     virtual ~PyRunner();
+
+    /// Process options.
+    void initialize(PyOptions options);
 
     /*! \brief Advance the current frame one step.
      *
@@ -45,7 +68,7 @@ private:
     gmx::trajectoryanalysis::Runner runner_;
 
     /// binds to one analysis module
-    std::shared_ptr<gmx::TrajectoryAnalysisModule> module_;
+    shared_ptr<gmx::TrajectoryAnalysisModule> module_;
 };
 
 // class CachingTafModule;

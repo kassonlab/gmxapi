@@ -45,9 +45,13 @@
 #include "gromacs/trajectoryanalysis/analysissettings.h"
 #include "gromacs/trajectoryanalysis/runnercommon.h"
 #include "gromacs/selection/selectioncollection.h"
+#include "gromacs/options/options.h"
 #include "gromacs/analysisdata/paralleloptions.h"
 #include "gromacs/trajectory/trajectoryframe.h"
 #include "gromacs/pbcutil/pbc.h"
+#include "gromacs/selection/selectionoptionbehavior.h"
+
+//#include "gromacs/commandline/cmdlineoptionsmodule.h"
 
 namespace gmx
 {
@@ -55,7 +59,15 @@ namespace trajectoryanalysis
 {
 
 using gmx::TrajectoryAnalysisModule;
+using gmx::TrajectoryAnalysisModuleSharedPointer;
+using gmx::IOptionsContainer;
+using gmx::SelectionOptionBehavior;
 
+using std::shared_ptr;
+using std::make_shared;
+
+// Initializes an empty TrajectoryAnalysisSettings and uses it to
+// initialize the TrajectoryAnalysisRunnerCommon member
 Runner::Runner() :
     module_{nullptr},
     settings_{},
@@ -63,8 +75,47 @@ Runner::Runner() :
     selections_{},
     pdata_{nullptr},
     nframes_{0},
-    is_initialized_{false}
-{}
+    is_initialized_{false},
+    options_{},
+    selectionOptionBehavior_{&selections_, common_.topologyProvider()}
+{
+    // Initialization is somewhat coupled to the caller-provided options container in initialize().
+
+    IOptionsContainer& options = options_;
+
+    /* Set up IOptionsContainer and behaviors as in RunnerModule::initOptions(). Note that a caller-provided
+    Options object is a IOptionsContainerWithSections is a
+    IOptionsContainer.
+    TODO: make this relationship clearer in doxygen.
+    */
+
+    // A TimeUnitBehavior is an IOptionsBehavior
+    shared_ptr<TimeUnitBehavior> time_unit_behavior = make_shared<TimeUnitBehavior>();
+
+    // TODO: extract options behaviors from ICommandLineOptionsModuleSettings and ICommandLineOptionsModuleSettings from TrajectoryAnalysisSettings
+    /*
+    // Retain settings for module(s)
+    ICommandLineOptionsModuleSettings cli_settings{};
+    cli_settings.addOptionsBehavior(selectionOptionBehavior);
+    cli_settings.addOptionsBehavior(time_unit_behavior);
+    settings_.setOptionsModuleSettings(cli_settings);
+    */
+
+    // This is where RunnerModule would call CommandLineOptionsModuleSettings::addOptionsBehavior(...), which causes OptionsBehaviorCollection::addBehavior(behavior), which causes behavior->initBehavior(options_);
+    selectionOptionBehavior_.initBehavior(&options_);
+
+    // Let the common_ add its options to the IOptionsContainer
+    // and create for it a TimeUnitBehavior.
+    IOptionsContainer &common_options = options.addGroup();
+    common_.initOptions(&common_options, time_unit_behavior.get());
+    // TODO: need methods to report this upstream...
+    // Note no one owns the TimeUnitBehavior after this returns.
+    // If we need it, we'll have to find a place for it to live
+    // or it will be destroyed.
+
+    selectionOptionBehavior_.initOptions(&common_options);
+
+}
 
 Runner::~Runner()
 {}
@@ -72,7 +123,7 @@ Runner::~Runner()
 // The Runner will share ownership of the module argument.
 // TODO: clarify requirements and behavior for order of invocation of add_module()
 // and initialize()
-gmx::TrajectoryAnalysisModuleSharedPointer Runner::add_module(gmx::TrajectoryAnalysisModuleSharedPointer module)
+TrajectoryAnalysisModuleSharedPointer Runner::add_module(TrajectoryAnalysisModuleSharedPointer module)
 {
     if (is_initialized_)
     {
@@ -80,6 +131,14 @@ gmx::TrajectoryAnalysisModuleSharedPointer Runner::add_module(gmx::TrajectoryAna
         return nullptr;
     }
     module_ = module;
+
+    // Let the module(s) register its options and receive settings.
+    IOptionsContainer &module_options = options_.addGroup();
+    module_->initOptions(&module_options, &settings_);
+
+    // Let the module(s) take a first stab at the selections.
+    selectionOptionBehavior_.initOptions(&module_options);
+
     return module_;
 }
 
@@ -90,6 +149,22 @@ gmx::TrajectoryAnalysisModuleSharedPointer Runner::add_module(gmx::TrajectoryAna
  */
 void Runner::initialize()
 {
+    // Parse user parameters, parse selections, and initialized selection variables in module
+
+    // Finalize options and check for errors. Module may adjust selections settings
+    module_->optionsFinished(&settings_);
+
+    // Selections are checked and module variables updated.
+    // Finalize and compile selections.
+    selectionOptionBehavior_.optionsFinishing(&options_);
+    selectionOptionBehavior_.optionsFinished();
+
+    // finalize options for helper class and check for errors.
+    common_.optionsFinished();
+
+    //
+    // Perform first frame initialization as in RunnerModule::run()
+    //
     common_.initTopology();
     const TopologyInformation &topology = common_.topologyInformation();
     module_->initAnalysis(settings_, topology);
@@ -129,8 +204,8 @@ bool Runner::next()
         set_pbc(pbc, topology.ePBC(), frame.box);
         // Take ownership of any memory now pointed to by pbc
         ppbc_ = std::unique_ptr<t_pbc>(pbc);
+        //TODO: update pbc function
     }
-
 
     // TODO: convert the next two functions not to need non-const pointers to t_pbc
     selections_.evaluate(&frame, ppbc_.get());

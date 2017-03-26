@@ -46,9 +46,14 @@
 #include "gromacs/trajectoryanalysis/analysissettings.h"
 #include "gromacs/trajectoryanalysis/runnercommon.h"
 #include "gromacs/selection/selectioncollection.h"
+#include "gromacs/options/options.h"
+#include "gromacs/selection/selectionoptionbehavior.h"
+
 
 namespace gmx
 {
+
+class IOptionsContainer;
 
 namespace trajectoryanalysis
 {
@@ -106,7 +111,10 @@ public:
     Runner(const Runner& runner) = delete;
     Runner& operator=(const Runner& runner) = delete;
 
+    /// Populate an options object provided by the caller.
+    //void initialize(gmx::IOptionsContainer& options);
     void initialize();
+
     gmx::TrajectoryAnalysisModuleSharedPointer add_module(gmx::TrajectoryAnalysisModuleSharedPointer module);
 
     /// Advance one frame
@@ -129,6 +137,10 @@ private:
     /// True if modules have been initialized and first frame read.
     bool is_initialized_; // TODO: more complete taf_state enum
     // Actual state machine can be hidden in implementation class.
+
+    // For now, let's own an Options container object.
+    gmx::Options options_;
+    SelectionOptionBehavior selectionOptionBehavior_;
 };
 
 } // end namespace trajectoryanalysis

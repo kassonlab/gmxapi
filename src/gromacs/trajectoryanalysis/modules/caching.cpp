@@ -48,8 +48,11 @@ void CachingTafModule::finishAnalysis(int nframes)
     // If we're just caching trajectories, there is no post-processing.
 }
 
+/// Does not produce output unless requested.
 void CachingTafModule::writeOutput() {}
 
+/// Return the last frame processed.
+// TODO implement
 void CachingTafModule::frame() {}
 
 } // end namespace trajectoryanalysis
