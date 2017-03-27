@@ -45,8 +45,8 @@ class TrajectoryFile:
         runner = gmx.core.TafRunner(self._cpp_module)
 
         # Create options object with which to initialize runner
-        #options = gmx.core.Options(filename=self.filename)
-        options = gmx.core.Options()
+        options = gmx.core.Options(filename=self.filename)
+        #options = gmx.core.Options()
 
         # Initialize runner and module
         runner.initialize(options)

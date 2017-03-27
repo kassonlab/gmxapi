@@ -26,6 +26,8 @@ class PyOptions
 public:
     /// Create an empty options container.
     PyOptions();
+    /// Create an options container with our only known option.
+    PyOptions(std::string filename);
     ~PyOptions();
     PyOptions(const PyOptions&) = default;
     // Copy semantics seem likely to involve multiple pointers to the same object rather than copies of the options object, but we'll see...
@@ -34,8 +36,11 @@ public:
     /// Get a raw pointer to the member data.
     gmx::Options & data();
 
+    bool parse();
+
 private:
     shared_ptr<gmx::Options> options_;
+    std::string filename_;
 };
 
 /*! \brief Wraps Trajectory Analyis Runner for Python interface.

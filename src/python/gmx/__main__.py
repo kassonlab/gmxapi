@@ -9,7 +9,7 @@ Defines behavior when module is invoked as a script or with
 from .io import TrajectoryFile
 
 # Create the Python proxy to the caching gmx::TrajectoryAnalysisModule object.
-filename = 'foo'
+filename = 'em-vac.trr'
 mytraj = TrajectoryFile(filename, 'r')
 
 # Implicitly create the Runner object and get an iterator based on selection.

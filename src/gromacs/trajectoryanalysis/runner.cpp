@@ -50,7 +50,7 @@
 #include "gromacs/trajectory/trajectoryframe.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/selection/selectionoptionbehavior.h"
-#include "gromacs/options/filenameoptionmanager.h"
+
 
 //#include "gromacs/commandline/cmdlineoptionsmodule.h"
 
@@ -77,7 +77,6 @@ Runner::Runner() :
     pdata_{nullptr},
     nframes_{0},
     is_initialized_{false},
-    options_{},
     selectionOptionBehavior_{&selections_, common_.topologyProvider()}
 {
 
@@ -101,19 +100,13 @@ TrajectoryAnalysisModuleSharedPointer Runner::add_module(TrajectoryAnalysisModul
     return module_;
 }
 
-/// Prepare the runner and modules to start iterating over frames.
-/*! Part of initialization is to read the first frame with knowledge of what
- * information is needed by the modules. Thus, modules cannot be added without
- * reinitializing afterwards. For the moment, require forward progress...
+/// Negotiate the options once module(s) have been registered.
+/*! Receive an IOptionsContainer from the caller. It is assumed to already
+ * have a FileNameOptionManager in place. After calling this method, the
+ * caller should parse/process its input using the configured OptionsContainer.
  */
-void Runner::initialize()
+void Runner::register_options(Options& options)
 {
-    // Initialization is somewhat coupled to the caller-provided options container in initialize().
-
-    //IOptionsContainer& options = options_;
-
-    gmx::FileNameOptionManager filename_option_manager;
-    options_.addManager(&filename_option_manager);
 
     /* Set up IOptionsContainer and behaviors as in RunnerModule::initOptions(). Note that a caller-provided
     Options object is a IOptionsContainerWithSections is a
@@ -133,12 +126,12 @@ void Runner::initialize()
     settings_.setOptionsModuleSettings(cli_settings);
     */
 
-    // This is where RunnerModule would call CommandLineOptionsModuleSettings::addOptionsBehavior(...), which causes OptionsBehaviorCollection::addBehavior(behavior), which causes behavior->initBehavior(options_);
-    selectionOptionBehavior_.initBehavior(&options_);
+    // This is where RunnerModule would call CommandLineOptionsModuleSettings::addOptionsBehavior(...), which causes OptionsBehaviorCollection::addBehavior(behavior), which causes behavior->initBehavior(options);
+    selectionOptionBehavior_.initBehavior(&options);
 
     // Let the common_ add its options to the IOptionsContainer
     // and create for it a TimeUnitBehavior.
-    IOptionsContainer &common_options = options_.addGroup();
+    IOptionsContainer &common_options = options.addGroup();
     common_.initOptions(&common_options, time_unit_behavior.get());
     // TODO: need methods to report this upstream...
     // Note no one owns the TimeUnitBehavior after this returns.
@@ -146,21 +139,29 @@ void Runner::initialize()
     // or it will be destroyed.
 
     // Let the module(s) register its options and receive settings.
-    IOptionsContainer &module_options = options_.addGroup();
+    IOptionsContainer &module_options = options.addGroup();
     module_->initOptions(&module_options, &settings_);
 
     selectionOptionBehavior_.initOptions(&common_options);
+}
 
     // Parse user parameters, parse selections, and initialized selection variables in module
     // parse(&options)
-    options_.finish();
+    //options.finish();
 
+/// Prepare the runner and modules to start iterating over frames.
+/*! Part of initialization is to read the first frame with knowledge of what
+ * information is needed by the modules. Thus, modules cannot be added without
+ * reinitializing afterwards. For the moment, require forward progress...
+ */
+void Runner::initialize(Options& options)
+{
     // Finalize options and check for errors. Module may adjust selections settings
     module_->optionsFinished(&settings_);
 
     // Selections are checked and module variables updated.
     // Finalize and compile selections.
-    selectionOptionBehavior_.optionsFinishing(&options_);
+    selectionOptionBehavior_.optionsFinishing(&options);
     selectionOptionBehavior_.optionsFinished();
 
     // finalize options for helper class and check for errors.
