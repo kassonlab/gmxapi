@@ -50,6 +50,7 @@
 #include "gromacs/trajectory/trajectoryframe.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/selection/selectionoptionbehavior.h"
+#include "gromacs/options/filenameoptionmanager.h"
 
 //#include "gromacs/commandline/cmdlineoptionsmodule.h"
 
@@ -79,9 +80,40 @@ Runner::Runner() :
     options_{},
     selectionOptionBehavior_{&selections_, common_.topologyProvider()}
 {
+
+}
+
+Runner::~Runner()
+{}
+
+// The Runner will share ownership of the module argument.
+// TODO: clarify requirements and behavior for order of invocation of add_module()
+// and initialize()
+TrajectoryAnalysisModuleSharedPointer Runner::add_module(TrajectoryAnalysisModuleSharedPointer module)
+{
+    if (is_initialized_)
+    {
+        // Alert that we can't add modules anymore.
+        return nullptr;
+    }
+    module_ = module;
+
+    return module_;
+}
+
+/// Prepare the runner and modules to start iterating over frames.
+/*! Part of initialization is to read the first frame with knowledge of what
+ * information is needed by the modules. Thus, modules cannot be added without
+ * reinitializing afterwards. For the moment, require forward progress...
+ */
+void Runner::initialize()
+{
     // Initialization is somewhat coupled to the caller-provided options container in initialize().
 
-    IOptionsContainer& options = options_;
+    //IOptionsContainer& options = options_;
+
+    gmx::FileNameOptionManager filename_option_manager;
+    options_.addManager(&filename_option_manager);
 
     /* Set up IOptionsContainer and behaviors as in RunnerModule::initOptions(). Note that a caller-provided
     Options object is a IOptionsContainerWithSections is a
@@ -106,50 +138,22 @@ Runner::Runner() :
 
     // Let the common_ add its options to the IOptionsContainer
     // and create for it a TimeUnitBehavior.
-    IOptionsContainer &common_options = options.addGroup();
+    IOptionsContainer &common_options = options_.addGroup();
     common_.initOptions(&common_options, time_unit_behavior.get());
     // TODO: need methods to report this upstream...
     // Note no one owns the TimeUnitBehavior after this returns.
     // If we need it, we'll have to find a place for it to live
     // or it will be destroyed.
 
-    selectionOptionBehavior_.initOptions(&common_options);
-
-}
-
-Runner::~Runner()
-{}
-
-// The Runner will share ownership of the module argument.
-// TODO: clarify requirements and behavior for order of invocation of add_module()
-// and initialize()
-TrajectoryAnalysisModuleSharedPointer Runner::add_module(TrajectoryAnalysisModuleSharedPointer module)
-{
-    if (is_initialized_)
-    {
-        // Alert that we can't add modules anymore.
-        return nullptr;
-    }
-    module_ = module;
-
     // Let the module(s) register its options and receive settings.
     IOptionsContainer &module_options = options_.addGroup();
     module_->initOptions(&module_options, &settings_);
 
-    // Let the module(s) take a first stab at the selections.
-    selectionOptionBehavior_.initOptions(&module_options);
+    selectionOptionBehavior_.initOptions(&common_options);
 
-    return module_;
-}
-
-/// Prepare the runner and modules to start iterating over frames.
-/*! Part of initialization is to read the first frame with knowledge of what
- * information is needed by the modules. Thus, modules cannot be added without
- * reinitializing afterwards. For the moment, require forward progress...
- */
-void Runner::initialize()
-{
     // Parse user parameters, parse selections, and initialized selection variables in module
+    // parse(&options)
+    options_.finish();
 
     // Finalize options and check for errors. Module may adjust selections settings
     module_->optionsFinished(&settings_);
