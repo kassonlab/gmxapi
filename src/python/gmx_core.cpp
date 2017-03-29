@@ -15,6 +15,7 @@
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/options/optionsassigner.h"
 #include "gromacs/options/optionsvisitor.h"
+#include "gromacs/trajectory/trajectoryframe.h"
 
 #include <iostream>
 
@@ -288,23 +289,27 @@ const char* const docstring = "Gromacs core module"; ///< used to set __doc__
 /*! \internal \brief Export gmx.core Python module in shared object file.
  */
 PYBIND11_PLUGIN(core) {
+    using namespace gmx::pyapi;
+
     // Instantiate the module
     py::module m(name, docstring);
 
     // Export runner class
-    py::class_< gmx::pyapi::PyRunner > runner(m, "TafRunner");
+    py::class_< PyRunner > runner(m, "TafRunner");
     // We shouldn't need a keep_alive<>() for the module we're attaching since
     // pybind knows how to handle shared_ptr and this object does not need to
     // survive after the associated module is done with it, but we need to
     // reconsider when the usage model changes for chained or more general modules.
     runner.def(py::init< shared_ptr<gmx::TrajectoryAnalysisModule> >())
-        .def("initialize", &gmx::pyapi::PyRunner::initialize, "handle options")
-        .def("next", &gmx::pyapi::PyRunner::next, "Advance the current frame one step.");
+        .def("initialize", &PyRunner::initialize, "handle options")
+        .def("next", &PyRunner::next, "Advance the current frame one step.");
 
     // Export module classes
     py::class_< gmx::TrajectoryAnalysisModule,
                 shared_ptr<gmx::TrajectoryAnalysisModule>
               >(m, "TafModuleAbstractBase");
+
+    py::class_< PyTrajectoryFrame, shared_ptr<PyTrajectoryFrame> > (m, "Frame");
     // Default holder is std::unique_ptr, but we allow multiple handles to module.
     py::class_< gmx::trajectoryanalysis::CachingTafModule,
                 shared_ptr<gmx::trajectoryanalysis::CachingTafModule>,
@@ -312,9 +317,15 @@ PYBIND11_PLUGIN(core) {
               >(m, "CachingTafModule")
         .def(py::init())
         //.def("select", py:make_iterator...)
-        .def("frame", &gmx::trajectoryanalysis::CachingTafModule::frame, "Retrieve cached trajectory frame.");
+        //.def("frame", &gmx::trajectoryanalysis::CachingTafModule::frame, "Retrieve cached trajectory frame.")
+        .def("frame",
+            [](const gmx::trajectoryanalysis::CachingTafModule &cache) -> shared_ptr<PyTrajectoryFrame>
+            {
+                return std::make_shared<PyTrajectoryFrame>(cache.frame());
+            }
+        );
 
-    py::class_< gmx::pyapi::PyOptions, std::shared_ptr<gmx::pyapi::PyOptions> >(m, "Options")
+    py::class_< PyOptions, std::shared_ptr<PyOptions> >(m, "Options")
         .def(
             py::init<const std::string>(),
             py::arg("filename")

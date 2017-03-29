@@ -56,7 +56,10 @@ void CachingTafModule::writeOutput() {}
 
 /// Return the last frame processed.
 // TODO implement
-void CachingTafModule::frame() {}
+std::shared_ptr<t_trxframe> CachingTafModule::frame() const
+{
+    return last_frame_;
+}
 
 } // end namespace trajectoryanalysis
 } // end namespace gmx

@@ -90,6 +90,12 @@ private:
     shared_ptr<gmx::TrajectoryAnalysisModule> module_;
 };
 
+class PyTrajectoryFrame
+{
+public:
+    PyTrajectoryFrame(std::shared_ptr<t_trxframe> frame) {};
+};
+
 // class CachingTafModule;
 
 } // end namespace pyapi

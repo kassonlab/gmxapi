@@ -20,7 +20,7 @@ class CachingTafModule : public gmx::TrajectoryAnalysisModule
 {
 public:
     // Additional methods provide by derived class
-    void frame();
+    std::shared_ptr<t_trxframe> frame() const;
 
     // Implement required virtual functions from base class
 
@@ -38,7 +38,7 @@ public:
     virtual void finishAnalysis(int nframes);
 
     virtual void writeOutput();
-    
+
 private:
     std::shared_ptr<t_trxframe> last_frame_; //!< cache the last frame read.
 };
