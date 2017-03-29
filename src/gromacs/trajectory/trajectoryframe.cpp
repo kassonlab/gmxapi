@@ -115,10 +115,11 @@ std::shared_ptr<t_trxframe> trxframe_copy(const t_trxframe& frame)
 
     // Allocate memory and copy the available member arrays.
     // Allow for addition of non-default copy constructor with
-    // deep copy.
+    // deep copy by checking whether arrays are distinct non-null addresses.
     // Note that struct t_trxframe definition is in trajectoryframe.h and there is no other documented interface to member data
-    if (frame.x && frame.x != frame_copy->x)
+    if (frame.x && (!frame_copy->x || frame_copy->x == frame.x))
     {
+        // allocate new memory and perform copy
         snew(frame_copy->x, frame.natoms);
         for (auto i(0); i < frame.natoms; ++i)
         {
@@ -126,7 +127,7 @@ std::shared_ptr<t_trxframe> trxframe_copy(const t_trxframe& frame)
 //            frame_copy->f[i] = frame.f[i];
         }
     }
-    if (frame.v && frame.v != frame_copy->v)
+    if (frame.v && (!frame_copy->v || frame.v == frame_copy->v))
     {
         snew(frame_copy->v, frame.natoms);
         for (auto i(0); i < frame.natoms; ++i)
@@ -134,7 +135,7 @@ std::shared_ptr<t_trxframe> trxframe_copy(const t_trxframe& frame)
             std::copy(std::begin(frame.v[i]), std::end(frame.v[i]), frame_copy->v[i]);
         }
     }
-    if (frame.f && frame.f != frame_copy->f)
+    if (frame.f && (!frame_copy->f || frame.f == frame_copy->f))
     {
         snew(frame_copy->f, frame.natoms);
         for (auto i(0); i < frame.natoms; ++i)

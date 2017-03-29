@@ -24,6 +24,8 @@ void CachingTafModule::initOptions(IOptionsContainer *options,
     // TODO: convert TRX_ flags in trxio.h to named enum
     // TODO: update gmx::TrajectoryAnalysisSettings::set{,Frame}Flags() call signature and enum to identifiable types.
     // TODO: get more helpful error from read_next_frame when _NEED_ flags aren't present?
+    // Note that memory is allocated for v and f even if they are not available
+    // for reading.
     settings->setFrameFlags(TRX_NEED_X | TRX_READ_V | TRX_READ_F);
 }
 

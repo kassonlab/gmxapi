@@ -119,7 +119,7 @@ public:
 
     gmx::TrajectoryAnalysisModuleSharedPointer add_module(gmx::TrajectoryAnalysisModuleSharedPointer module);
 
-    /// Advance one frame
+    /// Advance one frame. Return false if there are no more frames.
     bool next();
 
     /// Process all remaining available frames
@@ -139,6 +139,9 @@ private:
     /// True if modules have been initialized and first frame read.
     bool is_initialized_; // TODO: more complete taf_state enum
     // Actual state machine can be hidden in implementation class.
+
+    /// Indicate we have reached the end of input.
+    bool end_of_frames_;
 
     SelectionOptionBehavior selectionOptionBehavior_;
 };

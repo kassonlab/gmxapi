@@ -77,13 +77,24 @@ Runner::Runner() :
     pdata_{nullptr},
     nframes_{0},
     is_initialized_{false},
+    end_of_frames_{false},
     selectionOptionBehavior_{&selections_, common_.topologyProvider()}
 {
 
 }
 
 Runner::~Runner()
-{}
+{
+    if (module_)
+    {
+        module_->finishFrames(pdata_.get());
+    }
+    if (pdata_.get() != nullptr)
+    {
+        pdata_->finish();
+    }
+    pdata_.reset();
+}
 
 // The Runner will share ownership of the module argument.
 // TODO: clarify requirements and behavior for order of invocation of add_module()
@@ -161,8 +172,8 @@ void Runner::initialize(Options& options)
 
     // Selections are checked and module variables updated.
     // Finalize and compile selections.
-    //selectionOptionBehavior_.optionsFinishing(&options);
-    //selectionOptionBehavior_.optionsFinished();
+    selectionOptionBehavior_.optionsFinishing(&options);
+    selectionOptionBehavior_.optionsFinished();
 
     // finalize options for helper class and check for errors.
     common_.optionsFinished();
@@ -170,13 +181,13 @@ void Runner::initialize(Options& options)
     //
     // Perform first frame initialization as in RunnerModule::run()
     //
-    common_.initTopology();
+    common_.initTopology(); // Need some error handling
     const TopologyInformation &topology = common_.topologyInformation();
     module_->initAnalysis(settings_, topology);
 
     // Load first frame.
-    common_.initFirstFrame();
-    common_.initFrameIndexGroup();
+    common_.initFirstFrame(); // need some error handling
+    common_.initFrameIndexGroup(); // what is this?
     module_->initAfterFirstFrame(settings_, common_.frame());
 
     // Nothing seems to use the AnalysisDataParallelOptions object and it is only the size of an int, so
@@ -189,6 +200,11 @@ void Runner::initialize(Options& options)
 
 bool Runner::next()
 {
+    if (end_of_frames_)
+    {
+        // There are no available input frames.
+        return false;
+    }
     if (!is_initialized_)
     {
         // Can't run if not initialized...
@@ -220,16 +236,12 @@ bool Runner::next()
 
     ++nframes_;
 
-    if (common_.readNextFrame())
+    if (!common_.readNextFrame())
     {
-        // There are still more input frames
-        return true;
+        // There are no more input frames
+        end_of_frames_ = true;
     }
-    else
-    {
-        // Note that there are no more frames.
-        return false;
-    }
+    return true;
 }
 
 int Runner::run()

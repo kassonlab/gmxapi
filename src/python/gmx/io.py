@@ -46,7 +46,6 @@ class TrajectoryFile:
 
         # Create options object with which to initialize runner
         options = gmx.core.Options(filename=self.filename)
-        #options = gmx.core.Options()
 
         # Initialize runner and module
         runner.initialize(options)

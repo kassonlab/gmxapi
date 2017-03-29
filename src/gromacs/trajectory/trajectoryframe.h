@@ -106,6 +106,9 @@ void comp_frame(FILE *fp, t_trxframe *fr1, t_trxframe *fr2,
 
 void done_frame(t_trxframe *frame);
 
+// Request explicit instantiation.
+template class std::shared_ptr<t_trxframe>;
+
 /*! \brief make a deep copy of a trajectory frame
  *
  * Allocates heap memory for structure and member arrays.

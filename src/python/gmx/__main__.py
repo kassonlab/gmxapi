@@ -20,8 +20,11 @@ mytraj = TrajectoryFile(filename, 'r')
 # the runner must now be initialized and begin execution.
 # mytraj.runner.initialize(context, options)
 # mytraj.runner.next()
-frames = mytraj.select('asdf')
-next(frames)
+frames = mytraj.select('not implemented')
+try:
+    print(next(frames))
+except StopIteration:
+    print("no frames")
 
 # Subsequent iterations only need to step the runner and return a frame.
 for frame in frames:
