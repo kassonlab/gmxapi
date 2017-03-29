@@ -29,6 +29,16 @@ namespace gmx
 namespace pyapi
 {
 
+PyTrajectoryFrame::PyTrajectoryFrame(std::shared_ptr<t_trxframe> frame) :
+    frame_{frame}
+{
+}
+
+std::shared_ptr< TrajDataArray<real, 3> > PyTrajectoryFrame::x()
+{
+    return std::make_shared< TrajDataArray<real, 3> >(static_cast<real (*)>(frame_->x[0]), frame_->natoms);
+}
+
 PyOptions::PyOptions() :
     options_{}
 {
@@ -297,7 +307,9 @@ PYBIND11_PLUGIN(core) {
                 shared_ptr<gmx::TrajectoryAnalysisModule>
               >(m, "TafModuleAbstractBase");
 
-    py::class_< PyTrajectoryFrame, shared_ptr<PyTrajectoryFrame> > (m, "Frame");
+    // Export trajectory frame class
+    py::class_< PyTrajectoryFrame, shared_ptr<PyTrajectoryFrame> > (m, "Frame")
+        .def("x", &PyTrajectoryFrame::x, "get positions");
     // Default holder is std::unique_ptr, but we allow multiple handles to module.
     py::class_< gmx::trajectoryanalysis::CachingTafModule,
                 shared_ptr<gmx::trajectoryanalysis::CachingTafModule>,
@@ -313,12 +325,57 @@ PYBIND11_PLUGIN(core) {
             }
         );
 
+    // Export options class
     py::class_< PyOptions, std::shared_ptr<PyOptions> >(m, "Options")
         .def(
             py::init<const std::string>(),
             py::arg("filename")
         )
         ;
+
+    // Export buffer class that exposes trajectory data arrays
+    py::class_< TrajDataArray<real, 3>,
+                std::shared_ptr<TrajDataArray<real, 3> >
+              >(m, "TrajDataBuffer", py::buffer_protocol())
+        // A buffer interface exported to Python.
+        .def_buffer(
+            [](TrajDataArray<real, 3> &data) -> py::buffer_info
+            {
+                return py::buffer_info(
+                    data.data(),                        /* Pointer to buffer */
+                    sizeof(real),                          /* Size of one scalar */
+                    py::format_descriptor<real>::format(), /* Python struct-style format descriptor */
+                    2,                                      /* Number of dimensions */
+                    { data.N(), data.dim() },                 /* Python buffer dimensions */
+                    { sizeof(real) * data.dim(), sizeof(real) }  /* Strides (in bytes) for each index in C++ */
+                );
+            }
+        )
+        // Accept buffers from Python.
+        .def("__init__", [](TrajDataArray<real, 3> &data, py::buffer b)
+        {
+            /* Request a buffer descriptor from Python */
+            py::buffer_info info = b.request();
+
+            /* Some sanity checks ... */
+            if (info.format != py::format_descriptor<real>::format())
+            {
+                throw std::runtime_error("Incompatible format: expected a array of type real!");
+            };
+            if (info.ndim != 2 || info.shape[0] != 3)
+            {
+                throw std::runtime_error("Incompatible buffer dimension!");
+            };
+
+            // Construct in place
+            // It is important that the reference count of the buffer object b
+            // should be incremented to prevent Python garbage collection from
+            // deallocating the memory in the TrajDataArray object. I assume
+            // pybind11 takes care of that.
+            new (&data) TrajDataArray<real, 3>(static_cast<real *>(info.ptr), info.shape[0]);
+        })
+        // Inspect...
+        .def("N", &TrajDataArray<real, 3>::N, "number of elements");
 /*
     py::class_< gmx::Options >(m, "Options")
         .def(py::init<>()); // Need to figure out options passing...

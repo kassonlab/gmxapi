@@ -6,6 +6,8 @@ Defines behavior when module is invoked as a script or with
 ``python -m gmx``
 """
 
+import numpy
+
 from .io import TrajectoryFile
 
 # Create the Python proxy to the caching gmx::TrajectoryAnalysisModule object.
@@ -22,7 +24,9 @@ mytraj = TrajectoryFile(filename, 'r')
 # mytraj.runner.next()
 frames = mytraj.select('not implemented')
 try:
-    print(next(frames))
+    frame = next(frames)
+    print(frame)
+    print(numpy.array(frame.x(), copy=False))
 except StopIteration:
     print("no frames")
 

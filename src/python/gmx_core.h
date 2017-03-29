@@ -90,10 +90,59 @@ private:
     shared_ptr<gmx::TrajectoryAnalysisModule> module_;
 };
 
+/// Wrapper for flat data structure
+template<typename Scalar, size_t D>
+class TrajDataArray
+{
+public:
+    /*
+    // Create empty container
+    TrajDataArray() :
+        data_{}
+    {};
+    */
+
+    // Allocate space for an NxD array
+    TrajDataArray(size_t N) :
+        data_(N*D),
+        N_(N)
+    {};
+
+    // Copy from raw data pointer.
+    TrajDataArray(Scalar* data, size_t N) :
+        data_(data, data + N*D),
+        N_(N)
+    {
+    };
+
+    // Move constructor
+    //TrajDataArray(TrajDataArray&& )
+
+    // The destructor cannot deallocate the memory pointed to.
+    ~TrajDataArray() {};
+
+    size_t dim() const { return D; };
+    size_t N() const { return N_; };
+    Scalar* data() { return data_.data(); };
+
+private:
+    std::vector<Scalar> data_; // Flat
+    // Actual dimensions
+    const size_t N_;
+};
+
 class PyTrajectoryFrame
 {
 public:
-    PyTrajectoryFrame(std::shared_ptr<t_trxframe> frame) {};
+    /// Share ownership of a t_trxframe
+    PyTrajectoryFrame(std::shared_ptr<t_trxframe> frame);
+
+    /// Return a handle to a buffer of positions
+    std::shared_ptr< TrajDataArray<real, 3> > x();
+
+private:
+    /// Handle to a t_trxframe object
+    std::shared_ptr<t_trxframe> frame_;
 };
 
 // class CachingTafModule;
