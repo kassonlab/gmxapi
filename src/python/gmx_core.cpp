@@ -17,7 +17,7 @@
 #include "gromacs/options/optionsvisitor.h"
 #include "gromacs/trajectory/trajectoryframe.h"
 
-#include <iostream>
+//#include <iostream>
 
 #include "pybind11/pybind11.h"
 
@@ -32,8 +32,7 @@ namespace pyapi
 PyOptions::PyOptions() :
     options_{}
 {
-    std::cout << "PyOptions constructor" << std::endl;
-    print_options(*this);
+    //print_options(*this);
 }
 
 PyOptions::PyOptions(std::string filename) :
@@ -59,7 +58,6 @@ bool PyOptions::parse()
     public:
         Assigner(gmx::Options& options) : assigner_{&options}
         {
-            std::cout << "Assigner constructor" << std::endl;
             assigner_.start();
         };
         ~Assigner()
@@ -69,7 +67,6 @@ bool PyOptions::parse()
 
         bool startOption(const std::string& name)
         {
-            std::cout << "Handling " << name << std::endl;
             assigner_.startOption(name.c_str());
             return true;
         };
@@ -78,17 +75,14 @@ bool PyOptions::parse()
         {
             try
             {
-                std::cout << "Assigning value " << value << std::endl;
                 assigner_.appendValue(value.c_str());
             }
             catch (GromacsException &ex)
             {
-                std::cout << "Failed" << std::endl;
                 assigner_.finishOption();
                 return false;
             }
             assigner_.finishOption();
-            std::cout << "Assigner finished option" << std::endl;
             return true;
         };
 
@@ -155,13 +149,12 @@ bool PyOptions::parse()
         }
     }
     options_.finish();
-    print_options(*this);
+    //print_options(*this);
     return true;
 }
 
 void PyOptions::view_traverse(gmx::OptionsVisitor&& visitor) const
 {
-    std::cout << "Visiting" << std::endl;
     visitor.visitSection(options_.rootSection());
 }
 
@@ -195,10 +188,10 @@ void print_options(const PyOptions& pyoptions)
         }
         virtual void visitOption(const OptionInfo &option)
         {
-            // Do the thing
+            // Do something...
             const std::string name = option.name();
             const bool is_set = option.isSet();
-            std::cout << name << " is " << (is_set ? "not" : "") << " set" << std::endl;
+
             // Can't see values? OptionInfo::option() returns a AbstractOptionStorage& but is a protected function.
             // There does not appear to be a way to get the OptionType (template
             // parameter) settings object used in addOption. OptionType is
@@ -258,21 +251,16 @@ void PyRunner::initialize(PyOptions& options)
 {
     //gmx::FileNameOptionManager filename_option_manager;
     //options.data()->addManager(&filename_option_manager);
-    //std::cout << "Added manager\n";
     //print_options(options);
     runner_.register_options(*options.data());
-    std::cout << "Runner registered options\n";
     // parse options...
     if (!options.parse())
         throw(InvalidInputError("could not parse"));
-    std::cout << "Parsed options\n";
-    print_options(options);
+    //print_options(options);
     options.data()->finish();
-    std::cout << "Options finished\n";
-    print_options(options);
+    //print_options(options);
     runner_.initialize(*options.data());
-    std::cout << "Runner initialized\n";
-    print_options(options);
+    ////print_options(options);
 }
 
 } // end namespace pyapi
