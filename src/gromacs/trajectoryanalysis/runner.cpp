@@ -161,8 +161,8 @@ void Runner::initialize(Options& options)
 
     // Selections are checked and module variables updated.
     // Finalize and compile selections.
-    selectionOptionBehavior_.optionsFinishing(&options);
-    selectionOptionBehavior_.optionsFinished();
+    //selectionOptionBehavior_.optionsFinishing(&options);
+    //selectionOptionBehavior_.optionsFinished();
 
     // finalize options for helper class and check for errors.
     common_.optionsFinished();
@@ -192,7 +192,7 @@ bool Runner::next()
     if (!is_initialized_)
     {
         // Can't run if not initialized...
-        // TODO: raise exception.
+        // TODO: raise APIError?
         return false;
     }
     common_.initFrame();
@@ -205,11 +205,12 @@ bool Runner::next()
     std::unique_ptr<t_pbc> ppbc_{nullptr};
     if (settings_.hasPBC())
     {
-        t_pbc* pbc{nullptr};
+        // Need to preallocate memory for pbc
+        t_pbc* pbc = new t_pbc;
         set_pbc(pbc, topology.ePBC(), frame.box);
         // Take ownership of any memory now pointed to by pbc
         ppbc_ = std::unique_ptr<t_pbc>(pbc);
-        //TODO: update pbc function
+        //TODO: update set_pbc function and/or documentation.
     }
 
     // TODO: convert the next two functions not to need non-const pointers to t_pbc

@@ -10,11 +10,15 @@
 #include <memory>
 #include "gromacs/trajectoryanalysis/analysismodule.h"
 #include "gromacs/trajectoryanalysis/runner.h"
+#include "gromacs/options/options.h"
+
 
 namespace gmx
 {
 /*! \brief API wrappers for Python bindings
  */
+class OptionsVisitor;
+
 namespace pyapi
 {
 using std::shared_ptr;
@@ -29,19 +33,29 @@ public:
     /// Create an options container with our only known option.
     PyOptions(std::string filename);
     ~PyOptions();
-    PyOptions(const PyOptions&) = default;
+    PyOptions(const PyOptions&) = delete;
+    const PyOptions& operator=(const PyOptions&) = delete;
     // Copy semantics seem likely to involve multiple pointers to the same object rather than copies of the options object, but we'll see...
     // gmx::Options objects have implementation members that look like they are not meant to be copied...
 
     /// Get a raw pointer to the member data.
-    gmx::Options & data();
+    gmx::Options* data();
+
+    /// Provide a manager for OptionsVisitors
+    /*! visitor may modify itself during traversal.
+     */
+    void view_traverse(gmx::OptionsVisitor&& visitor) const;
+//    void modify_traverse(gmx::OptionsVisitor& visitor);
 
     bool parse();
 
 private:
-    shared_ptr<gmx::Options> options_;
+    gmx::Options options_;
     std::string filename_;
 };
+
+// Apply a OptionsVisitor that prints out the contents of the Options collection.
+void print_options(const PyOptions& pyoptions);
 
 /*! \brief Wraps Trajectory Analyis Runner for Python interface.
  *
@@ -59,7 +73,7 @@ public:
     virtual ~PyRunner();
 
     /// Process options.
-    void initialize(PyOptions options);
+    void initialize(PyOptions& options);
 
     /*! \brief Advance the current frame one step.
      *

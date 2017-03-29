@@ -14,6 +14,9 @@
 #include "gromacs/options/filenameoptionmanager.h"
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/options/optionsassigner.h"
+#include "gromacs/options/optionsvisitor.h"
+
+#include <iostream>
 
 #include "pybind11/pybind11.h"
 
@@ -26,60 +29,71 @@ namespace pyapi
 {
 
 PyOptions::PyOptions() :
-    options_{make_shared<gmx::Options>()}
+    options_{}
 {
+    std::cout << "PyOptions constructor" << std::endl;
+    print_options(*this);
 }
 
 PyOptions::PyOptions(std::string filename) :
-    options_{make_shared<gmx::Options>()},
+    options_{},
     filename_{filename}
 {}
 
 PyOptions::~PyOptions()
 {}
 
-gmx::Options& PyOptions::data()
+gmx::Options* PyOptions::data()
 {
     // Return a pointer to the Options object
-    return *options_;
+    return &options_;
 }
 
-class Assigner
-{
-public:
-    Assigner(gmx::Options& options) : assigner_{&options}
-    {
-        assigner_.start();
-    };
-    ~Assigner()
-    {
-        assigner_.finish();
-    };
-    bool tryStartOption(const std::string& name)
-    {
-        return assigner_.tryStartOption(name.c_str());
-    };
-    bool addSingleValue(const std::string& value)
-    {
-        try
-        {
-            assigner_.appendValue(value.c_str());
-        }
-        catch (GromacsException &ex)
-        {
-            assigner_.finishOption();
-            return false;
-        }
-        assigner_.finishOption();
-        return true;
-    };
-
-private:
-    gmx::OptionsAssigner assigner_;
-};
 
 bool PyOptions::parse()
 {
+    /// Helper class for RAII wrapping of gmx::OptionsAssigner
+    class Assigner
+    {
+    public:
+        Assigner(gmx::Options& options) : assigner_{&options}
+        {
+            std::cout << "Assigner constructor" << std::endl;
+            assigner_.start();
+        };
+        ~Assigner()
+        {
+            assigner_.finish();
+        };
+
+        bool startOption(const std::string& name)
+        {
+            std::cout << "Handling " << name << std::endl;
+            assigner_.startOption(name.c_str());
+            return true;
+        };
+
+        bool addSingleValue(const std::string& value)
+        {
+            try
+            {
+                std::cout << "Assigning value " << value << std::endl;
+                assigner_.appendValue(value.c_str());
+            }
+            catch (GromacsException &ex)
+            {
+                std::cout << "Failed" << std::endl;
+                assigner_.finishOption();
+                return false;
+            }
+            assigner_.finishOption();
+            std::cout << "Assigner finished option" << std::endl;
+            return true;
+        };
+
+    private:
+        gmx::OptionsAssigner assigner_;
+    };
     // use gmx::OptionsAssigner to set parsed options, but refer to
     // CommandLineParser().impl_->assigner for example helper functions.
     // Note that toOptionName just identifies command-line flags and strips
@@ -110,34 +124,120 @@ bool PyOptions::parse()
     // build an argparse-like object. I suppose that's what the help generator
     // does...
 
-    // TrajectoryRunnerCommon names the filename option "f"
-    Assigner assigner{*options_};
-
-    const std::string name{"f"};
-
-    try // assign a new option
+    // Scope the lifetime of assigner
     {
-        if (assigner.tryStartOption(name.c_str()))
+        Assigner assigner{options_};
+        // TrajectoryRunnerCommon names the filename option "f"
+
+        const std::string name{"f"};
+
+        try // assign a new option
         {
-            // assign (all of) the value(s) for name
-            if (!assigner.addSingleValue(filename_.c_str()))
+            if (assigner.startOption(name.c_str()))
             {
-                throw(InvalidInputError("bad option value"));
+                // assign (all of) the value(s) for name
+                if (!assigner.addSingleValue(filename_.c_str()))
+                {
+                    throw(InvalidInputError("bad option value"));
+                }
+                // else value successfully appended
             }
-            // else value successfully appended
+            else
+            {
+                throw(InvalidInputError("bad option name"));
+            };
         }
-        else
+        catch (InvalidInputError &ex)
         {
-            throw(InvalidInputError("bad option name"));
-        };
+            // InvalidInputError is thrown if option is not recognized or inappropriate (e.g. specified more than once)
+            throw(ex);
+        }
     }
-    catch (InvalidInputError &ex)
-    {
-        // InvalidInputError is thrown if option is not recognized or inappropriate (e.g. specified more than once)
-        throw(ex);
-    }
+    options_.finish();
+    print_options(*this);
     return true;
 }
+
+void PyOptions::view_traverse(gmx::OptionsVisitor&& visitor) const
+{
+    std::cout << "Visiting" << std::endl;
+    visitor.visitSection(options_.rootSection());
+}
+
+void print_options(const PyOptions& pyoptions)
+{
+    /// Provide a way to explore the PyOptions object
+    /*! gmx::OptionsVisitor defines an interface for visitor classes.
+     *  gmx::OptionsIterator provides a means to traverse an Options collection
+     *  as a non-member from arbitrary calling code, rather than as a member function of the collection,
+     *  which would be more like the Visitor pattern I'm used to.
+     *  gmx::OptionsIterator decorates an Options object to provide
+     *  acceptSection(OptionsVisitor*) and acceptOptions(OptionsVisitor*)
+     *  so that a visitor object should have its visit methods
+     *  called directly. E.g. Visitor().visitSection(options.rootSection()) calls
+     *  OptionsIteratory(options.rootSection()).acceptSections(visitor) and again
+     *  for acceptOptions(visitor). It is not documented whether OptionsIterator.acceptSections(visitor) is made recursive through the Visitor's implementation of visitSection.
+     */
+    // TODO: IOptionsContainer can only throw APIError and has no way to tell
+    // the caller that an option is already defined. However, it is implemented
+    // in gmx::Options, so the calling code can get there in a roundabout way.
+    // TODO: There is no const version of gmx::OptionsVisitor
+    class Visitor : public gmx::OptionsVisitor
+    {
+        virtual void visitSection(const gmx::OptionSectionInfo& section)
+        {
+            // note hierarchy...
+            // const std::string name = section.name()
+            gmx::OptionsIterator iterator(section);
+            iterator.acceptSections(this);
+            iterator.acceptOptions(this);
+        }
+        virtual void visitOption(const OptionInfo &option)
+        {
+            // Do the thing
+            const std::string name = option.name();
+            const bool is_set = option.isSet();
+            std::cout << name << " is " << (is_set ? "not" : "") << " set" << std::endl;
+            // Can't see values? OptionInfo::option() returns a AbstractOptionStorage& but is a protected function.
+            // There does not appear to be a way to get the OptionType (template
+            // parameter) settings object used in addOption. OptionType is
+            // derived from AbstractOption, I think. Unless there is a default
+            // value, there is no option value until the Assigner runs, which
+            // operates on a full gmx::Options object. Then the value is owned
+            // by the caller of IOptionsContainer.addOption()
+            // Where does the reference in AbstractOption.store(T*) end up?
+            // Options have a T* store_ that points to the storage defined
+            // in the object passed to addOption().
+            // OptionSectionImpl::Group::addOptionImpl(AbstractOption& settings) calls
+            // settings.createStorage() to get a OptionSectionImpl::AbstractOptionStoragePointer object.
+            // When the Assigner gets to appendValue, there is ultimately a
+            // commitValues() template method that calls OptionStorageTemplate<T>::store_->append(value). Here, store_ was
+            // initialized in the constructor and is a
+            // std::unique_ptr<IOptionValueStore<T> >
+            // IOptionValueStore<T> is a wrapper that is implemented by various
+            // basic ValueStore types to
+            // provide some methods and a wrapped ArrayRef<T>.
+            // Assigner::Impl uses Options::impl_->rootSection_ to get a
+            // internal::OptionSectionImpl which provides findOption() to get
+            // an AbstractOptionStorage*. AbstractOptionsStorage->appendValue()
+            // results in the values actually being set through virtual functions
+            // in the inaccessible OptionStorage object.
+            // There appears to be no way to get from either an Options or
+            // OptionInfo object to the OptionStorageTemplate object that can
+            // see the actual storage. I would need to implement an alternative
+            // IOptionsContainer or cause the modules to provide some interface.
+            // Also, the parsed option values appear temporarily in the machinery
+            // but I think are gone after assignment completes.
+            //
+            // In short, if I want to see the values being passed now, I can
+            // look at the raw memory for the storage destinations, the values
+            // being handled by the Assigner, or add printf debugging into the
+            // core options handling code...
+        }
+    };
+    pyoptions.view_traverse(Visitor());
+}
+
 
 PyRunner::PyRunner(shared_ptr<gmx::TrajectoryAnalysisModule> module) :
     runner_(),
@@ -153,16 +253,25 @@ bool PyRunner::next()
     return runner_.next();
 }
 
-void PyRunner::initialize(PyOptions options)
+void PyRunner::initialize(PyOptions& options)
 {
-    gmx::FileNameOptionManager filename_option_manager;
-    options.data().addManager(&filename_option_manager);
-    runner_.register_options(options.data());
+    //gmx::FileNameOptionManager filename_option_manager;
+    //options.data()->addManager(&filename_option_manager);
+    //std::cout << "Added manager\n";
+    //print_options(options);
+    runner_.register_options(*options.data());
+    std::cout << "Runner registered options\n";
     // parse options...
     if (!options.parse())
         throw(InvalidInputError("could not parse"));
-    options.data().finish();
-    runner_.initialize(options.data());
+    std::cout << "Parsed options\n";
+    print_options(options);
+    options.data()->finish();
+    std::cout << "Options finished\n";
+    print_options(options);
+    runner_.initialize(*options.data());
+    std::cout << "Runner initialized\n";
+    print_options(options);
 }
 
 } // end namespace pyapi
@@ -205,7 +314,7 @@ PYBIND11_PLUGIN(core) {
         //.def("select", py:make_iterator...)
         .def("frame", &gmx::trajectoryanalysis::CachingTafModule::frame, "Retrieve cached trajectory frame.");
 
-    py::class_< gmx::pyapi::PyOptions >(m, "Options")
+    py::class_< gmx::pyapi::PyOptions, std::shared_ptr<gmx::pyapi::PyOptions> >(m, "Options")
         .def(
             py::init<const std::string>(),
             py::arg("filename")
