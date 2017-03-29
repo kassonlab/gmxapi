@@ -3,4 +3,8 @@ This README.md file supplants the main README file to avoid merge conflicts whil
 
 To use, you need to fetch the pybind11 git submodule, too.
 
-    git clone --recursive git@bitbucket.org:kassonlab/gromacs_api.git
+    git clone git@bitbucket.org:kassonlab/gromacs_api.git
+    cd gromacs_api
+    git checkout trajectory
+    git submodule init
+    git submodule update src/external/pybind11
