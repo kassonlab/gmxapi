@@ -107,23 +107,25 @@ void done_frame(t_trxframe *frame)
     sfree(frame->f);
 }
 
-std::shared_ptr<t_trxframe> gmx::trajectory::trxframe_copy(const t_trxframe& frame)
+void gmx::trajectory::trxframe_deleter(t_trxframe* f)
+{
+    // Must only free memory allocated in frame_copy.
+    if (f->x) sfree(f->x);
+    if (f->v) sfree(f->v);
+    if (f->f) sfree(f->f);
+    //if (f->title) delete f->title;
+    //if (f->atoms) delete f->atoms;
+    //if (f->index) delete[] f->index;
+    delete f;
+};
+
+std::unique_ptr<t_trxframe, void(*)(t_trxframe*)> gmx::trajectory::trxframe_copy(const t_trxframe& frame)
 {
     // Copy construct the trajectory frame struct.
     // std::make_unique not available until C++14, but we probably want a
     // custom deleter anyway.
-    std::shared_ptr<t_trxframe> frame_copy(new t_trxframe(frame),
-        [](t_trxframe* f)
-        {
-            if (f->title) delete f->title;
-            if (f->atoms) delete f->atoms;
-            if (f->x) delete[] f->x;
-            if (f->v) delete[] f->v;
-            if (f->f) delete[] f->f;
-            if (f->index) delete[] f->index;
-            delete f;
-        }
-    );
+    std::unique_ptr<t_trxframe, void(*)(t_trxframe*)> frame_copy(nullptr, &trxframe_deleter);
+    frame_copy.reset(new t_trxframe(frame));
 
     // Allocate memory and copy the available member arrays.
     // Allow for addition of non-default copy constructor with

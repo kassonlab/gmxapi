@@ -56,8 +56,11 @@
 #include "gromacs/math/vectypes.h"
 #include "gromacs/utility/basedefinitions.h"
 #include "gromacs/utility/real.h"
+// required to be able to delete t_atoms
+#include "gromacs/topology/atoms.h"
+#include "gromacs/utility/smalloc.h"
 
-struct t_atoms;
+//struct t_atoms;
 
 /*! \libinternal \brief
 * C structure of basic data read from a trajectory
@@ -118,16 +121,22 @@ namespace gmx
 namespace trajectory
 {
 
+/*! \brief Deleter for t_trxframe
+ *
+ * Used for objects created with frame_copy.
+ */
+void trxframe_deleter(t_trxframe* f);
+
 /*! \brief make a deep copy of a trajectory frame
  *
  * Allocates heap memory for structure and member arrays.
  * Returns nullptr if unable to allocate memory.
- * Caller must destroy returned frame before releasing ptr.
+ * A lambda deleter would be nice, but linkage gets tricky.
  * \param frame trx frame to copy
  * \returns trxframe_ptr
  * \internal
  */
-std::shared_ptr<t_trxframe> trxframe_copy(const t_trxframe& frame);
+std::unique_ptr<t_trxframe, void(*)(t_trxframe*)> trxframe_copy(const t_trxframe& frame);
 
 } // end namespace trajectory
 } //end namespace gmx
