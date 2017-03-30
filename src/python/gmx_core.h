@@ -11,14 +11,14 @@
 #include "gromacs/trajectoryanalysis/analysismodule.h"
 #include "gromacs/trajectoryanalysis/runner.h"
 #include "gromacs/options/options.h"
-
+#include <stdexcept>
 
 namespace gmx
 {
-/*! \brief API wrappers for Python bindings
- */
 class OptionsVisitor;
 
+/*! \brief API wrappers for Python bindings
+ */
 namespace pyapi
 {
 using std::shared_ptr;
@@ -54,8 +54,8 @@ private:
     std::string filename_;
 };
 
-// Apply a OptionsVisitor that prints out the contents of the Options collection.
-void print_options(const PyOptions& pyoptions);
+/// Apply a OptionsVisitor that prints out the contents of the Options collection.
+void print_options(const PyOptions& pyoptions); // can't, really...
 
 /*! \brief Wraps Trajectory Analyis Runner for Python interface.
  *
@@ -101,47 +101,98 @@ public:
         data_{}
     {};
     */
+    TrajDataArray() = delete;
+    TrajDataArray(const TrajDataArray&) = delete;
+    const TrajDataArray& operator=(const TrajDataArray&) = delete;
 
     // Allocate space for an NxD array
     TrajDataArray(size_t N) :
         data_(N*D),
         N_(N)
-    {};
+    {
+    };
 
     // Copy from raw data pointer.
-    TrajDataArray(Scalar* data, size_t N) :
-        data_(data, data + N*D),
+    TrajDataArray(Scalar* data_src, size_t N) :
+        //data_(data_src, data_src + N*D),
+        data_(N*D),
         N_(N)
     {
+        std::copy(data_src, data_src + N*D, data_.begin());
     };
 
     // Move constructor
     //TrajDataArray(TrajDataArray&& )
 
-    // The destructor cannot deallocate the memory pointed to.
-    ~TrajDataArray() {};
+    // Simple destructor.
+    ~TrajDataArray() { };
 
     size_t dim() const { return D; };
     size_t N() const { return N_; };
+
+    // This is very bad if the caller tries to delete the result.
     Scalar* data() { return data_.data(); };
 
+    std::vector<Scalar> operator[](const size_t i) const
+    {
+        if (i < N_)
+        {
+            return std::vector<Scalar>(&data_[i*D], &data_[i*D] + D);
+        }
+        else
+        {
+            throw std::out_of_range("bad index value to Trajectory data");
+        }
+    }
+
 private:
-    std::vector<Scalar> data_; // Flat
-    // Actual dimensions
+    /// Flattened array of data
+    std::vector<Scalar> data_;
+    /// Actual dimensions are N_ x D
     const size_t N_;
 };
 
+/// Minimal wrapper for t_trxframe.
+/*! Hopefully very temporary.
+ */
 class PyTrajectoryFrame
 {
 public:
-    /// Share ownership of a t_trxframe
-    PyTrajectoryFrame(std::shared_ptr<t_trxframe> frame);
+    /*! \brief Share ownership of a t_trxframe
+     *
+     * These shared pointers must originate from gmx::trajectory::trxframe_copy
+     * where a sensible deleter is provided. Unfortunately, this does not allow
+     * the lifetime of a member array to be decoupled from the rest of the frame.
+     */
+    explicit PyTrajectoryFrame(std::shared_ptr<t_trxframe> frame);
+
+    /*! Copy a t_trxframe
+     *
+     * The copy is performed by gmx::trajectory::trxframe_copy, which provides
+     * a sensible deleter, but cannot allow the lifetime of member arrays to
+     * be decoupled from the whole frame.
+     */
+    explicit PyTrajectoryFrame(const t_trxframe&);
+
+    /// With current t_trxframe usage, we have to be careful.
+    PyTrajectoryFrame() = delete;
+    const PyTrajectoryFrame& operator=(const PyTrajectoryFrame&) = delete;
 
     /// Return a handle to a buffer of positions
+    /* Ideally, this buffer's life is not tied to the frame it is in, but it is
+     * while we are using t_trxframe. We can copy the arrays for now to be on
+     * the safe side, which happens in the TrajDataArray constructor used.
+     * There is also something weird about lifetime management if a unique_ptr
+     * is used to provide the buffer interface to Python. Maybe the py::buffer_info
+     * does not keep alive the object that provides it, but a quick stepping
+     * through the code looks like the object does not survive the conversion
+     * from unique_ptr to shared_ptr in the export, so we can just use a shared_ptr
+     * return value for now.
+     */
     std::shared_ptr< TrajDataArray<real, 3> > x();
 
 private:
-    /// Handle to a t_trxframe object
+    /// Handle to a shareable t_trxframe object
     std::shared_ptr<t_trxframe> frame_;
 };
 

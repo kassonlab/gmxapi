@@ -18,10 +18,12 @@
 #include "gromacs/trajectory/trajectoryframe.h"
 
 //#include <iostream>
+#include <sstream>
 
 #include "pybind11/pybind11.h"
 
 using std::shared_ptr;
+using std::unique_ptr;
 using std::make_shared;
 
 namespace gmx
@@ -34,9 +36,15 @@ PyTrajectoryFrame::PyTrajectoryFrame(std::shared_ptr<t_trxframe> frame) :
 {
 }
 
-std::shared_ptr< TrajDataArray<real, 3> > PyTrajectoryFrame::x()
+PyTrajectoryFrame::PyTrajectoryFrame(const t_trxframe& frame) :
+    frame_{gmx::trajectory::trxframe_copy(frame)}
 {
-    return std::make_shared< TrajDataArray<real, 3> >(static_cast<real (*)>(frame_->x[0]), frame_->natoms);
+}
+
+shared_ptr< TrajDataArray<real, 3> > PyTrajectoryFrame::x()
+{
+    return make_shared< TrajDataArray<real, 3> >(frame_->x[0], frame_->natoms);
+    //return std::unique_ptr< TrajDataArray<real, 3> >(new TrajDataArray<real, 3> (frame_->x[0], frame_->natoms));
 }
 
 PyOptions::PyOptions() :
@@ -309,7 +317,14 @@ PYBIND11_PLUGIN(core) {
 
     // Export trajectory frame class
     py::class_< PyTrajectoryFrame, shared_ptr<PyTrajectoryFrame> > (m, "Frame")
-        .def("x", &PyTrajectoryFrame::x, "get positions");
+        // For some reason this doesn't work right if PyTrajectoryFrame::x returns
+        // a unique_ptr instead of a shared_ptr.
+        // Note that since TrajDataArray is a shim for the unmanaged arrays in t_trxframe
+        // and since this result is not cached, a TrajDataArray is
+        // constructed and destroyed each time the property is accessed.
+        .def_property_readonly("x", &PyTrajectoryFrame::x, "positions");
+
+    // Export the caching dummy module.
     // Default holder is std::unique_ptr, but we allow multiple handles to module.
     py::class_< gmx::trajectoryanalysis::CachingTafModule,
                 shared_ptr<gmx::trajectoryanalysis::CachingTafModule>,
@@ -317,12 +332,12 @@ PYBIND11_PLUGIN(core) {
               >(m, "CachingTafModule")
         .def(py::init())
         //.def("select", py:make_iterator...)
-        //.def("frame", &gmx::trajectoryanalysis::CachingTafModule::frame, "Retrieve cached trajectory frame.")
         .def("frame",
             [](const gmx::trajectoryanalysis::CachingTafModule &cache) -> shared_ptr<PyTrajectoryFrame>
             {
                 return std::make_shared<PyTrajectoryFrame>(cache.frame());
-            }
+            },
+            "Retrieve cached trajectory frame."
         );
 
     // Export options class
@@ -336,7 +351,7 @@ PYBIND11_PLUGIN(core) {
     // Export buffer class that exposes trajectory data arrays
     py::class_< TrajDataArray<real, 3>,
                 std::shared_ptr<TrajDataArray<real, 3> >
-              >(m, "TrajDataBuffer", py::buffer_protocol())
+              >(m, "TrajData3", py::buffer_protocol())
         // A buffer interface exported to Python.
         .def_buffer(
             [](TrajDataArray<real, 3> &data) -> py::buffer_info
@@ -375,7 +390,31 @@ PYBIND11_PLUGIN(core) {
             new (&data) TrajDataArray<real, 3>(static_cast<real *>(info.ptr), info.shape[0]);
         })
         // Inspect...
-        .def("N", &TrajDataArray<real, 3>::N, "number of elements");
+        .def("__repr__", [](const TrajDataArray<real, 3>& t)
+            {
+                std::stringstream repr;
+                //std::string repr{"tah dah!"};//
+                repr << t.N() << "x" << t.dim() << " array of trajectory data of type 'real'\n";
+                // Ugh...
+                for (size_t i=0; i < t.N(); ++i)
+                {
+                    repr << t[i][0] << "\t" << t[i][1] << "\t" << t[i][2] << "\n";
+                }
+            return repr.str();
+            }
+        )
+        .def_property_readonly("N", &TrajDataArray<real, 3>::N, "number of elements")
+        /* Needs better TrajDataArray
+        .def("__iter__", [](const TrajDataArray<real, 3> &s)
+             {
+                 return py::make_iterator(s.begin(), s.end());
+             },
+             py::keep_alive<0, 1>() // Essential: keep object alive while iterator exists
+            )
+        */
+        // Use generator or make a list instead...
+        //.def("__getitem__", [](const TrajDataArray<real, 3> &s, py::slice slice) -> TrajDataArray<real, 3>* {})
+        ;
 /*
     py::class_< gmx::Options >(m, "Options")
         .def(py::init<>()); // Need to figure out options passing...

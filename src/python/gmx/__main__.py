@@ -26,7 +26,9 @@ frames = mytraj.select('not implemented')
 try:
     frame = next(frames)
     print(frame)
-    print(numpy.array(frame.x(), copy=False))
+    print(frame.x)
+    print("{} atoms in frame".format(frame.x.N))
+    print(numpy.array(frame.x, copy=False))
 except StopIteration:
     print("no frames")
 

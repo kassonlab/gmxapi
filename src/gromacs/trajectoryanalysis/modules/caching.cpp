@@ -43,7 +43,7 @@ void CachingTafModule::analyzeFrame(int frnr,
     // The AnalysisData protocol seems inconsistent between the TAF overview
     // and the class documentation.
     // Copy assign the member shared_ptr with the input frame.
-    last_frame_ = trxframe_copy(fr);
+    last_frame_ = gmx::trajectory::trxframe_copy(fr);
 }
 
 void CachingTafModule::finishAnalysis(int nframes)
@@ -54,8 +54,7 @@ void CachingTafModule::finishAnalysis(int nframes)
 /// Does not produce output unless requested.
 void CachingTafModule::writeOutput() {}
 
-/// Return the last frame processed.
-// TODO implement
+/// Get a shared handle to the last frame processed.
 std::shared_ptr<t_trxframe> CachingTafModule::frame() const
 {
     return last_frame_;

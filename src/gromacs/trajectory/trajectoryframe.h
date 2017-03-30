@@ -99,6 +99,10 @@ struct t_trxframe
 };
 typedef struct t_trxframe t_trxframe;
 
+// Request explicit instantiation.
+template class std::shared_ptr<t_trxframe>;
+template class std::unique_ptr<t_trxframe>;
+
 /*! \brief Compare trajectory frames
  */
 void comp_frame(FILE *fp, t_trxframe *fr1, t_trxframe *fr2,
@@ -109,12 +113,23 @@ void done_frame(t_trxframe *frame);
 // Request explicit instantiation.
 template class std::shared_ptr<t_trxframe>;
 
+namespace gmx
+{
+namespace trajectory
+{
+
 /*! \brief make a deep copy of a trajectory frame
  *
  * Allocates heap memory for structure and member arrays.
  * Returns nullptr if unable to allocate memory.
  * Caller must destroy returned frame before releasing ptr.
+ * \param frame trx frame to copy
+ * \returns trxframe_ptr
+ * \internal
  */
 std::shared_ptr<t_trxframe> trxframe_copy(const t_trxframe& frame);
+
+} // end namespace trajectory
+} //end namespace gmx
 
 #endif

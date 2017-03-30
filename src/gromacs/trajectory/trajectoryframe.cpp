@@ -38,7 +38,7 @@
 
 #include <cstdio>
 #include <memory>
-
+#include <functional>
 #include <algorithm>
 
 #include "gromacs/math/veccompare.h"
@@ -107,11 +107,23 @@ void done_frame(t_trxframe *frame)
     sfree(frame->f);
 }
 
-std::shared_ptr<t_trxframe> trxframe_copy(const t_trxframe& frame)
+std::shared_ptr<t_trxframe> gmx::trajectory::trxframe_copy(const t_trxframe& frame)
 {
     // Copy construct the trajectory frame struct.
-    // std::make_unique not available until C++14
-    auto frame_copy = std::make_shared<t_trxframe>(frame);
+    // std::make_unique not available until C++14, but we probably want a
+    // custom deleter anyway.
+    std::shared_ptr<t_trxframe> frame_copy(new t_trxframe(frame),
+        [](t_trxframe* f)
+        {
+            if (f->title) delete f->title;
+            if (f->atoms) delete f->atoms;
+            if (f->x) delete[] f->x;
+            if (f->v) delete[] f->v;
+            if (f->f) delete[] f->f;
+            if (f->index) delete[] f->index;
+            delete f;
+        }
+    );
 
     // Allocate memory and copy the available member arrays.
     // Allow for addition of non-default copy constructor with
@@ -124,7 +136,6 @@ std::shared_ptr<t_trxframe> trxframe_copy(const t_trxframe& frame)
         for (auto i(0); i < frame.natoms; ++i)
         {
             std::copy(std::begin(frame.x[i]), std::end(frame.x[i]), frame_copy->x[i]);
-//            frame_copy->f[i] = frame.f[i];
         }
     }
     if (frame.v && (!frame_copy->v || frame.v == frame_copy->v))
@@ -143,7 +154,7 @@ std::shared_ptr<t_trxframe> trxframe_copy(const t_trxframe& frame)
             std::copy(std::begin(frame.f[i]), std::end(frame.f[i]), frame_copy->f[i]);
         }
     }
-    // TODO: this is not a complete copy...
+    // TODO: this is not a complete copy... missing atoms, title, index.
 
     return frame_copy;
 }

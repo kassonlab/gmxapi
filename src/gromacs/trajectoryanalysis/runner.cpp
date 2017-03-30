@@ -65,6 +65,7 @@ using gmx::IOptionsContainer;
 using gmx::SelectionOptionBehavior;
 
 using std::shared_ptr;
+using std::unique_ptr;
 using std::make_shared;
 
 // Initializes an empty TrajectoryAnalysisSettings and uses it to
@@ -126,7 +127,7 @@ void Runner::register_options(Options& options)
     */
 
     // A TimeUnitBehavior is an IOptionsBehavior
-    shared_ptr<TimeUnitBehavior> time_unit_behavior = make_shared<TimeUnitBehavior>();
+    const unique_ptr<TimeUnitBehavior> time_unit_behavior(new TimeUnitBehavior());
 
     // TODO: extract options behaviors from ICommandLineOptionsModuleSettings and ICommandLineOptionsModuleSettings from TrajectoryAnalysisSettings
     /*

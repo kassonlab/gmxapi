@@ -1,6 +1,7 @@
 /*! \file
  * \brief Declares the CachingTafModule
  *
+ * \internal
  */
 
 #ifndef GMX_TRAJECTORYANALYSIS_CACHING_H
@@ -16,12 +17,17 @@ using gmx::TrajectoryAnalysisSettings;
 using gmx::TopologyInformation;
 using gmx::IOptionsContainer;
 
+/*! \brief Provide a dummy module to grab copies of frames received.
+ *
+ * Objects of this class are useful for testing runners, pipelines,
+ * and other proofs of concept. This rough draft should be replaced
+ * soon with a class that uses the data modules to retrieve and
+ * store trajectory info and to use selection processing.
+ * /internal
+ */
 class CachingTafModule : public gmx::TrajectoryAnalysisModule
 {
 public:
-    // Additional methods provide by derived class
-    std::shared_ptr<t_trxframe> frame() const;
-
     // Implement required virtual functions from base class
 
     virtual void initOptions(IOptionsContainer *options,
@@ -38,6 +44,12 @@ public:
     virtual void finishAnalysis(int nframes);
 
     virtual void writeOutput();
+
+    /*! \brief Additional methods provided by this class.
+     *
+     * \internal
+     */
+    std::shared_ptr<t_trxframe> frame() const;
 
 private:
     std::shared_ptr<t_trxframe> last_frame_; //!< cache the last frame read.
