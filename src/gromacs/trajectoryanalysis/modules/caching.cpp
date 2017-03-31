@@ -49,12 +49,17 @@ void CachingTafModule::analyzeFrame(int frnr,
                               t_pbc *pbc,
                               TrajectoryAnalysisModuleData *pdata)
 {
-    // Let's just grab a copy of the frame, using the unpublished trxframe interface.
+    // Let's just grab a copy of the frame, using the trxframe interface.
     // We can stash it in an AnalysisData object, but don't need to for a first draft.
-    // The AnalysisData protocol seems inconsistent between the TAF overview
-    // and the class documentation.
     // Copy assign the member shared_ptr with the input frame.
     last_frame_ = gmx::trajectory::trxframe_copy(fr);
+    /*
+    Note AnalysisData != TrajectoryAnalysisModuleData. The TrajectoryAnalysisModuleData object provided by the runner mediates access
+    to the AnalysisData members of *this as configured with initAnalysis() and startFrames(). The Selection objects available via the TrajectoryAnalysisModuleData are probably more useful than direct trxframe access, anyway.
+    */
+    /*! TODO: use data module for analyzeFrame to retain a shared_ptr
+    * to the trajectory frame data rather than copying fr.
+    */
 }
 
 // Is there a Gromacs convention for tagging unused function parameters?

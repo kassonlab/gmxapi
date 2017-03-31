@@ -293,6 +293,29 @@ const char* const name = "core"; ///< used to set __name__
 const char* const docstring = "Gromacs core module"; ///< used to set __doc__
 
 /*! \internal \brief Export gmx.core Python module in shared object file.
+ *
+ // One goal of these bindings is to declare a buffer type suitable for numpy Nx3 array output.
+ // If we want to pass access but not ownership to Python, we need to make
+ // sure we can allow a C++ shared pointer ref count to be increased.
+ // The buffer protocol requires that the exporter (this code) keeps the
+ // memory valid for the exported view until all consumers are done and
+ // the PyBuffer_Release(buffer *view) is issued. I'm not sure, but I assume
+ // pybind11 manages that for us by holding a shared_ptr to this. However, there
+ // seem to be subtleties I overlooked in some testing, so this warrants
+ // further investigation.
+ //
+ // To be safe (and in general) we can use the keep_alive<>() call policy
+ // and return_value_policy annotations.
+ // The keep_alive<Nurse, Patient>() call policy keeps Patient alive as long
+ // as Nurse is alive. Indices for Nurse or Patient are 0 for the return value
+ // of the annotated function
+ // and higher numbers for arguments. For member functions, index 1 is used
+ // for the this* object.
+ //
+ // The pybind11 documentation notes "For functions returning smart pointers, it is not necessary to specify a return value policy."
+ // and
+ // "It is even possible to completely avoid copy operations with Python expressions like np.array(matrix_instance, copy = False)"
+ //
  */
 PYBIND11_PLUGIN(core) {
     using namespace gmx::pyapi;
@@ -353,6 +376,14 @@ PYBIND11_PLUGIN(core) {
                 std::shared_ptr<TrajDataArray<real, 3> >
               >(m, "TrajData3", py::buffer_protocol())
         // A buffer interface exported to Python.
+        // I'm not sure that def_buffer implies return_value_policy::reference_internal,
+        // which implies keep_alive<0,1> to make sure that C++ will keep the
+        // object alive as long as the return value is alive, def_buffer does
+        // not take return_value_policy arguments. It would be nice if we could
+        // instead use the support for Eigen / numpy compatibility.
+        // Note that the bindings for std::vector use reference_internal for __getitem__
+        // and keep_alive<0,1> for __iter__ but nothing for the def_buffer interface to
+        // std::vector. However, it copies data from the py::buffer in the vector_buffer __init__
         .def_buffer(
             [](TrajDataArray<real, 3> &data) -> py::buffer_info
             {
@@ -367,6 +398,22 @@ PYBIND11_PLUGIN(core) {
             }
         )
         // Accept buffers from Python.
+        // We should be careful to safely perform a no-copy construction from a
+        // buffer when TrajDataArray can have multiple references on the C++ side.
+        // If the Python buffer views are all closed and there are no more
+        // Python references to the object, then any remaining C++ references
+        // to the object will have their data become invalid if the buffer object
+        // is allowed to be released. I need to look into this more, but if pybind11 doesn't
+        // already do it, we can keep the source of the buffer alive by using
+        // keep_alive<1,3> in the init method to keep the py::buffer argument
+        // alive as long as the TrajDataArray. return_value_policy::reference
+        // prevents Python from taking ownership (C++ manages the lifetime).
+        // If we want to set
+        // data in TrajDataArray objects with minimal copies, we can implement
+        // element access methods to write directly from Python to the managed
+        // array.
+        // TO DO: only accept dense numpy arrays with array_t arguments.
+        // py::array_t<real, py::array::c_style | py::array::forcecast> data
         .def("__init__", [](TrajDataArray<real, 3> &data, py::buffer b)
         {
             /* Request a buffer descriptor from Python */
