@@ -39,3 +39,7 @@ install(TARGETS core DESTINATION ${PYGMX_INSTALL_DIR}/gmx)
 #    "${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in"
 #    "${CMAKE_BINARY_DIR}/setup.py"
 #)
+
+if (BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
