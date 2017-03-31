@@ -57,12 +57,10 @@ class IOptionsContainer;
 
 namespace trajectoryanalysis
 {
-//using gmx::TrajectoryAnalysisModule;
-// Force symbol availability
-//template class std::shared_ptr<gmx::TrajectoryAnalysisModule>;
 
 /*! \brief Generic runner for modules in Trajectory Analysis Framework
  *
+ * \brief
  * The protocol described in the Trajectory Analysis Framework for a runner to
  * drive analysis tools is not implemented generically and publicly for runner
  * classes to use.
@@ -94,10 +92,11 @@ namespace trajectoryanalysis
  *    auto mymodule = std::make_shared<Module>(Module());
  *    auto runner = Runner();
  *    runner.add_module(mymodule);
+ *    runner.register_options(options)
  *    runner.initialize(options);
- *    runner.next();
- *    int frame_number = runner.next();
+ *    bool end_of_data = runner.next();
  *    runner.run();
+ *    assert(runner.next() == false);
  *    del runner;
  *    do_something(mymodule);
  *    del mymodule;
@@ -117,9 +116,20 @@ public:
     /// Finalize options and read first frame.
     void initialize(gmx::Options& options);
 
+    /*! \brief Registers a TrajectoryAnalysisModule with the runner.
+     *
+     * Currently can only handle a single runner.
+     * \return another shared pointer to the module added.
+     * Could be set to null if unsuccessful. This exists in case we want to
+     * allow an overload that takes ownership of a module that is not already
+     * managed.
+     */
     gmx::TrajectoryAnalysisModuleSharedPointer add_module(gmx::TrajectoryAnalysisModuleSharedPointer module);
 
-    /// Advance one frame. Return false if there are no more frames.
+    /*! \brief Advance one frame.
+     *
+     * \return false if there are no more frames.
+     */
     bool next();
 
     /// Process all remaining available frames

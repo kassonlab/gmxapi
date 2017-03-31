@@ -50,9 +50,14 @@
 #include <string>
 
 // How do I set the working directory or input path appropriately?
-//const std::string filepath = std::string(SOURCEDIR) + "/em-vac.trr";
+/*! \internal \brief input file path
+ *
+ * \{
+ */
 const std::string filepath = std::string(SOURCEDIR) + "/simple.gro";
 const char* const trjfile = filepath.c_str();
+/*! \}
+ */
 
 /// trxframe test case
 TEST(TrxFrameTest, Construct)

@@ -67,46 +67,48 @@
 *
 * \ingroup module_trajectory
 * \ingroup libraryapi
+* \{
 */
 struct t_trxframe
 {
     int             not_ok;    ///< integrity flags
     gmx_bool        bDouble;   ///< Double precision?
     int             natoms;    ///< number of atoms (atoms, x, v, f, index) */
-    gmx_bool        bTitle;
+    gmx_bool        bTitle;    ///< has title
     const char     *title;     ///< title of the frame
-    gmx_bool        bStep;
+    gmx_bool        bStep;     ///< has step
     gmx_int64_t     step;      ///< MD step number
-    gmx_bool        bTime;
+    gmx_bool        bTime;     ///< has time
     real            time;      ///< time of the frame
-    gmx_bool        bLambda;
+    gmx_bool        bLambda;   ///< has lambda
     gmx_bool        bFepState; ///< does it contain fep_state?
     real            lambda;    ///< free energy perturbation lambda
     int             fep_state; ///< which fep state are we in?
-    gmx_bool        bAtoms;
+    gmx_bool        bAtoms;    ///< has atoms
     t_atoms        *atoms;     ///< atoms struct (natoms)
-    gmx_bool        bPrec;
+    gmx_bool        bPrec;     ///< has prec
     real            prec;      ///< precision of x, fraction of 1 nm
-    gmx_bool        bX;
+    gmx_bool        bX;        ///< has x
     rvec           *x;         ///< coordinates (natoms)
-    gmx_bool        bV;
+    gmx_bool        bV;        ///< has v
     rvec           *v;         ///< velocities (natoms)
-    gmx_bool        bF;
+    gmx_bool        bF;        ///< has f
     rvec           *f;         ///< forces (natoms)
-    gmx_bool        bBox;
+    gmx_bool        bBox;      ///< has box
     matrix          box;       ///< the 3 box vectors
-    gmx_bool        bPBC;
+    gmx_bool        bPBC;      ///< has pbc
     int             ePBC;      ///< the type of pbc
-    gmx_bool        bIndex;
+    gmx_bool        bIndex;    ///< has index
     int            *index;     ///< atom indices of contained coordinates
 };
 typedef struct t_trxframe t_trxframe;
+/// \}
 
 // Request explicit instantiation.
 template class std::shared_ptr<t_trxframe>;
 template class std::unique_ptr<t_trxframe>;
 
-/*! \brief Compare trajectory frames
+/*! \libinternal \brief Compare trajectory frames
  */
 void comp_frame(FILE *fp, t_trxframe *fr1, t_trxframe *fr2,
                 gmx_bool bRMSD, real ftol, real abstol);
@@ -124,6 +126,7 @@ namespace trajectory
 /*! \brief Deleter for t_trxframe
  *
  * Used for objects created with frame_copy.
+ * \internal
  */
 void trxframe_deleter(t_trxframe* f);
 

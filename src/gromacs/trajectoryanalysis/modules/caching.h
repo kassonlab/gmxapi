@@ -59,12 +59,21 @@ private:
  *
  * Various code for registering modules requires a class (undocumented?)
  * providing these three members.
+ * \internal
+ * \ingroup module_trajectoryanalysis
  */
 class CacheInfo
 {
 public:
+    /// Name to register for module
     static const char name[];
+    /// Description for registration
     static const char shortDescription[];
+
+    /*! \brief Get pointer for registering module
+     *
+     * \return pointer to a new CachingTafModule
+     */
     static TrajectoryAnalysisModulePointer create();
 };
 
