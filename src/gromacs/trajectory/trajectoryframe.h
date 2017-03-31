@@ -113,10 +113,10 @@ template class std::unique_ptr<t_trxframe>;
 void comp_frame(FILE *fp, t_trxframe *fr1, t_trxframe *fr2,
                 gmx_bool bRMSD, real ftol, real abstol);
 
+/*! \libinternal \brief Frees memory for a trajectory frame
+ *
+ */
 void done_frame(t_trxframe *frame);
-
-// Request explicit instantiation.
-template class std::shared_ptr<t_trxframe>;
 
 namespace gmx
 {
@@ -125,7 +125,8 @@ namespace trajectory
 
 /*! \brief Deleter for t_trxframe
  *
- * Used for objects created with frame_copy.
+ * Used for objects created with frame_copy. Not sure if this tackles the same
+ * exact task as done_frame, introduced recently.
  * \internal
  */
 void trxframe_deleter(t_trxframe* f);
