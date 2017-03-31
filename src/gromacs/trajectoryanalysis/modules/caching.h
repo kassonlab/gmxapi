@@ -55,6 +55,19 @@ private:
     std::shared_ptr<t_trxframe> last_frame_; //!< cache the last frame read.
 };
 
+/*! \brief Module info for Caching module
+ *
+ * Various code for registering modules requires a class (undocumented?)
+ * providing these three members.
+ */
+class CacheInfo
+{
+public:
+    static const char name[];
+    static const char shortDescription[];
+    static TrajectoryAnalysisModulePointer create();
+};
+
 } // end namespace trajectoryanalysis
 } // end namespace gmx
 

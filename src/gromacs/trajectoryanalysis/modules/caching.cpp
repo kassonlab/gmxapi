@@ -16,6 +16,15 @@ namespace gmx
 namespace trajectoryanalysis
 {
 
+const char CacheInfo::name[] = "cache";
+const char CacheInfo::shortDescription[] =
+    "Cache a frame of trajectory data";
+
+TrajectoryAnalysisModulePointer CacheInfo::create()
+{
+    return TrajectoryAnalysisModulePointer(new CachingTafModule);
+}
+
 // Implement required functions from base class
 
 void CachingTafModule::initOptions(IOptionsContainer *options,
