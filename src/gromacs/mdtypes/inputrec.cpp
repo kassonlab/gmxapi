@@ -39,6 +39,7 @@
 #include "inputrec.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include <algorithm>
@@ -67,6 +68,19 @@
 const int nstmin_berendsen_tcouple =  5;
 const int nstmin_berendsen_pcouple = 10;
 const int nstmin_harmonic          = 20;
+
+t_inputrec::t_inputrec()
+{
+    std::memset(this, 0, sizeof(*this));
+    snew(fepvals, 1);
+    snew(expandedvals, 1);
+    snew(simtempvals, 1);
+}
+
+t_inputrec::~t_inputrec()
+{
+    done_inputrec(this);
+}
 
 static int nst_wanted(const t_inputrec *ir)
 {
@@ -277,6 +291,18 @@ static void done_pull_params(pull_params_t *pull)
     sfree(pull->coord);
 }
 
+static void done_lambdas(t_lambda *fep)
+{
+    if (fep->n_lambda > 0)
+    {
+        for (int i = 0; i < efptNR; i++)
+        {
+            sfree(fep->all_lambda[i]);
+        }
+        sfree(fep->all_lambda);
+    }
+}
+
 void done_inputrec(t_inputrec *ir)
 {
     sfree(ir->opts.nrdf);
@@ -300,6 +326,8 @@ void done_inputrec(t_inputrec *ir)
     sfree(ir->opts.SAsteps);
     sfree(ir->opts.bOPT);
     sfree(ir->opts.bTS);
+    sfree(ir->opts.egp_flags);
+    done_lambdas(ir->fepvals);
     sfree(ir->fepvals);
     sfree(ir->expandedvals);
     sfree(ir->simtempvals);

@@ -54,7 +54,9 @@
 #include "gromacs/gmxana/gmx_ana.h"
 #include "gromacs/utility/arraysize.h"
 #include "gromacs/utility/cstringutil.h"
+#include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/fatalerror.h"
+#include "gromacs/utility/filestream.h"
 #include "gromacs/utility/futil.h"
 #include "gromacs/utility/gmxassert.h"
 #include "gromacs/utility/smalloc.h"
@@ -124,7 +126,8 @@ void get_params(const char *mpin, const char *mpout, t_psrec *psr)
 
     if (mpin != nullptr)
     {
-        inp = read_inpfile(mpin, &ninp, wi);
+        gmx::TextInputFile stream(mpin);
+        inp = read_inpfile(&stream, mpin, &ninp, wi);
     }
     else
     {
@@ -176,7 +179,9 @@ void get_params(const char *mpin, const char *mpout, t_psrec *psr)
 
     if (mpout != nullptr)
     {
-        write_inpfile(mpout, ninp, inp, TRUE, wi);
+        gmx::TextOutputFile stream(mpout);
+        write_inpfile(&stream, mpout, ninp, inp, TRUE, WriteMdpHeader::yes, wi);
+        stream.close();
     }
 
     done_warning(wi, FARGS);
@@ -799,7 +804,11 @@ void ps_mat(const char *outf, int nmat, t_matrix mat[], t_matrix mat2[],
 
     /* memory leak: */
     libm2p = m2p ? gmxlibfn(m2p) : m2p;
-    get_params(libm2p, m2pout, &psrec);
+    try
+    {
+        get_params(libm2p, m2pout, &psrec);
+    }
+    GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR;
 
     psr = &psrec;
 

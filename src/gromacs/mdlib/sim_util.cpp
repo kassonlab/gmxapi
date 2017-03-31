@@ -86,6 +86,7 @@
 #include "gromacs/mdlib/nbnxn_kernels/simd_2xnn/nbnxn_kernel_simd_2xnn.h"
 #include "gromacs/mdlib/nbnxn_kernels/simd_4xn/nbnxn_kernel_simd_4xn.h"
 #include "gromacs/mdtypes/commrec.h"
+#include "gromacs/mdtypes/iforceprovider.h"
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/md_enums.h"
 #include "gromacs/mdtypes/state.h"
@@ -2483,11 +2484,21 @@ void finish_run(FILE *fplog, const gmx::MDLogger &mdlog, t_commrec *cr,
             elapsed_time_over_all_ranks,
             elapsed_time_over_all_threads,
             elapsed_time_over_all_threads_over_all_ranks;
+    /* Control whether it is valid to print a report. Only the
+       simulation master may print, but it should not do so if the run
+       terminated e.g. before a scheduled reset step. This is
+       complicated by the fact that PME ranks are unaware of the
+       reason why they were sent a pmerecvqxFINISH. To avoid
+       communication deadlocks, we always do the communication for the
+       report, even if we've decided not to write the report, because
+       how long it takes to finish the run is not important when we've
+       decided not to report on the simulation performance. */
+    bool    printReport = SIMMASTER(cr);
 
     if (!walltime_accounting_get_valid_finish(walltime_accounting))
     {
         GMX_LOG(mdlog.warning).asParagraph().appendText("Simulation ended prematurely, no performance report will be written.");
-        return;
+        printReport = false;
     }
 
     if (cr->nnodes > 1)
@@ -2525,7 +2536,7 @@ void finish_run(FILE *fplog, const gmx::MDLogger &mdlog, t_commrec *cr,
     }
 #endif
 
-    if (SIMMASTER(cr))
+    if (printReport)
     {
         print_flop(fplog, nrnb_tot, &nbfs, &mflop);
     }
@@ -2548,7 +2559,7 @@ void finish_run(FILE *fplog, const gmx::MDLogger &mdlog, t_commrec *cr,
     wallcycle_scale_by_num_threads(wcycle, cr->duty == DUTY_PME, nthreads_pp, nthreads_pme);
     auto cycle_sum(wallcycle_sum(cr, wcycle));
 
-    if (SIMMASTER(cr))
+    if (printReport)
     {
         struct gmx_wallclock_gpu_t* gputimes = use_GPU(nbv) ? nbnxn_gpu_get_timings(nbv->gpu_nbv) : nullptr;
 
@@ -2640,7 +2651,8 @@ extern void initialize_lambdas(FILE *fplog, t_inputrec *ir, int *fep_state, gmx:
 
 
 void init_md(FILE *fplog,
-             t_commrec *cr, t_inputrec *ir, const gmx_output_env_t *oenv,
+             t_commrec *cr, gmx::IMDOutputProvider *outputProvider,
+             t_inputrec *ir, const gmx_output_env_t *oenv,
              double *t, double *t0,
              gmx::ArrayRef<real> lambda, int *fep_state, double *lam0,
              t_nrnb *nrnb, gmx_mtop_t *mtop,
@@ -2703,7 +2715,7 @@ void init_md(FILE *fplog,
 
     if (nfile != -1)
     {
-        *outf = init_mdoutf(fplog, nfile, fnm, Flags, cr, ir, mtop, oenv, wcycle);
+        *outf = init_mdoutf(fplog, nfile, fnm, Flags, cr, outputProvider, ir, mtop, oenv, wcycle);
 
         *mdebin = init_mdebin((Flags & MD_APPENDFILES) ? nullptr : mdoutf_get_fp_ene(*outf),
                               mtop, ir, mdoutf_get_fp_dhdl(*outf));

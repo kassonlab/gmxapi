@@ -46,6 +46,7 @@
  */
 
 #include "gromacs/gpu_utils/cuda_arch_utils.cuh"
+#include "gromacs/gpu_utils/cuda_kernel_utils.cuh"
 #include "gromacs/math/utilities.h"
 #include "gromacs/pbcutil/ishift.h"
 /* Note that floating-point constants in CUDA code should be suffixed
@@ -185,9 +186,6 @@ __global__ void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_cuda)
 #ifdef EL_RF
     float two_k_rf              = nbparam.two_k_rf;
 #endif
-#ifdef EL_EWALD_TAB
-    float coulomb_tab_scale     = nbparam.coulomb_tab_scale;
-#endif
 #ifdef EL_EWALD_ANA
     float beta2                 = nbparam.ewald_beta*nbparam.ewald_beta;
     float beta3                 = nbparam.ewald_beta*nbparam.ewald_beta*nbparam.ewald_beta;
@@ -276,7 +274,8 @@ __global__ void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_cuda)
         ci = sci * c_numClPerSupercl + tidxj;
         ai = ci * c_clSize + tidxi;
 
-        xqbuf    = xq[ai] + shift_vec[nb_sci.shift];
+        float  *shiftptr = (float *)&shift_vec[nb_sci.shift];
+        xqbuf    = xq[ai] + make_float4(LDG(shiftptr), LDG(shiftptr + 1), LDG(shiftptr + 2), 0.0f);
         xqbuf.w *= nbparam.epsfac;
         xqib[tidxj * c_clSize + tidxi] = xqbuf;
 
@@ -342,6 +341,10 @@ __global__ void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_cuda)
 
 #endif                                  /* CALC_ENERGIES */
 
+#ifdef EXCLUSION_FORCES
+    const int nonSelfInteraction = !(nb_sci.shift == CENTRAL & tidxj <= tidxi);
+#endif
+
     /* loop over the j clusters = seen by any of the atoms in the current super-cluster */
     for (j4 = cij4_start + tidxz; j4 < cij4_end; j4 += NTHREAD_Z)
     {
@@ -354,7 +357,7 @@ __global__ void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_cuda)
 #endif
         {
             /* Pre-load cj into shared memory on both warps separately */
-            if ((tidxj == 0 || tidxj == 4) && tidxi < c_nbnxnGpuJgroupSize)
+            if ((tidxj == 0 | tidxj == 4) & (tidxi < c_nbnxnGpuJgroupSize))
             {
                 cjs[tidxi + tidxj * c_nbnxnGpuJgroupSize/c_splitClSize] = pl_cj4[j4].cj[tidxi];
             }
@@ -415,10 +418,9 @@ __global__ void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_cuda)
 
                             /* cutoff & exclusion check */
 #ifdef EXCLUSION_FORCES
-                            if (r2 < rcoulomb_sq *
-                                (nb_sci.shift != CENTRAL || ci != cj || tidxj > tidxi))
+                            if ((r2 < rcoulomb_sq) * (nonSelfInteraction | (ci != cj)))
 #else
-                            if (r2 < rcoulomb_sq * int_bit)
+                            if ((r2 < rcoulomb_sq) * int_bit)
 #endif
                             {
                                 /* load the rest of the i-atom parameters */
@@ -427,8 +429,7 @@ __global__ void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_cuda)
 #ifndef LJ_COMB
                                 /* LJ 6*C6 and 12*C12 */
                                 typei   = atib[i * c_clSize + tidxi];
-                                c6      = tex1Dfetch<float>(nbparam.nbfp_texobj, 2 * (ntypes * typei + typej));
-                                c12     = tex1Dfetch<float>(nbparam.nbfp_texobj, 2 * (ntypes * typei + typej) + 1);
+                                fetch_nbfp_c6_c12(c6, c12, nbparam, ntypes * typei + typej);
 #else
                                 ljcp_i  = ljcpib[i * c_clSize + tidxi];
 #ifdef LJ_COMB_GEOM
@@ -538,7 +539,7 @@ __global__ void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_cuda)
                                 F_invr  += qi * qj_f * (int_bit*inv_r2*inv_r + pmecorrF(beta2*r2)*beta3);
 #elif defined EL_EWALD_TAB
                                 F_invr  += qi * qj_f * (int_bit*inv_r2 -
-                                                        interpolate_coulomb_force_r(nbparam.coulomb_tab_texobj, r2 * inv_r, coulomb_tab_scale)) * inv_r;
+                                                        interpolate_coulomb_force_r(nbparam, r2 * inv_r)) * inv_r;
 #endif                          /* EL_EWALD_ANA/TAB */
 
 #ifdef CALC_ENERGIES

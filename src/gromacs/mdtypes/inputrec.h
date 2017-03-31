@@ -34,12 +34,6 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \brief
- * Declares inputrec data structure and utilities.
- *
- * \inpublicapi
- * \ingroup module_mdtypes
- */
 #ifndef GMX_MDTYPES_INPUTREC_H
 #define GMX_MDTYPES_INPUTREC_H
 
@@ -53,76 +47,12 @@
 #define EGP_EXCL  (1<<0)
 #define EGP_TABLE (1<<1)
 
-struct gmx_output_env_t;
 struct pull_params_t;
-struct t_filenm;
-struct t_forcerec;
 
 namespace gmx
 {
-
-class IKeyValueTreeTransformRules;
-class IOptionsContainerWithSections;
 class KeyValueTreeObject;
-
-/*! \libinternal \brief
- * Inputrec extension interface for a mdrun module.
- *
- * This interface provides a mechanism for additional modules to contribute
- * data that traditionally has been kept in t_inputrec. This is essentially
- * parameters read from an mdp file and subsequently stored in a tpr file.
- * The functionality to broadcast, compare, and print these parameters
- * currently needs to be provided separately, but this should simplify
- * significantly if/when we move to a more structured file format (both for mdp
- * and tpr) that allows a generic representation for code that does not need to
- * know the interpretation of the values.
- *
- * For now, this interface also includes some unrelated methods (initOutput(),
- * finishOutput(), initForcerec()), because t_inputrec is used as a container
- * to pass references to the modules around.
- * See MDModules for more information on the general approach and future
- * considerations.
- */
-class IInputRecExtension
-{
-    public:
-        virtual ~IInputRecExtension() {}
-
-        /*! \brief
-         * Initializes a transform from mdp values to sectioned options.
-         *
-         * The transform is specified from a flat KeyValueTreeObject that
-         * contains each mdp value as a property, to a structure which is then
-         * assigned to the options defined with initMdpOptions().
-         */
-        virtual void initMdpTransform(IKeyValueTreeTransformRules *transform) = 0;
-        /*! \brief
-         * Defines input (mdp) parameters for this extension.
-         */
-        virtual void initMdpOptions(IOptionsContainerWithSections *options) = 0;
-
-        /*! \brief Initiate output parameters
-         *
-         * \param[in] fplog File pointer for log messages
-         * \param[in] nfile Number of files
-         * \param[in] fnm   Array of filenames and properties
-         * \param[in] bAppendFiles Whether or not we should append to files
-         * \param[in] oenv  The output environment for xvg files
-         */
-        virtual void initOutput(FILE *fplog, int nfile, const t_filenm fnm[],
-                                bool bAppendFiles, const gmx_output_env_t *oenv) = 0;
-
-        //! Finalize output
-        virtual void finishOutput()               = 0;
-
-        /*! \brief Set/initiate relevant options in the forcerec structure
-         *
-         * \param[inout] fr The forcerec structure
-         */
-        virtual void initForcerec(t_forcerec *fr) = 0;
-};
-
-} // namespace gmx
+}
 
 typedef struct t_grpopts {
     int       ngtc;           /* # T-Coupl groups                        */
@@ -302,11 +232,13 @@ typedef struct t_swapcoords {
                                             * swapcoords.cpp                               */
 } t_swapcoords;
 
-// TODO gmx::IInputRecExtension pointers (e.g. efield) will eventually
-// be removed from this struct. In at least some cases, those will be
-// handled by MDModules.
 struct t_inputrec
 {
+    t_inputrec();
+    explicit t_inputrec(const t_inputrec &) = delete;
+    t_inputrec &operator=(const t_inputrec &) = delete;
+    ~t_inputrec();
+
     int             eI;                      /* Integration method                 */
     gmx_int64_t     nsteps;                  /* number of steps to be taken			*/
     int             simulation_part;         /* Used in checkpointing to separate chunks */
@@ -447,7 +379,6 @@ struct t_inputrec
     real                     userreal3;
     real                     userreal4;
     t_grpopts                opts;          /* Group options				*/
-    gmx::IInputRecExtension *efield;        /* Applied electric field                       */
     gmx_bool                 bQMMM;         /* QM/MM calculation                            */
     int                      QMconstraints; /* constraints on QM bonds                      */
     int                      QMMMscheme;    /* Scheme: ONIOM or normal                      */

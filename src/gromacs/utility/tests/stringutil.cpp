@@ -58,6 +58,10 @@
 #include "testutils/refdata.h"
 #include "testutils/stringtest.h"
 
+namespace gmx
+{
+namespace test
+{
 namespace
 {
 
@@ -136,6 +140,26 @@ TEST(StringUtilityTest, SplitDelimitedString)
     EXPECT_THAT(gmx::splitDelimitedString("foo", ';'), ElementsAre("foo"));
     EXPECT_THAT(gmx::splitDelimitedString(";", ';'), ElementsAre("", ""));
     EXPECT_THAT(gmx::splitDelimitedString("", ';'), IsEmpty());
+}
+
+TEST(StringUtilityTest, SplitAndTrimDelimitedString)
+{
+    using ::testing::ElementsAre;
+    using ::testing::IsEmpty;
+    EXPECT_THAT(splitAndTrimDelimitedString("", ';'), IsEmpty());
+    EXPECT_THAT(splitAndTrimDelimitedString(" \t\n ", ';'), ElementsAre(""));
+    EXPECT_THAT(splitAndTrimDelimitedString("foo", ';'), ElementsAre("foo"));
+    EXPECT_THAT(splitAndTrimDelimitedString(" foo ", ';'), ElementsAre("foo"));
+    EXPECT_THAT(splitAndTrimDelimitedString("foo;bar", ';'), ElementsAre("foo", "bar"));
+    EXPECT_THAT(splitAndTrimDelimitedString(";foo;bar", ';'), ElementsAre("", "foo", "bar"));
+    EXPECT_THAT(splitAndTrimDelimitedString("foo;bar;", ';'), ElementsAre("foo", "bar", ""));
+    EXPECT_THAT(splitAndTrimDelimitedString(";foo;bar;", ';'), ElementsAre("", "foo", "bar", ""));
+    EXPECT_THAT(splitAndTrimDelimitedString("foo;;bar", ';'), ElementsAre("foo", "", "bar"));
+    EXPECT_THAT(splitAndTrimDelimitedString("foo  ;  bar ", ';'), ElementsAre("foo", "bar"));
+    EXPECT_THAT(splitAndTrimDelimitedString("  ; foo ;  bar ", ';'), ElementsAre("", "foo", "bar"));
+    EXPECT_THAT(splitAndTrimDelimitedString(" foo  ;  bar ; ", ';'), ElementsAre("foo", "bar", ""));
+    EXPECT_THAT(splitAndTrimDelimitedString(" ;  foo\n ;  bar ;  ", ';'), ElementsAre("", "foo", "bar", ""));
+    EXPECT_THAT(splitAndTrimDelimitedString(" foo  ; ; \tbar", ';'), ElementsAre("foo", "", "bar"));
 }
 
 /********************************************************************
@@ -284,7 +308,7 @@ TEST_F(TextLineWrapperTest, HandlesTrailingWhitespace)
 
     wrapper.settings().setKeepFinalSpaces(true);
     EXPECT_EQ("line   ", wrapper.wrapToString("line   "));
-    EXPECT_EQ("line\n", wrapper.wrapToString("line   \n"));
+    EXPECT_EQ("line   \n", wrapper.wrapToString("line   \n"));
 }
 
 TEST_F(TextLineWrapperTest, HandlesTrailingNewlines)
@@ -400,6 +424,12 @@ TEST_F(TextLineWrapperTest, WrapsCorrectlyWithExtraWhitespace)
 
     checkText(wrapper.wrapToString(g_wrapTextWhitespace),
               "WrappedAt14");
+
+    wrapper.settings().setKeepFinalSpaces(true);
+    checkText(wrapper.wrapToString(g_wrapTextWhitespace),
+              "WrappedAt14WithTrailingWhitespace");
 }
 
+} // namespace
+} // namespace
 } // namespace

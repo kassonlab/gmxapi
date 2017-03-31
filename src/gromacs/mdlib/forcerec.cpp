@@ -80,6 +80,7 @@
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/fcdata.h"
 #include "gromacs/mdtypes/group.h"
+#include "gromacs/mdtypes/iforceprovider.h"
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/md_enums.h"
 #include "gromacs/pbcutil/ishift.h"
@@ -2304,6 +2305,7 @@ void init_forcerec(FILE                *fp,
                    const gmx::MDLogger &mdlog,
                    t_forcerec          *fr,
                    t_fcdata            *fcd,
+                   IForceProvider      *forceProviders,
                    const t_inputrec    *ir,
                    const gmx_mtop_t    *mtop,
                    const t_commrec     *cr,
@@ -2824,7 +2826,7 @@ void init_forcerec(FILE                *fp,
     /* Initialization call after setting bF_NoVirSum,
      * since it efield->initForcerec also sets this to true.
      */
-    ir->efield->initForcerec(fr);
+    forceProviders->initForcerec(fr);
 
     if (fr->bF_NoVirSum)
     {

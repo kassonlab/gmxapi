@@ -56,7 +56,6 @@
 #include "gromacs/math/utilities.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/perf_est.h"
-#include "gromacs/mdrunutility/mdmodules.h"
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/md_enums.h"
@@ -661,17 +660,17 @@ static void check_mdrun_works(gmx_bool    bThreads,
      * gmx_print_version_info() in the GMX_MPI section */
     const char match_mpi[]     = "MPI library:        MPI";
     const char match_mdrun[]   = "Executable: ";
-    const char match_gpu[]     = "GPU support:        enabled";
+    const char match_nogpu[]   = "GPU support:        disabled";
     gmx_bool   bMdrun          = FALSE;
     gmx_bool   bMPI            = FALSE;
-    gmx_bool   bHaveGpuSupport = FALSE;
+    gmx_bool   bHaveGpuSupport = TRUE;
 
     /* Run a small test to see whether mpirun + mdrun work  */
     fprintf(stdout, "Making sure that mdrun can be executed. ");
     if (bThreads)
     {
         snew(command, std::strlen(cmd_mdrun) + std::strlen(cmd_np) + std::strlen(filename) + 50);
-        sprintf(command, "%s%s-version -maxh 0.001 1> %s 2>&1", cmd_mdrun, cmd_np, filename);
+        sprintf(command, "%s%s -version -maxh 0.001 1> %s 2>&1", cmd_mdrun, cmd_np, filename);
     }
     else
     {
@@ -704,9 +703,9 @@ static void check_mdrun_works(gmx_bool    bThreads,
             {
                 bMPI = TRUE;
             }
-            if (str_starts(line, match_gpu) )
+            if (str_starts(line, match_nogpu) )
             {
-                bHaveGpuSupport = TRUE;
+                bHaveGpuSupport = FALSE;
             }
         }
     }
@@ -871,13 +870,12 @@ static void modify_PMEsettings(
         const char     *fn_best_tpr, /* tpr file with the best performance */
         const char     *fn_sim_tpr)  /* name of tpr file to be launched */
 {
-    t_inputrec    *ir;
     t_state        state;
     gmx_mtop_t     mtop;
     char           buf[200];
 
-    gmx::MDModules mdModules;
-    ir = mdModules.inputrec();
+    t_inputrec     irInstance;
+    t_inputrec    *ir = &irInstance;
     read_tpx_state(fn_best_tpr, ir, &state, &mtop);
 
     /* Reset nsteps and init_step to the value of the input .tpr file */
@@ -915,7 +913,6 @@ static void make_benchmark_tprs(
         FILE           *fp)              /* Write the output here                         */
 {
     int           i, j, d;
-    t_inputrec   *ir;
     t_state       state;
     gmx_mtop_t    mtop;
     real          nlist_buffer;     /* Thickness of the buffer regions for PME-switch potentials */
@@ -938,8 +935,8 @@ static void make_benchmark_tprs(
     }
     fprintf(stdout, ".\n");
 
-    gmx::MDModules mdModules;
-    ir = mdModules.inputrec();
+    t_inputrec  irInstance;
+    t_inputrec *ir = &irInstance;
     read_tpx_state(fn_sim_tpr, ir, &state, &mtop);
 
     /* Check if some kind of PME was chosen */
@@ -2048,14 +2045,13 @@ static float inspect_tpr(int nfile, t_filenm fnm[], real *rcoulomb)
     gmx_bool     bFree;     /* Is a free energy simulation requested?         */
     gmx_bool     bNM;       /* Is a normal mode analysis requested?           */
     gmx_bool     bSwap;     /* Is water/ion position swapping requested?      */
-    t_inputrec  *ir;
     t_state      state;
     gmx_mtop_t   mtop;
 
 
     /* Check tpr file for options that trigger extra output files */
-    gmx::MDModules mdModules;
-    ir = mdModules.inputrec();
+    t_inputrec  irInstance;
+    t_inputrec *ir = &irInstance;
     read_tpx_state(opt2fn("-s", nfile, fnm), ir, &state, &mtop);
     bFree = (efepNO  != ir->efep );
     bNM   = (eiNM    == ir->eI   );

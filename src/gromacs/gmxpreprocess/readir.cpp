@@ -71,6 +71,7 @@
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/fatalerror.h"
+#include "gromacs/utility/filestream.h"
 #include "gromacs/utility/gmxassert.h"
 #include "gromacs/utility/ikeyvaluetreeerror.h"
 #include "gromacs/utility/keyvaluetree.h"
@@ -810,7 +811,7 @@ void check_ir(const char *mdparin, t_inputrec *ir, t_gromppopts *opts,
         if (expand->nstTij > 0)
         {
             sprintf(err_buf, "nstlog must be non-zero");
-            CHECK(ir->nstlog != 0);
+            CHECK(ir->nstlog == 0);
             sprintf(err_buf, "nst-transition-matrix (%d) must be an integer multiple of nstlog (%d)",
                     expand->nstTij, ir->nstlog);
             CHECK((expand->nstTij % ir->nstlog) != 0);
@@ -1808,8 +1809,8 @@ class MdpErrorHandler : public gmx::IKeyValueTreeErrorHandler
 } // namespace
 
 void get_ir(const char *mdparin, const char *mdparout,
-            gmx::MDModules *mdModules, t_gromppopts *opts,
-            warninp_t wi)
+            gmx::MDModules *mdModules, t_inputrec *ir, t_gromppopts *opts,
+            WriteMdpHeader writeMdpHeader, warninp_t wi)
 {
     char       *dumstr[2];
     double      dumdub[2][6];
@@ -1817,12 +1818,12 @@ void get_ir(const char *mdparin, const char *mdparout,
     const char *tmp;
     int         i, j, m, ninp;
     char        warn_buf[STRLEN];
-    t_inputrec *ir     = mdModules->inputrec();
     t_lambda   *fep    = ir->fepvals;
     t_expanded *expand = ir->expandedvals;
 
     init_inputrec_strings();
-    inp = read_inpfile(mdparin, &ninp, wi);
+    gmx::TextInputFile stream(mdparin);
+    inp = read_inpfile(&stream, mdparin, &ninp, wi);
 
     snew(dumstr[0], STRLEN);
     snew(dumstr[1], STRLEN);
@@ -2249,9 +2250,11 @@ void get_ir(const char *mdparin, const char *mdparout,
         }
         MdpErrorHandler              errorHandler(wi);
         auto                         result
-            = transform.transform(convertedValues, &errorHandler);
+                   = transform.transform(convertedValues, &errorHandler);
+        ir->params = new gmx::KeyValueTreeObject(result.object());
+        mdModules->adjustInputrecBasedOnModules(ir);
         errorHandler.setBackMapping(result.backMapping());
-        mdModules->assignOptionsToModulesFromMdp(result.object(), &errorHandler);
+        mdModules->assignOptionsToModules(*ir->params, &errorHandler);
     }
 
     /* Ion/water position swapping ("computational electrophysiology") */
@@ -2350,7 +2353,12 @@ void get_ir(const char *mdparin, const char *mdparout,
     RTYPE ("userreal4",   ir->userreal4,  0);
 #undef CTYPE
 
-    write_inpfile(mdparout, ninp, inp, FALSE, wi);
+    {
+        gmx::TextOutputFile stream(mdparout);
+        write_inpfile(&stream, mdparout, ninp, inp, FALSE, writeMdpHeader, wi);
+        stream.close();
+    }
+
     for (i = 0; (i < ninp); i++)
     {
         sfree(inp[i].name);

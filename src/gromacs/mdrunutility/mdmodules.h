@@ -45,48 +45,46 @@
 
 #include "gromacs/utility/classhelpers.h"
 
+struct IForceProvider;
 struct t_inputrec;
 
 namespace gmx
 {
 
-class KeyValueTreeObject;
 class IKeyValueTreeErrorHandler;
 class IKeyValueTreeTransformRules;
+class IMDOutputProvider;
+class KeyValueTreeObject;
 
 /*! \libinternal \brief
- * Factory for t_inputrec.
+ * Manages the collection of all modules used for mdrun.
  *
- * This class acts as a central place for constructing t_inputrec (and possibly
- * other mdrun structures in the future) and wiring up dependencies between
- * modules that are referenced from these structures.  This class owns all such
- * modules, and needs to remain in existence as long as the returned data
- * structures are in use.  Ideally, it is also the only place that creates
- * instances of these modules (outside test code).
+ * This class acts as a central place for constructing modules for mdrun
+ * and wiring up dependencies between them.  This class should be the only
+ * place that contains the full list of modules, although in the future, some
+ * code (e.g., in tools) may benefit from the ability to only create one or a
+ * few modules and use them.
  *
  * The general idea is that each module takes care of its own data rather than
  * mdrun having to know about all the details of each type of force calculation.
  * Initially this is applied for simple things like electric field calculations
  * but later more complex forces will be supported too.
  *
- * The current approach uses t_inputrec and IInputRecExtension to pass
- * references to the modules to other code to avoid changing many function
- * signatures.  Also, the current usage means that nearly every use of
- * t_inputrec (in particular, reading it from mdp or tpr files) needs to be
- * initialized through MDModules for correct functionality.  For the future, a
- * better approach would be to pass around a reference to MDModules instead and
- * call it directly for cases that are not related to t_inputrec functionality.
- * This (and other refactoring) would allow simplifying IInputRecExtension.
- * IForceProvider is the other interface currently used to interact with these
- * modules.  Also, all the places where these interfaces are used should become
- * loops over a container of these interfaces, and/or groups of them (e.g.
- * applied forces), instead of the current single pointer.
+ * Currently, where the set of modules needs to be accessed, either a pointer
+ * to MDModules is passed around, or an instance of IMDOutputProvider or
+ * IForceProvider returned from MDModules.  The implementation of these
+ * interfaces in MDModules calls the corresponding methods in the relevant
+ * modules.  In the future, some additional logic may need to be introduced at
+ * the call sites that can also influence the signature of the methods.  In
+ * this case, a separate object may need to be introduced (e.g.,
+ * ForceProvidersManager or similar) that can be passed around without
+ * knowledge of the full MDModules.  t_forcerec also currently directly calls
+ * individual modules through pointers to their interfaces, which should be
+ * generalized in the future.
  *
- * The assignOptionsToModules() and
- * assignOptionsToModulesFromInputrec() methods of this class also
- * take responsibility for wiring up the options (and their defaults)
- * for each module, respectively for mdp- and tpr-style input of those
- * options.
+ * The assignOptionsToModules() and adjustInputrecBasedOnModules() methods of
+ * this class also take responsibility for wiring up the options (and their
+ * defaults) for each module.
  *
  * \inlibraryapi
  * \ingroup module_mdrunutility
@@ -98,52 +96,41 @@ class MDModules
         ~MDModules();
 
         /*! \brief
-         * Returns an initialized t_inputrec structure.
+         * Initializes a transform from mdp values to sectioned options.
          *
-         * The inputrec structure is owned by MDModules and will be destroyed
-         * with it.
-         */
-        t_inputrec *inputrec();
-        //! \copydoc t_inputrec *inputrec()
-        const t_inputrec *inputrec() const;
-
-        /*! \brief Initializes a transform from mdp values to
-         * sectioned options.
+         * \see IMdpOptionProvider::initMdpTransform()
          *
-         * The transform is specified from a flat KeyValueTreeObject that
-         * contains each mdp value as a property, to a structure which is then
-         * assigned to the options defined with initMdpOptions().
-         *
-         * Once the transition from mdp to key-value input is
-         * complete, this method will probably not exist.
+         * Initializes the combined transform from all modules.
          */
         void initMdpTransform(IKeyValueTreeTransformRules *rules);
 
-        /*! \brief Use \c mdpOptionValues to set the options (e.g.read
-         * from mdp input) for each module.
+        /*! \brief
+         * Sets input parameters from `params` for each module.
          *
-         * \param[in] mdpOptionValues Contains keys and values from user
+         * \param[in]  params  Contains keys and values from user
          *     input (and defaults) to configure modules that have
          *     registered options with those keys.
-         * \param[out] errorHandler  Called to report errors. */
-        void assignOptionsToModulesFromMdp(const KeyValueTreeObject  &mdpOptionValues,
-                                           IKeyValueTreeErrorHandler *errorHandler);
-
-        /*! \brief
-         * Initializes modules based on inputrec values read from tpr file.
-         *
-         * This needs to be called after read_tpx_state() if the modules need
-         * to be accessed.
+         * \param[out] errorHandler  Called to report errors.
          */
-        void assignOptionsToModulesFromTpr();
+        void assignOptionsToModules(const KeyValueTreeObject  &params,
+                                    IKeyValueTreeErrorHandler *errorHandler);
 
         /*! \brief
          * Normalizes inputrec parameters to match current code version.
          *
-         * This orders the parameters in inputrec to match the current code and
-         * adds any missing defaults.
+         * This orders the parameters in `ir->param` to match the current code
+         * and adds any missing defaults.
          */
-        void adjustInputrecBasedOnModules();
+        void adjustInputrecBasedOnModules(t_inputrec *ir);
+
+        /*! \brief
+         * Returns an interface for initializing and finalizing output for modules.
+         */
+        IMDOutputProvider *outputProvider();
+        /*! \brief
+         * Returns an interface for initializing modules providing forces.
+         */
+        IForceProvider *forceProvider();
 
     private:
         class Impl;

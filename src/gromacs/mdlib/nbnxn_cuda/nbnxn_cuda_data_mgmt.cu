@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014,2015,2016, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015,2016,2017, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -38,8 +38,6 @@
  *  \author Szilard Pall <pall.szilard@gmail.com>
  */
 #include "gmxpre.h"
-
-#include "config.h"
 
 #include <assert.h>
 #include <stdarg.h>
@@ -625,26 +623,18 @@ void nbnxn_gpu_init(gmx_nbnxn_cuda_t         **p_nb,
     {
         init_plist(nb->plist[eintNonlocal]);
 
-        /* CUDA stream priority available in the CUDA RT 5.5 API.
-         * Note that the device we're running on does not have to support
+        /* Note that the device we're running on does not have to support
          * priorities, because we are querying the priority range which in this
          * case will be a single value.
          */
-#if GMX_CUDA_VERSION >= 5050
-        {
-            int highest_priority;
-            stat = cudaDeviceGetStreamPriorityRange(NULL, &highest_priority);
-            CU_RET_ERR(stat, "cudaDeviceGetStreamPriorityRange failed");
+        int highest_priority;
+        stat = cudaDeviceGetStreamPriorityRange(NULL, &highest_priority);
+        CU_RET_ERR(stat, "cudaDeviceGetStreamPriorityRange failed");
 
-            stat = cudaStreamCreateWithPriority(&nb->stream[eintNonlocal],
-                                                cudaStreamDefault,
-                                                highest_priority);
-            CU_RET_ERR(stat, "cudaStreamCreateWithPriority on stream[eintNonlocal] failed");
-        }
-#else
-        stat = cudaStreamCreate(&nb->stream[eintNonlocal]);
-        CU_RET_ERR(stat, "cudaStreamCreate on stream[eintNonlocal] failed");
-#endif
+        stat = cudaStreamCreateWithPriority(&nb->stream[eintNonlocal],
+                                            cudaStreamDefault,
+                                            highest_priority);
+        CU_RET_ERR(stat, "cudaStreamCreateWithPriority on stream[eintNonlocal] failed");
     }
 
     /* init events for sychronization (timing disabled for performance reasons!) */
@@ -1026,15 +1016,6 @@ void nbnxn_gpu_free(gmx_nbnxn_cuda_t *nb)
     {
         fprintf(debug, "Cleaned up CUDA data structures.\n");
     }
-}
-
-void cu_synchstream_atdat(gmx_nbnxn_cuda_t *nb, int iloc)
-{
-    cudaError_t  stat;
-    cudaStream_t stream = nb->stream[iloc];
-
-    stat = cudaStreamWaitEvent(stream, nb->timers->stop_atdat, 0);
-    CU_RET_ERR(stat, "cudaStreamWaitEvent failed");
 }
 
 gmx_wallclock_gpu_t * nbnxn_gpu_get_timings(gmx_nbnxn_cuda_t *nb)

@@ -56,6 +56,7 @@ struct t_nrnb;
 
 namespace gmx
 {
+class IMDOutputProvider;
 class MDLogger;
 }
 
@@ -144,7 +145,8 @@ void do_constrain_first(FILE *log, gmx_constr *constr,
                         t_forcerec *fr, gmx_localtop_t *top);
 
 void init_md(FILE *fplog,
-             t_commrec *cr, t_inputrec *ir, const gmx_output_env_t *oenv,
+             t_commrec *cr, gmx::IMDOutputProvider *outputProvider,
+             t_inputrec *ir, const gmx_output_env_t *oenv,
              double *t, double *t0,
              gmx::ArrayRef<real> lambda, int *fep_state, double *lam0,
              t_nrnb *nrnb, gmx_mtop_t *mtop,

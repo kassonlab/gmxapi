@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014,2015, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015,2017, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -37,19 +37,23 @@
 
 #include "cuda_version_information.h"
 
-#include <cstdio>
+#include <utility>
 
-#include "buildinfo.h"
-
-void gmx_print_version_info_cuda_gpu(FILE *fp)
+namespace gmx
 {
-    int cuda_driver, cuda_runtime;
-    fprintf(fp, "CUDA compiler:      %s\n", CUDA_NVCC_COMPILER_INFO);
-    fprintf(fp, "CUDA compiler flags:%s\n", CUDA_NVCC_COMPILER_FLAGS);
-    cuda_driver = 0;
+
+std::pair<int, int> getCudaDriverVersion()
+{
+    int cuda_driver;
     cudaDriverGetVersion(&cuda_driver);
-    cuda_runtime = 0;
-    cudaRuntimeGetVersion(&cuda_runtime);
-    fprintf(fp, "CUDA driver:        %d.%d\n", cuda_driver/1000, cuda_driver%100);
-    fprintf(fp, "CUDA runtime:       %d.%d\n", cuda_runtime/1000, cuda_runtime%100);
+    return std::pair<int, int>(cuda_driver/1000, cuda_driver%100);
 }
+
+std::pair<int, int> getCudaRuntimeVersion()
+{
+    int cuda_runtime;
+    cudaRuntimeGetVersion(&cuda_runtime);
+    return std::pair<int, int>(cuda_runtime/1000, cuda_runtime%100);
+}
+
+} // namespace
