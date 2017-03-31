@@ -91,6 +91,9 @@ private:
 };
 
 /// Wrapper for flat data structure
+/*! This is a temporary shim to experiment with how to manage multidimensional
+ * data of arbitrary size in ways that are friendly to old code, new code, and STL.
+ */
 template<typename Scalar, size_t D>
 class TrajDataArray
 {
@@ -105,16 +108,15 @@ public:
     TrajDataArray(const TrajDataArray&) = delete;
     const TrajDataArray& operator=(const TrajDataArray&) = delete;
 
-    // Allocate space for an NxD array
+    /// Allocate space for an NxD array
     TrajDataArray(size_t N) :
         data_(N*D),
         N_(N)
     {
     };
 
-    // Copy from raw data pointer.
+    /// Copy from raw data pointer.
     TrajDataArray(Scalar* data_src, size_t N) :
-        //data_(data_src, data_src + N*D),
         data_(N*D),
         N_(N)
     {
@@ -124,15 +126,35 @@ public:
     // Move constructor
     //TrajDataArray(TrajDataArray&& )
 
-    // Simple destructor.
+    /// Simple destructor.
     ~TrajDataArray() { };
 
+    /// Get width of data
+    /*! \return number of columns (dimensionality for arrays of vectors)
+     */
     size_t dim() const { return D; };
+    /// Get number of elements
+    /*! \return number of rows (number of elements for arrays of vectors)
+     */
     size_t N() const { return N_; };
 
-    // This is very bad if the caller tries to delete the result.
+    /*! \brief Get raw pointer to managed data
+     *
+     * \return the pointer to the underlying contiguous data storage
+     * This is very bad if the caller tries to delete the result.
+     */
     Scalar* data() { return data_.data(); };
 
+    /*! \brief indexing operator
+     *
+     * \param i (first) index in the two-dimensional array
+     * \return a copy (not a reference) of row i as a std::vector of length D
+     * TODO: Not sure why this isn't a std::array. span or array view could be
+     * even better. But first some thought would need to go into the expected
+     * readable/writable behavior. Note that the return value *will be copied*
+     * when returned to Python unless shared via a shared_ptr or transfered via
+     * unique_ptr to a class that Python is aware of (no casting necessary).
+     */
     std::vector<Scalar> operator[](const size_t i) const
     {
         if (i < N_)
@@ -152,14 +174,20 @@ private:
     const size_t N_;
 };
 
-/// Minimal wrapper for t_trxframe.
-/*! Hopefully very temporary.
+/*! \brief Minimal wrapper for t_trxframe.
+ *
+ * Hopefully very temporary. Wrapping and exposing t_trxframe is silly.
+ * The next step is probably to provide a flexible wrapper to arbitrary
+ * TrajectoryAnalysisDataModule data, trajectory or derived.
+ * \ingroup module_python
+ * \internal
  */
 class PyTrajectoryFrame
 {
 public:
     /*! \brief Share ownership of a t_trxframe
      *
+     * \param frame a managed frame pointer (with an appropriate deleter) that we can safely share.
      * These shared pointers must originate from gmx::trajectory::trxframe_copy
      * where a sensible deleter is provided. Unfortunately, this does not allow
      * the lifetime of a member array to be decoupled from the rest of the frame.
@@ -168,14 +196,16 @@ public:
 
     /*! Copy a t_trxframe
      *
+     * \param frame a t_trxframe object to make a deep copy of
      * The copy is performed by gmx::trajectory::trxframe_copy, which provides
      * a sensible deleter, but cannot allow the lifetime of member arrays to
      * be decoupled from the whole frame.
      */
-    explicit PyTrajectoryFrame(const t_trxframe&);
+    explicit PyTrajectoryFrame(const t_trxframe& frame);
 
     /// With current t_trxframe usage, we have to be careful.
     PyTrajectoryFrame() = delete;
+    /// TODO: this should be fine now, but need to test.
     const PyTrajectoryFrame& operator=(const PyTrajectoryFrame&) = delete;
 
     /// Return a handle to a buffer of positions
