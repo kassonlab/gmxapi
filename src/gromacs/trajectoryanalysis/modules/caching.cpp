@@ -26,7 +26,7 @@ TrajectoryAnalysisModulePointer CacheInfo::create()
 }
 
 // Implement required functions from base class
-
+// Is there a Gromacs convention for tagging unused function parameters?
 void CachingTafModule::initOptions(IOptionsContainer *options,
                              TrajectoryAnalysisSettings *settings)
 {
@@ -38,10 +38,12 @@ void CachingTafModule::initOptions(IOptionsContainer *options,
     settings->setFrameFlags(TRX_NEED_X | TRX_READ_V | TRX_READ_F);
 }
 
+// Is there a Gromacs convention for tagging unused function parameters?
 void CachingTafModule::initAnalysis(const TrajectoryAnalysisSettings &settings,
                               const TopologyInformation &top)
 {}
 
+// Is there a Gromacs convention for tagging unused function parameters?
 void CachingTafModule::analyzeFrame(int frnr,
                               const t_trxframe &fr,
                               t_pbc *pbc,
@@ -55,6 +57,7 @@ void CachingTafModule::analyzeFrame(int frnr,
     last_frame_ = gmx::trajectory::trxframe_copy(fr);
 }
 
+// Is there a Gromacs convention for tagging unused function parameters?
 void CachingTafModule::finishAnalysis(int nframes)
 {
     // If we're just caching trajectories, there is no post-processing.
