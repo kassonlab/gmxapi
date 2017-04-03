@@ -37,8 +37,29 @@
 
 The gmx Python module provides an interface suitable for scripting Gromacs
 workflows, interactive use, or connectivity to external Python-based APIs.
-When using the module to control Gromacs tools or to build Gromacs toolchains,
 
+The API allows interaction with Gromacs that is decoupled from command-line
+interfaces, terminal I/O, and filesystem access. Computation and data management
+are managed by the API until/unless the user explicitly requests specific data,
+such as for writing to a local file or manipulating with a tool that does not
+implement the Gromacs API.
+
+When data must be retrieved from Gromacs, efforts are made to do so as efficiently
+as possible, so the user should consult documentation for the specific Gromacs
+objects they are interested in regarding efficient access, if performance is
+critical. For instance, exporting Gromacs data directly to a numpy array can be
+much faster and require less memory than exporting to a Python list or tuple,
+and using available iterators directly can save a lot of memory versus creating
+an array and then iterating over it in two separate steps.
+
+For more efficient iterative access to Gromacs data, such as analyzing a simulation
+in progress, or applying Python analysis scripts in a trajectory analysis workflow,
+consider using an appropriate call-back or, better yet, creating a C++ plugin
+that can be inserted directly in the tool chain.
+
+For more advanced use, the module provides means to access or manipulate Gromacs
+more granularly than the command-line tool. This allows rapid prototyping of
+new methods, debugging of unexpected simulation behavior, and adaptive workflows.
 
 """
 
