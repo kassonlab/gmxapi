@@ -32,68 +32,68 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \internal \file
- * \brief
- * Tests for functionality of the "caching" trajectory analysis module.
- *
- * \ingroup module_trajectoryanalysis
- */
 
 #include "gmxpre.h"
 
-#include "gromacs/trajectoryanalysis/modules/caching.h"
+#include "trajectory.h"
 
-#include <gtest/gtest.h>
+#include "gromacs/trajectory/trajectoryframe.h"
 
-#include "testutils/cmdlinetest.h"
-
-#include "moduletest.h"
-
-namespace
+namespace gmx
+{
+namespace pyapi
 {
 
-using gmx::test::CommandLine;
+using std::shared_ptr;
+using std::unique_ptr;
+using std::make_shared;
 
-/********************************************************************
- * Tests for gmx::analysismodules::CachingTafModule.
- */
-
-//! Test fixture for the caching analysis module.
-typedef gmx::test::TrajectoryAnalysisModuleTestFixture<gmx::trajectoryanalysis::CacheInfo>
-    CachingModuleTest;
-
-TEST_F(CachingModuleTest, Runs)
+PyTrajectoryFrame::PyTrajectoryFrame(shared_ptr<t_trxframe> frame) :
+    frame_ {frame}
 {
-    const char *const cmdline[] = {
-        "caching"
-//         "-select", "atomname S1 S2"
-    };
-//     setTopology("simple.gro");
-    setTrajectory("angle.gro");
-    runTest(CommandLine(cmdline));
 }
-/*
-   TEST_F(DistanceModuleTest, ComputesMultipleDistances)
-   {
-     const char *const cmdline[] = {
-         "distance",
-         "-select", "atomname S1 S2",
-         "resindex 1 to 4 and atomname CB merge resindex 2 to 5 and atomname CB",
-         "-len", "2", "-binw", "0.5"
-     };
-     setTopology("simple.gro");
-     runTest(CommandLine(cmdline));
-   }
 
-   TEST_F(DistanceModuleTest, HandlesDynamicSelections)
-   {
-     const char *const cmdline[] = {
-         "distance",
-         "-select", "atomname S1 S2 and res_cog x < 2.8",
-         "-len", "2", "-binw", "0.5"
-     };
-     setTopology("simple.gro");
-     runTest(CommandLine(cmdline));
-   }
- */
-}  // namespace
+PyTrajectoryFrame::PyTrajectoryFrame(const t_trxframe &frame) :
+    frame_ {gmx::trajectory::trxframe_copy(frame)}
+{
+}
+
+
+// Implementation to retrieve a read handle
+template<>
+unique_ptr<Data3Handle> PyTrajectoryFrame::get_read_handle<trjvectorfield>(const trjvectorfield t) const
+{
+    // return value
+    unique_ptr<Data3Handle> handle;
+
+    if (t == trjvectorfield::POSITION)
+    {
+        // Currently, individual arrays are not separable from the frame object without copy.
+        if (position_cache_)
+        {
+            // if we've already got a copy floating around, use it
+        }
+        else
+        {
+            // stash the data safely
+            position_cache_ = make_shared< Data3 >(frame_->x[0], frame_->natoms);
+        }
+        handle.reset(new LocalTrajDataHandle(position_cache_));
+    }
+    else
+    {
+        //TODO: a switch expression may be fine...
+        return nullptr;
+    }
+    return handle;
+}
+
+
+unique_ptr<Data3Handle> PyTrajectoryFrame::get_positions() const
+{
+    return get_read_handle<trjvectorfield>(trjvectorfield::POSITION);
+}
+
+
+} // end namespace pyapi
+} // end namespace gmx

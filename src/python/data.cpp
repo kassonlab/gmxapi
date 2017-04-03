@@ -32,68 +32,34 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \internal \file
- * \brief
- * Tests for functionality of the "caching" trajectory analysis module.
- *
- * \ingroup module_trajectoryanalysis
- */
+
 
 #include "gmxpre.h"
 
-#include "gromacs/trajectoryanalysis/modules/caching.h"
+#include "data.h"
 
-#include <gtest/gtest.h>
-
-#include "testutils/cmdlinetest.h"
-
-#include "moduletest.h"
-
-namespace
+namespace gmx
+{
+namespace pyapi
 {
 
-using gmx::test::CommandLine;
 
-/********************************************************************
- * Tests for gmx::analysismodules::CachingTafModule.
- */
-
-//! Test fixture for the caching analysis module.
-typedef gmx::test::TrajectoryAnalysisModuleTestFixture<gmx::trajectoryanalysis::CacheInfo>
-    CachingModuleTest;
-
-TEST_F(CachingModuleTest, Runs)
+LocalTrajDataHandle::LocalTrajDataHandle(shared_ptr<Data3> data) :
+    data_(data)
 {
-    const char *const cmdline[] = {
-        "caching"
-//         "-select", "atomname S1 S2"
-    };
-//     setTopology("simple.gro");
-    setTrajectory("angle.gro");
-    runTest(CommandLine(cmdline));
 }
-/*
-   TEST_F(DistanceModuleTest, ComputesMultipleDistances)
-   {
-     const char *const cmdline[] = {
-         "distance",
-         "-select", "atomname S1 S2",
-         "resindex 1 to 4 and atomname CB merge resindex 2 to 5 and atomname CB",
-         "-len", "2", "-binw", "0.5"
-     };
-     setTopology("simple.gro");
-     runTest(CommandLine(cmdline));
-   }
 
-   TEST_F(DistanceModuleTest, HandlesDynamicSelections)
+LocalTrajDataHandle::~LocalTrajDataHandle() {};
+
+/*const shared_ptr<Data3> LocalTrajDataHandle::fetch_data() const
    {
-     const char *const cmdline[] = {
-         "distance",
-         "-select", "atomname S1 S2 and res_cog x < 2.8",
-         "-len", "2", "-binw", "0.5"
-     };
-     setTopology("simple.gro");
-     runTest(CommandLine(cmdline));
-   }
- */
-}  // namespace
+    return data_;
+   }*/
+shared_ptr<Data3> LocalTrajDataHandle::fetch_data()
+{
+    return data_;
+}
+
+
+} // end namespace pyapi
+} // end namespace gmx

@@ -32,38 +32,78 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-/*! \defgroup module_python Python module for accessing Gromacs library
- *  \internal
- * The Python module ``gmx`` consists of a high-level interface implemented in
- * pure Python and a low-level interface implemented as a C++ extension in the
- * submodule, gmx.core.
- */
+/// \cond internal
 /*! \internal \file
- * \brief Declares symbols to be exported to gmx.core Python module.
+ * \brief Declares Python runner
  *
- * Declares namespace gmx::pyapi
  * \ingroup module_python
  */
-#ifndef PYGMX_CORE_H
-#define PYGMX_CORE_H
+#ifndef PYGMX_RUNNER_H
+#define PYGMX_RUNNER_H
 
 
 #include "gmxpre.h"
 
+#include <memory>
+
+#include "gromacs/trajectoryanalysis/analysismodule.h"
+#include "gromacs/trajectoryanalysis/runner.h"
 
 namespace gmx
 {
 
-/*! \brief API client code from which to export Python bindings
- *
- * \internal
- * \ingroup module_python
- */
 namespace pyapi
 {
+using std::shared_ptr;
+using std::unique_ptr;
+using std::make_shared;
 
-}      // end namespace pyapi
-}      // end namespace gmx
+class PyOptions;
 
-#endif // PYGMX_CORE_H
+/*! \brief Wraps Trajectory Analyis Runner for Python interface.
+ *
+ * Exported to Python as gmx.core.TafRunner
+ * \internal \ingroup module_python
+ */
+class PyRunner
+{
+    public:
+        /// Empty constructor not yet used.
+        PyRunner() = delete;
+
+        /*! \brief Construct runner with a single bound module.
+         *
+         * \param module existing module object to register with a new runner.
+         */
+        PyRunner(shared_ptr<gmx::TrajectoryAnalysisModule> module);
+
+        virtual ~PyRunner();
+
+        /*! \brief Process options.
+         *
+         * Allows options to be registered by the runner and bound modules.
+         * \param options existing object to be provided by calling code.
+         */
+        void initialize(PyOptions &options);
+
+        /*! \brief Advance the current frame one step.
+         *
+         * Returns when data dependencies on the next trajectory frame have been
+         * satisfied. Updates internal state of runner to begin handling the next
+         * frame of input, if any.
+         * \return true while there are remaining frames to be handled, otherwise false.
+         */
+        bool next();
+
+    private:
+        /// has a common runner for most behavior
+        gmx::trajectoryanalysis::Runner runner_;
+
+        /// binds to one analysis module
+        shared_ptr<gmx::TrajectoryAnalysisModule> module_;
+};
+
+};     //end namespace pyapi
+};     // end namespace gmx
+#endif // header guard
+/// \endcond

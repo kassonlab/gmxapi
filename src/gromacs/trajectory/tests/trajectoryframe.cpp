@@ -39,15 +39,18 @@
  * \ingroup module_trajectory
  */
 
-#include "gromacs/trajectory/trajectoryframe.h"
-#include "gromacs/fileio/trxio.h"
-#include "gromacs/fileio/oenv.h"
-#include "gromacs/utility/smalloc.h"
+#include "gmxpre.h"
 
-#include "gromacs/utility/programcontext.h"
+#include "gromacs/trajectory/trajectoryframe.h"
+
+#include <string>
 
 #include <gtest/gtest.h>
-#include <string>
+
+#include "gromacs/fileio/oenv.h"
+#include "gromacs/fileio/trxio.h"
+#include "gromacs/utility/programcontext.h"
+#include "gromacs/utility/smalloc.h"
 
 // How do I set the working directory or input path appropriately?
 /*! \internal \brief input file path
@@ -55,7 +58,7 @@
  * \{
  */
 const std::string filepath = std::string(SOURCEDIR) + "/simple.gro";
-const char* const trjfile = filepath.c_str();
+const char* const trjfile  = filepath.c_str();
 /*! \}
  */
 
@@ -70,14 +73,18 @@ TEST(TrxFrameTest, Construct)
 /// read a frame for reference
 TEST(TrxFrameTest, Read)
 {
-    t_trxstatus *status{nullptr};
+    t_trxstatus *status {
+        nullptr
+    };
     t_trxframe *fr;
     snew(fr, 1);
 
-    time_unit_t time_unit{};
+    time_unit_t time_unit {};
     //    = static_cast<time_unit_t>(settings_.timeUnit() + 1);
 
-    gmx_output_env_t *oenv{nullptr};
+    gmx_output_env_t *oenv {
+        nullptr
+    };
 
     output_env_init(&oenv, gmx::getProgramContext(), time_unit, FALSE, exvgNONE, 0);
 
@@ -98,14 +105,18 @@ TEST(TrxFrameTest, Read)
 /// make a deep copy of a frame
 TEST(TrxFrameTest, Copy)
 {
-    t_trxstatus *status{nullptr};
+    t_trxstatus *status {
+        nullptr
+    };
     t_trxframe *fr;
     snew(fr, 1);
 
-    time_unit_t time_unit{};
+    time_unit_t time_unit {};
     //    = static_cast<time_unit_t>(settings_.timeUnit() + 1);
 
-    gmx_output_env_t *oenv{nullptr};
+    gmx_output_env_t *oenv {
+        nullptr
+    };
 
     output_env_init(&oenv, gmx::getProgramContext(), time_unit, FALSE, exvgNONE, 0);
 
@@ -133,14 +144,18 @@ TEST(TrxFrameTest, Copy)
 /// not really a good way to test...
 TEST(TrxFrameTest, Release)
 {
-    t_trxstatus *status{nullptr};
+    t_trxstatus *status {
+        nullptr
+    };
     t_trxframe *fr;
     snew(fr, 1);
 
-    time_unit_t time_unit{};
+    time_unit_t time_unit {};
     //    = static_cast<time_unit_t>(settings_.timeUnit() + 1);
 
-    gmx_output_env_t *oenv{nullptr};
+    gmx_output_env_t *oenv {
+        nullptr
+    };
 
     output_env_init(&oenv, gmx::getProgramContext(), time_unit, FALSE, exvgNONE, 0);
 
@@ -155,7 +170,9 @@ TEST(TrxFrameTest, Release)
         // This copies to fr_tmp and transfers ownership to fr_copy, but that
         // doesn't prove much other than that such operations compile and run.
         auto fr_tmp = gmx::trajectory::trxframe_copy(*fr);
-        std::shared_ptr<t_trxframe> fr_copy{std::move(fr_tmp)};
+        std::shared_ptr<t_trxframe> fr_copy {
+            std::move(fr_tmp)
+        };
         // If trxframe_copy returns unique_ptr, fr_tmp should be empty now.
         ASSERT_EQ(fr_tmp.get(), nullptr);
         ASSERT_NE(fr_copy->x, nullptr);

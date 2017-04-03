@@ -34,14 +34,12 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
+/// \cond
+// Adding this file to the doxygen mesh isn't essential right now.
 /*! \libinternal \file
  * \ingroup module_trajectory Classes for handling trajectory data
- * \ingroup group_utilitymodules
- * \ingroup libraryapi
  * \brief defines t_trxframe frame data and operations
  */
-
 
 /* The gmx_bools indicate whether a field was read from the trajectory.
  * Do not try to use a pointer when its gmx_bool is FALSE, as memory might
@@ -51,6 +49,7 @@
 #define GMX_TRAJECTORY_TRX_H
 
 #include <cstdio>
+
 #include <memory>
 
 #include "gromacs/math/vectypes.h"
@@ -60,15 +59,13 @@
 #include "gromacs/topology/atoms.h"
 #include "gromacs/utility/smalloc.h"
 
-//struct t_atoms;
-
 /*! \libinternal \brief
-* C structure of basic data read from a trajectory
-*
-* \ingroup module_trajectory
-* \ingroup libraryapi
-* \{
-*/
+ * C structure of basic data read from a trajectory
+ *
+ * \ingroup module_trajectory
+ * \ingroup libraryapi
+ * \{
+ */
 struct t_trxframe
 {
     int             not_ok;    ///< integrity flags
@@ -140,9 +137,10 @@ void trxframe_deleter(t_trxframe* f);
  * \returns trxframe_ptr
  * \internal
  */
-std::unique_ptr<t_trxframe, void(*)(t_trxframe*)> trxframe_copy(const t_trxframe& frame);
+std::unique_ptr<t_trxframe, void(*)(t_trxframe*)> trxframe_copy(const t_trxframe &frame);
 
 } // end namespace trajectory
 } //end namespace gmx
 
 #endif
+/// \endcond

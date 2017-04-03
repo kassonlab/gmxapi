@@ -109,20 +109,35 @@ void done_frame(t_trxframe *frame)
 void gmx::trajectory::trxframe_deleter(t_trxframe* f)
 {
     // Must only free memory allocated.
-    if (f->bX) sfree(f->x);
-    if (f->bV) sfree(f->v);
-    if (f->bF) sfree(f->f);
-    if (f->bTitle) delete f->title;
+    if (f->bX)
+    {
+        sfree(f->x);
+    }
+    if (f->bV)
+    {
+        sfree(f->v);
+    }
+    if (f->bF)
+    {
+        sfree(f->f);
+    }
+    if (f->bTitle)
+    {
+        delete f->title;
+    }
     if (f->atoms)
     {
         done_atom(f->atoms);
         delete f->atoms;
     }
-    if (f->bIndex) sfree(f->index);
+    if (f->bIndex)
+    {
+        sfree(f->index);
+    }
     delete f;
 };
 
-std::unique_ptr<t_trxframe, void(*)(t_trxframe*)> gmx::trajectory::trxframe_copy(const t_trxframe& frame)
+std::unique_ptr<t_trxframe, void(*)(t_trxframe*)> gmx::trajectory::trxframe_copy(const t_trxframe &frame)
 {
     // Copy construct the trajectory frame struct.
     // std::make_unique not available until C++14, but we probably want a

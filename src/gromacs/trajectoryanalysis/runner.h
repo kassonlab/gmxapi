@@ -32,7 +32,8 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \internal \file
+
+/*! \libinternal \file
  * \brief
  * Declares gmx::trajectoryanalysis::Runner.
  *
@@ -42,12 +43,12 @@
 #ifndef GMX_TRAJECTORYANALYSIS_RUNNER_H
 #define GMX_TRAJECTORYANALYSIS_RUNNER_H
 
+#include "gromacs/selection/selectioncollection.h"
+#include "gromacs/selection/selectionoptionbehavior.h"
 #include "gromacs/trajectoryanalysis/analysismodule.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
-#include "gromacs/trajectoryanalysis/runnercommon.h"
-#include "gromacs/selection/selectioncollection.h"
-//#include "gromacs/options/options.h"
-#include "gromacs/selection/selectionoptionbehavior.h"
+
+#include "runnercommon.h"
 
 
 namespace gmx
@@ -60,7 +61,6 @@ namespace trajectoryanalysis
 
 /*! \brief Generic runner for modules in Trajectory Analysis Framework
  *
- * \brief
  * The protocol described in the Trajectory Analysis Framework for a runner to
  * drive analysis tools is not implemented generically and publicly for runner
  * classes to use.
@@ -77,7 +77,7 @@ namespace trajectoryanalysis
  * First revision handles only a single module and no parallelism.
  *
  * Implements the Trajectory Analysis Framework protocol to run analysis modules
- * derived from gmx::TrajectoryAnalysisModule, registered with add_module().
+ * derived from gmx::TrajectoryAnalysisModule, registered with addModule().
  *
  * Usage: The runner is constructed, a module bound, the runner initialized with
  * options, and then the user may either call next() to step one input frame or
@@ -87,76 +87,86 @@ namespace trajectoryanalysis
  * Runner objects are not assignable or copyable.
  *
  * Example:
- *
- *    # Assume Module is a class derived from TrajectoryAnalysisModule
- *    auto mymodule = std::make_shared<Module>(Module());
- *    auto runner = Runner();
- *    runner.add_module(mymodule);
- *    runner.register_options(options)
- *    runner.initialize(options);
- *    bool end_of_data = runner.next();
- *    runner.run();
- *    assert(runner.next() == false);
- *    del runner;
- *    do_something(mymodule);
- *    del mymodule;
+ * ```
+ *     // Assume Module is a class derived from TrajectoryAnalysisModule
+ *     auto mymodule = std::make_shared<Module>(Module());
+ *     auto runner = Runner();
+ *     runner.addModule(mymodule);
+ *     runner.registerOptions(options)
+ *     runner.initialize(options);
+ *     bool end_of_data = runner.next();
+ *     runner.run();
+ *     assert(runner.next() == false);
+ *     del runner;
+ *     do_something(mymodule);
+ *     del mymodule;
+ * ```
+ * \libinternal \ingroup module_trajectoryanalysis
  */
 class Runner
 {
-public:
-    Runner();
-    virtual ~Runner();
+    public:
+        /// Default constructor
+        Runner();
 
-    Runner(const Runner& runner) = delete;
-    Runner& operator=(const Runner& runner) = delete;
+        /// Clean up
+        virtual ~Runner();
 
-    /// Populate an options object provided by the caller.
-    void register_options(gmx::Options& options);
+        /// Disallow copy construction
+        Runner(const Runner &runner)            = delete;
+        /// Disallow copy assignment
+        const Runner &operator=(const Runner &runner) = delete;
 
-    /// Finalize options and read first frame.
-    void initialize(gmx::Options& options);
+        /// Populate an options object provided by the caller.
+        //! \param options created and owned by the caller
+        void registerOptions(gmx::Options &options);
 
-    /*! \brief Registers a TrajectoryAnalysisModule with the runner.
-     *
-     * Currently can only handle a single runner.
-     * \return another shared pointer to the module added.
-     * Could be set to null if unsuccessful. This exists in case we want to
-     * allow an overload that takes ownership of a module that is not already
-     * managed.
-     */
-    gmx::TrajectoryAnalysisModuleSharedPointer add_module(gmx::TrajectoryAnalysisModuleSharedPointer module);
+        /// Finalize options and read first frame.
+        //! \param options created and owned by the caller
+        void initialize(gmx::Options &options);
 
-    /*! \brief Advance one frame.
-     *
-     * \return false if there are no more frames.
-     */
-    bool next();
+        /*! \brief Registers a TrajectoryAnalysisModule with the runner.
+         *
+         * \param module Currently can only handle a single runner.
+         * \return another shared pointer to the module added.
+         * Could be set to null if unsuccessful. This exists in case we want to
+         * allow an overload that takes ownership of a module that is not already
+         * managed.
+         */
+        gmx::TrajectoryAnalysisModuleSharedPointer addModule(gmx::TrajectoryAnalysisModuleSharedPointer module);
 
-    /// Process all remaining available frames
-    int run();
+        /*! \brief Advance one frame.
+         *
+         * \return false if there are no more frames.
+         */
+        bool next();
 
-private:
-    gmx::TrajectoryAnalysisModuleSharedPointer module_;
-    TrajectoryAnalysisSettings settings_;
-    TrajectoryAnalysisRunnerCommon common_;
-    SelectionCollection selections_;
+        /// Process all remaining available frames
+        int run();
 
-    // data object returned by module_->startFrames()
-    std::unique_ptr<TrajectoryAnalysisModuleData> pdata_;
+    private:
+        /// Handle to bound module
+        gmx::TrajectoryAnalysisModuleSharedPointer module_;
 
-    /// Number of frames processed
-    unsigned int nframes_;
-    /// True if modules have been initialized and first frame read.
-    bool is_initialized_; // TODO: more complete taf_state enum
-    // Actual state machine can be hidden in implementation class.
+        TrajectoryAnalysisSettings                 settings_;
+        TrajectoryAnalysisRunnerCommon             common_;
+        SelectionCollection selections_;
 
-    /// Indicate we have reached the end of input.
-    bool end_of_frames_;
+        // data object returned by module_->startFrames()
+        std::unique_ptr<TrajectoryAnalysisModuleData> pdata_;
 
-    SelectionOptionBehavior selectionOptionBehavior_;
+        /// Number of frames processed
+        unsigned int nframes_;
+        /// True if modules have been initialized and first frame read.
+        bool         is_initialized_; // TODO: more complete taf_state enum
+        // Actual state machine can be hidden in implementation class.
+
+        /// Indicate we have reached the end of input.
+        bool                    end_of_frames_;
+
+        SelectionOptionBehavior selectionOptionBehavior_;
 };
 
-} // end namespace trajectoryanalysis
-} // end namespace gmx
-
+}      // end namespace trajectoryanalysis
+}      // end namespace gmx
 #endif // GMX_TRAJECTORYANALYSIS_RUNNER_H

@@ -33,6 +33,5 @@
 # the research papers on the package. Check out http://www.gromacs.org.
 
 gmx_add_unit_test(TrajectoryDataUnitTests trajectorymodule-test
-        trajectory.cpp
         trajectoryframe.cpp)
 set_property(TARGET trajectorymodule-test APPEND PROPERTY COMPILE_DEFINITIONS "SOURCEDIR=\"${CMAKE_CURRENT_SOURCE_DIR}\"")

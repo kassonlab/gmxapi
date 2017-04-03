@@ -39,17 +39,20 @@
  * \ingroup module_trajectoryanalysis
  */
 
-#include "gromacs/trajectoryanalysis/runner.h"
+#include "gmxpre.h"
 
+#include "runner.h"
+
+#include "gromacs/analysisdata/paralleloptions.h"
+#include "gromacs/options/options.h"
+#include "gromacs/pbcutil/pbc.h"
+#include "gromacs/selection/selectioncollection.h"
+#include "gromacs/selection/selectionoptionbehavior.h"
+#include "gromacs/trajectory/trajectoryframe.h"
 #include "gromacs/trajectoryanalysis/analysismodule.h"
 #include "gromacs/trajectoryanalysis/analysissettings.h"
-#include "gromacs/trajectoryanalysis/runnercommon.h"
-#include "gromacs/selection/selectioncollection.h"
-#include "gromacs/options/options.h"
-#include "gromacs/analysisdata/paralleloptions.h"
-#include "gromacs/trajectory/trajectoryframe.h"
-#include "gromacs/pbcutil/pbc.h"
-#include "gromacs/selection/selectionoptionbehavior.h"
+
+#include "runnercommon.h"
 
 
 //#include "gromacs/commandline/cmdlineoptionsmodule.h"
@@ -69,19 +72,20 @@ using std::unique_ptr;
 using std::make_shared;
 
 // Initializes an empty TrajectoryAnalysisSettings and uses it to
-// initialize the TrajectoryAnalysisRunnerCommon member
+// initialize the TrajectoryAnalysisRunnerCommon member.
 Runner::Runner() :
-    module_{nullptr},
-    settings_{},
-    common_{&settings_},
-    selections_{},
-    pdata_{nullptr},
-    nframes_{0},
-    is_initialized_{false},
-    end_of_frames_{false},
-    selectionOptionBehavior_{&selections_, common_.topologyProvider()}
+    module_(nullptr),
+    settings_(),
+    common_(&settings_),
+    selections_(),
+    pdata_(nullptr),
+    nframes_(0),
+    is_initialized_(false),
+    end_of_frames_(false),
+    selectionOptionBehavior_(&selections_, common_.topologyProvider())
 {
-
+    // TODO: Uncrustify wants to make my brace initialization ugly, at least
+    // when it hits certain arguments...
 }
 
 Runner::~Runner()
@@ -98,9 +102,9 @@ Runner::~Runner()
 }
 
 // The Runner will share ownership of the module argument.
-// TODO: clarify requirements and behavior for order of invocation of add_module()
+// TODO: clarify requirements and behavior for order of invocation of addModule()
 // and initialize()
-TrajectoryAnalysisModuleSharedPointer Runner::add_module(TrajectoryAnalysisModuleSharedPointer module)
+TrajectoryAnalysisModuleSharedPointer Runner::addModule(TrajectoryAnalysisModuleSharedPointer module)
 {
     if (is_initialized_)
     {
@@ -117,26 +121,26 @@ TrajectoryAnalysisModuleSharedPointer Runner::add_module(TrajectoryAnalysisModul
  * have a FileNameOptionManager in place. After calling this method, the
  * caller should parse/process its input using the configured OptionsContainer.
  */
-void Runner::register_options(Options& options)
+void Runner::registerOptions(Options &options)
 {
 
     /* Set up IOptionsContainer and behaviors as in RunnerModule::initOptions(). Note that a caller-provided
-    Options object is a IOptionsContainerWithSections is a
-    IOptionsContainer.
-    TODO: make this relationship clearer in doxygen.
-    */
+       Options object is a IOptionsContainerWithSections is a
+       IOptionsContainer.
+       TODO: make this relationship clearer in doxygen.
+     */
 
     // A TimeUnitBehavior is an IOptionsBehavior
     const unique_ptr<TimeUnitBehavior> time_unit_behavior(new TimeUnitBehavior());
 
     // TODO: extract options behaviors from ICommandLineOptionsModuleSettings and ICommandLineOptionsModuleSettings from TrajectoryAnalysisSettings
     /*
-    // Retain settings for module(s)
-    ICommandLineOptionsModuleSettings cli_settings{};
-    cli_settings.addOptionsBehavior(selectionOptionBehavior);
-    cli_settings.addOptionsBehavior(time_unit_behavior);
-    settings_.setOptionsModuleSettings(cli_settings);
-    */
+       // Retain settings for module(s)
+       ICommandLineOptionsModuleSettings cli_settings{};
+       cli_settings.addOptionsBehavior(selectionOptionBehavior);
+       cli_settings.addOptionsBehavior(time_unit_behavior);
+       settings_.setOptionsModuleSettings(cli_settings);
+     */
 
     // This is where RunnerModule would call CommandLineOptionsModuleSettings::addOptionsBehavior(...), which causes OptionsBehaviorCollection::addBehavior(behavior), which causes behavior->initBehavior(options);
     selectionOptionBehavior_.initBehavior(&options);
@@ -157,16 +161,16 @@ void Runner::register_options(Options& options)
     selectionOptionBehavior_.initOptions(&common_options);
 }
 
-    // Parse user parameters, parse selections, and initialized selection variables in module
-    // parse(&options)
-    //options.finish();
+// Parse user parameters, parse selections, and initialized selection variables in module
+// parse(&options)
+//options.finish();
 
 /// Prepare the runner and modules to start iterating over frames.
 /*! Part of initialization is to read the first frame with knowledge of what
  * information is needed by the modules. Thus, modules cannot be added without
  * reinitializing afterwards. For the moment, require forward progress...
  */
-void Runner::initialize(Options& options)
+void Runner::initialize(Options &options)
 {
     // Finalize options and check for errors. Module may adjust selections settings
     module_->optionsFinished(&settings_);
@@ -187,14 +191,12 @@ void Runner::initialize(Options& options)
     module_->initAnalysis(settings_, topology);
 
     // Load first frame.
-    common_.initFirstFrame(); // need some error handling
+    common_.initFirstFrame();      // need some error handling
     common_.initFrameIndexGroup(); // what is this?
     module_->initAfterFirstFrame(settings_, common_.frame());
 
-    // Nothing seems to use the AnalysisDataParallelOptions object and it is only the size of an int, so
-    // I don't know why it is passed const ref all over the place...
     AnalysisDataParallelOptions dataOptions;
-    pdata_ = decltype(pdata_)(module_->startFrames(std::move(dataOptions), selections_));
+    pdata_ = decltype           (pdata_)(module_->startFrames(std::move(dataOptions), selections_));
 
     is_initialized_ = true;
 }
@@ -215,11 +217,13 @@ bool Runner::next()
     common_.initFrame();
 
     // Why isn't this const?
-    t_trxframe &frame = common_.frame();
+    t_trxframe                &frame = common_.frame();
 
     const TopologyInformation &topology = common_.topologyInformation();
 
-    std::unique_ptr<t_pbc> ppbc_{nullptr};
+    std::unique_ptr<t_pbc>     ppbc_ {
+        nullptr
+    };
     if (settings_.hasPBC())
     {
         // Need to preallocate memory for pbc
@@ -247,10 +251,11 @@ bool Runner::next()
 
 int Runner::run()
 {
-    while(next())
+    while (next())
     {
         // handle error and return 1;
-    };
+    }
+    ;
     return 0;
 }
 
