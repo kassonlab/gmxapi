@@ -32,25 +32,69 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 
-# provide the high-level interface to the trajectory module in the gmx package.
+"""Provide the high-level interface to the file i/o behaviors the gmx package.
+
+"""
 
 # TODO: fix namespace polution
 import gmx.core
 
 class TrajectoryFile:
-    """
-    Provides an interface to Gromacs supported trajectory file formats.
+    """Provides an interface to Gromacs supported trajectory file formats.
+
+    TrajectoryFile objects are Trajectory data sources or sinks (depending on
+    access mode) that can be used in a Gromacs tool chain. If data is requested
+    from an object before it has been explicitly attached to a tool chain or
+    runner, these are implicitly created. If no execution context is specified,
+    a local single-threaded context is created.
+
+    Thus, stand-alone TrajectoryFile objects can serve as a rudimentary interface
+    to file types supported by Gromacs.
 
     If the file mode is 'r', the object created supports the Python iterator
     protocol for reading one frame at a time.
 
     Other file modes are not yet supported.
+
+    Example usage:
+
+       import gmx
+
+       # Create the Python proxy to the caching gmx::TrajectoryAnalysisModule object.
+       mytraj = gmx.io.TrajectoryFile(filename, 'r')
+
+       # Implicitly create the Runner object and get an iterator based on selection.
+       frames = mytraj.select(...)
+
+       # Iterating on the module advances the Runner.
+       # Since the Python interpreter is explicitly asking for data,
+       # the runner must now be initialized and begin execution.
+       # mytraj.runner.initialize(context, options)
+       # mytraj.runner.next()
+       next(frames)
+
+       # Subsequent iterations only need to step the runner and return a frame.
+       for frame in frames:
+           # do some stuff
+
+       # The generator yielding frames has finished, so the runner has been released.
+       # The module caching the frames still exists and could still be accessed or
+       # given to a new runner with a new selection.
+       for frame in mytraj.select(...):
+           # do some other stuff
+
     """
 
+    # TODO: decide how to represent file mode and how/if to reflect in the C++ API
     READ = 1
 
     def __init__(self, filename, mode=None):
-        """ Prepare filename for the requested mode of access.
+        """Prepare filename for the requested mode of access.
+
+        Args:
+            filename (str): filesystem path to the file to be opened.
+            mode (str): file access mode. 'r' for read.
+
         """
         if mode == 'r':
             self.mode = TrajectoryFile.READ
@@ -62,7 +106,7 @@ class TrajectoryFile:
             raise ValueError("Trajectory file access mode not supported.")
 
     def select(self, selection=None):
-        """ Generator to read atom positions frame-by-frame.
+        """Generator to read atom positions frame-by-frame.
 
         An analysis module runner is implicitly created when the iterator
         is returned and destroyed when the iterator raises StopIteration.
@@ -72,6 +116,7 @@ class TrajectoryFile:
 
         Returns:
             iterator to frames
+
         """
 
         # Implementation details:
@@ -86,7 +131,7 @@ class TrajectoryFile:
         # 8. Runner returns control to Python.
         # 9. When Runner runs out of frames, the Python generator is done.
         # 10. When Python leaves the context object or otherwise destroys the runner, it cleans up.
-        
+
         #assert(isinstance(selection, gmx.core.Selection))
 
         # Create runner and bind module

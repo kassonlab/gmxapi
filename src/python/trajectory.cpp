@@ -61,7 +61,7 @@ PyTrajectoryFrame::PyTrajectoryFrame(const t_trxframe &frame) :
 
 // Implementation to retrieve a read handle
 template<>
-unique_ptr<Data3Handle> PyTrajectoryFrame::get_read_handle<trjvectorfield>(const trjvectorfield t) const
+unique_ptr<Data3Handle> PyTrajectoryFrame::get_read_handle<trjvectorfield>(const trjvectorfield &t) const
 {
     // return value
     unique_ptr<Data3Handle> handle;

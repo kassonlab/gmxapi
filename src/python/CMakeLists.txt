@@ -37,6 +37,7 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 pybind11_add_module(core gmx_core.cpp data.cpp options.cpp runner.cpp trajectory.cpp)
 target_link_libraries(core PRIVATE libgromacs)
+target_include_directories(core INTERFACE ${PYTHON_INCLUDE_DIRS})
 
 # use, i.e. don't skip the full RPATH for the build tree
 set_target_properties(core PROPERTIES SKIP_BUILD_RPATH FALSE)

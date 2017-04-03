@@ -66,6 +66,25 @@ if (NOT GMX_FAHCORE)
 endif()
 
 find_package(PythonInterp REQUIRED)
+find_package(PythonLibs REQUIRED)
+# Double-check we found Python.h...
+MESSAGE(STATUS "Checking for headers required for Python C++ extensions.")
+set(CMAKE_REQUIRED_INCLUDES "${PYTHON_INCLUDE_DIRS}")
+MESSAGE(STATUS "Looking in ${PYTHON_INCLUDE_DIRS}")
+CHECK_INCLUDE_FILE(Python.h FOUND_PYTHON_H)
+
+check_cxx_source_compiles(
+  "#include <Python.h>
+int main(void) {
+return 0;
+}" PYTHON_H)
+
+set(CMAKE_REQUIRED_INCLUDES)
+IF(${PYTHON_H})
+ELSE()
+  MESSAGE(FATAL_ERROR "No Python.h?")
+ENDIF()
+
 # TODO: get this from gromacs...
 set(PYBIND11_CPP_STANDARD "-std=c++11")
 add_subdirectory(external/pybind11)

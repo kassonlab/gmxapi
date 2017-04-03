@@ -78,10 +78,28 @@ class RunnerModule : public ICommandLineOptionsModule
         {
         }
 
+        /*! \brief Initializes the module and provides settings for the caller.
+         *
+         * Implements gmx::ICommandLineOptionsModule so that this module runner
+         * can be used as a module by the command-line runner.
+         */
         virtual void init(CommandLineModuleSettings * /*settings*/) {}
+        /*! \brief Initializes command-line arguments understood by this class.
+         *
+         * Implements gmx::ICommandLineOptionsModule so that this module runner
+         * can be used as a module by the command-line runner.
+         */
         virtual void initOptions(IOptionsContainer                 *options,
                                  ICommandLineOptionsModuleSettings *settings);
+        /*! \brief Called after all option values have been set.
+        *
+        * Implements gmx::ICommandLineOptionsModule so that this module runner
+        * can be used as a module by the command-line runner.
+        */
         virtual void optionsFinished();
+        /*! \brief Starts the main loop to execute registered modules.
+         *
+         */
         virtual int run();
 
         TrajectoryAnalysisModulePointer module_;
@@ -89,7 +107,21 @@ class RunnerModule : public ICommandLineOptionsModule
         TrajectoryAnalysisRunnerCommon  common_;
         SelectionCollection             selections_;
 };
+/*
+CommandLineModuleManager calls CommandLineOptionsModule::run,
+which calls parseOptions and then module_.run() on this, the
+ICommandLineOptionsModule.
+*/
 
+/* Before calling initOptions(&options, &settings), parseOptions does this:
+    FileNameOptionManager fileoptManager;
+    Options               options;
+
+    options.addManager(&fileoptManager);
+
+    OptionsBehaviorCollection        behaviors(&options);
+    CommandLineOptionsModuleSettings settings(&behaviors);
+*/
 void RunnerModule::initOptions(
         IOptionsContainer *options, ICommandLineOptionsModuleSettings *settings)
 {
@@ -104,15 +136,28 @@ void RunnerModule::initOptions(
     IOptionsContainer &moduleOptions = options->addGroup();
 
     settings_.setOptionsModuleSettings(settings);
+    // Module adds selection options and other options to moduleOptions
     module_->initOptions(&moduleOptions, &settings_);
     settings_.setOptionsModuleSettings(nullptr);
     common_.initOptions(&commonOptions, timeUnitBehavior.get());
     selectionOptionBehavior->initOptions(&commonOptions);
 }
 
+/* Between these steps, the commandline runner does this
+in parseOptions(argc, argv):
+{
+    CommandLineParser parser(&options);
+    parser.parse(&argc, argv);
+    behaviors.optionsFinishing();
+    options.finish();
+}
+*/
+
 void RunnerModule::optionsFinished()
 {
+    // This is where common_ will throw errors for missing trajectory file, etc.
     common_.optionsFinished();
+    // Module adjusts selections
     module_->optionsFinished(&settings_);
 }
 

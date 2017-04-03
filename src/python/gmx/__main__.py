@@ -37,6 +37,11 @@
 Provides the gmx.__main__() method for the gmx package main module.
 Defines behavior when module is invoked as a script or with
 ``python -m gmx``
+
+Right now, this is a test/demonstration script. Ultimately, it is
+unclear what the gmx module should do when invoked from the command-line
+except in some far distant future when perhaps it is used to implement
+the gmx command-line wrapper, which is not currently a focus of this work.
 """
 
 import sys
