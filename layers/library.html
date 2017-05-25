@@ -1,0 +1,336 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Core Gromacs library &mdash; Gromacs External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Gromacs External Interfaces" href="../index.html"/>
+        <link rel="up" title="Implementation layers" href="../layers.html"/>
+        <link rel="next" title="Reference" href="../reference.html"/>
+        <link rel="prev" title="C++ API" href="cppapi.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> Gromacs API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../userguide.html">Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developerguide.html">Architecture and design notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../components.html">Components</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../layers.html">Implementation layers</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="python.html">Python module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bindings.html">Low-level Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="middleware.html">Execution context abstraction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cppapi.html">C++ API</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Core Gromacs library</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#plugins">Plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#callback-hooks">Callback hooks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#supporting-infrastructure">Supporting infrastructure</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Gromacs API</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../layers.html">Implementation layers</a> &raquo;</li>
+        
+      <li>Core Gromacs library</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/layers/library.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="core-gromacs-library">
+<h1>Core Gromacs library<a class="headerlink" href="#core-gromacs-library" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="plugins">
+<h2>Plugins<a class="headerlink" href="#plugins" title="Permalink to this headline">¶</a></h2>
+<p>It should be possible for users to implement external potentials, particle
+interactions, live simulation analysis, and high-performance analysis-driven
+simulation tweaking without altering the distributed Gromacs code by writing
+to a plugin API. Target use cases are tools like Plumed, experimental free energy
+analysis, long-term code development that may or may not eventually be submitted
+for inclusion, and everyone who has
+hacked on the external force part of mdrun to implement custom pulling or biasing
+methods.</p>
+<p>In addition to the obvious basic access to internal data structures, it will be
+helpful to expand the functionality of the communicator(s) to allow local code
+to request data to be sent or retrieved so that plugins can take advantage of
+the existing parallelism without incurring additional communication. To support
+future task-based parallelism, additional infrastructure may be necessary for
+managed data access handles and mechanisms for selecting/grouping atoms.</p>
+<p>Plugins should also be provided with facilities for checkpointing, logging,
+status messages, and whatever else they need to avoid doing their own I/O.</p>
+<p>I suspect there is even less burden of ABI compatibility for plugins, but the
+public API, library API, and plugin API should have separately managed
+versioning to facilitate API compatibility checks and independent stability.</p>
+<p>The API should provide plugins with (at least) the following resources:</p>
+<ul class="simple">
+<li>logging facility</li>
+<li>message facility</li>
+<li>access to communicators</li>
+<li>ability to request local data for next step</li>
+<li>iterators for particles in whatever structural data types exist</li>
+<li>serialization / checkpoint hooks</li>
+<li>neighbor list(s)</li>
+</ul>
+<p>See <a class="reference internal" href="#"><span class="doc">Core Gromacs library</span></a></p>
+</div>
+<div class="section" id="callback-hooks">
+<h2>Callback hooks<a class="headerlink" href="#callback-hooks" title="Permalink to this headline">¶</a></h2>
+<p>It should be as easy as possible to create C++ objects that can
+be plugged into the simulation loop as viewers, observers, actors,
+or just compute kernels, but a simple callback API allows greater
+flexibility. But how should a callback be bound and invoked?</p>
+<p>I propose one call-back function can be registered with the runner to be called
+every <code class="docutils literal"><span class="pre">period</span></code> steps (provide a helper function for time units).
+The function will be called with a single argument that is a
+reference to the simulation object.
+The call-back function can access whatever statefull information
+it needs through the API and/or be configured with necessary
+references to other simulation objects before the loop is run.</p>
+</div>
+<div class="section" id="supporting-infrastructure">
+<h2>Supporting infrastructure<a class="headerlink" href="#supporting-infrastructure" title="Permalink to this headline">¶</a></h2>
+<p>Updates in the core Gromacs library are necessary to support compartmentalization, but are distinct from this project. Such dependencies belong in an issue tracking system, but can be linked from here for convenience before public release.</p>
+<p>Various abstraction in libgromacs will be necessary in these projects. Some is already underway.</p>
+<ul>
+<li><p class="first">Terminal I/O</p>
+</li>
+<li><p class="first">File I/O abstraction</p>
+<blockquote>
+<div><ul class="simple">
+<li>trajectory output</li>
+<li>input and configuration files</li>
+<li>log files</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p class="first">Prompted user interaction</p>
+</li>
+<li><p class="first">CLI and runtime options</p>
+</li>
+<li><p class="first">Simulation configuration, input state</p>
+</li>
+<li><p class="first">Gathered parallel data, running state</p>
+</li>
+<li><p class="first">task-level modules</p>
+</li>
+<li><p class="first">Compute kernels used within <code class="docutils literal"><span class="pre">do_md()</span></code> (for plug-ins as well as external access)</p>
+</li>
+<li><p class="first">Domain&#8211;rank binding / Interprocess communication / MPI communicator</p>
+</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../reference.html" class="btn btn-neutral float-right" title="Reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="cppapi.html" class="btn btn-neutral" title="C++ API" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

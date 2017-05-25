@@ -1,0 +1,282 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Execution context &mdash; Gromacs External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Gromacs External Interfaces" href="../index.html"/>
+        <link rel="up" title="Components" href="../components.html"/>
+        <link rel="next" title="Simulation internals" href="plugins.html"/>
+        <link rel="prev" title="Runner and modules" href="graphmodules.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> Gromacs API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../userguide.html">Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developerguide.html">Architecture and design notes</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../components.html">Components</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="fileio.html">File-backed data interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="microstate.html">Model and Microstate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="graphmodules.html">Runner and modules</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Execution context</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html">Simulation internals</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../layers.html">Implementation layers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Gromacs API</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../components.html">Components</a> &raquo;</li>
+        
+      <li>Execution context</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/components/context.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="execution-context">
+<h1>Execution context<a class="headerlink" href="#execution-context" title="Permalink to this headline">¶</a></h1>
+<p>From low-level parallelism to high-level task scheduling and data flow,
+implementation details for features vary in ways that can be hidden from the
+high-level interfaces, depending on the compute resources.
+The execution context is compartmentalized with an abstraction layer.</p>
+<ul class="simple">
+<li>Hide the details of work scheduling to allow separation of compute resource
+allocation from task preparation</li>
+<li>Provide a layer in which work scheduling and data flow can be managed
+by external software or extended with minimally invasive code additions.</li>
+<li>Allow object-oriented interaction with handles to objects that are not well defined outside
+of a running context (<em>e.g.</em> object-oriented interfaces to internal modules,
+a node in a data graph that is not yet executing, a plugin in a simulation
+that has either finished or not yet started)</li>
+</ul>
+<p>Communicator objects should be represented and have appropriate interfaces at
+each API layer that is aware of the execution context.</p>
+<p>Extending the facilities of the context abstraction is a long term project, but
+should be considered in short-term design. Most immediately, it will guide the
+handling of code paths for single-threaded versus multithreaded and MPI features.</p>
+<p>For instance, it should be easy to write a Python script that can run a Gromacs
+workflow on a single core or in an MPI context, but it should also be easy for
+a user to make sensible use of their available concurrency APIs. An API client
+(Python or C++) should be allowed, but not required, to adapt code execution
+for data locality.</p>
+<p>It should be difficult and explicit for API clients to
+invalidate distributed data structures or inadvertently trigger expensive
+communication, but appropriate notifiers should be available so that such
+operations do not violate encapsulation (e.g. signal/slot, publisher-subscriber,
+observer). The same framework may be used to announce and handle data events in
+graph execution.</p>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="plugins.html" class="btn btn-neutral float-right" title="Simulation internals" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="graphmodules.html" class="btn btn-neutral" title="Runner and modules" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
