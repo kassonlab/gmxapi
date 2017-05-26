@@ -1,0 +1,2 @@
+Redirect 301 / http://gromacs-api.readthedocs.io/
+RedirectMatch 301 /(.*) http://gromacs-api.readthedocs.io/$1
