@@ -22,13 +22,24 @@ just while we build docs. Note-to-self: Find build_temp... I think it is from bu
 """
 
 import os
-import sys
 import platform
 import subprocess
+import sys
+
 import setuptools
-from setuptools import setup, Extension, find_packages
+from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from setuptools.command.test import test as TestCommand
+
+# TODO: Allow user to optionally downlaod and install GROMACS if it is not found.
+# TODO: if building on readthedocs, automatically download, build, and install GROMACS.
+
+
+# Find installed GROMACS
+
+GROMACS_DIR = os.getenv('GROMACS_DIR')
+if GROMACS_DIR is None:
+    GROMACS_DIR = ""
 
 class Tox(TestCommand):
     def finalize_options(self):
@@ -40,30 +51,6 @@ class Tox(TestCommand):
         import tox
         errcode = tox.cmdline(self.test_args)
         sys.exit(errcode)
-
-class get_pybind_include(object):
-    """Helper class to find header files installed with the pybind11 module.
-
-    If we decide to rely on user-supplied pybind11 in the same package environment
-    to which this package is being installed, we can use the ``get_include()``
-    method of the pybind11 module. However, if it is installed as a prerequisite
-    during this invocation of pip, we need to defer importing the module until
-    after dependencies have been installed. This helper class employs some trickery
-    suggested by the pybind11 developers to defer gathering include directories
-    until a string representation of the elements of ``include_dirs`` is actually
-    referenced.
-
-    If we need to be able to install the Python bindings when no network access
-    is available, we need to rework this and use bundled pybind11 headers.
-    """
-
-    def __init__(self, user=False):
-        self.user = user
-
-    def __str__(self):
-        import pybind11
-        # Uses pip.locations.distutils_scheme('pybind11', *args, **kwargs)['headers'])
-        return pybind11.get_include(self.user)
 
 def get_gmxapi_library():
     """Find a path to libgmxapi, if available.
@@ -156,9 +143,9 @@ class CMakeGromacsBuild(build_ext):
         cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gromacs_install_path,
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       ]
-        extra_rpath = get_gmxapi_library()
-        if extra_rpath is not None:
-            cmake_args.append('-DPYGMX_RPATH=' + extra_rpath)
+        # extra_rpath = get_gmxapi_library()
+        # if extra_rpath is not None:
+        #     cmake_args.append('-DPYGMX_RPATH=' + extra_rpath)
 
         # cfg = 'Debug' if self.debug else 'Release'
         cfg = 'Debug'
@@ -184,17 +171,17 @@ class CMakeGromacsBuild(build_ext):
             os.makedirs(self.build_temp)
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
-
-        # For the moment, make sure libgmxapi is installed
-        try:
-            import gmxapi
-        except ImportError:
-            # Install in Gromacs in the build directory and install gmxapi package
-            # Todo: Mature gmxapi package.
-            # This is not good enough, since the build directory is likely not available
-            # at runtime. Improve gmxapi package to include full gromacs install.
-            subprocess.check_call(['cmake', '--install'], cwd=self.build_temp)
-
+        #
+        # # For the moment, make sure libgmxapi is installed
+        # try:
+        #     import gmxapi
+        # except ImportError:
+        #     # Install in Gromacs in the build directory and install gmxapi package
+        #     # Todo: Mature gmxapi package.
+        #     # This is not good enough, since the build directory is likely not available
+        #     # at runtime. Improve gmxapi package to include full gromacs install.
+        #     subprocess.check_call(['cmake', '--install'], cwd=self.build_temp)
+        #
 
 
 class CMakeExtension(Extension):
@@ -206,16 +193,17 @@ class CMakeExtension(Extension):
 
 
 # Construct path to package relative to this setup.py file.
-package_dir = os.path.join(os.path.dirname(__file__), 'src', 'api', 'python', 'gmx')
+# package_dir = os.path.join(os.path.dirname(__file__), 'src', 'api', 'python', 'gmx')
 extension_sources = ['core.cpp',
                      'pymd.cpp',
                      'pyrunner.cpp']
+
 
 setup(
     name='gmx',
 
     packages=['gmx', 'gmx.test'],
-    package_dir = {'gmx': package_dir},
+    # package_dir = {'gmx': package_dir},
 
     use_scm_version = {'root': '.', 'relative_to': __file__},
 
@@ -224,13 +212,13 @@ setup(
 
     # Use Git commit and tags to determine Python package version
     # setup_requires=['setuptools_scm', 'gmxapi'],
-    setup_requires=['setuptools_scm', 'cmake', 'pybind11>=2.1'],
+    setup_requires=['setuptools_scm', 'cmake'],
 
     #install_requires=['docutils', 'cmake', 'sphinx_rtd_theme'],
     # optional targets:
     #   docs requires 'docutils', 'sphinx>=1.4', 'sphinx_rtd_theme'
     #   build_gromacs requires 'cmake>=3.4'
-    install_requires=['pybind11>=2.1'],
+    install_requires=[],
 
     author='M. Eric Irrgang',
     author_email='ericirrgang@gmail.com',
