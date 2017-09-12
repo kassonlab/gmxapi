@@ -236,11 +236,9 @@ Example:
     ...   runner.run(10000)
 )delimiter";
 
-
-PYBIND11_PLUGIN(core) {
-
-    // Instantiate the module
-    py::module m(name, docstring);
+// Instantiate the module
+PYBIND11_MODULE(core, m) {
+    m.doc() = docstring;
 
     // Export core bindings
     py::class_< PyGmxModule, std::shared_ptr<PyGmxModule> > gmx_module(m, "Module", "Base class for computation modules.");
@@ -255,6 +253,4 @@ PYBIND11_PLUGIN(core) {
     //export_options()
     //export_datatypes(m);
     //export_trajectory(m);
-
-    return m.ptr();
 }

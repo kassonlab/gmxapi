@@ -72,6 +72,9 @@ class PyMD;
 class PySingleNodeRunner : public std::enable_shared_from_this<PySingleNodeRunner>
 {
     public:
+        /// Implementation class
+        class State;
+
         PySingleNodeRunner() = delete;
         PySingleNodeRunner(const PySingleNodeRunner &smr) = delete;
         PySingleNodeRunner&operator=(const PySingleNodeRunner&) = delete;
@@ -87,32 +90,33 @@ class PySingleNodeRunner : public std::enable_shared_from_this<PySingleNodeRunne
         PyStatus run();
         PyStatus run(long int nsteps);
 
-        /// Initialize a gmx::mdrunner object for the attached module.
+        /// Initialize a gmx::Mdrunner object for the attached module.
+        /// \returns handle to runner if successful or else a nullptr
         std::shared_ptr<PySingleNodeRunner> startup();
 //        PyStatus startup();
 
 //        virtual bool bind_context(std::shared_ptr<PyContext> context);
 
     private:
+        /// Gromacs module to run
         std::shared_ptr<PyMD>  module_;
+        /// Ability to get a handle to an associated context manager.
         std::weak_ptr<PyContext> context_;
-        class State;
+        /// Implementation object
         std::shared_ptr<State> state_;
 };
 
 class PySingleNodeRunner::State
 {
     public:
+        /// Object should be initialized with the startup() method of the owning object.
         State() :
-                proxy_{std::make_shared<gmxapi::SingleNodeRunnerProxy>()},
-                runner_{nullptr}
+                runner_{std::make_shared<gmxapi::RunnerProxy>()}
         {};
         explicit State(std::shared_ptr<gmxapi::MDProxy> md) :
-                proxy_{std::make_shared<gmxapi::SingleNodeRunnerProxy>(std::move(md))},
-                runner_{nullptr}
+                runner_{std::make_shared<gmxapi::RunnerProxy>(std::move(md))}
         {};
 
-        std::shared_ptr<gmxapi::SingleNodeRunnerProxy> proxy_;
         std::shared_ptr<gmxapi::IMDRunner> runner_;
 };
 

@@ -35,12 +35,14 @@
 
 
 #include "pyrunner.h"
-#include "pymd.h"
-
-#include "gmxapi/runner.h"
 
 #include <memory>
 #include <iostream>
+
+#include "gmxapi/runner.h"
+#include "gmxapi/context.h"
+
+#include "pymd.h"
 
 namespace gmxpy
 {
@@ -52,13 +54,25 @@ PySingleNodeRunner::PySingleNodeRunner(std::shared_ptr<PyMD> m)
 {
 };
 
+// Convert an inactive runner to an active runner. In this simple implementation, a handle
+// to the same object is returned, but different implementation classes may be used to
+// manage state.
 std::shared_ptr<PySingleNodeRunner> PySingleNodeRunner::startup()
 {
-    state_ = std::make_shared<PySingleNodeRunner::State>(module_->get());
-    auto builder = state_->proxy_->builder();
-    state_->runner_ = builder->build();
-    state_->proxy_ = std::make_shared<gmxapi::SingleNodeRunnerProxy>(module_->get());
-    return shared_from_this();
+    std::shared_ptr<PySingleNodeRunner> product{nullptr};
+
+    auto state = std::make_shared<PySingleNodeRunner::State>(module_->get());
+    if (state != nullptr)
+    {
+        state->runner_ = state->runner_->initialize(gmxapi::defaultContext());
+        if (state->runner_ != nullptr)
+        {
+            product = std::make_shared<PySingleNodeRunner>(module_);
+            product->state_ = state;
+        }
+    }
+
+    return product;
 }
 
 //PyStatus PySingleNodeRunner::startup()
@@ -90,8 +104,9 @@ PyStatus PySingleNodeRunner::run(long int nsteps)
     PyStatus status{};
     if (state_->runner_ != nullptr)
     {
-        auto runstatus = state_->runner_->run(nsteps);
-        status = PyStatus(runstatus);
+//        auto runstatus = state_->runner_->run(nsteps);
+//        status = PyStatus(runstatus);
+        throw gmxapi::NotImplementedError("...need to add back this behavior...");
     }
     else
     {
