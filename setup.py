@@ -205,6 +205,8 @@ setup(
     packages=['gmx', 'gmx.test'],
     # package_dir = {'gmx': package_dir},
 
+    # Get version from the most recent tag in the form X.Y.Z
+    # from the git repository rooted in the current directory
     use_scm_version = {'root': '.', 'relative_to': __file__},
 
     # Require Python 2.7 or 3.3+
