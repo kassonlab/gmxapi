@@ -52,42 +52,45 @@ class Tox(TestCommand):
         errcode = tox.cmdline(self.test_args)
         sys.exit(errcode)
 
-def get_gmxapi_library():
-    """Find a path to libgmxapi, if available.
 
-    This is not essential, but if libgmxapi is installed outside of the site-packages dir, allows us to set an
-    appropriate rpath.
-    """
-    # I don't see an obvious way to get the gromacs libdir from cmake.
-    # If GMXRC has been sourced, ENV{GROMACS_DIR}/lib is available.
-    # I can also define GMXLDLIB for substitution by cmake.
-    # Note libdir is provided by pkgconfig...
-    libdir = os.getenv('GMXLDLIB')
-    if libdir is not None:
-        return libdir
-    else:
-        try:
-            import gmxapi
-        except:
-            return None
-        libdir = gmxapi.get_libdir()
-    return libdir
-
-class get_gmxapi_include(object):
-    """Get the external API headers."""
-    def __init__(self, user=False):
-        self.user = user
-
-    def __str__(self):
-        import gmxapi
-        return gmxapi.get_include(self.user)
+# def get_gmxapi_library():
+#     """Find a path to libgmxapi, if available.
+#
+#     This is not essential, but if libgmxapi is installed outside of the site-packages dir, allows us to set an
+#     appropriate rpath.
+#     """
+#     # I don't see an obvious way to get the gromacs libdir from cmake.
+#     # If GMXRC has been sourced, ENV{GROMACS_DIR}/lib is available.
+#     # I can also define GMXLDLIB for substitution by cmake.
+#     # Note libdir is provided by pkgconfig...
+#     libdir = os.getenv('GMXLDLIB')
+#     if libdir is not None:
+#         return libdir
+#     else:
+#         try:
+#             import gmxapi
+#         except:
+#             return None
+#         libdir = gmxapi.get_libdir()
+#     return libdir
+#
+# class get_gmxapi_include(object):
+#     """Get the external API headers."""
+#     def __init__(self, user=False):
+#         self.user = user
+#
+#     def __str__(self):
+#         import gmxapi
+#         return gmxapi.get_include(self.user)
 
 extra_link_args=[]
-if platform.system() == 'Darwin':
-    # OS X doesn't use runtime_library_dirs right for some reason...
-    gromacs_libdir = get_gmxapi_library()
-    if gromacs_libdir is not None:
-        extra_link_args.append('-Wl,-rpath,'+ gromacs_libdir)
+
+
+# if platform.system() == 'Darwin':
+#     # OS X doesn't use runtime_library_dirs right for some reason...
+#     gromacs_libdir = get_gmxapi_library()
+#     if gromacs_libdir is not None:
+#         extra_link_args.append('-Wl,-rpath,'+ gromacs_libdir)
 
 # As of Python 3.6, CCompiler has a `has_flag` method.
 # cf http://bugs.python.org/issue26689
@@ -139,8 +142,10 @@ class CMakeGromacsBuild(build_ext):
 
     def build_extension(self, ext):
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
-        gromacs_install_path = os.path.join(os.path.abspath(self.build_temp), 'gromacs')
-        cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gromacs_install_path,
+        # gromacs_install_path = os.path.join(os.path.abspath(self.build_temp), 'gromacs')
+        staging_dir = os.path.join(os.path.dirname(__file__), 'gmx')
+        # cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gromacs_install_path,
+        cmake_args = ['-DPYGMX_DIRECTORY=' + staging_dir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       ]
         # extra_rpath = get_gmxapi_library()
@@ -194,9 +199,9 @@ class CMakeExtension(Extension):
 
 # Construct path to package relative to this setup.py file.
 # package_dir = os.path.join(os.path.dirname(__file__), 'src', 'api', 'python', 'gmx')
-extension_sources = ['core.cpp',
-                     'pymd.cpp',
-                     'pyrunner.cpp']
+# extension_sources = ['core.cpp',
+#                      'pymd.cpp',
+#                      'pyrunner.cpp']
 
 
 setup(
@@ -213,7 +218,8 @@ setup(
     python_requires = '>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',
 
     # Use Git commit and tags to determine Python package version
-    # setup_requires=['setuptools_scm', 'gmxapi'],
+    # If cmake package causes weird build errors like "missing skbuild", try uninstalling and reinstalling the cmake
+    # package with pip in the current (virtual) environment.
     setup_requires=['setuptools_scm', 'cmake'],
 
     #install_requires=['docutils', 'cmake', 'sphinx_rtd_theme'],
@@ -230,8 +236,7 @@ setup(
     #keywords = '',
 
     ext_modules = [CMakeExtension(
-        'gmx.core',
-
+        'gmx.core'
     )],
 
     # Bundle some files needed for testing
