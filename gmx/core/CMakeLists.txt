@@ -63,13 +63,15 @@ pybind11_add_module(pygmx_core
 # The target name is for clarity, but the installed module will be gmx.core
 set_target_properties(pygmx_core PROPERTIES OUTPUT_NAME core)
 
-set(PYGMX_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
-    CACHE PATH "Full path to the gmx module installation")
+
+#set(PYGMX_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
+#    CACHE PATH "Full path to the gmx module installation")
 
 # Set the output to the staging area
-set_target_properties(
-    pygmx_core
-    PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${PYGMX_DIRECTORY}")
+# For installs that are part of a GROMACS install, we probably want to stage differently
+# set_target_properties(
+#    pygmx_core
+#    PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${PYGMX_DIRECTORY}")
 
 target_link_libraries(pygmx_core PRIVATE Gromacs::gmxapi)
 
@@ -79,14 +81,14 @@ target_include_directories(pygmx_core PRIVATE
 	)
 
 # RPATH management
-set(PYGMX_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" CACHE PATH
-    "Set to override RPATH for Python C++ extension (as by setuptools)")
-mark_as_advanced(PYGMX_RPATH)
+#set(PYGMX_RPATH "${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}" CACHE PATH
+#    "Set to override RPATH for Python C++ extension (as by setuptools)")
+#mark_as_advanced(PYGMX_RPATH)
 # don't skip the full RPATH for the build tree
 set_target_properties(pygmx_core PROPERTIES SKIP_BUILD_RPATH FALSE)
 
 # (but later on when installing)
 # If building with setuptools, CMake will not be performing the install
 set_target_properties(pygmx_core PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH ${PYGMX_RPATH})
+#set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH ${PYGMX_RPATH})
 set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)

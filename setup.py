@@ -142,10 +142,14 @@ class CMakeGromacsBuild(build_ext):
 
     def build_extension(self, ext):
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
+        # print("extdir is {}".format(extdir))
         # gromacs_install_path = os.path.join(os.path.abspath(self.build_temp), 'gromacs')
-        staging_dir = os.path.join(os.path.dirname(__file__), 'gmx')
+        staging_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gmx')
+        print("__file__ is {}".format(__file__))
+        print("staging_dir is {}".format(staging_dir))
+        print("build_temp is {}".format(self.build_temp))
         # cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gromacs_install_path,
-        cmake_args = ['-DPYGMX_DIRECTORY=' + staging_dir,
+        cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       ]
         # extra_rpath = get_gmxapi_library()
