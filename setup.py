@@ -3,7 +3,7 @@
 
 Build and install libgromacs and libgmxapi, then
 
-    python setup.py install --user --library-dirs=/path/to/gromacs/lib --include-dirs=/path/to/gmxapi/include
+    gmxapi_DIR=/path/to/gromacs python setup.py install --user
 
 or
 
@@ -12,19 +12,13 @@ or
 Note that setup.py by itself doesn't like to be run from other directories than the one in which
 it is located. In general, just use pip. If you don't want to use pip, just plan on cluttering your
 source directory. Sorry.
-
-Currently there are several paths hard-coded in setup.py and setup.cfg that should go...
-Todo: remove hard-coded paths
-
-Once this works from src/api/python/, we can try moving it to the top level and conditionally
-scripting a special cmake build and install of Gromacs into the setuptools build directory to use
-just while we build docs. Note-to-self: Find build_temp... I think it is from build_py
 """
 
 import os
 import platform
 import subprocess
 import sys
+from warnings import warn
 
 import setuptools
 from setuptools import setup, Extension
@@ -34,11 +28,54 @@ from setuptools.command.test import test as TestCommand
 # TODO: Allow user to optionally downlaod and install GROMACS if it is not found.
 # TODO: if building on readthedocs, automatically download, build, and install GROMACS.
 
+# readthedocs.org isn't very specific about promising any particular value...
+build_for_readthedocs = False
+if os.getenv('READTHEDOCS') is not None:
+    build_for_readthedocs = True
+
+build_gromacs = False
+if build_for_readthedocs:
+    build_gromacs = True
+
+def get_gromacs(url="https://bitbucket.org/kassonlab/gromacs_api/get/0.0.0.tar.gz", cmake_args=[], build_args=[]):
+    """Download, build, and install a local copy of gromacs to a temporary location.
+    """
+    import urllib
+    import tempfile
+    import tarfile
+    local_filename, headers = urllib.urlretrieve(url)
+    # make temporary source directory
+    sourcedir = tempfile.mkdtemp()
+    # Get top-level directory name in archive
+    archive = tarfile.open(local_filename)
+    # Extract all under top-level to source directory
+    root = archive.next().name
+    archive.extractall(path=sourcedir)
+    # make temporary build directory
+    build_temp = tempfile.mkdtemp()
+    # run CMake to configure with installation directory in extension staging area
+    env = os.environ.copy()
+    try:
+        subprocess.check_call(['cmake', os.path.join(sourcedir, root)] + cmake_args, cwd=build_temp, env=env)
+    except:
+        warn("Not removing source directory {} or build directory {}".format(sourcedir, build_temp))
+        raise
+    # run CMake to build and install
+    try:
+        subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=build_temp)
+    except:
+        warn("Not removing source directory {} or build directory {}".format(sourcedir, build_temp))
+        raise
+    os.removedirs(build_temp)
+    os.removedirs(sourcedir)
 
 # Find installed GROMACS
 
 GROMACS_DIR = os.getenv('GROMACS_DIR')
 if GROMACS_DIR is None:
+    gmxapi_DIR = os.getenv('gmxapi_DIR')
+    if gmxapi_DIR is not None:
+        GROMACS_DIR = gmxapi_DIR
     GROMACS_DIR = ""
 
 class Tox(TestCommand):
@@ -141,7 +178,37 @@ class CMakeGromacsBuild(build_ext):
             self.build_extension(ext)
 
     def build_extension(self, ext):
+        # Note distutils prints extra output if DISTUTILS_DEBUG environement variable is set.
+        # The setup.py build command allows a --debug flag that will have set self.debug
+        # cfg = 'Debug' if self.debug, else 'Release'
+        cfg = 'Release'
+        if self.debug:
+            cfg = 'Debug'
+        build_args = ['--config', cfg]
+
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
+
+        # Build and install a private copy of GROMACS, if necessary.
+        # This could be replaced with a pypi gromacs bundle. We also may prefer to move to scikit-build.
+        # Refer to the 'cmake' pypi package for a simple example of bundling a non-Python package to satisfy a dependency.
+        if build_gromacs:
+            gromacs_url = "https://bitbucket.org/kassonlab/gromacs_api/get/0.0.0.tar.gz"
+            gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
+            cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
+                          # make sure not to recursively build the Python module...
+                          ]
+            if platform.system() == "Windows":
+                cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
+                if sys.maxsize > 2 ** 32:
+                    cmake_args += ['-A', 'x64']
+                build_args += ['--', '/m']
+            else:
+                cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
+                build_args += ['--', '-j8']
+            get_gromacs(gromacs_url, cmake_args, build_args)
+            GROMACS_DIR = gmxapi_DIR
+            cmake_args = []
+
         # print("extdir is {}".format(extdir))
         # gromacs_install_path = os.path.join(os.path.abspath(self.build_temp), 'gromacs')
         staging_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gmx')
@@ -155,10 +222,6 @@ class CMakeGromacsBuild(build_ext):
         # extra_rpath = get_gmxapi_library()
         # if extra_rpath is not None:
         #     cmake_args.append('-DPYGMX_RPATH=' + extra_rpath)
-
-        # cfg = 'Debug' if self.debug else 'Release'
-        cfg = 'Debug'
-        build_args = ['--config', cfg]
 
         # Actually, we're going to let readthedocs call Sphinx-build. What we
         # really need is for conf.py to be configured and available.
@@ -174,6 +237,7 @@ class CMakeGromacsBuild(build_ext):
             build_args += ['--', '-j8']
 
         env = os.environ.copy()
+        env['GROMACS_DIR'] = GROMACS_DIR
         # env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(env.get('CXXFLAGS', ''),
         #                                                       self.distribution.get_version())
         if not os.path.exists(self.build_temp):
@@ -207,6 +271,11 @@ class CMakeExtension(Extension):
 #                      'pymd.cpp',
 #                      'pyrunner.cpp']
 
+package_data = {
+        'gmx': ['data/topol.tpr'],
+    }
+if build_gromacs:
+    package_data['gmx'].append('data/gromacs')
 
 setup(
     name='gmx',
@@ -223,7 +292,7 @@ setup(
 
     # Use Git commit and tags to determine Python package version
     # If cmake package causes weird build errors like "missing skbuild", try uninstalling and reinstalling the cmake
-    # package with pip in the current (virtual) environment.
+    # package with pip in the current (virtual) environment: `pip uninstall cmake; pip install cmake`
     setup_requires=['setuptools_scm', 'cmake'],
 
     #install_requires=['docutils', 'cmake', 'sphinx_rtd_theme'],
@@ -244,9 +313,7 @@ setup(
     )],
 
     # Bundle some files needed for testing
-    package_data = {
-        'gmx': ['data/topol.tpr'],
-    },
+    package_data = package_data,
     # test suite to be invoked by `setup.py test`
     tests_require = ['tox', 'numpy'],
     cmdclass={'build_ext': CMakeGromacsBuild,
