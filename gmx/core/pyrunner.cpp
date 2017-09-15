@@ -38,6 +38,7 @@
 
 #include <memory>
 #include <iostream>
+#include <cassert>
 
 #include "gmxapi/runner.h"
 #include "gmxapi/context.h"
@@ -66,8 +67,14 @@ PySingleNodeRunner::PySingleNodeRunner(std::shared_ptr<gmxapi::IMDRunner> runner
 std::shared_ptr<PySingleNodeRunner> PySingleNodeRunner::startup()
 {
     std::shared_ptr<PySingleNodeRunner> product{nullptr};
+    auto state = std::make_shared<PySingleNodeRunner::State>(this->state_->runner_);
 
-    auto state = std::make_shared<PySingleNodeRunner::State>(module_->get());
+    if (state == nullptr)
+    {
+        state = std::make_shared<PySingleNodeRunner::State>(module_->get());
+    }
+
+    assert(state != nullptr);
     if (state != nullptr)
     {
         state->runner_ = state->runner_->initialize(gmxapi::defaultContext());
