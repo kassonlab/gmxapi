@@ -54,10 +54,10 @@ pybind11_add_module(pygmx_core
 					core.cpp
 					pymd.h
                     pymd.cpp
-					#context.cpp
 					pyrunner.h
 					pyrunner.cpp
-					#session.cpp
+					pysystem.h
+					pysystem.cpp
 					)
 
 # The target name is for clarity, but the installed module will be gmx.core

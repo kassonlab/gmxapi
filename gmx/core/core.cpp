@@ -44,6 +44,7 @@
 #include "bindings.h"
 #include "pymd.h"
 #include "pyrunner.h"
+#include "pysystem.h"
 
 namespace py = pybind11;
 using namespace gmxpy;
@@ -124,6 +125,15 @@ void export_runner(py::module &m)
 //    //     .def("initialize", &PyRunner::initialize, "handle options")
 //    //     .def("next", &PyRunner::next, "Advance the current frame one step.");
 //
+}
+
+void export_system(py::module &m)
+{
+    // Export system container class
+    py::class_< PySystem, std::shared_ptr<PySystem> > system(m, "MDSystem");
+    system.def(py::init());
+    system.def_property_readonly("runner", &PySystem::get_runner, "Bound runner");
+    m.def("from_tpr", &PySystem::from_tpr, "Return a system container initialized from the given input record.");
 }
 
 //void export_context(py::module &m)
@@ -248,6 +258,7 @@ PYBIND11_MODULE(core, m) {
     // Get bindings exported by the various components.
     export_module_md(m);
     export_runner(m);
+    export_system(m);
 //    export_context(m);
 //    export_session(m);
     //export_options()

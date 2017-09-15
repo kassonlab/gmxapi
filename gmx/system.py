@@ -79,15 +79,17 @@ class System(object):
             # we use the API to process TPR files. We create a MD module and
             # retrieve a system from its contents.
             md_module = gmx.md.from_tpr(inputrecord)
+            newsystem = gmx.core.from_tpr(inputrecord)
         else:
             raise gmx.UsageError("Need a TPR file.")
         system = System()
+        system.runner = newsystem.runner
         # TBD as md runner is reimplemented:
         #system.atoms = md_module.atoms
         #system.topology = md_module.topology
 
-        runner = gmx.runner.SimpleRunner(md_module)
-        system.runner = runner
+        #runner = gmx.runner.SimpleRunner(md_module)
+        #system.runner = runner
 
         return system
 

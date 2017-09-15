@@ -83,12 +83,16 @@ class PySingleNodeRunner : public std::enable_shared_from_this<PySingleNodeRunne
 
         /// Can only be created by binding to a task.
         explicit PySingleNodeRunner(std::shared_ptr<PyMD> m);
+        /// ... or from to wrap an API object
+        explicit PySingleNodeRunner(std::shared_ptr<gmxapi::IMDRunner> runner);
 
         ~PySingleNodeRunner();
 
         /// Call the configured runner if possible.
         PyStatus run();
         PyStatus run(long int nsteps);
+
+        std::shared_ptr<gmxapi::IMDRunner> get_apiObject();
 
         /// Initialize a gmx::Mdrunner object for the attached module.
         /// \returns handle to runner if successful or else a nullptr
@@ -111,10 +115,14 @@ class PySingleNodeRunner::State
     public:
         /// Object should be initialized with the startup() method of the owning object.
         State() :
-                runner_{std::make_shared<gmxapi::RunnerProxy>()}
+            runner_{std::make_shared<gmxapi::RunnerProxy>()}
         {};
         explicit State(std::shared_ptr<gmxapi::MDProxy> md) :
-                runner_{std::make_shared<gmxapi::RunnerProxy>(std::move(md))}
+            runner_{std::make_shared<gmxapi::RunnerProxy>(std::move(md))}
+        {};
+
+        explicit State(std::shared_ptr<gmxapi::IMDRunner> runner) :
+            runner_(std::move(runner))
         {};
 
         std::shared_ptr<gmxapi::IMDRunner> runner_;

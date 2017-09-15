@@ -18,7 +18,7 @@ class MD(object):
     managed by a Runner to execute Gromacs molecular dynamics calculations.
     """
     def __init__(self):
-        """noop constructor..."""
+        self._api_object = None
 
 
 

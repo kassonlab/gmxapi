@@ -54,6 +54,12 @@ PySingleNodeRunner::PySingleNodeRunner(std::shared_ptr<PyMD> m)
 {
 };
 
+PySingleNodeRunner::PySingleNodeRunner(std::shared_ptr<gmxapi::IMDRunner> runner)
+{
+    module_ = std::make_shared<PyMD>();
+    state_ = std::make_shared<PySingleNodeRunner::State>(std::move(runner));
+}
+
 // Convert an inactive runner to an active runner. In this simple implementation, a handle
 // to the same object is returned, but different implementation classes may be used to
 // manage state.
@@ -74,15 +80,6 @@ std::shared_ptr<PySingleNodeRunner> PySingleNodeRunner::startup()
 
     return product;
 }
-
-//PyStatus PySingleNodeRunner::startup()
-//{
-//    state_ = std::make_shared<PySingleNodeRunner::State>(module_->get());
-//    auto builder = state_->proxy_->builder();
-//    state_->runner_ = builder->build();
-//    state_->proxy_ = std::make_shared<gmxapi::SingleNodeRunnerProxy>(module_->get());
-//    return PyStatus();
-//}
 
 PyStatus PySingleNodeRunner::run()
 {
