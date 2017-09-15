@@ -82,8 +82,10 @@ class System(object):
             newsystem = gmx.core.from_tpr(inputrecord)
         else:
             raise gmx.UsageError("Need a TPR file.")
+        newrunner = gmx.runner.SimpleRunner()
+        newrunner._runner = newsystem.runner
         system = System()
-        system.runner = newsystem.runner
+        system.runner = newrunner
         # TBD as md runner is reimplemented:
         #system.atoms = md_module.atoms
         #system.topology = md_module.topology

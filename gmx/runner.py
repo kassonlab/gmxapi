@@ -30,7 +30,7 @@ class SimpleRunner(Runner):
     Workflows with no dependence between multiple computation modules are substantially
     simpler and can be executed with a simpler runner.
     """
-    def __init__(self, module):
+    def __init__(self, module=None):
         """
         Create the runner and bind it to an existing module of computational work.
 
@@ -39,9 +39,11 @@ class SimpleRunner(Runner):
         """
         self.module = module
         super(SimpleRunner, self).__init__()
-        self._runner = gmx.core.SimpleRunner(self.module._api_object)
+        self._runner = None
 
     def start(self, context):
         """Ask the API to set up and launch an execution session using the given runner and context."""
+        if self._runner is None:
+            self._runner = gmx.core.SimpleRunner(self.module._api_object)
         session = self._runner.start()
         return session

@@ -3,6 +3,7 @@
 import unittest
 import os
 
+import gmx
 import gmx.md
 import gmx.core
 from gmx.data import tpr_filename
@@ -24,7 +25,7 @@ class BindingsTestCase(unittest.TestCase):
         # assert isinstance(session, gmx.core.SimpleRunner)
         # assert isinstance(session.run(), gmx.core.Status)
         #assert isinstance(session.run(4), gmx.core.Status)
-    def test_SystemFromTpr(self):
+    def test_APIObjectsFromTpr(self):
         apisystem = gmx.core.from_tpr(tpr_filename)
         assert isinstance(apisystem, gmx.core.MDSystem)
         assert hasattr(apisystem, 'runner')
@@ -34,3 +35,16 @@ class BindingsTestCase(unittest.TestCase):
         assert hasattr(apirunner, 'run')
         session = apirunner.start()
         session.run()
+        # Test rerunability
+        # system = gmx.System()
+        # runner = gmx.runner.SimpleRunner()
+        # runner._runner = apirunner
+        # system.runner = runner
+        # assert isinstance(system, gmx.System)
+        # assert isinstance(system.runner, gmx.runner.Runner)
+        # assert isinstance(system.runner._runner, gmx.core.SimpleRunner)
+        # with gmx.context.DefaultContext(system.runner) as session:
+        #     session.run()
+    def test_SystemFromTpr(self):
+        system = gmx.System._from_file(tpr_filename)
+        system.run()
