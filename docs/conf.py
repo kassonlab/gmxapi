@@ -39,7 +39,7 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'breathe',
+#    'breathe',
 ]
 
 # todo: need to figure out how to use breathe correctly...

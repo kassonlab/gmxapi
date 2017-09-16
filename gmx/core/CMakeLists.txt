@@ -91,4 +91,8 @@ set_target_properties(pygmx_core PROPERTIES SKIP_BUILD_RPATH FALSE)
 # If building with setuptools, CMake will not be performing the install
 set_target_properties(pygmx_core PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
 #set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH ${PYGMX_RPATH})
+# workaround for relocated package when installing nested gromacs on readthedocs.org
+if($ENV{READTHEDOCS})
+    set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH "$ORIGIN/:$ORIGIN/data/gromacs/lib/")
+endif()
 set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)

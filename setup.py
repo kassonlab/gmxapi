@@ -45,7 +45,10 @@ def get_gromacs(url, cmake_args=[], build_args=[]):
     except:
         warn("get_gromacs needs ssl support, but `import ssl` fails")
         raise
-    import urllib2
+    try:
+        from urllib.request import urlopen
+    except:
+        from urllib2 import urlopen
     import tempfile
     import tarfile
     import shutil
@@ -53,7 +56,7 @@ def get_gromacs(url, cmake_args=[], build_args=[]):
     sourcedir = tempfile.mkdtemp()
     try:
         with tempfile.TemporaryFile(suffix='.tgz', dir=sourcedir) as fh:
-            fh.write(urllib2.urlopen(url).read())
+            fh.write(urlopen(url).read())
             fh.seek(0)
             archive = tarfile.open(fileobj=fh)
             # Get top-level directory name in archive
@@ -169,6 +172,8 @@ class CMakeGromacsBuild(build_ext):
         # Refer to the 'cmake' pypi package for a simple example of bundling a non-Python package to satisfy a dependency.
         # There is no caching: gromacs is downloaded and rebuilt each time. On readthedocs that should be okay since
         # libgmxapi is likely to update more frequently than gmxpy.
+        # Linking is a pain because the package is relocated to the site-packages directory. We should really do this
+        # in two stages.
         if build_gromacs:
             gromacs_url = "https://bitbucket.org/kassonlab/gromacs/get/0.0.0.tar.gz"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
