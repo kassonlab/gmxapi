@@ -175,7 +175,7 @@ class CMakeGromacsBuild(build_ext):
         # Linking is a pain because the package is relocated to the site-packages directory. We should really do this
         # in two stages.
         if build_gromacs:
-            gromacs_url = "https://bitbucket.org/kassonlab/gromacs/get/0.0.0.tar.gz"
+            gromacs_url = "https://bitbucket.org/kassonlab/gromacs/get/0.0.1.tar.gz"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
 
             # Warning: make sure not to recursively build the Python module...
