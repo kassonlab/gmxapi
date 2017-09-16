@@ -74,7 +74,7 @@ def get_gromacs(url, cmake_args=[], build_args=[]):
         raise
     # run CMake to build and install
     try:
-        subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=build_temp)
+        subprocess.check_call(['cmake', '--build', '.', '--target', 'install'] + build_args, cwd=build_temp)
     except:
         warn("Not removing source directory {} or build directory {}".format(sourcedir, build_temp))
         raise
@@ -145,11 +145,9 @@ class CMakeGromacsBuild(build_ext):
         if self.debug:
             cfg = 'Debug'
         build_args = ['--config', cfg]
-        cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
-                      '-DPYTHON_EXECUTABLE=' + sys.executable,
+        cmake_args = ['-DPYTHON_EXECUTABLE=' + sys.executable,
                       ]
         if platform.system() == "Windows":
-            cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
             if sys.maxsize > 2**32:
                 cmake_args += ['-A', 'x64']
             build_args += ['--', '/m']
@@ -192,6 +190,9 @@ class CMakeGromacsBuild(build_ext):
         env['GROMACS_DIR'] = GROMACS_DIR
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
+        cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir]
+        if platform.system() == "Windows":
+            cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
