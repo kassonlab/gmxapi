@@ -37,7 +37,7 @@ Refer to the Python source code itself for additional clarification.
 
 .. autofunction:: gmx.core.from_tpr
 
-.. autofunction:: gmx.core.md_from_tpr
+.. skipping gmx.core.md_from_tpr
 
 .. autoclass:: gmx.core.MD
     :members:

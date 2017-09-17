@@ -250,7 +250,7 @@ setup(
     author_email='ericirrgang@gmail.com',
     description='Gromacs Python module',
     license = 'LGPL',
-    url = 'https://bitbucket.org/kassonlab/gromacs',
+    url = 'https://bitbucket.org/kassonlab/gmxpy',
     #keywords = '',
 
     ext_modules = [CMakeExtension(
