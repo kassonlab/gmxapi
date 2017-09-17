@@ -1,0 +1,4 @@
+docutils>=0.13.1
+Pygments>=2.2.0
+Sphinx>=1.6.3
+sphinx-rtd-theme>=0.2.4

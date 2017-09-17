@@ -156,7 +156,11 @@ class CMakeGromacsBuild(build_ext):
             build_args += ['--', '/m']
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
-            build_args += ['--', '-j8']
+            if build_for_readthedocs:
+                # save some RAM
+                build_args += ['--', '-j2']
+            else:
+                build_args += ['--', '-j8']
 
         # Find installed GROMACS
         GROMACS_DIR = os.getenv('GROMACS_DIR')
@@ -177,10 +181,12 @@ class CMakeGromacsBuild(build_ext):
         if build_gromacs:
             gromacs_url = "https://bitbucket.org/kassonlab/gromacs/get/0.0.1.tar.gz"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
+            extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
+                                '-DGMX_FFT_LIBRARY=fftpack']
 
             # Warning: make sure not to recursively build the Python module...
             get_gromacs(gromacs_url,
-                        cmake_args + ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR],
+                        cmake_args + extra_cmake_args,
                         build_args)
             GROMACS_DIR = gmxapi_DIR
 
