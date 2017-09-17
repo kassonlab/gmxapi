@@ -2,10 +2,14 @@
 About
 =====
 
+These documents describe project goals, software design, and usage information. In addition to the
+Python ``gmx`` package, discussion includes the ``gmxapi`` C++ project and plans for integration with
+the core GROMACS distribution.
+
 Goals and scope
 ===============
 
-A (set of) well-designed API(s), compartmentalized from the core Gromacs code,
+A (set of) well-designed API(s), compartmentalized from the core GROMACS code,
 provide external interfaces to support a modern scientific software ecosystem.
 
 * Flexible workflow
@@ -14,7 +18,9 @@ provide external interfaces to support a modern scientific software ecosystem.
 * Streamlined code development
 * Sustainable code sharing
 
-Design and implementation can and should be encapsulated into iterative feature enhancements to allow incremental forward progress, but components are unified in an architecture designed to meet a variety of client needs.
+Design and implementation can and should be encapsulated into iterative feature enhancements
+to allow incremental forward progress, but components are unified in an architecture designed
+to meet a variety of client needs.
 
 * Data manipulation
   * file i/o parsing, editing and conversion
