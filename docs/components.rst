@@ -22,7 +22,7 @@ against experimental SAXS data and that is
 
 * configured through the Python interface before launching the simulation
 * is originally designed to read experimental data from a file, and
-* registers code with hooks in the simulation loop
+* registers code with hooks in the simulation loop.
 
 The respective Python and C++ aspects may look something like the following.
 

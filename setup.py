@@ -158,6 +158,8 @@ class CMakeGromacsBuild(build_ext):
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             if build_for_readthedocs:
                 # save some RAM
+                # We're pushing the limits of the readthedocs build host provisions. We might soon need
+                # a binary package or mock library for libgmxapi / libgromacs.
                 build_args += ['--', '-j2']
             else:
                 build_args += ['--', '-j8']
@@ -248,7 +250,7 @@ setup(
     author_email='ericirrgang@gmail.com',
     description='Gromacs Python module',
     license = 'LGPL',
-    url = 'https://bitbucket.org/kassonlab/gromacs',
+    url = 'https://bitbucket.org/kassonlab/gmxpy',
     #keywords = '',
 
     ext_modules = [CMakeExtension(

@@ -34,61 +34,46 @@
 # the research papers on the package. Check out http://www.gromacs.org.
 
 """
-Provide Python access to Gromacs
-================================
+Providing Python access to Gromacs
+==================================
 
-The gmx Python module provides an interface suitable for scripting Gromacs
+The gmx Python module provides an interface suitable for scripting GROMACS
 workflows, interactive use, or connectivity to external Python-based APIs.
+The project is hosted at https://bitbucket.org/kassonlab/gmxpy
 
-The API allows interaction with Gromacs that is decoupled from command-line
+The API allows interaction with GROMACS that is decoupled from command-line
 interfaces, terminal I/O, and filesystem access. Computation and data management
 are managed by the API until/unless the user explicitly requests specific data,
 such as for writing to a local file or manipulating with a tool that does not
 implement the Gromacs API.
 
-When data must be retrieved from Gromacs, efforts are made to do so as efficiently
-as possible, so the user should consult documentation for the specific Gromacs
+When data must be retrieved from GROMACS, efforts are made to do so as efficiently
+as possible, so the user should consult documentation for the specific GROMACS
 objects they are interested in regarding efficient access, if performance is
-critical. For instance, exporting Gromacs data directly to a numpy array can be
+critical. For instance, exporting GROMACS data directly to a numpy array can be
 much faster and require less memory than exporting to a Python list or tuple,
 and using available iterators directly can save a lot of memory versus creating
 an array and then iterating over it in two separate steps.
 
-For more efficient iterative access to Gromacs data, such as analyzing a simulation
+For more efficient iterative access to GROMACS data, such as analyzing a simulation
 in progress, or applying Python analysis scripts in a trajectory analysis workflow,
 consider using an appropriate call-back or, better yet, creating a C++ plugin
 that can be inserted directly in the tool chain.
 
-For more advanced use, the module provides means to access or manipulate Gromacs
+For more advanced use, the module provides means to access or manipulate GROMACS
 more granularly than the command-line tool. This allows rapid prototyping of
 new methods, debugging of unexpected simulation behavior, and adaptive workflows.
 
 Installation
 ------------
 
-The gmxapi library must be installed to build and install the gmx module. Do a normal CMake build and install.
+Download the ``gmxpy`` repository from https://bitbucket.org/kassonlab/gmxpy and refer
+to the README.md file for details on installing this Python module.
 
-Then,
-using the install location of Gromacs, do `pip install /path/to/gromacs/include` to use the `setup.py` file that was
-generated and installed with libgmxapi.
-
-Then, from the top level directory of the repository, gmx is built and installed with
-setuptools, using either `setup.py` classically or by using `pip` (recommended) with
-
-    $ pip install .
-
-If you are not using a virtual environment, the `--user` flag tells pip to only install in the
-home directory for the user, but then this conflicts with subsequent installations in virtual
-environments for Python installations of the same version. So it's kind of an either/or thing.
-
-After installation, tests can be run with your favorite python test driver. E.g.
-``nosetests gmx`` or
-``pytest --pyargs gmx``
-
+The gmxapi library must be installed to build and install the gmx module.
+Retrieve the GROMACS fork from https://bitbucket.org/kassonlab/gromacs and
+do a normal CMake build and install.
 """
-# currently broken because full git repo is necessary to build bundled gromacs due to pybind inclusion
-#From the repository, testing in Python virtual environments via `tox` is performed by `setup.py test`.
-
 
 from __future__ import absolute_import
 from __future__ import division

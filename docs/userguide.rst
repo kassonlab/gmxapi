@@ -1,9 +1,13 @@
-======
-Guides
-======
+==========
+User Guide
+==========
 
 Build and install
 =================
+
+Download the repository from
+`bitbucket.org/kassonlab/gmxpy <https://bitbucket.org/kassonlab/gmxpy/>`_
+and refer to the ``README.md`` file for details.
 
 How to
 ======
@@ -14,6 +18,8 @@ How to
     Unavailable workflows belong in a scrum board or issue tracking system, but
     are too noisy for the main Gromacs Redmine. For the moment, curate them here
     to clarify targeted features.
+
+The following is a template of planned functionality that will link to documentation-by-example in the future.
 
 As a Python user
 ----------------
