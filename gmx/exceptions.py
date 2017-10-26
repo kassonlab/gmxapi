@@ -18,7 +18,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 
-__all__ = ['Error', 'UsageError', 'OptionalFeatureNotAvailableError']
+__all__ = ['Error', 'UsageError', 'OptionalFeatureNotAvailableError', 'TypeError']
 
 class Error(Exception):
     """Base exception for gmx.exceptions classes."""
@@ -37,3 +37,6 @@ class OptionalFeatureNotAvailableError(Error):
 
 class OptionalFeatureNotAvailableWarning(Warning):
     """A feature is not installed or is missing dependencies."""
+
+class TypeError(Error):
+    """An object is of a type incompatible with the API operation."""

@@ -49,6 +49,43 @@ but is not likely to be a supported use case unless a need is demonstrated. Down
 Use the READTHEDOCS environment variable to tell setup.py to download and install a private copy of
 GROMACS with the Python module.
 
+# Python virtual environments
+
+In the world of Python, a virtual environment is a Python installation that is self-contained
+and easy to activate or deactivate to allow normal Python use without additional concerns of
+software compatibility.
+
+Several systems of managing virtual environments exist. Pygmx is tested with Anaconda and with
+Python 3's built-in virtualenv.
+
+The following documentation assumes you have installed a compatible version of GROMACS and
+installed it in the directory `/path/to/gromacs`. Replace `/path/to/gromacs` with the actual
+install location below.
+
+## Anaconda
+
+Get and install Anaconda https://docs.anaconda.com/anaconda/install/
+
+You don't have to follow all of the instructions for setting up your login profile if you don't want to,
+but if you don't, then the `conda` and `activate` commands below will have to be prefixed by your
+conda installation location. E.g. `~/miniconda3/bin/conda info` or `source ~/miniconda3/bin/activate myEnv`
+
+Create a conda virtual environment. Replace `myEnv` below with whatever convenient name you choose.
+
+    conda create -n myEnv python=3
+
+Activate, or enter the environment.
+
+    source activate myEnv
+
+Install the Python module. At some point, this will be simplified, but for right now please use the instructions above.
+
+## virtualenv
+
+## virtualenvwrapper
+
+## Docker
+
 # Testing
 
 Unit tests are performed individually with `pytest` or as a full installation and test

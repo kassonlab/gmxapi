@@ -12,6 +12,7 @@ class System(object):
 
     Attributes:
         runner (:obj:`gmx.runner.Runner`): workflow runner to be used when executed.
+        md (:obj:`gmx.md.MDEngine`): molecular dynamics computation object.
 
     Example:
 
@@ -40,7 +41,8 @@ class System(object):
     """
 
     def __init__(self):
-        self.runner = None
+        self.__runner = None
+        self.__md = None
         #self.atoms = None
         #self.topology = None
 
@@ -50,7 +52,25 @@ class System(object):
 
     @runner.setter
     def runner(self, runner):
+        """
+
+        :type runner: gmx.runner.Runner
+        """
+        if not isinstance(runner, gmx.runner.Runner):
+            message = "Got object of type {} but provided object must be a subclass of gmx.runner.Runner"
+            message = message.format(type(runner))
+            raise gmx.TypeError(message)
         self.__runner = runner
+
+    @property
+    def md(self):
+        return self.__md
+
+    @md.setter
+    def md(self, md):
+        if not isinstance(md, gmx.md.MD):
+            raise gmx.TypeError("Provided object must be a subclass of gmx.md.MD")
+        self.__md = md
 
     @staticmethod
     def _from_file(inputrecord):
@@ -80,6 +100,8 @@ class System(object):
             # retrieve a system from its contents.
             md_module = gmx.md.from_tpr(inputrecord)
             newsystem = gmx.core.from_tpr(inputrecord)
+            if newsystem is None:
+                raise gmx.Error("Got empty system when reading TPR file.")
         else:
             raise gmx.UsageError("Need a TPR file.")
         newrunner = gmx.runner.SimpleRunner()

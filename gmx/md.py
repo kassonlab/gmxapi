@@ -41,6 +41,8 @@ class ExtendedMD(MD):
 
     @potential.setter
     def potential(self, potential):
+        if not isinstance(potential, gmx.core.MDModule):
+            raise TypeError("Object providing the potential must be derived from type gmx.core.MDModule")
         self.__potential = potential
 
     def add_potential(self, potential=None):
