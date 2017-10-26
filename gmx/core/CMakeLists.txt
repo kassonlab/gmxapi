@@ -52,6 +52,9 @@ find_package(gmxapi
 pybind11_add_module(pygmx_core
                     core.h
 					core.cpp
+					export_md.cpp
+					export_runner.cpp
+					export_system.cpp
 					pymd.h
                     pymd.cpp
 					pyrunner.h

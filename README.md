@@ -98,12 +98,34 @@ a virtual environment. If you get errors, try running the tests from the native 
 or a different virtual environment manager (i.e. conda versus virtualenvwrapper). And let us know
 if you come up with any tips or tricks!
 
+Note: `python setup.py test` seems not to invoke the correct C++ standards...
+
 # Documentation
 
 Documentation for the Python classes and functions in the gmx module can be accessed in the usual ways, using `pydoc`
 from the command line or `help()` in an interactive Python session.
 
 Additional documentation can be browsed on readthedocs.org or built with Sphinx after installation.
+
+To build the user documentation locally, first make sure you have sphinx installed, such as by doing
+a `pip install sphinx` or by using whatever package management system you are familiar with.
+You may also need to install a `sphinx_rtd_theme` package.
+
+Build *and install* the gmxpy module.
+
+Then decide what directory you want to put the docs in and call `sphinx-build` to build `html` docs
+from the configuration in the `docs` directory of the gmxpy repository.
+
+Assuming you downloaded the repository to `/path/to/gmxpy` and you want to build the docs in `/path/to/docs`,
+do
+
+    sphinx-build -b html /path/to/gmxpy/docs /path/to/docs
+    
+or
+
+    python -m sphinx -b html /path/to/gmxpy/docs /path/to/docs
+
+Then open `/path/to/docs/index.html` in a browser.
 
 # Troubleshooting
 
