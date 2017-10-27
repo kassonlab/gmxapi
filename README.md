@@ -8,7 +8,25 @@ A compatible version of GROMACS must either be already installed or may be insta
 as part of package installation.
 Alternatively, the Python module can be installed during a CMake-driven GROMACS installation.
 
-# Installation Options
+# Installation
+
+You will need a few packages installed that are hard for gmxpy to install automatically.
+Before proceeding, install / upgrade the Python package for `cmake`. Note that it is not
+sufficient just to have the command-line CMake tools installed.
+
+    python -m pip install --upgrade pip
+    pip install --upgrade cmake
+    
+If you will be running the testing suite, you also need `virtualenv` and `tox`.
+
+    pip install --upgrade tox
+
+pip3 install --upgrade cmake && \
+pip install --upgrade cmake && \
+gmxapi_DIR=/usr/local/gromacs python setup.py install --verbose
+
+pip install --upgrade virtualenv && \
+gmxapi_DIR=/usr/local/gromacs python setup.py test
 
 ## Python setuptools with existing or shared GROMACS installation
 
@@ -92,6 +110,14 @@ Unit tests are performed individually with `pytest` or as a full installation an
 suite with `tox`. Tests can be invoked from the root of the repository in the standard way.
 
     $ python setup.py test
+    
+or
+
+    $ gmxapi_DIR=/path/to/gromacs python setup.py test
+
+or
+
+    $ gmxapi_DIR=/path/to/gromacs tox
 
 Note: `tox` may get confused when it tries to create virtual environments when run from within
 a virtual environment. If you get errors, try running the tests from the native Python environment
