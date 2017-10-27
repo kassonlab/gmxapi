@@ -65,8 +65,14 @@ class PyMD : public PyGmxModule
         PyMD(const PyMD&) = delete;
         PyMD& operator=(const PyMD&) = delete;
 
+        // Construct from a gmxapi::MDProxy reference to wrap
+        explicit PyMD(std::shared_ptr<gmxapi::MDProxy> md);
+
         std::string info() override;
 
+        /*!
+         * \brief Get a reference to the underlying gmxapi object.
+         */
         std::shared_ptr<gmxapi::MDProxy> get();
 
         /*!

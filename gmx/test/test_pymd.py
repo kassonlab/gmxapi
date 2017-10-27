@@ -48,3 +48,9 @@ class BindingsTestCase(unittest.TestCase):
     def test_SystemFromTpr(self):
         system = gmx.System._from_file(tpr_filename)
         system.run()
+    def test_Extension(self):
+        # Test attachment of external code
+        system = gmx.System._from_file(tpr_filename)
+        md = system.md
+        assert isinstance(md, gmx.md.MD)
+        md.add_potential(gmx.core.MDModule())

@@ -21,6 +21,7 @@ void export_md(py::module &m)
     m.def("md_from_tpr", &PyMD::md_from_tpr, "Return an MD module to run the given input record.");
 
     py::class_< PyMDModule > plugin(m, "MDModule", plugindocs);
+    plugin.def(py::init());
 
 }
 

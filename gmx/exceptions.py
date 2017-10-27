@@ -40,3 +40,10 @@ class OptionalFeatureNotAvailableWarning(Warning):
 
 class TypeError(Error):
     """An object is of a type incompatible with the API operation."""
+    def __init__(self, got=None, expected=None):
+        message = "Incompatible type."
+        if expected is not None:
+            message += " Expected type {}.".format(expected)
+        if got is not None:
+            message += " Got type {}.".format(type(got))
+        super(TypeError, self).__init__(message)

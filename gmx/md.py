@@ -16,11 +16,26 @@ class MD(object):
 
     Interacts with molecular data in a System container and with the workflow
     managed by a Runner to execute Gromacs molecular dynamics calculations.
-    """
-    def __init__(self):
-        self._api_object = None
+        """
+    def __init__(self, md):
+        self._api_object = md
 
 
+    @property
+    def _api_object(self):
+        return self.__api_object
+
+    @_api_object.setter
+    def _api_object(self, md):
+        """
+        Private attribute to hold reference to C++ API object.
+
+        :param md: gmx.core.MD object
+        :type md: gmx.core.MD
+        """
+        if not isinstance(md, gmx.core.MD):
+            raise gmx.TypeError(md, gmx.core.MD)
+        self.__api_object = md
 
 class ExtendedMD(MD):
     """
@@ -31,9 +46,9 @@ class ExtendedMD(MD):
 
     Manages additional potentials provided by external extension code.
     """
-    def __init__(self):
-        super(ExtendedMD, self).__init__()
-        self.potential = None
+    def __init__(self, md):
+        super(ExtendedMD, self).__init__(md)
+        self.__potential = None
 
     @property
     def potential(self):
@@ -42,7 +57,7 @@ class ExtendedMD(MD):
     @potential.setter
     def potential(self, potential):
         if not isinstance(potential, gmx.core.MDModule):
-            raise TypeError("Object providing the potential must be derived from type gmx.core.MDModule")
+            raise TypeError(potential, gmx.core.MDModule)
         self.__potential = potential
 
     def add_potential(self, potential=None):
@@ -73,6 +88,5 @@ def from_tpr(inputrecord=None):
     import gmx.core
     if not isinstance(inputrecord, str):
         raise gmx.exceptions.UsageError("Need a file name as a string.")
-    md = MD()
-    md._api_object = gmx.core.md_from_tpr(inputrecord)
+    md = MD(gmx.core.md_from_tpr(inputrecord))
     return md

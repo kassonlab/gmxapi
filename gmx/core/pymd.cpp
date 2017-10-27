@@ -50,8 +50,12 @@
 namespace gmxpy
 {
 
+PyMD::PyMD(std::shared_ptr<gmxapi::MDProxy> md) :
+    mdProxy_{std::move(md)}
+{};
+
 PyMD::PyMD() :
-    mdProxy_{nullptr}
+    PyMD{std::make_shared<gmxapi::MDProxy>()}
 {};
 
 PyMD::~PyMD() = default;

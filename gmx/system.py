@@ -57,9 +57,7 @@ class System(object):
         :type runner: gmx.runner.Runner
         """
         if not isinstance(runner, gmx.runner.Runner):
-            message = "Got object of type {} but provided object must be a subclass of gmx.runner.Runner"
-            message = message.format(type(runner))
-            raise gmx.TypeError(message)
+            raise gmx.TypeError(runner, gmx.runner.Runner)
         self.__runner = runner
 
     @property
@@ -69,7 +67,7 @@ class System(object):
     @md.setter
     def md(self, md):
         if not isinstance(md, gmx.md.MD):
-            raise gmx.TypeError("Provided object must be a subclass of gmx.md.MD")
+            raise gmx.TypeError(md, gmx.md.MD)
         self.__md = md
 
     @staticmethod
@@ -98,7 +96,6 @@ class System(object):
         if gmx.util._filetype(inputrecord) is gmx.fileio.TprFile:
             # we use the API to process TPR files. We create a MD module and
             # retrieve a system from its contents.
-            md_module = gmx.md.from_tpr(inputrecord)
             newsystem = gmx.core.from_tpr(inputrecord)
             if newsystem is None:
                 raise gmx.Error("Got empty system when reading TPR file.")
@@ -106,8 +103,12 @@ class System(object):
             raise gmx.UsageError("Need a TPR file.")
         newrunner = gmx.runner.SimpleRunner()
         newrunner._runner = newsystem.runner
+
+        newmd = gmx.md.ExtendedMD(newsystem.md)
+
         system = System()
         system.runner = newrunner
+        system.md = newmd
         # TBD as md runner is reimplemented:
         #system.atoms = md_module.atoms
         #system.topology = md_module.topology
