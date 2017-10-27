@@ -238,7 +238,7 @@ setup(
     # Use Git commit and tags to determine Python package version
     # If cmake package causes weird build errors like "missing skbuild", try uninstalling and reinstalling the cmake
     # package with pip in the current (virtual) environment: `pip uninstall cmake; pip install cmake`
-    setup_requires=['setuptools_scm', 'cmake'],
+    setup_requires=['setuptools_scm', 'scikit-build', 'cmake'],
 
     #install_requires=['docutils', 'cmake', 'sphinx_rtd_theme'],
     # optional targets:
