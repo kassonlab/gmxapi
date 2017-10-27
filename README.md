@@ -21,13 +21,6 @@ If you will be running the testing suite, you also need `virtualenv` and `tox`.
 
     pip install --upgrade tox
 
-pip3 install --upgrade cmake && \
-pip install --upgrade cmake && \
-gmxapi_DIR=/usr/local/gromacs python setup.py install --verbose
-
-pip install --upgrade virtualenv && \
-gmxapi_DIR=/usr/local/gromacs python setup.py test
-
 ## Python setuptools with existing or shared GROMACS installation
 
 Make sure that you have GROMACS installed with the gmxapi library.
