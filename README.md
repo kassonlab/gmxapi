@@ -34,13 +34,37 @@ Either first source the GMXRC as described in GROMACS documentation or provide a
     $ git clone git clone https://bitbucket.org:kassonlab/gmxpy.git
     $ cd gmxpy
 
-Then,
+Then, if you have sourced your gmxrc or exported GROMACS environment variables, you can just
+
+    $ python setup.py install
+
+or
+
+    $ pip install --upgrade .
+    
+Otherwise, you need to tell Python where to find GROMACS with an environment variable.
+Note that in `bash`, there must not be spaces between the variable name and the equals sign (`=`).
 
     $ gmxapi_DIR=/Users/eric/gromacs python setup.py install
 
 or
 
     $ gmxapi_DIR=/Users/eric/gromacs pip install --upgrade .
+
+If you have not installed GROMACS already or if `gmxapi_DIR` does not contain directories like
+`bin` and `share` then you will get an error along the lines of the following.
+
+   CMake Error at gmx/core/CMakeLists.txt:45 (find_package):
+      Could not find a package configuration file provided by "gmxapi" with any
+      of the following names:
+
+        gmxapiConfig.cmake
+        gmxapi-config.cmake
+
+      Add the installation prefix of "gmxapi" to CMAKE_PREFIX_PATH or set
+      "gmxapi_DIR" to a directory containing one of the above files.  If "gmxapi"
+      provides a separate development package or SDK, be sure it has been
+      installed.
 
 If you are not a system administrator you are encouraged to install in a virtual environment,
 such as is created with Anaconda or virtualenv.
@@ -104,7 +128,7 @@ suite with `tox`. Tests can be invoked from the root of the repository in the st
 
     $ python setup.py test
     
-or
+or, if Python cannot find the path to your GROMACS installation or you need to specify one of several:
 
     $ gmxapi_DIR=/path/to/gromacs python setup.py test
 
