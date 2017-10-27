@@ -47,7 +47,7 @@ Then,
 
 or
 
-    $ gmxapi_DIR=/Users/eric/gromacs pip install .
+    $ gmxapi_DIR=/Users/eric/gromacs pip install --upgrade .
 
 If you are not a system administrator you are encouraged to install in a virtual environment,
 such as is created with Anaconda or virtualenv.
