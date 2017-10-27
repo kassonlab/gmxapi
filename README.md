@@ -15,6 +15,7 @@ Before proceeding, install / upgrade the Python package for `cmake`. Note that i
 sufficient just to have the command-line CMake tools installed.
 
     python -m pip install --upgrade pip
+    pip install --upgrade setuptools
     pip install --upgrade cmake
     
 If you will be running the testing suite, you also need `virtualenv` and `tox`.
