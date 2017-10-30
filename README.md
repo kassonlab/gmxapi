@@ -171,9 +171,49 @@ or
 
 Then open `/path/to/docs/index.html` in a browser.
 
+Note:
+
+If you try to run `sphinx-build` from the root directory of the repository, it will get confused
+and not realize that it should use the package you just installed instead of the unbuilt source code.
+Therefore, I recommend the following complete procedure to download, install, and build docs for the
+`gmxpy` package:
+
+    $ python -m pip install --upgrade pip
+    $ pip install --upgrade setuptools
+    $ pip install --upgrade cmake
+    $ pip install --upgrade sphinx
+    $ pip install --upgrade sphinx_rtd_theme
+    $ git clone git clone https://bitbucket.org:kassonlab/gmxpy.git
+    $ cd gmxpy
+    $ gmxapi_DIR=/path/to/gromacs pip install .
+    $ cd docs
+    $ python -m sphinx -b html . ../html
+    $ cd ..
+    $ open html/index.html
+
+Note that the periods '.' and '..' in the above commands are important and that there
+are no spaces before or after the equals sign ('=') when specifying the GROMACS path.
+
 # Troubleshooting
 
 If an attempted installation fails with CMake errors about missing "gmxapi", make
 sure that Gromacs is installed and can be found during installation. For instance,
 
     $ gmxapi_DIR=/Users/eric/gromacs python setup.py install --verbose
+        
+Pip and related Python package management tools can be a little too flexible and ambiguous
+sometimes.
+If things get really messed up, try explicitly uninstalling the `gmx` module and its dependencies,
+then do it again and repeat until `pip` can no longer find any version of any of the packages.
+
+    $ pip uninstall gmx
+    $ pip uninstall cmake
+    ...
+
+Successfully running the test suite is not essential to having a working `gmxpy` package.
+We are working to make the testing more robust, but right now the test suite is a bit delicate
+and may not work right, even though you have a successfully built `gmxpy` package. If you
+want to troubleshoot, though, the main problems seem to be that automatic installation of
+required python packages may not work (requiring manual installations, such as with `pip install somepackage`)
+and ambiguities between python versions. The testing attempts to run under both Python 2 and
+Python 3, so you may need to explicitly install packages for each Python installation.
