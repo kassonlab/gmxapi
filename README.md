@@ -116,11 +116,21 @@ Activate, or enter the environment.
 
 Install the Python module. At some point, this will be simplified, but for right now please use the instructions above.
 
+Note: we do not yet have a robust suggestion for setting up `tox` for running the test suite.
+If you come up with a recipe, please let us know. Otherwise, don't worry if you are able to install
+the package but can't get weird errors when you try to run the tests.
+
 ## virtualenv
+
+Todo: step-by-step instructions for building and installing with native Python `virtualenv`
 
 ## virtualenvwrapper
 
+Todo: step-by-step instructions for building and installing with helper package.
+
 ## Docker
+
+Todo: Dockerfile and/or images for building, using, developing, or reading docs.
 
 # Testing
 
