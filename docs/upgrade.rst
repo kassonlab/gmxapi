@@ -37,6 +37,72 @@ The old macro emits a compile-time deprecation warning.
     }
 
 
+New API for defining custom constructors and pickling functions
+---------------------------------------------------------------
+
+The old placement-new custom constructors have been deprecated. The new approach
+uses ``py::init()`` and factory functions to greatly improve type safety.
+
+Placement-new can be called accidentally with an incompatible type (without any
+compiler errors or warnings), or it can initialize the same object multiple times
+if not careful with the Python-side ``__init__`` calls. The new-style custom
+constructors prevent such mistakes. See :ref:`custom_constructors` for details.
+
+.. code-block:: cpp
+
+    // old -- deprecated (runtime warning shown only in debug mode)
+    py::class<Foo>(m, "Foo")
+        .def("__init__", [](Foo &self, ...) {
+            new (&self) Foo(...); // uses placement-new
+        });
+
+    // new
+    py::class<Foo>(m, "Foo")
+        .def(py::init([](...) { // Note: no `self` argument
+            return new Foo(...); // return by raw pointer
+            // or: return std::make_unique<Foo>(...); // return by holder
+            // or: return Foo(...); // return by value (move constructor)
+        }));
+
+Mirroring the custom constructor changes, ``py::pickle()`` is now the preferred
+way to get and set object state. See :ref:`pickling` for details.
+
+.. code-block:: cpp
+
+    // old -- deprecated (runtime warning shown only in debug mode)
+    py::class<Foo>(m, "Foo")
+        ...
+        .def("__getstate__", [](const Foo &self) {
+            return py::make_tuple(self.value1(), self.value2(), ...);
+        })
+        .def("__setstate__", [](Foo &self, py::tuple t) {
+            new (&self) Foo(t[0].cast<std::string>(), ...);
+        });
+
+    // new
+    py::class<Foo>(m, "Foo")
+        ...
+        .def(py::pickle(
+            [](const Foo &self) { // __getstate__
+                return py::make_tuple(f.value1(), f.value2(), ...); // unchanged
+            },
+            [](py::tuple t) { // __setstate__, note: no `self` argument
+                return new Foo(t[0].cast<std::string>(), ...);
+                // or: return std::make_unique<Foo>(...); // return by holder
+                // or: return Foo(...); // return by value (move constructor)
+            }
+        ));
+
+For both the constructors and pickling, warnings are shown at module
+initialization time (on import, not when the functions are called).
+They're only visible when compiled in debug mode. Sample warning:
+
+.. code-block:: none
+
+    pybind11-bound class 'mymodule.Foo' is using an old-style placement-new '__init__'
+    which has been deprecated. See the upgrade guide in pybind11's docs.
+
+
 Stricter enforcement of hidden symbol visibility for pybind11 modules
 ---------------------------------------------------------------------
 
@@ -135,31 +201,13 @@ localize all common type bindings in order to avoid conflicts with
 third-party modules.
 
 
-New syntax for custom constructors
-----------------------------------
+Negative strides for Python buffer objects and numpy arrays
+-----------------------------------------------------------
 
-The old placement-new custom constructors are still valid, but the new approach
-greatly improves type safety. Placement-new can be called accidentally with an
-incompatible type (without any compiler errors or warnings), or it can initialize
-the same object multiple times if not careful with the Python-side ``__init__``
-calls. The new-style ``py::init()`` custom constructors prevent such mistakes.
-See :ref:`custom_constructors` for details.
-
-.. code-block:: cpp
-
-    // old
-    py::class<Foo>(m, "Foo")
-        .def("__init__", [](Foo &self, ...) {
-            new (&self) Foo(...); // uses placement-new
-        });
-
-    // new
-    py::class<Foo>(m, "Foo")
-        .def(py::init([](...) { // Note: no `self` argument
-            return new Foo(...); // return by raw pointer
-            // or: return std::make_unique<Foo>(...); // return by holder
-            // or: return Foo(...); // return by value (move constructor)
-        }));
+Support for negative strides required changing the integer type from unsigned
+to signed in the interfaces of ``py::buffer_info`` and ``py::array``. If you
+have compiler warnings enabled, you may notice some new conversion warnings
+after upgrading. These can be resolved using ``static_cast``.
 
 
 Deprecation of some ``py::object`` APIs
@@ -176,6 +224,33 @@ were previously available as protected constructor tags. Now the types
 should be used directly instead: ``borrowed_t{}`` and ``stolen_t{}``
 (`#771 <https://github.com/pybind/pybind11/pull/771>`_).
 
+
+Stricter compile-time error checking
+------------------------------------
+
+Some error checks have been moved from run time to compile time. Notably,
+automatic conversion of ``std::shared_ptr<T>`` is not possible when ``T`` is
+not directly registered with ``py::class_<T>`` (e.g. ``std::shared_ptr<int>``
+or ``std::shared_ptr<std::vector<T>>`` are not automatically convertible).
+Attempting to bind a function with such arguments now results in a compile-time
+error instead of waiting to fail at run time.
+
+``py::init<...>()`` constructor definitions are also stricter and now prevent
+bindings which could cause unexpected behavior:
+
+.. code-block:: cpp
+
+    struct Example {
+        Example(int &);
+    };
+
+    py::class_<Example>(m, "Example")
+        .def(py::init<int &>()); // OK, exact match
+        // .def(py::init<int>()); // compile-time error, mismatch
+
+A non-``const`` lvalue reference is not allowed to bind to an rvalue. However,
+note that a constructor taking ``const T &`` can still be registered using
+``py::init<T>()`` because a ``const`` lvalue reference can bind to an rvalue.
 
 v2.1
 ====
