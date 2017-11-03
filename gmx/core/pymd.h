@@ -50,6 +50,8 @@
 namespace gmxpy
 {
 
+class PyMDModule; // forward declaration
+
 /*!
  * \brief Wrapper for C++ MD interface.
  */
@@ -67,6 +69,8 @@ class PyMD : public PyGmxModule
 
         // Construct from a gmxapi::MDProxy reference to wrap
         explicit PyMD(std::shared_ptr<gmxapi::MDProxy> md);
+
+        void addPotential(PyMDModule module);
 
         std::string info() override;
 
@@ -188,6 +192,8 @@ Example:
  */
 class PyMDModule
 {
+public:
+    std::shared_ptr<gmxapi::MDModule> module;
 };
 
 }      // end namespace gmxpy

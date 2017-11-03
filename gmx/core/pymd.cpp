@@ -92,5 +92,9 @@ std::shared_ptr<gmxapi::MDProxy> PyMD::get()
     return mdProxy_;
 }
 
+void PyMD::addPotential(PyMDModule module)
+{
+    (void)module.module;
+}
 
 } // end namespace gmxpy

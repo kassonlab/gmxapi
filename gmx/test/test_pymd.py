@@ -53,4 +53,10 @@ class BindingsTestCase(unittest.TestCase):
         system = gmx.System._from_file(tpr_filename)
         md = system.md
         assert isinstance(md, gmx.md.MD)
-        md.add_potential(gmx.core.MDModule())
+        assert isinstance(md, gmx.md.ExtendedMD)
+        potential = gmx.core.MDModule();
+        assert isinstance(potential, gmx.core.MDModule)
+        # Let's try leaving shared_ptr<gmxapi::MDModule> unregistered
+        # assert isinstance(potential._api_object, None)
+        md._api_object.add_potential(potential)
+        md.add_potential(potential)

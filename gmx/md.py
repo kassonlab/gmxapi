@@ -56,9 +56,10 @@ class ExtendedMD(MD):
 
     @potential.setter
     def potential(self, potential):
-        if not isinstance(potential, gmx.core.MDModule):
-            raise TypeError(potential, gmx.core.MDModule)
+        # if not hasattr(potential, 'module'):
+        #     raise gmx.UsageError("Object does not have a register() method")
         self.__potential = potential
+        self._api_object.add_potential(potential)
 
     def add_potential(self, potential=None):
         """
