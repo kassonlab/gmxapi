@@ -52,12 +52,6 @@
 
 #include <string>
 
-namespace pybind11
-{
-class module;
-}
-
-
 /*! \brief API client code from which to export Python bindings
  *
  * gmxpy is not a public interface. It implements bindings for the public
