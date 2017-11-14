@@ -43,8 +43,6 @@
 
 #include <memory>
 
-#include "bindings.h"
-#include "core.h"
 #include "runner.h"
 #include "session.h"
 

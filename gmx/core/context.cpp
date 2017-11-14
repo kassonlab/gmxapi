@@ -37,7 +37,6 @@
 
 #include <memory>
 
-#include "bindings.h"
 #include "core.h"
 
 namespace py = pybind11;

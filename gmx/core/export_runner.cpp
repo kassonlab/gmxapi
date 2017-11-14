@@ -1,4 +1,4 @@
-#include "bindings.h"
+#include "core.h"
 #include "pyrunner.h"
 #include "pymd.h"
 
@@ -15,10 +15,10 @@ void export_runner(py::module &m)
 {
     // Export runner classes
     py::class_< PySingleNodeRunner, std::shared_ptr<PySingleNodeRunner> > simple_runner(m, "SimpleRunner");
-    simple_runner.def(py::init<std::shared_ptr<PyMD>> ());
+    simple_runner.def(py::init<std::shared_ptr<PyMD>> (), "");
     simple_runner.def("start", &PySingleNodeRunner::startup, "Initialize runner." );
     simple_runner.def("run", (PyStatus (PySingleNodeRunner::*)()) &PySingleNodeRunner::run, "Invoke runner for configured number of steps.");
-    simple_runner.def("run", (PyStatus (PySingleNodeRunner::*)(long int)) &PySingleNodeRunner::run, "Invoke runner for configured number of steps.");
+    simple_runner.def("run", (PyStatus (PySingleNodeRunner::*)(long int)) &PySingleNodeRunner::run, "Invoke runner for indicated number of steps.");
 
 //    //
 //    // py::class_< PyRunner > tafrunner(m, "TafRunner");

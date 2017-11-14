@@ -42,18 +42,13 @@
 /*! \internal \file
  * \brief Declares symbols to be exported to gmx.core Python module.
  *
- * Declares namespace gmx::pyapi
+ * Declares namespace gmxpy.
  * \ingroup module_python
  */
 #ifndef GMXPY_CORE_H
 #define GMXPY_CORE_H
 
-#include "gmxapi/gmxapi.h"
-#include "gmxapi/md.h"
-#include "gmxapi/md/mdmodule.h"
-
-#include <string>
-
+#include "pybind11/pybind11.h"
 
 
 /*! \brief API client code from which to export Python bindings
@@ -68,27 +63,20 @@
 namespace gmxpy
 {
 
-
-/*! \brief Generic return value for API calls.
- *
- * \internal
- * \ingroup module_python
- */
-class PyStatus
+namespace detail
 {
-    public:
-        PyStatus() : success_(false) {};
-        PyStatus(const PyStatus &status) : success_{status.success_} {};
-        virtual ~PyStatus()         = default;
 
-        explicit PyStatus(const bool &status) : success_(status) {};
-        explicit PyStatus(const gmxapi::Status status) : success_(status.success()) {};
+void export_md(pybind11::module &m);
 
-        bool success() const { return success_; };
+void export_runner(pybind11::module &m);
 
-    private:
-        bool success_{false};
-};
+void export_context(pybind11::module &m);
+
+void export_session(pybind11::module &m);
+
+void export_system(pybind11::module &m);
+
+} // end namespace gmxpy::detail
 
 }      // end namespace gmxpy
 

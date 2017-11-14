@@ -44,7 +44,9 @@
 #include <memory>
 
 #include "core.h"
+#include "pystatus.h"
 #include "gmxapi/runner.h"
+
 namespace gmxpy
 {
 

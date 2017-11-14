@@ -45,8 +45,9 @@
 #include <string>
 
 #include "core.h"
-#include "gmxapi/md.h"
 #include "pymdmodule.h"
+
+#include "gmxapi/md.h"
 
 namespace gmxpy
 {

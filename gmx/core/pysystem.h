@@ -8,6 +8,7 @@
 //#include "pyrunner.h"
 
 #include "gmxapi/gmxapi.h"
+#include "gmxapi/system.h"
 
 namespace gmxpy
 {

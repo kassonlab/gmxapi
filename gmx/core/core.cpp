@@ -41,10 +41,13 @@
 #include <memory>
 #include "core.h"
 
-#include "bindings.h"
+#include "gmxpy_api.h"
 #include "pymd.h"
 #include "pyrunner.h"
+#include "pystatus.h"
 #include "pysystem.h"
+
+#include <pybind11/pybind11.h>
 
 namespace py = pybind11;
 using namespace gmxpy;
@@ -123,6 +126,8 @@ PYBIND11_MODULE(core, m) {
     using namespace gmxpy::detail;
 
     m.doc() = docstring;
+
+    export_gmxapi(m);
 
     // Export core bindings
     py::class_< PyStatus > gmx_status(m, "Status", "Holds status for API operations.");
