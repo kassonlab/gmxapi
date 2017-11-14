@@ -57,6 +57,8 @@ pybind11_add_module(pygmx_core
 					export_system.cpp
 					pymd.h
                     pymd.cpp
+					pymdmodule.h
+					pymdmodule.cpp
 					pyrunner.h
 					pyrunner.cpp
 					pysystem.h

@@ -14,7 +14,8 @@ class BindingsTestCase(unittest.TestCase):
         assert isinstance(pymd, gmx.core.MD)
         pymd = gmx.md.from_tpr(tpr_filename)
         assert isinstance(pymd._api_object, gmx.core.MD)
-        assert isinstance(pymd._api_object, gmx.core.Module)
+        # Haven't decided whether there should be a single (or small set of) API object base class...
+        # assert isinstance(pymd._api_object, gmx.core.Module)
     def test_RunnerProxy(self):
         md = gmx.md.from_tpr(tpr_filename)
         runner = gmx.runner.SimpleRunner(md)
@@ -54,6 +55,7 @@ class BindingsTestCase(unittest.TestCase):
         md = system.md
         assert isinstance(md, gmx.md.MD)
         assert isinstance(md, gmx.md.ExtendedMD)
+        assert isinstance(md._api_object, gmx.core.MD)
         potential = gmx.core.MDModule();
         assert isinstance(potential, gmx.core.MDModule)
         # Let's try leaving shared_ptr<gmxapi::MDModule> unregistered

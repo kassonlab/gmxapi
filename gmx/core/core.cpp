@@ -125,8 +125,8 @@ PYBIND11_MODULE(core, m) {
     m.doc() = docstring;
 
     // Export core bindings
-    py::class_< PyGmxModule, std::shared_ptr<PyGmxModule> > gmx_module(m, "Module", "Base class for computation modules.");
     py::class_< PyStatus > gmx_status(m, "Status", "Holds status for API operations.");
+
 
     // Get bindings exported by the various components.
     export_md(m);

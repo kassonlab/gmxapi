@@ -93,6 +93,7 @@ class System(object):
             status = simulation.run()
 
         """
+        import gmx.core
         if gmx.util._filetype(inputrecord) is gmx.fileio.TprFile:
             # we use the API to process TPR files. We create a MD module and
             # retrieve a system from its contents.

@@ -49,8 +49,12 @@
 #define GMXPY_CORE_H
 
 #include "gmxapi/gmxapi.h"
+#include "gmxapi/md.h"
+#include "gmxapi/md/mdmodule.h"
 
 #include <string>
+
+
 
 /*! \brief API client code from which to export Python bindings
  *
@@ -64,35 +68,6 @@
 namespace gmxpy
 {
 
-/*! \brief Base class for Gromacs modules exported to Python
- *
- * PyGmxModule objects provide sufficient interface to bind with Runners.
- * Derived classes may provide additional interfaces.
- *
- * \internal
- * \ingroup module_python
- */
-class PyGmxModule
-{
-    public:
-        PyGmxModule()                               = default;
-        PyGmxModule(const PyGmxModule &)            = default;
-        PyGmxModule(PyGmxModule&&) noexcept         = default;
-        virtual ~PyGmxModule()                      = default;
-        PyGmxModule &operator=(const PyGmxModule &) = default;
-        PyGmxModule& operator=(PyGmxModule&&) noexcept      = default;
-
-        /*!
-         * \brief Generic string output.
-         *
-         * Provide a generic way to implement simple self-representation. Optionally implemented
-         * to allows for some trivial
-         * introspection and/or runtime debugging. May ultimately be used as the hook for __str__()
-         * or __repr__().
-         * \return some useful information on the type or state of the object in string form.
-         */
-        virtual std::string info() { return ""; };
-};
 
 /*! \brief Generic return value for API calls.
  *
