@@ -30,7 +30,7 @@ class Context(object):
 
         """
         self.initialized = False
-        self.runner = runner
+        self.__runner = runner
 
     @property
     def runner(self):

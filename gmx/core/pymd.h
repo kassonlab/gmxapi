@@ -48,11 +48,17 @@
 #include "pymdmodule.h"
 
 #include "gmxapi/md.h"
+#include <pybind11/pybind11.h>
+
 
 namespace gmxpy
 {
-
-// forward declaration
+//
+//class MD
+//{
+//    public:
+//        void addForce(pybind11::object force_object);
+//};
 
 /*!
  * \brief Wrapper for C++ MD interface.

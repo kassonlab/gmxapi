@@ -19,6 +19,7 @@ void export_runner(py::module &m)
     simple_runner.def("start", &PySingleNodeRunner::startup, "Initialize runner." );
     simple_runner.def("run", (PyStatus (PySingleNodeRunner::*)()) &PySingleNodeRunner::run, "Invoke runner for configured number of steps.");
     simple_runner.def("run", (PyStatus (PySingleNodeRunner::*)(long int)) &PySingleNodeRunner::run, "Invoke runner for indicated number of steps.");
+    simple_runner.def("add_force", &gmxpy::PySingleNodeRunner::addForce, "Attach a restraint or other potential.");
 
 //    //
 //    // py::class_< PyRunner > tafrunner(m, "TafRunner");

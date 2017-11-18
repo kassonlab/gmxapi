@@ -42,10 +42,12 @@
 
 #include <memory>
 #include <string>
+#include <pybind11/pytypes.h>
 
 #include "core.h"
 
 #include "gmxapi/md.h"
+#include "gmxapi/gmxapi.h"
 
 namespace gmxpy
 {
@@ -96,5 +98,15 @@ void PyMD::addPotential(std::shared_ptr<::gmxapi::MDModule> module)
 {
     (void)module;
 }
+
+//void MD::addForce(pybind11::object force_object)
+//{
+//    namespace py=pybind11;
+//    if (py::hasattr(force_object, "bind"))
+//    {
+//        py::object bind = force_object.attr("bind")();
+//        bind(gmxapi::MDHolder(gmxapi::MDWorkSpec));
+//    }
+//}
 
 } // end namespace gmxpy

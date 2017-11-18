@@ -33,8 +33,8 @@ class BindingsTestCase(unittest.TestCase):
         apirunner = apisystem.runner
         assert isinstance(apirunner, gmx.core.SimpleRunner)
         assert hasattr(apirunner, 'start')
-        assert hasattr(apirunner, 'run')
         session = apirunner.start()
+        assert hasattr(session, 'run')
         session.run()
         # Test rerunability
         # system = gmx.System()
@@ -56,9 +56,12 @@ class BindingsTestCase(unittest.TestCase):
         assert isinstance(md, gmx.md.MD)
         assert isinstance(md, gmx.md.ExtendedMD)
         assert isinstance(md._api_object, gmx.core.MD)
-        potential = gmx.core.MDModule();
+        potential = gmx.core.TestModule();
         assert isinstance(potential, gmx.core.MDModule)
-        # Let's try leaving shared_ptr<gmxapi::MDModule> unregistered
-        # assert isinstance(potential._api_object, None)
         md._api_object.add_potential(potential)
         md.add_potential(potential)
+
+        with gmx.context.DefaultContext(system.runner) as session:
+            assert isinstance(session, gmx.core.SimpleRunner)
+            session.add_force(potential)
+            session.run()

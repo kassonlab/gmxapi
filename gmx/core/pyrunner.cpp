@@ -40,6 +40,9 @@
 #include <iostream>
 #include <cassert>
 
+#include "gmxapi/md.h"
+#include "gmxapi/md/mdmodule.h"
+#include "gmxapi/gmxapi.h"
 #include "gmxapi/runner.h"
 #include "gmxapi/context.h"
 
@@ -51,7 +54,8 @@ namespace gmxpy
 
 PySingleNodeRunner::PySingleNodeRunner(std::shared_ptr<PyMD> m)
     : module_ {std::move(m)},
-      state_{std::make_shared<PySingleNodeRunner::State>()}
+      state_{std::make_shared<PySingleNodeRunner::State>()},
+      spec_{std::make_shared<gmxapi::MDWorkSpec>()}
 {
 };
 
@@ -59,6 +63,7 @@ PySingleNodeRunner::PySingleNodeRunner(std::shared_ptr<gmxapi::IMDRunner> runner
 {
     module_ = std::make_shared<PyMD>();
     state_ = std::make_shared<PySingleNodeRunner::State>(std::move(runner));
+    spec_ = std::make_shared<gmxapi::MDWorkSpec>();
 }
 
 // Convert an inactive runner to an active runner. In this simple implementation, a handle
@@ -90,10 +95,16 @@ std::shared_ptr<PySingleNodeRunner> PySingleNodeRunner::startup()
 
 PyStatus PySingleNodeRunner::run()
 {
+    assert(state_ != nullptr);
     PyStatus status{};
     if (state_->runner_ != nullptr)
     {
-        auto runstatus = state_->runner_->run();
+        auto runner = state_->runner_;
+        for (auto&& module : spec_->getModules())
+        {
+            runner->setRestraint(module);
+        }
+        auto runstatus = runner->run();
         status = PyStatus(runstatus);
     }
     else
@@ -117,6 +128,40 @@ PyStatus PySingleNodeRunner::run(long int nsteps)
         status = PyStatus(false);
     }
     return PyStatus(status);
+}
+
+void PySingleNodeRunner::addForce(pybind11::object force_object)
+{
+    namespace py=pybind11;
+    // If force_object has a bind method, give it a PyCapsule with a pointer
+    // to our C++ object.
+    if (py::hasattr(force_object, "bind"))
+    {
+//        // Wrap the work specification in an API object.
+//        auto holder = std::make_shared<gmxapi::MDHolder>(spec_);
+//        holder->name_ = "pygmx holder";
+//        // Get a reference to a Python object with the bindings defined in this module.
+
+        auto holder = new gmxapi::MDHolder("pygmx holder");
+        auto deleter = [](PyObject* o){
+            if (PyCapsule_IsValid(o, gmxapi::MDHolder_Name))
+            {
+                auto holder_ptr = (gmxapi::MDHolder*) PyCapsule_GetPointer(o, gmxapi::MDHolder_Name);
+                delete holder_ptr;
+            };
+        };
+        auto capsule = py::capsule(holder, gmxapi::MDHolder_Name, deleter);
+
+        // Generate a capsule object that extends the lifetime of the holder, which extends the lifetime of the spec_ managed object, and pass it through the bind interface.
+
+        force_object.attr("bind")(capsule);
+
+    }
+    else
+    {
+        // Need to bind the exceptions...
+        throw PyExc_RuntimeError;
+    }
 }
 
 PySingleNodeRunner::~PySingleNodeRunner() = default;

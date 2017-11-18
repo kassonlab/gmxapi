@@ -102,14 +102,34 @@ class PySingleNodeRunner : public std::enable_shared_from_this<PySingleNodeRunne
 //        PyStatus startup();
 
 //        virtual bool bind_context(std::shared_ptr<PyContext> context);
+        /*!
+         * \brief Attach an MDModule that provides a restraint force.
+         *
+         * \param force_object MDModule-like Python object.
+         * \internal
+         *
+         * The Python object passed to addForce() does not need to be any
+         * particular type, but it should look like an MDModule in that it
+         * should provide a bind() method that receives a Python Capsule
+         * with an appropriate name for the API. It should not keep a
+         * handle to the capsule for any length of time, as we do not yet
+         * guarantee the lifetime of the pointed-to object for longer than
+         * the execution of bind().
+         * \endinternal
+         *
+         * \ingroup module_python
+         */
+        void addForce(pybind11::object force_object);
 
     private:
         /// Gromacs module to run
         std::shared_ptr<PyMD>  module_;
         /// Ability to get a handle to an associated context manager.
         std::weak_ptr<PyContext> context_;
-        /// Implementation object
+        /// Implementation object.
         std::shared_ptr<State> state_;
+        /// Shared ownership of a work specification.
+        std::shared_ptr<gmxapi::MDWorkSpec> spec_;
 };
 
 class PySingleNodeRunner::State

@@ -36,6 +36,8 @@
 #include "gmxapi/gmxapi.h"
 #include "pybind11/pybind11.h"
 
+#include <string>
+
 // To emphasize that this source code is local to a project, I'm leaving this namespace anonymous.
 // Feel free to name it if you want.
 namespace
@@ -43,11 +45,27 @@ namespace
 
 namespace py=pybind11;
 
+/*!
+ * \brief Call this function when defining a pybind11 C++ extension module.
+ *
+ * \param mymodule the pybind11 module you are exporting bindings for.
+ */
 static void export_gmxapi(py::module& mymodule);
+
+class PYBIND11_EXPORT MyHolder : public gmxapi::MDHolder
+{
+    public:
+        using gmxapi::MDHolder::MDHolder;
+
+        explicit MyHolder(const std::string& name) :
+            MDHolder(std::make_shared<gmxapi::MDWorkSpec>())
+        {
+            name_ = name;
+        }
+};
 
 void export_gmxapi(py::module& mymodule)
 {
-    py::class_<gmxapi::MDHolder> md_holder(mymodule, "MD", "Wrapper for gmxapi object", py::module_local());
 }
 
 } // end anonymous namespace
