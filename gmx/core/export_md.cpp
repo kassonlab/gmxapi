@@ -38,16 +38,22 @@ void export_md(py::module &m)
 
     // Consider whether to bother exporting base class and whether/how to overload methods for testing.
     gmxapi_mdmodule.def("bind",
-                         [](py::object self, py::capsule capsule){
-                             if (capsule.name() == std::string(gmxapi::MDHolder::api_name))
+                         [](py::object self, py::object object){
+
+//                             if (capsule.name() == std::string(gmxapi::MDHolder::api_name))
+                             if (PyCapsule_IsValid(object.ptr(), gmxapi::MDHolder::api_name))
                              {
                                  auto this_ = py::cast<gmxapi::MDModule*>(self);
-                                 gmxapi::MDHolder* holder = capsule;
+                                 gmxapi::MDHolder* holder = (gmxapi::MDHolder*) PyCapsule_GetPointer(object.ptr(), gmxapi::MDHolder::api_name);;
                                  auto spec = holder->getSpec();
                                  std::cout << this_->name() << " received " << holder->name();
                                  std::cout << " containing spec of size ";
                                  std::cout << spec->getModules().size();
                                  std::cout << std::endl;
+                             }
+                             else
+                             {
+                                 throw gmxapi::ProtocolError("MDModule bind method requires properly named PyCapsule input.");
                              }
                          }
     );

@@ -48,6 +48,9 @@
 
 #include "pymd.h"
 
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+
 namespace gmxpy
 {
 
@@ -154,7 +157,11 @@ void PySingleNodeRunner::addForce(pybind11::object force_object)
 
         // Generate a capsule object that extends the lifetime of the holder, which extends the lifetime of the spec_ managed object, and pass it through the bind interface.
 
-        force_object.attr("bind")(capsule);
+
+        py::object bind = force_object.attr("bind");
+//        py::object obj{capsule};
+        py::object obj = capsule;
+        bind(obj);
 
     }
     else

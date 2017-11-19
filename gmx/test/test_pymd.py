@@ -50,6 +50,7 @@ class BindingsTestCase(unittest.TestCase):
         system = gmx.System._from_file(tpr_filename)
         system.run()
     def test_Extension(self):
+        import pytest
         # Test attachment of external code
         system = gmx.System._from_file(tpr_filename)
         md = system.md
@@ -60,6 +61,12 @@ class BindingsTestCase(unittest.TestCase):
         assert isinstance(potential, gmx.core.MDModule)
         md._api_object.add_potential(potential)
         md.add_potential(potential)
+
+        assert hasattr(potential, "bind")
+        generic_object = object()
+        with pytest.raises(Exception) as exc_info:
+            potential.bind(generic_object)
+        assert str(exc_info).endswith("MDModule bind method requires properly named PyCapsule input.")
 
         with gmx.context.DefaultContext(system.runner) as session:
             assert isinstance(session, gmx.core.SimpleRunner)
