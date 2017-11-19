@@ -71,4 +71,5 @@ class BindingsTestCase(unittest.TestCase):
         with gmx.context.DefaultContext(system.runner) as session:
             assert isinstance(session, gmx.core.SimpleRunner)
             session.add_force(potential)
+            session.add_force(potential)
             session.run()

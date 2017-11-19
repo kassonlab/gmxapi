@@ -90,6 +90,7 @@ std::shared_ptr<PySingleNodeRunner> PySingleNodeRunner::startup()
         {
             product = std::make_shared<PySingleNodeRunner>(module_);
             product->state_ = state;
+            product->spec_ = spec_;
         }
     }
 
@@ -103,6 +104,7 @@ PyStatus PySingleNodeRunner::run()
     if (state_->runner_ != nullptr)
     {
         auto runner = state_->runner_;
+        std::cout << "Starting runner with " << spec_->getModules().size() << " mdmodules" << std::endl;
         for (auto&& module : spec_->getModules())
         {
             runner->setRestraint(module);
@@ -145,7 +147,8 @@ void PySingleNodeRunner::addForce(pybind11::object force_object)
 //        holder->name_ = "pygmx holder";
 //        // Get a reference to a Python object with the bindings defined in this module.
 
-        auto holder = new gmxapi::MDHolder("pygmx holder");
+        auto holder = new gmxapi::MDHolder(spec_);
+        holder->name_ = "pygmx holder";
         auto deleter = [](PyObject* o){
             if (PyCapsule_IsValid(o, gmxapi::MDHolder_Name))
             {
@@ -162,7 +165,7 @@ void PySingleNodeRunner::addForce(pybind11::object force_object)
 //        py::object obj{capsule};
         py::object obj = capsule;
         bind(obj);
-
+        std::cout << "Work specification now has " << spec_->getModules().size() << " modules." << std::endl;
     }
     else
     {
