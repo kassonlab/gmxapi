@@ -162,7 +162,7 @@ void PySingleNodeRunner::addForce(pybind11::object force_object)
 
 
         py::object bind = force_object.attr("bind");
-//        py::object obj{capsule};
+        // py::capsule does not have bindings and does not implicitly convert to py::object
         py::object obj = capsule;
         bind(obj);
         std::cout << "Work specification now has " << spec_->getModules().size() << " modules." << std::endl;
