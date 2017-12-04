@@ -12,15 +12,6 @@
 namespace gmxpy
 {
 
-class PySystem
-{
-public:
-    static std::shared_ptr<PySystem> from_tpr(const std::string& filename);
-
-private:
-    std::shared_ptr<gmxapi::System> system_;
-};
-
 std::shared_ptr<gmxapi::System> from_tpr(std::string filename);
 
 } // end namespace gmxpy

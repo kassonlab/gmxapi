@@ -42,8 +42,6 @@
 #include "core.h"
 
 #include "gmxpy_api.h"
-#include "pymd.h"
-#include "pysystem.h"
 
 #include "gmxapi/status.h"
 
@@ -97,29 +95,6 @@ This documentation is generated from docstrings exported by C++ extension code.
  * \ingroup module_python
  */
 
-
-
-//void export_context(py::module &m)
-//{
-//    py::class_< PyContext, shared_ptr<PyContext> > context(m, "Context");
-//    context.def_property("runner", &PyContext::get_runner, &PyContext::set_runner);
-//
-//    py::class_< PySimpleContext, PyContext, shared_ptr<PySimpleContext> > simplecontext(m, "SimpleContext");
-//    simplecontext.def(py::init())
-//        .def("initialize", &PySimpleContext::initialize, "Initialize context and return a session.");
-//
-//    py::class_< PyContextManager > cm(m, "ContextManager");
-//    cm.def("__enter__", &PyContextManager::enter)
-//        .def("__exit__", &PyContextManager::exit);
-//}
-
-//void export_session(py::module &m)
-//{
-//    py::class_ < PySession, shared_ptr<PySession> > session(m, "Session");
-//    session.def("run", &PySession::run, "Run the configured task(s)");
-//}
-
-
 // Instantiate the module
 PYBIND11_MODULE(core, m) {
 
@@ -136,9 +111,4 @@ PYBIND11_MODULE(core, m) {
     // Get bindings exported by the various components.
     export_md(m);
     export_system(m);
-//    export_context(m);
-//    export_session(m);
-    //export_options()
-    //export_datatypes(m);
-    //export_trajectory(m);
 }

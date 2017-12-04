@@ -55,8 +55,6 @@ pybind11_add_module(pygmx_core
 					export_md.cpp
 					export_system.cpp
 					gmxpy_api.h
-					pymd.h
-                    pymd.cpp
 					pymdmodule.h
 					pymdmodule.cpp
 					pysystem.h

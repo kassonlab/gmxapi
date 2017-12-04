@@ -1,8 +1,9 @@
 #include <gmxapi/gmxapi.h>
 #include <iostream>
 #include "core.h"
-#include "pymd.h"
 
+#include "gmxapi/md.h"
+#include "gmxapi/md/mdmodule.h"
 
 namespace gmxpy
 {
@@ -55,14 +56,6 @@ void export_md(py::module &m)
                              }
                          }
     );
-
-//    py::class_< PyMD, std::shared_ptr<PyMD> > md(m, "MD");
-//    md.def(py::init(), "");
-//    md.def("__str__", [](PyMD* proxy){ return proxy->info(); }, "Get some human-readable runtime information.");
-////    m.def("info", [](PyMD* md){ return md->info();}, "Get some human-readable runtime information.");
-//    md.def("add_potential", &PyMD::addPotential, "Add a restraint potential.");
-//
-//    m.def("md_from_tpr", &PyMD::md_from_tpr, "Return an MD module to run the given input record.");
 
 
 }

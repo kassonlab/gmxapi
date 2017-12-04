@@ -34,6 +34,7 @@
  */
 
 #include "gmxapi/gmxapi.h"
+#include "gmxapi/md.h"
 #include "pybind11/pybind11.h"
 
 #include <string>
