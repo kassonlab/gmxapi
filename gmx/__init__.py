@@ -81,7 +81,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 # TODO: what should happen when ``from gmx import *``?
-__all__ = ['Status', 'System', 'context', 'md', 'runner']
+__all__ = ['Status', 'System', 'context']
 
 from . system import System
 
@@ -90,8 +90,6 @@ from . exceptions import *
 __all__.extend(exceptions.__all__)
 
 from . import context
-from . import md
-from . import runner
 from . status import Status
 from . import util
 

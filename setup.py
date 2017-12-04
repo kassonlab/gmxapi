@@ -71,13 +71,18 @@ def get_gromacs(url, cmake_args=[], build_args=[]):
     # run CMake to configure with installation directory in extension staging area
     env = os.environ.copy()
     try:
-        subprocess.check_call(['cmake', os.path.join(sourcedir, root)] + cmake_args, cwd=build_temp, env=env)
+        import cmake
+        cmake_bin = os.path.join(cmake.CMAKE_BIN_DIR, 'cmake')
+    except:
+        raise
+    try:
+        subprocess.check_call([cmake_bin, os.path.join(sourcedir, root)] + cmake_args, cwd=build_temp, env=env)
     except:
         warn("Not removing source directory {} or build directory {}".format(sourcedir, build_temp))
         raise
     # run CMake to build and install
     try:
-        subprocess.check_call(['cmake', '--build', '.', '--target', 'install'] + build_args, cwd=build_temp)
+        subprocess.check_call([cmake_bin, '--build', '.', '--target', 'install'] + build_args, cwd=build_temp)
     except:
         warn("Not removing source directory {} or build directory {}".format(sourcedir, build_temp))
         raise
@@ -129,7 +134,12 @@ def cpp_flag(compiler):
 class CMakeGromacsBuild(build_ext):
     def run(self):
         try:
-            out = subprocess.check_output(['cmake', '--version'])
+            import cmake
+            cmake_bin = os.path.join(cmake.CMAKE_BIN_DIR, 'cmake')
+        except:
+            raise
+        try:
+            out = subprocess.check_output([cmake_bin, '--version'])
         except OSError:
             raise RuntimeError("CMake must be installed to build the following extensions: " +
                                ", ".join(e.name for e in self.extensions))
@@ -206,8 +216,13 @@ class CMakeGromacsBuild(build_ext):
         cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir]
         if platform.system() == "Windows":
             cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
-        subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
-        subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
+        try:
+            import cmake
+            cmake_bin = os.path.join(cmake.CMAKE_BIN_DIR, 'cmake')
+        except:
+            raise
+        subprocess.check_call([cmake_bin, ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
+        subprocess.check_call([cmake_bin, '--build', '.'] + build_args, cwd=self.build_temp)
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
@@ -238,13 +253,13 @@ setup(
     # Use Git commit and tags to determine Python package version
     # If cmake package causes weird build errors like "missing skbuild", try uninstalling and reinstalling the cmake
     # package with pip in the current (virtual) environment: `pip uninstall cmake; pip install cmake`
-    setup_requires=['setuptools_scm', 'cmake'],
+    setup_requires=['setuptools>=28', 'setuptools_scm', 'scikit-build', 'cmake'],
 
     #install_requires=['docutils', 'cmake', 'sphinx_rtd_theme'],
     # optional targets:
     #   docs requires 'docutils', 'sphinx>=1.4', 'sphinx_rtd_theme'
     #   build_gromacs requires 'cmake>=3.4'
-    install_requires=[],
+    install_requires=['setuptools>=28', 'scikit-build', 'cmake'],
 
     author='M. Eric Irrgang',
     author_email='ericirrgang@gmail.com',
@@ -260,7 +275,7 @@ setup(
     # Bundle some files needed for testing
     package_data = package_data,
     # test suite to be invoked by `setup.py test`
-    tests_require = ['tox', 'numpy'],
+    tests_require = ['virtualenv', 'tox', 'numpy'],
     cmdclass={'build_ext': CMakeGromacsBuild,
               'test': Tox},
 #    test_suite = 'gmx.test.test_gmx',

@@ -1,0 +1,9 @@
+.DS_Store
+.cache/
+.idea/
+.tox/
+*build*/
+dist/
+*.egg-info
+*.pyc
+__pycache__

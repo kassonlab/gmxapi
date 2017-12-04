@@ -2,22 +2,13 @@
 
 #include <memory>
 
-#include "gmxapi/system.h"
-
 namespace gmxpy
 {
 
-PySingleNodeRunner PySystem::get_runner()
+std::shared_ptr<gmxapi::System> from_tpr(std::string filename)
 {
-    PySingleNodeRunner runner{system_->runner()};
-    return std::move(runner);
-}
-
-std::shared_ptr<PySystem> PySystem::from_tpr(const std::string& filename)
-{
-    auto system = std::make_shared<PySystem>();
-    system->system_ = gmxapi::fromTprFile(filename);
-    return system;
+    auto system = gmxapi::fromTprFile(filename);
+    return std::move(system);
 }
 
 } // end namespace gmxpy

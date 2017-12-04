@@ -1,5 +1,7 @@
 cmake>=0.8.0
 py>=1.4.34
 pytest>=3.2.2
-setuptools-scm>=1.15.6
+setuptools>=28.0.0
+scikit-build>=0.6.1
+setuptools_scm>=1.15.6
 virtualenv>=15.1.0
