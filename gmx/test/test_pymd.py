@@ -4,36 +4,15 @@ import unittest
 import os
 
 import gmx
-import gmx.md
 import gmx.core
 from gmx.data import tpr_filename
 
 class BindingsTestCase(unittest.TestCase):
-    def test_MDProxy(self):
-        pymd = gmx.core.md_from_tpr(tpr_filename)
-        assert isinstance(pymd, gmx.core.MD)
-        pymd = gmx.md.from_tpr(tpr_filename)
-        assert isinstance(pymd._api_object, gmx.core.MD)
-        # Haven't decided whether there should be a single (or small set of) API object base class...
-        # assert isinstance(pymd._api_object, gmx.core.Module)
-    def test_RunnerProxy(self):
-        md = gmx.md.from_tpr(tpr_filename)
-        runner = gmx.runner.SimpleRunner(md)
-        assert str(md._api_object).startswith('MDStatePlaceholder')
-        assert str(md._api_object).rstrip().endswith('topol.tpr"')
-        assert str(runner.module._api_object) == str(md._api_object)
-        # session = runner._runner.start()
-        # assert isinstance(session, gmx.core.SimpleRunner)
-        # assert isinstance(session.run(), gmx.core.Status)
-        #assert isinstance(session.run(4), gmx.core.Status)
     def test_APIObjectsFromTpr(self):
         apisystem = gmx.core.from_tpr(tpr_filename)
         assert isinstance(apisystem, gmx.core.MDSystem)
-        assert hasattr(apisystem, 'runner')
-        apirunner = apisystem.runner
-        assert isinstance(apirunner, gmx.core.SimpleRunner)
-        assert hasattr(apirunner, 'start')
-        session = apirunner.start()
+        assert hasattr(apisystem, 'launch')
+        session = apisystem.launch()
         assert hasattr(session, 'run')
         session.run()
         # Test rerunability
@@ -53,14 +32,9 @@ class BindingsTestCase(unittest.TestCase):
         import pytest
         # Test attachment of external code
         system = gmx.System._from_file(tpr_filename)
-        md = system.md
-        assert isinstance(md, gmx.md.MD)
-        assert isinstance(md, gmx.md.ExtendedMD)
-        assert isinstance(md._api_object, gmx.core.MD)
-        potential = gmx.core.TestModule();
+        potential = gmx.core.TestModule()
         assert isinstance(potential, gmx.core.MDModule)
-        md._api_object.add_potential(potential)
-        md.add_potential(potential)
+        system.add_potential(potential)
 
         assert hasattr(potential, "bind")
         generic_object = object()
@@ -68,8 +42,5 @@ class BindingsTestCase(unittest.TestCase):
             potential.bind(generic_object)
         assert str(exc_info).endswith("MDModule bind method requires properly named PyCapsule input.")
 
-        with gmx.context.DefaultContext(system.runner) as session:
-            assert isinstance(session, gmx.core.SimpleRunner)
-            session.add_force(potential)
-            session.add_force(potential)
+        with gmx.context.DefaultContext(system.workflow) as session:
             session.run()

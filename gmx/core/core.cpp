@@ -43,9 +43,9 @@
 
 #include "gmxpy_api.h"
 #include "pymd.h"
-#include "pyrunner.h"
-#include "pystatus.h"
 #include "pysystem.h"
+
+#include "gmxapi/status.h"
 
 #include <pybind11/pybind11.h>
 
@@ -130,12 +130,11 @@ PYBIND11_MODULE(core, m) {
     export_gmxapi(m);
 
     // Export core bindings
-    py::class_< PyStatus > gmx_status(m, "Status", "Holds status for API operations.");
+    py::class_< ::gmxapi::Status > gmx_status(m, "Status", "Holds status for API operations.");
 
 
     // Get bindings exported by the various components.
     export_md(m);
-    export_runner(m);
     export_system(m);
 //    export_context(m);
 //    export_session(m);

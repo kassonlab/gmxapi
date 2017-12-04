@@ -56,29 +56,13 @@ void export_md(py::module &m)
                          }
     );
 
-
-    // The runner interface will be simplified and the add_force moved here.
-//    py::class_<::gmxpy::MD> coremd(m, "MD");
-//    coremd.def(py::init(), "");
-//    coremd.def("add_force", &gmxpy::MD::addForce, "Attach a restraint or other potential.");
-
-//    py::class_< PyGmxModule, std::shared_ptr<PyGmxModule> > gmxapi_module(m, "Module", "Base class for computation modules.");
-//    gmxapi_module.def(py::init<>());
-
-//    m.def("printName", [](MDModule* module){ return module->name(); }, "Print module name");
-//    m.def("printName", [](PyGmxModule* module){ return module->info(); }, "Print module name");
-
-//    py::class_< PyMDModule > plugin(m, "MDModule", plugindocs);
-//    plugin.def(py::init());
-//    plugin.def_readwrite("_api_object", &PyMDModule::module);
-
-    py::class_< PyMD, std::shared_ptr<PyMD> > md(m, "MD");
-    md.def(py::init(), "");
-    md.def("__str__", [](PyMD* proxy){ return proxy->info(); }, "Get some human-readable runtime information.");
-//    m.def("info", [](PyMD* md){ return md->info();}, "Get some human-readable runtime information.");
-    md.def("add_potential", &PyMD::addPotential, "Add a restraint potential.");
-
-    m.def("md_from_tpr", &PyMD::md_from_tpr, "Return an MD module to run the given input record.");
+//    py::class_< PyMD, std::shared_ptr<PyMD> > md(m, "MD");
+//    md.def(py::init(), "");
+//    md.def("__str__", [](PyMD* proxy){ return proxy->info(); }, "Get some human-readable runtime information.");
+////    m.def("info", [](PyMD* md){ return md->info();}, "Get some human-readable runtime information.");
+//    md.def("add_potential", &PyMD::addPotential, "Add a restraint potential.");
+//
+//    m.def("md_from_tpr", &PyMD::md_from_tpr, "Return an MD module to run the given input record.");
 
 
 }

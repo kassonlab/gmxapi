@@ -44,7 +44,6 @@
 #include <memory>
 
 #include "core.h"
-#include "pystatus.h"
 #include "gmxapi/runner.h"
 
 namespace gmxpy
@@ -71,7 +70,7 @@ class PyMD;
 //
 //};
 
-class PySingleNodeRunner : public std::enable_shared_from_this<PySingleNodeRunner>
+class PySingleNodeRunner final : public std::enable_shared_from_this<PySingleNodeRunner>
 {
     public:
         /// Implementation class
