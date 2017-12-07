@@ -44,14 +44,12 @@
 namespace
 {
 
-namespace py=pybind11;
-
 /*!
  * \brief Call this function when defining a pybind11 C++ extension module.
  *
  * \param mymodule the pybind11 module you are exporting bindings for.
  */
-static void export_gmxapi(py::module& mymodule);
+static void export_gmxapi(pybind11::module& mymodule);
 
 class PYBIND11_EXPORT MyHolder : public gmxapi::MDHolder
 {
@@ -65,7 +63,7 @@ class PYBIND11_EXPORT MyHolder : public gmxapi::MDHolder
         }
 };
 
-void export_gmxapi(py::module& mymodule)
+void export_gmxapi(pybind11::module& mymodule)
 {
 }
 
