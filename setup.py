@@ -25,6 +25,8 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from setuptools.command.test import test as TestCommand
 
+import gmx.version
+
 extra_link_args=[]
 
 # readthedocs.org isn't very specific about promising any particular value...
@@ -243,17 +245,14 @@ setup(
     packages=['gmx', 'gmx.test'],
     # package_dir = {'gmx': package_dir},
 
-    # Get version from the most recent tag in the form X.Y.Z
-    # from the git repository rooted in the current directory
-    use_scm_version = {'root': '.', 'relative_to': __file__},
+    version=gmx.version.__version__,
 
     # Require Python 2.7 or 3.3+
     python_requires = '>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',
 
-    # Use Git commit and tags to determine Python package version
     # If cmake package causes weird build errors like "missing skbuild", try uninstalling and reinstalling the cmake
     # package with pip in the current (virtual) environment: `pip uninstall cmake; pip install cmake`
-    setup_requires=['setuptools>=28', 'setuptools_scm', 'scikit-build', 'cmake'],
+    setup_requires=['setuptools>=28', 'scikit-build', 'cmake'],
 
     #install_requires=['docutils', 'cmake', 'sphinx_rtd_theme'],
     # optional targets:
@@ -263,7 +262,7 @@ setup(
 
     author='M. Eric Irrgang',
     author_email='ericirrgang@gmail.com',
-    description='Gromacs Python module',
+    description='GROMACS Python module',
     license = 'LGPL',
     url = 'https://bitbucket.org/kassonlab/gmxpy',
     #keywords = '',
