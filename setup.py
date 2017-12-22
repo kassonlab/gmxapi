@@ -204,11 +204,15 @@ class CMakeGromacsBuild(build_ext):
                         build_args)
             GROMACS_DIR = gmxapi_DIR
 
-        # print("extdir is {}".format(extdir))
-        # gromacs_install_path = os.path.join(os.path.abspath(self.build_temp), 'gromacs')
+        #
         staging_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gmx')
-        print("__file__ is {}".format(__file__))
+        print("__file__ is {} at {}".format(__file__, os.path.abspath(__file__)))
+
+        # Compiled library will be put directly into extdir by CMake
+        print("extdir is {}".format(extdir))
         print("staging_dir is {}".format(staging_dir))
+
+        # CMake will be run in working directory build_temp
         print("build_temp is {}".format(self.build_temp))
 
         env = os.environ.copy()
@@ -223,7 +227,11 @@ class CMakeGromacsBuild(build_ext):
             cmake_bin = os.path.join(cmake.CMAKE_BIN_DIR, 'cmake')
         except:
             raise
+        cmake_command = [cmake_bin, ext.sourcedir] + cmake_args
+        print("Calling CMake: {}".format(' '.join(cmake_command)))
         subprocess.check_call([cmake_bin, ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
+        cmake_command = [cmake_bin, '--build', '.'] + build_args
+        print("Calling CMake: {}".format(' '.join(cmake_command)))
         subprocess.check_call([cmake_bin, '--build', '.'] + build_args, cwd=self.build_temp)
 
 class CMakeExtension(Extension):
@@ -232,6 +240,8 @@ class CMakeExtension(Extension):
         Extension.__init__(self, name, sources=[])
         # but we will use the sourcedir when our overridden build_extension calls cmake.
         self.sourcedir = os.path.abspath(sourcedir)
+
+package_dir='gmx'
 
 package_data = {
         'gmx': ['data/topol.tpr'],
@@ -243,7 +253,7 @@ setup(
     name='gmx',
 
     packages=['gmx', 'gmx.test'],
-    # package_dir = {'gmx': package_dir},
+    package_dir = {'gmx': package_dir},
 
     version=gmx.version.__version__,
 
