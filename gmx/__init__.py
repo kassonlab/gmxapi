@@ -93,12 +93,7 @@ from . import context
 from . status import Status
 from . import util
 
-from pkg_resources import get_distribution, DistributionNotFound
-try:
-    __version__ = get_distribution(__name__).version
-except DistributionNotFound:
-    # package is not installed
-    pass
+from . version import __version__
 
 # if __name__ == "__main__":
 #     import doctest

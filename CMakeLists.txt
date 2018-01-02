@@ -39,7 +39,7 @@ cmake_minimum_required(VERSION 3.4.3)
 #list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Sets the PROJECT_VERSION variable, as well...
-project(gmxpy VERSION 0.0.1)
+project(gmxpy VERSION 0.0.3)
 
 add_subdirectory(pybind11)
 
