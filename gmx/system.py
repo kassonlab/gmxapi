@@ -1,5 +1,6 @@
 import gmx
 import gmx.util
+from gmx import exceptions
 
 class System(object):
     """Gromacs simulation system objects.
@@ -12,6 +13,7 @@ class System(object):
 
     Attributes:
         runner (:obj:`gmx.runner.Runner`): workflow runner to be used when executed.
+        md (:obj:`gmx.md.MDEngine`): molecular dynamics computation object.
 
     Example:
 
@@ -20,13 +22,9 @@ class System(object):
 
     Example:
 
-        >>> system = gmx.System()
-        >>> md_module = gmx.md.from_tpr(tpr_filename)
-        >>> # Get a reference to a runner bound to the MD module.
-        >>> runner = gmx.runner.SimpleRunner(md_module)
-        >>> system.runner = runner
+        >>> my_sim = gmx.System._from_file(tpr_filename)
         >>> # Launch exectution of the runner and work on available resources.
-        >>> with gmx.context.DefaultContext(system.runner) as session:
+        >>> with gmx.context.DefaultContext(system) as session:
         ...     # Run the work specified in the TPR file
         ...     session.run()
         ...     # Extend the simulation and run an additional 1000 steps.
@@ -40,17 +38,15 @@ class System(object):
     """
 
     def __init__(self):
-        self.runner = None
-        #self.atoms = None
-        #self.topology = None
+        self.__workflow = None
 
     @property
-    def runner(self):
-        return self.__runner
+    def workflow(self):
+        return self.__workflow
 
-    @runner.setter
-    def runner(self, runner):
-        self.__runner = runner
+    @workflow.setter
+    def workflow(self, work):
+        self.__workflow = work
 
     @staticmethod
     def _from_file(inputrecord):
@@ -75,25 +71,26 @@ class System(object):
             status = simulation.run()
 
         """
+        import gmx.core
         if gmx.util._filetype(inputrecord) is gmx.fileio.TprFile:
             # we use the API to process TPR files. We create a MD module and
             # retrieve a system from its contents.
-            md_module = gmx.md.from_tpr(inputrecord)
             newsystem = gmx.core.from_tpr(inputrecord)
+            if newsystem is None:
+                raise gmx.Error("Got empty system when reading TPR file.")
         else:
             raise gmx.UsageError("Need a TPR file.")
-        newrunner = gmx.runner.SimpleRunner()
-        newrunner._runner = newsystem.runner
-        system = System()
-        system.runner = newrunner
-        # TBD as md runner is reimplemented:
-        #system.atoms = md_module.atoms
-        #system.topology = md_module.topology
 
-        #runner = gmx.runner.SimpleRunner(md_module)
-        #system.runner = runner
+        system = System()
+        system.workflow = newsystem
 
         return system
+
+    def add_potential(self, potential):
+        if (hasattr(potential, "bind")):
+            self.workflow.add_potential(potential)
+        else:
+            raise exceptions.UsageError("Cannot add a potential that does not have a 'bind' method.")
 
     def run(self, parameters=None):
         """Launch execution.
@@ -111,7 +108,7 @@ class System(object):
             Gromacs status object.
 
         """
-        with gmx.context.DefaultContext(self.runner) as session:
+        with gmx.context.DefaultContext(self.workflow) as session:
             if parameters is None:
                 return session.run()
             else:

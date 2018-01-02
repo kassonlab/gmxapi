@@ -92,7 +92,7 @@ so that I can take advantage of parallelism and data locality optimizations from
 As a plugin
 -----------
 
-Apply an external field to an atom selection
+Apply an :doc:`examples/externalForce` to an atom selection
 so that I can implement additional physics.
 
 Define new potentials by implementing a simple interface

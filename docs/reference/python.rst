@@ -50,3 +50,7 @@ Refer to the Python source code itself for additional clarification.
 
 .. autoclass:: gmx.core.Status
     :members:
+
+.. autoclass:: gmx.core.MDModule
+    :members:
+

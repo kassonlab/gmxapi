@@ -9,54 +9,57 @@ from __future__ import unicode_literals
 
 __all__ = ['Context', 'DefaultContext']
 
+from gmx import exceptions
+
 class Context(object):
     """ Proxy to API Context provides Python context manager.
 
     Binds to a workflow (in the form of a Runner) and manages computation resources
 
     Attributes:
-        runner (:obj:`gmx.runner.Runner`): bound workflow to be executed.
+        workflow (:obj:`gmx.workflow.workflow`): bound workflow to be executed.
 
     Example:
-        >>> with Context(my_runner) as session: # doctest: +SKIP
+        >>> with Context(my_workflow) as session: # doctest: +SKIP
         ...    session.run()
 
     """
-    def __init__(self, runner=None):
-        """Create new context bound to the provided runner, if any.
+    def __init__(self, workflow=None):
+        """Create new context bound to the provided workflow, if any.
 
         Args:
-            runner (gmx.Runner) Runner object to bind.
+            workflow (gmx.workflow) workflow object to bind.
 
         """
-        self.initialized = False
-        self.runner = runner
+        self._session = None
+        self.__workflow = workflow
 
     @property
-    def runner(self):
-        return self.__runner
+    def workflow(self):
+        return self.__workflow
 
-    @runner.setter
-    def runner(self, runner):
-        self.__runner = runner
+    @workflow.setter
+    def workflow(self, workflow):
+        self.__workflow = workflow
 
     def __enter__(self):
         """Implement Python context manager protocol."""
-        self.initialized = True
-        session = None
+        if self._session is not None:
+            raise exceptions.Error("Already running.")
         # The API runner currently has an implicit context.
         try:
-            session = self.runner.start(self)
+            self._session = self.workflow.launch()
         except:
-            session = None
-            self.initialized = False
+            self._session = None
             raise
-        return session
+        return self._session
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Implement Python context manager protocol."""
         # Todo: handle exceptions.
-        self.initialized = False
+        self._session.close()
+        self._session = None
+        return False
 
 # In the next pass, Context can become more abstract and simplest-case behavior moved here.
 # class SimpleContext(Context):
@@ -65,6 +68,6 @@ class Context(object):
 
 class DefaultContext(Context):
     """ Produce an appropriate context for the work and compute environment."""
-    def __init__(self, runner):
+    def __init__(self, work):
         # There is very little context abstraction at this point...
-        super(DefaultContext, self).__init__(runner)
+        super(DefaultContext, self).__init__(work)

@@ -42,20 +42,13 @@
 /*! \internal \file
  * \brief Declares symbols to be exported to gmx.core Python module.
  *
- * Declares namespace gmx::pyapi
+ * Declares namespace gmxpy.
  * \ingroup module_python
  */
 #ifndef GMXPY_CORE_H
 #define GMXPY_CORE_H
 
-#include "gmxapi/gmxapi.h"
-
-#include <string>
-
-namespace pybind11
-{
-class module;
-}
+#include "pybind11/pybind11.h"
 
 
 /*! \brief API client code from which to export Python bindings
@@ -70,56 +63,20 @@ class module;
 namespace gmxpy
 {
 
-/*! \brief Base class for Gromacs modules exported to Python
- *
- * PyGmxModule objects provide sufficient interface to bind with Runners.
- * Derived classes may provide additional interfaces.
- *
- * \internal
- * \ingroup module_python
- */
-class PyGmxModule
+namespace detail
 {
-    public:
-        PyGmxModule()                               = default;
-        PyGmxModule(const PyGmxModule &)            = default;
-        PyGmxModule(PyGmxModule&&) noexcept         = default;
-        virtual ~PyGmxModule()                      = default;
-        PyGmxModule &operator=(const PyGmxModule &) = default;
-        PyGmxModule& operator=(PyGmxModule&&) noexcept      = default;
 
-        /*!
-         * \brief Generic string output.
-         *
-         * Provide a generic way to implement simple self-representation. Optionally implemented
-         * to allows for some trivial
-         * introspection and/or runtime debugging. May ultimately be used as the hook for __str__()
-         * or __repr__().
-         * \return some useful information on the type or state of the object in string form.
-         */
-        virtual std::string info() { return ""; };
-};
+void export_md(pybind11::module &m);
 
-/*! \brief Generic return value for API calls.
- *
- * \internal
- * \ingroup module_python
- */
-class PyStatus
-{
-    public:
-        PyStatus() : success_(false) {};
-        PyStatus(const PyStatus &status) : success_{status.success_} {};
-        virtual ~PyStatus()         = default;
+void export_runner(pybind11::module &m);
 
-        explicit PyStatus(const bool &status) : success_(status) {};
-        explicit PyStatus(const gmxapi::Status status) : success_(status.success()) {};
+void export_context(pybind11::module &m);
 
-        bool success() const { return success_; };
+void export_session(pybind11::module &m);
 
-    private:
-        bool success_{false};
-};
+void export_system(pybind11::module &m);
+
+} // end namespace gmxpy::detail
 
 }      // end namespace gmxpy
 

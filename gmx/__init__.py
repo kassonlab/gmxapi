@@ -81,7 +81,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 # TODO: what should happen when ``from gmx import *``?
-__all__ = ['Status', 'System', 'context', 'md', 'runner']
+__all__ = ['Status', 'System', 'context']
 
 from . system import System
 
@@ -90,17 +90,10 @@ from . exceptions import *
 __all__.extend(exceptions.__all__)
 
 from . import context
-from . import md
-from . import runner
 from . status import Status
 from . import util
 
-from pkg_resources import get_distribution, DistributionNotFound
-try:
-    __version__ = get_distribution(__name__).version
-except DistributionNotFound:
-    # package is not installed
-    pass
+from . version import __version__
 
 # if __name__ == "__main__":
 #     import doctest

@@ -25,6 +25,8 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from setuptools.command.test import test as TestCommand
 
+import gmx.version
+
 extra_link_args=[]
 
 # readthedocs.org isn't very specific about promising any particular value...
@@ -71,13 +73,18 @@ def get_gromacs(url, cmake_args=[], build_args=[]):
     # run CMake to configure with installation directory in extension staging area
     env = os.environ.copy()
     try:
-        subprocess.check_call(['cmake', os.path.join(sourcedir, root)] + cmake_args, cwd=build_temp, env=env)
+        import cmake
+        cmake_bin = os.path.join(cmake.CMAKE_BIN_DIR, 'cmake')
+    except:
+        raise
+    try:
+        subprocess.check_call([cmake_bin, os.path.join(sourcedir, root)] + cmake_args, cwd=build_temp, env=env)
     except:
         warn("Not removing source directory {} or build directory {}".format(sourcedir, build_temp))
         raise
     # run CMake to build and install
     try:
-        subprocess.check_call(['cmake', '--build', '.', '--target', 'install'] + build_args, cwd=build_temp)
+        subprocess.check_call([cmake_bin, '--build', '.', '--target', 'install'] + build_args, cwd=build_temp)
     except:
         warn("Not removing source directory {} or build directory {}".format(sourcedir, build_temp))
         raise
@@ -129,7 +136,12 @@ def cpp_flag(compiler):
 class CMakeGromacsBuild(build_ext):
     def run(self):
         try:
-            out = subprocess.check_output(['cmake', '--version'])
+            import cmake
+            cmake_bin = os.path.join(cmake.CMAKE_BIN_DIR, 'cmake')
+        except:
+            raise
+        try:
+            out = subprocess.check_output([cmake_bin, '--version'])
         except OSError:
             raise RuntimeError("CMake must be installed to build the following extensions: " +
                                ", ".join(e.name for e in self.extensions))
@@ -192,11 +204,15 @@ class CMakeGromacsBuild(build_ext):
                         build_args)
             GROMACS_DIR = gmxapi_DIR
 
-        # print("extdir is {}".format(extdir))
-        # gromacs_install_path = os.path.join(os.path.abspath(self.build_temp), 'gromacs')
+        #
         staging_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gmx')
-        print("__file__ is {}".format(__file__))
+        print("__file__ is {} at {}".format(__file__, os.path.abspath(__file__)))
+
+        # Compiled library will be put directly into extdir by CMake
+        print("extdir is {}".format(extdir))
         print("staging_dir is {}".format(staging_dir))
+
+        # CMake will be run in working directory build_temp
         print("build_temp is {}".format(self.build_temp))
 
         env = os.environ.copy()
@@ -206,8 +222,17 @@ class CMakeGromacsBuild(build_ext):
         cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir]
         if platform.system() == "Windows":
             cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
-        subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
-        subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
+        try:
+            import cmake
+            cmake_bin = os.path.join(cmake.CMAKE_BIN_DIR, 'cmake')
+        except:
+            raise
+        cmake_command = [cmake_bin, ext.sourcedir] + cmake_args
+        print("Calling CMake: {}".format(' '.join(cmake_command)))
+        subprocess.check_call([cmake_bin, ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
+        cmake_command = [cmake_bin, '--build', '.'] + build_args
+        print("Calling CMake: {}".format(' '.join(cmake_command)))
+        subprocess.check_call([cmake_bin, '--build', '.'] + build_args, cwd=self.build_temp)
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
@@ -215,6 +240,8 @@ class CMakeExtension(Extension):
         Extension.__init__(self, name, sources=[])
         # but we will use the sourcedir when our overridden build_extension calls cmake.
         self.sourcedir = os.path.abspath(sourcedir)
+
+package_dir='gmx'
 
 package_data = {
         'gmx': ['data/topol.tpr'],
@@ -226,29 +253,26 @@ setup(
     name='gmx',
 
     packages=['gmx', 'gmx.test'],
-    # package_dir = {'gmx': package_dir},
+    package_dir = {'gmx': package_dir},
 
-    # Get version from the most recent tag in the form X.Y.Z
-    # from the git repository rooted in the current directory
-    use_scm_version = {'root': '.', 'relative_to': __file__},
+    version=gmx.version.__version__,
 
     # Require Python 2.7 or 3.3+
     python_requires = '>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',
 
-    # Use Git commit and tags to determine Python package version
     # If cmake package causes weird build errors like "missing skbuild", try uninstalling and reinstalling the cmake
     # package with pip in the current (virtual) environment: `pip uninstall cmake; pip install cmake`
-    setup_requires=['setuptools_scm', 'cmake'],
+    setup_requires=['setuptools>=28', 'scikit-build', 'cmake'],
 
     #install_requires=['docutils', 'cmake', 'sphinx_rtd_theme'],
     # optional targets:
     #   docs requires 'docutils', 'sphinx>=1.4', 'sphinx_rtd_theme'
     #   build_gromacs requires 'cmake>=3.4'
-    install_requires=[],
+    install_requires=['setuptools>=28', 'scikit-build', 'cmake'],
 
     author='M. Eric Irrgang',
     author_email='ericirrgang@gmail.com',
-    description='Gromacs Python module',
+    description='GROMACS Python module',
     license = 'LGPL',
     url = 'https://bitbucket.org/kassonlab/gmxpy',
     #keywords = '',
@@ -259,10 +283,9 @@ setup(
 
     # Bundle some files needed for testing
     package_data = package_data,
-    # test suite to be invoked by `setup.py test`
-    tests_require = ['tox', 'numpy'],
-    cmdclass={'build_ext': CMakeGromacsBuild,
-              'test': Tox},
+    # test suite is invoked via `tox` or with `pytest`
+    #tests_require = ['virtualenv', 'tox', 'numpy'],
+    cmdclass={'build_ext': CMakeGromacsBuild},
 #    test_suite = 'gmx.test.test_gmx',
 
     zip_safe=False
