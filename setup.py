@@ -274,10 +274,9 @@ setup(
 
     # Bundle some files needed for testing
     package_data = package_data,
-    # test suite to be invoked by `setup.py test`
-    tests_require = ['virtualenv', 'tox', 'numpy'],
-    cmdclass={'build_ext': CMakeGromacsBuild,
-              'test': Tox},
+    # test suite is invoked via `tox` or with `pytest`
+    #tests_require = ['virtualenv', 'tox', 'numpy'],
+    cmdclass={'build_ext': CMakeGromacsBuild},
 #    test_suite = 'gmx.test.test_gmx',
 
     zip_safe=False
