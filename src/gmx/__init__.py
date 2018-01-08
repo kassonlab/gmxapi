@@ -73,6 +73,24 @@ to the README.md file for details on installing this Python module.
 The gmxapi library must be installed to build and install the gmx module.
 Retrieve the GROMACS fork from https://bitbucket.org/kassonlab/gromacs and
 do a normal CMake build and install.
+
+Packaging
+---------
+
+There are a lot of open questions about packaging gmxpy. Many users will find it handy or essential to be able to
+install with distutils (setup.py), pip, or conda, in order to use arbitrary third-party Python tools in their workflow,
+so we need to be able to build the C++ extension against an already-installed GROMACS for an arbitrary Python interpreter.
+But it seems likely that system administrators might install the package for at least one or two Python installations to
+be managed with a modules system on an HPC cluster, and we would encourage this as a good time for testing and building
+docs, but after that the full distribution and CMake process may be unnecessary.
+
+I'm leaning towards separating the C++ and pure Python aspects of gmxpy (currently gmx and gmx.core) such that the full
+distribution of gmx.core is entirely CMake-based with testing and doxygen builds. It could be installed into a GROMACS
+installation path instead of the site-packages directory for a given interpreter and installation could include sufficient
+source code from which to rebuild for a different interpreter, though I'm not sure if it should be installed into a
+site-packages directory. The pure Python gmx package can then just regard gmxCore as an external package (maybe not even
+a hard dependency) and freely installed into site-packages directories. It may require some non-standard facilities to
+inform the user of its dependency or to find and build gmxCore in non-confusing, non-error-prone way.
 """
 
 from __future__ import absolute_import
