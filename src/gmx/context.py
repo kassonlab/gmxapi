@@ -48,6 +48,7 @@ class Context(object):
             raise exceptions.Error("Already running.")
         # The API runner currently has an implicit context.
         try:
+            # \todo Use API context implementation object
             self._session = self.workflow.launch()
         except:
             self._session = None

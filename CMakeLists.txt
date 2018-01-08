@@ -43,4 +43,4 @@ project(gmxpy VERSION 0.0.4)
 
 add_subdirectory(pybind11)
 
-add_subdirectory(gmx/core)
+add_subdirectory(src/gmx/core)

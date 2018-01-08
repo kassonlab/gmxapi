@@ -241,7 +241,7 @@ class CMakeExtension(Extension):
         # but we will use the sourcedir when our overridden build_extension calls cmake.
         self.sourcedir = os.path.abspath(sourcedir)
 
-package_dir='gmx'
+package_dir=os.path.join('src','gmx')
 
 package_data = {
         'gmx': ['data/topol.tpr'],
