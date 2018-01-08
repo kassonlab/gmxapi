@@ -25,7 +25,8 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from setuptools.command.test import test as TestCommand
 
-import gmx.version
+#import gmx.version
+__version__ = '0.0.4'
 
 extra_link_args=[]
 
@@ -242,6 +243,9 @@ class CMakeExtension(Extension):
         self.sourcedir = os.path.abspath(sourcedir)
 
 package_dir=os.path.join('src','gmx')
+# For better or worse, it seems pretty common for distutils to freely stomp around in the source directory during builds.
+with open(os.path.join(package_dir, 'version.py'), 'w') as fh:
+    fh.write("__version__ = '{}'".format(__version__))
 
 package_data = {
         'gmx': ['data/topol.tpr'],
@@ -255,7 +259,7 @@ setup(
     packages=['gmx', 'gmx.test'],
     package_dir = {'gmx': package_dir},
 
-    version=gmx.version.__version__,
+    version=__version__,
 
     # Require Python 2.7 or 3.3+
     python_requires = '>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',

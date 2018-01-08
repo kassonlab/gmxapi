@@ -7,3 +7,5 @@ dist/
 *.egg-info
 *.pyc
 __pycache__
+# version.py is generated in place by setup.py
+src/gmx/version.py
