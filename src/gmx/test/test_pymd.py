@@ -1,5 +1,7 @@
 """Test gmx.md submodule"""
 
+# We are generally using py.test so simpler assert statements just work.
+
 # Question: can/should pytest handle MPI jobs? How should we test features that only make sense in MPI?
 # I'm increasingly thinking that the CMake-managed C++ extension module should be managed separately than the setuptools
 # primary module. Then we can just do standard things like using CTest and googletest for the more complicated stuff.
