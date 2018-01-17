@@ -91,8 +91,8 @@ class SerialArrayContext(object):
         self.__context_array = list([DefaultContext(work_element) for work_element in work])
         self._session = None
 
-class MpiArrayContext(object):
-    """ Use MPI to manage an array of simulations.
+class ParallelArrayContext(object):
+    """Manage an array of simulation work executing in parallel.
 
     Hierarchical Context manages simpler contexts for an array of work specifications.
 
@@ -103,7 +103,7 @@ class MpiArrayContext(object):
         >>> import gmx.core
         >>> from gmx.data import tpr_filename # Get a test tpr filename
         >>> work = gmx.core.from_tpr(tpr_filename)
-        >>> context = gmx.context.MpiArrayContext([work, work])
+        >>> context = gmx.context.ParallelArrayContext([work, work])
         >>> with context as session:
         ...    session.run()
         ...    # The session is one abstraction too low to know what rank it is. It lets the spawning context manage
@@ -123,7 +123,7 @@ class MpiArrayContext(object):
     specializations of session classes produced by different contexts and a little extra wrapping to abstract the
     context management related stuff from the lower level stuff.
 
-    \todo MpiArrayContext should not operate on an array of work objects, but on a work object representing a job array.
+    \todo ParallelArrayContext should not operate on an array of work objects, but on a work object representing a job array.
     Ultimately, a job array is just a workflow graph that contains multiple pipelines. We don't need to make special
     provisions for the case where the pipelines have no interdependencies, because that is just a trivial version of the
     more general case in which the array of simulations are coupled in some way.
@@ -157,7 +157,7 @@ class MpiArrayContext(object):
         # Check the global MPI configuration
         communicator = MPI.COMM_WORLD
         if (len(self.__context_array) != communicator.Get_size()):
-            raise exceptions.UsageError("MpiArrayContext requires a work array that matches the MPI communicator size.")
+            raise exceptions.UsageError("ParallelArrayContext requires a work array that matches the MPI communicator size.")
 
         # Launch the work for this rank
         self.rank = communicator.Get_rank()
