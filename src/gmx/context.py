@@ -94,7 +94,14 @@ class SerialArrayContext(object):
 class ParallelArrayContext(object):
     """Manage an array of simulation work executing in parallel.
 
-    Hierarchical Context manages simpler contexts for an array of work specifications.
+    Hierarchical Context manages simpler contexts for array work that can be decomposed into an array of serial
+    specifications. Additional facilities are available to elements of the array members.
+
+      * array element corresponding to work in the current sub-context
+      * "global" resources managed by the ParallelArrayContext
+
+    Attributes:
+
 
     Example: Use ``mpiexec -n 2 python -m mpi4py myscript.py`` to run two jobs at the same time.
     In this example the jobs are identical. In myscript.py:
@@ -130,6 +137,10 @@ class ParallelArrayContext(object):
 
     """
     def __init__(self, work, workdir_list=None):
+        """Initialize compute resources.
+
+        Appropriate computing resources need to be available when the
+        """
         if not isinstance(work, list):
             raise ValueError("work specification should be a Python list.")
         if workdir_list is None:

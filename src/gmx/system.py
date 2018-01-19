@@ -12,8 +12,7 @@ class System(object):
     the following properties.
 
     Attributes:
-        runner (:obj:`gmx.runner.Runner`): workflow runner to be used when executed.
-        md (:obj:`gmx.md.MDEngine`): molecular dynamics computation object.
+        workflow: element of work to be executed.
 
     Example:
 
@@ -28,7 +27,8 @@ class System(object):
         ...     # Run the work specified in the TPR file
         ...     session.run()
         ...     # Extend the simulation and run an additional 1000 steps.
-        ...     status = session.run(1000)
+        ...     # (version 0.1.0)
+        ...     #status = session.run(1000)
         ...     print(status)
         ...
         gmx.Status(True)
