@@ -20,6 +20,106 @@ inspect the properties of a WorkSpec to determine if the work can be launched on
 
 ``ARRAY``: work requires parallel execution to satisfy data dependencies.
 
+
+Single-sim example
+
+    >>> work = gmx.workflow.from_tpr(filename)
+    >>> gmx.run(work)
+    >>>
+    >>> # The above is shorthand for
+    >>> work = gmx.workflow.from_tpr(filename)
+    >>> with gmx.get_context(work) as session:
+    ...    session.run()
+    ...
+    >>> # Which is, in turn, shorthand for
+    >>> work = gmx.workflow.from_tpr(filename)
+    >>> with gmx.context.Context(work) as session:
+    ...    session.run()
+    ...
+
+Array sim example
+
+    >>> work = gmx.workflow.from_tpr([filename1, filename2])
+    >>> gmx.run(work)
+    >>>
+    >>> # The above is shorthand for
+    >>> work = gmx.workflow.from_tpr([filename1, filename2])
+    >>> with gmx.get_context(work) as session:
+    ...    session.run()
+    ...
+    >>> # Which is, in turn, shorthand for
+    >>> work = gmx.workflow.from_tpr([filename1, filename2])
+    >>> global_context = gmx.context.ParallelArrayContext(work)
+    >>> my_id = global_context.local_id
+    >>> my_work = global_context.work_array[my_id]
+    >>> with gmx.context.Context(my_work) as session:
+    ...    session.run()
+    ...
+
+Single-sim with plugin
+
+    >>> work = gmx.workflow.from_tpr(filename)
+    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
+    >>> work['md'].add_potential(potential)
+    >>> gmx.run(work)
+    >>>
+    >>> # The above is shorthand for
+    >>> work = gmx.workflow.from_tpr(filename)
+    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
+    >>> work['md'].add_potential(potential)
+    >>> with gmx.context.Context(work) as session:
+    ...    session.run()
+
+Array sim with plugin
+
+    >>> work = gmx.workflow.from_tpr([filename1, filename2])
+    >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0)
+    >>> work['md'].add_potential(potential)
+    >>> gmx.run(work)
+
+    >>> # The above is shorthand for
+    >>> work = gmx.workflow.from_tpr(filename)
+    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
+    >>> work['md'].add_potential(potential)
+    >>> global_context = gmx.context.ParallelArrayContext(work)
+    >>> my_id = global_context.local_id
+    >>> my_work = global_context.work_array[my_id]
+    >>> with gmx.context.Context(my_work) as session:
+    ...    session.run()
+
+
+Array sim with plugin using global resources
+
+    >>> md = gmx.create_md_unit([filename1, filename2])
+    >>> workfile = gmx.SharedDataFile(workfilename)
+    >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0, workfile=workfile)
+    >>> md.add_potential(potential)
+    >>> gmx.run(md)
+
+    >>> # The above is shorthand for
+    >>> # Create work spec and get handle to MD work unit
+    >>> md = gmx.workflow.from_tpr([filename1, filename2])
+    >>> # Implicitly, the new SharedDataFile has its own otherwise-empty workspec now.
+    >>> workfile = gmx.SharedDataFile(workfilename)
+    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0, workfile=workfile)
+    >>> # EnsembleRestraint is dependent on workfile, so `workfile` must be added to
+    >>> # `work` before `potential` can be added to `work`. Combine specs.
+    >>> md.workflow.add(workfile.workflow)
+    >>> md.add_potential(potential)
+    >>> # Initialize resources for work or throw appropriate error
+    >>> global_context = gmx.get_context(md.workflow)
+    >>> # Global resources like SharedDataFile are now available.
+    >>> my_id = global_context.local_id
+    >>> my_work = global_context.work_array[my_id]
+    >>> with gmx.context.Context(my_work) as session:
+    ...    # plugin and simulation are now initialized.
+    ...    session.run()
+
+Note that object representing work specification contains a recipe, not references to actual objects representing the
+workflow elements. Distinctly, objects can be created as handles to representations of workflow elements, and these
+objects can hold strong references to objects representing work specification. In other words, the work specification
+is a serialized data structure containing the serialized representations of workflow elements.
+
 """
 
 from __future__ import absolute_import

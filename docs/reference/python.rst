@@ -18,6 +18,9 @@ Refer to the Python source code itself for additional clarification.
 .. automodule:: gmx.system
     :members:
 
+.. automodule:: gmx.workflow
+    :members:
+
 .. automodule:: gmx.runner
     :members:
 
