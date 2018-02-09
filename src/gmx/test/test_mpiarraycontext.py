@@ -15,7 +15,6 @@ try:
 except ImportError:
     withmpi_only = pytest.mark.skip(reason="Test requires at least 2 MPI ranks, but mpi4py is not available.")
 
-# \todo disable test if not run with MPI.
 @withmpi_only
 class MpiArrayContextTestCase(unittest.TestCase):
     def test_basic(self):

@@ -1,0 +1,138 @@
+# Test gmx.workflow classes and functions.
+
+import unittest
+import pytest
+
+import gmx
+import json
+import os
+# # Get a test tpr filename
+# from gmx.data import tpr_filename
+
+try:
+    from mpi4py import MPI
+    withmpi_only = pytest.mark.skipif(not MPI.Is_initialized() or MPI.COMM_WORLD.Get_size() >= 2,
+                                      reason="Test requires at least 2 MPI ranks, but MPI is not initialized or too small.")
+except ImportError:
+    withmpi_only = pytest.mark.skip(reason="Test requires at least 2 MPI ranks, but mpi4py is not available.")
+
+
+class WorkElementTestCase(unittest.TestCase):
+    """Tests for the gmx.workflow.WorkElement class."""
+    def test_initialization(self):
+        """Create a basic element and check initialization."""
+        namespace = "gromacs"
+        depends = ()
+        workspec = None
+        name = ""
+        operation = "load_tpr"
+        params = ["filename1", "filename2"]
+        element = gmx.workflow.WorkElement(operation=operation, params=params)
+
+        assert element.name == name
+        assert element.workspec == workspec
+        assert element.namespace == namespace
+        assert element.operation == operation
+        for a, b in zip(params, element.params):
+            assert a == b
+        for a, b in zip(depends, element.depends):
+            assert a == b
+
+    def test_portability(self):
+        """Serialize and deserialize."""
+        namespace = "gromacs"
+        depends = ()
+        workspec = None
+        name = ""
+        operation = "load_tpr"
+        params = ["filename1", "filename2"]
+        element = gmx.workflow.WorkElement(operation=operation, params=params)
+
+        json_data = element.serialize()
+        assert "namespace" in json.loads(json_data)
+        # Two elements with the same name cannot exist in the same workspec, but this is not the case here.
+        element = gmx.workflow.WorkElement.deserialize(json_data)
+
+        assert element.name == name
+        assert element.workspec == workspec
+        assert element.namespace == namespace
+        assert element.operation == operation
+        for a, b in zip(params, element.params):
+            assert a == b
+        for a, b in zip(depends, element.depends):
+            assert a == b
+
+class WorkSpecTestCase(unittest.TestCase):
+    """Tests for gmx.workflow.WorkSpec class and gmxapi workspec schema."""
+    def test_creation(self):
+        """Create an empty workspec and check API features."""
+        workspec = gmx.workflow.WorkSpec()
+        assert workspec.version == "gmxapi_workspec_1_0"
+    def test_updates(self):
+        """Create an empty workspec and add some basic elements.
+
+        Accessors should preserve the validity of the WorkSpec. Validity basically equates to its ability
+        to be processed by the context manager.
+        """
+        workspec = gmx.workflow.WorkSpec()
+        inputelement = gmx.workflow.WorkElement(operation="load_tpr", params=[])
+        inputelement.name = "tpr_input"
+        assert inputelement.name not in workspec.elements
+        workspec.elements[inputelement.name] = inputelement.serialize()
+        inputelement.workspec = workspec
+
+@pytest.mark.usefixtures("cleandir")
+class WorkflowFreeFunctions(unittest.TestCase):
+    """Test helpers and other free functions in gmx.workflow submodule."""
+    def test_from_tpr(self):
+        """from_tpr() should return a reference to a WorkElement with an attached WorkSpec.
+        It should properly handle single files or arrays of files.
+        """
+        # check that we actually got an empty directory form "cleandir"
+        assert os.listdir(os.getcwd()) == []
+        # Make sure that we have some "input files".
+        file1 = "a.tpr"
+        file2 = "b.tpr"
+        # Expectations for sanity-checking input are open to discussion...
+        with open(file1, 'wb'):
+            # an empty file suffices for now
+            pass
+        with open(file2, 'wb'):
+            pass
+
+        # Test single file input
+        md = gmx.workflow.from_tpr(file1)
+        assert isinstance(md, gmx.workflow.WorkElement)
+        assert hasattr(md, "workspec")
+        assert isinstance(md.workspec, gmx.workflow.WorkSpec)
+        assert md.name in md.workspec.elements
+        for dependency in md.depends:
+            assert dependency in md.workspec.elements
+
+        # Test array file input
+        md = gmx.workflow.from_tpr([file1, file2])
+        assert isinstance(md, gmx.workflow.WorkElement)
+        assert hasattr(md, "workspec")
+        assert isinstance(md.workspec, gmx.workflow.WorkSpec)
+        assert md.name in md.workspec.elements
+        for dependency in md.depends:
+            assert dependency in md.workspec.elements
+
+    def test_get_source_elements(self):
+        """get_source_elements should find elements with no dependencies and ignore the rest."""
+
+
+# @withmpi_only
+# class MpiArrayContextTestCase(unittest.TestCase):
+#     def test_basic(self):
+#         from mpi4py import MPI
+#         if not MPI.Is_initialized() or MPI.COMM_WORLD.Get_size() != 2:
+#             return
+#         work = gmx.core.from_tpr(tpr_filename)
+#         context = gmx.context.MpiArrayContext([work, work])
+#         with context as session:
+#             session.run()
+#             rank = context.rank
+#             output_path = os.path.join(context.workdir_list[rank], 'traj.trr')
+#             assert(os.path.exists(output_path))
+#             print("Worker {} produced {}".format(rank, output_path))
