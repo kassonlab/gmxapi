@@ -205,6 +205,35 @@ class WorkSpec(object):
 
     # @classmethod deserialize(serialized):
 
+    def __str__(self):
+        """Generate string representation for str() or print().
+
+        The string output should look like the abstract schema for gmxapi_workspec_1_0, but the exact
+        format is unspecified.
+
+        For json output, use WorkSpec.serialize(). For output in the form of valid Python, use repr().
+        """
+        output = ""
+
+        output += 'version: "{}"\n'.format(self.version)
+
+        output += 'elements:\n'
+        for element in self.elements:
+            data = gmx.workflow.WorkElement.deserialize(self.elements[element])
+            output += '    {}:\n'.format(element)
+            output += '        namespace: "{}"\n'.format(data.namespace)
+            output += '        operation: {}\n'.format(data.operation)
+            if data.params is not None:
+                output += '            params: {}\n'.format(str(data.params))
+            if data.depends is not None:
+                output += '            depends: {}\n'.format(str(data.depends))
+
+        return output
+
+    def __repr__(self):
+        """Generate Pythonic representation for repr(workspec)."""
+        return 'gmx.workflow.WorkSpec()'
+
 class WorkElement(object):
     """Encapsulate an element of a work specification."""
     def __init__(self, namespace="gromacs", operation=None, params=(), depends=()):

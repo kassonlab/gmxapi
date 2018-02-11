@@ -16,6 +16,9 @@ try:
 except ImportError:
     withmpi_only = pytest.mark.skip(reason="Test requires at least 2 MPI ranks, but mpi4py is not available.")
 
+# Some constants for this test module
+file1 = "a.tpr"
+file2 = "b.tpr"
 
 class WorkElementTestCase(unittest.TestCase):
     """Tests for the gmx.workflow.WorkElement class."""
@@ -68,6 +71,13 @@ class WorkSpecTestCase(unittest.TestCase):
         """Create an empty workspec and check API features."""
         workspec = gmx.workflow.WorkSpec()
         assert workspec.version == "gmxapi_workspec_1_0"
+    def test_methods(self):
+        workspec = gmx.workflow.WorkSpec()
+        assert str(workspec) is not None
+        assert str(workspec) != ''
+        assert repr(workspec) is not None
+        assert repr(workspec) != ''
+
     def test_updates(self):
         """Create an empty workspec and add some basic elements.
 
@@ -80,9 +90,6 @@ class WorkSpecTestCase(unittest.TestCase):
         assert inputelement.name not in workspec.elements
         workspec.elements[inputelement.name] = inputelement.serialize()
         inputelement.workspec = workspec
-
-file1 = "a.tpr"
-file2 = "b.tpr"
 
 @pytest.mark.usefixtures("cleandir")
 class WorkflowFreeFunctions(unittest.TestCase):
