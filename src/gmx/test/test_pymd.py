@@ -7,12 +7,14 @@
 # primary module. Then we can just do standard things like using CTest and googletest for the more complicated stuff.
 
 import unittest
+import pytest
 import os
 
 import gmx
 import gmx.core
 from gmx.data import tpr_filename
 
+@pytest.mark.usefixtures("cleandir")
 class BindingsTestCase(unittest.TestCase):
     def test_APIObjectsFromTpr(self):
         apisystem = gmx.core.from_tpr(tpr_filename)
