@@ -81,24 +81,27 @@ class WorkSpecTestCase(unittest.TestCase):
         workspec.elements[inputelement.name] = inputelement.serialize()
         inputelement.workspec = workspec
 
+file1 = "a.tpr"
+file2 = "b.tpr"
+
 @pytest.mark.usefixtures("cleandir")
 class WorkflowFreeFunctions(unittest.TestCase):
     """Test helpers and other free functions in gmx.workflow submodule."""
-    def test_from_tpr(self):
-        """from_tpr() should return a reference to a WorkElement with an attached WorkSpec.
-        It should properly handle single files or arrays of files.
-        """
+    def setUp(self):
         # check that we actually got an empty directory form "cleandir"
         assert os.listdir(os.getcwd()) == []
         # Make sure that we have some "input files".
-        file1 = "a.tpr"
-        file2 = "b.tpr"
         # Expectations for sanity-checking input are open to discussion...
         with open(file1, 'wb'):
             # an empty file suffices for now
             pass
         with open(file2, 'wb'):
             pass
+
+    def test_from_tpr(self):
+        """from_tpr() should return a reference to a WorkElement with an attached WorkSpec.
+        It should properly handle single files or arrays of files.
+        """
 
         # Test single file input
         md = gmx.workflow.from_tpr(file1)
@@ -120,7 +123,18 @@ class WorkflowFreeFunctions(unittest.TestCase):
 
     def test_get_source_elements(self):
         """get_source_elements should find elements with no dependencies and ignore the rest."""
+        file1 = "a.tpr"
+        file2 = "b.tpr"
 
+        md = gmx.workflow.from_tpr([file1, file2])
+        workspec = md.workspec
+        elements = set(workspec.elements)
+        sources = set([element.name for element in gmx.workflow.get_source_elements(workspec)])
+        # workspec should have 'tpr_input' and 'md_sim' elements. 'tpr_input' is the only source.
+        assert "tpr_input" in sources
+        assert "md_sim" not in sources
+        # confirm sources is a subset of elements and sources does not equal elements
+        assert len(sources) < len(elements)
 
 # @withmpi_only
 # class MpiArrayContextTestCase(unittest.TestCase):
@@ -136,3 +150,7 @@ class WorkflowFreeFunctions(unittest.TestCase):
 #             output_path = os.path.join(context.workdir_list[rank], 'traj.trr')
 #             assert(os.path.exists(output_path))
 #             print("Worker {} produced {}".format(rank, output_path))
+
+
+if __name__ == '__main__':
+    unittest.main()

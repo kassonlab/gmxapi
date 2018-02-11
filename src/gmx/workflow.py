@@ -129,7 +129,7 @@ from __future__ import unicode_literals
 
 from .exceptions import UsageError
 
-__all__ = ['WorkSpec', 'SharedDataElement']
+__all__ = ['WorkSpec', 'SharedDataElement', 'WorkElement']
 
 # module-level constant indicating a workflow implementing parallel array work.
 ARRAY = 0
@@ -302,6 +302,13 @@ def get_source_elements(workspec):
 
     This function is provided in the API to allow flexibility in how source elements are determined.
     """
+    for name in workspec.elements:
+        element_data = workspec.elements[name]
+        element = WorkElement.deserialize(element_data)
+        if len(element.depends) == 0:
+            element.name = name
+            element.workspec = workspec
+            yield(element)
 
 def from_tpr(input=None):
     """Create a WorkSpec from a (list of) tpr file(s).
