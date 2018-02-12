@@ -190,3 +190,34 @@ class ParallelArrayContext(object):
         self._session.close()
         self._session = None
         return False
+
+def get_context(work=None):
+    """Get a concrete Context object.
+
+    Args:
+        work: runnable work as a valid gmx.workflow.WorkSpec object
+
+    Returns:
+        An object implementing the gmx.context.Context interface, if possible.
+
+    Raises:
+        gmx.exceptions.Error if an appropriate context for `work` could not be loaded.
+
+    If work is provided, return a Context object capable of running the provided work or produce an error.
+
+    The semantics for finding Context implementations needs more consideration, and a more informative exception
+    is likely possible.
+    """
+    from . import workflow
+    context = None
+    if work is None:
+        context = Context()
+    elif isinstance(work, workflow.WorkSpec):
+        # Assume simple simulation for now.
+        # Get source elements.
+        #
+        # Use old-style constructor that takes gmx.core.MDSystem
+        context = Context(work)
+    else:
+        raise exceptions.UsageError("Argument to get_context must be a runnable gmx.workflow.WorkSpec object.")
+    return context

@@ -23,17 +23,17 @@ inspect the properties of a WorkSpec to determine if the work can be launched on
 
 Single-sim example
 
-    >>> work = gmx.workflow.from_tpr(filename)
-    >>> gmx.run(work)
+    >>> md = gmx.workflow.from_tpr(filename)
+    >>> gmx.run(md)
     >>>
     >>> # The above is shorthand for
-    >>> work = gmx.workflow.from_tpr(filename)
-    >>> with gmx.get_context(work) as session:
+    >>> md = gmx.workflow.from_tpr(filename)
+    >>> with gmx.get_context(md.workspec) as session:
     ...    session.run()
     ...
     >>> # Which is, in turn, shorthand for
-    >>> work = gmx.workflow.from_tpr(filename)
-    >>> with gmx.context.Context(work) as session:
+    >>> md = gmx.workflow.from_tpr(filename)
+    >>> with gmx.context.Context(md.workspec) as session:
     ...    session.run()
     ...
 
@@ -401,5 +401,14 @@ def from_tpr(input=None):
 
     return mdelement
 
-
-
+def run(work=None):
+    """Run the provided work on available resources."""
+    if isinstance(work, WorkSpec):
+        workspec = work
+    elif hasattr(work, "workspec") and isinstance(work.workspec, WorkSpec):
+        workspec = work.workspec
+    else:
+        raise exceptions.UsageError("Runnable work must be provided to run.")
+    # Find a Context that can run the work and hand it off.
+    with gmx.get_context(workspec) as session:
+        session.run()

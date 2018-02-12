@@ -99,10 +99,9 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 # TODO: what should happen when ``from gmx import *``?
-__all__ = ['Status', 'System', 'context', 'workflow']
+__all__ = ['Status', 'System', 'get_context', 'run']
 
-from . system import System
-
+# Import submodules.
 from . import exceptions
 from . exceptions import *
 __all__.extend(exceptions.__all__)
@@ -112,7 +111,11 @@ from . import workflow
 from . status import Status
 from . import util
 
+# Import top-level components
 from . version import __version__
+from . system import System
+from .workflow import run
+from .context import get_context
 
 # if __name__ == "__main__":
 #     import doctest
