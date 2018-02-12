@@ -127,7 +127,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from .exceptions import UsageError
+from . import exceptions
+import gmx
 
 __all__ = ['WorkSpec', 'SharedDataElement', 'WorkElement']
 

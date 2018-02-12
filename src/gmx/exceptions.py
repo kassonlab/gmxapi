@@ -18,7 +18,15 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 
-__all__ = ['Error', 'UsageError', 'OptionalFeatureNotAvailableError', 'TypeError']
+__all__ = ['Error',
+           'ApiError',
+           'FileError',
+           'OptionalFeatureNotAvailableError',
+           'OptionalFeatureNotAvailableWarning',
+           'TypeError',
+           'UsageError',
+           'ValueError',
+           ]
 
 class Error(Exception):
     """Base exception for gmx.exceptions classes."""
