@@ -16,10 +16,10 @@ import os
 class Context(object):
     """ Proxy to API Context provides Python context manager.
 
-    Binds to a workflow (in the form of a Runner) and manages computation resources
+    Binds to a workflow and manages computation resources
 
     Attributes:
-        workflow (:obj:`gmx.workflow.workflow`): bound workflow to be executed.
+        workflow (:obj:`gmx.workflow.WorkSpec`): bound workflow to be executed.
 
     Example:
         >>> with Context(my_workflow) as session: # doctest: +SKIP
@@ -30,7 +30,7 @@ class Context(object):
         """Create new context bound to the provided workflow, if any.
 
         Args:
-            workflow (gmx.workflow) workflow object to bind.
+            workflow (gmx.workflow.WorkSpec) work specification object to bind.
 
         """
         self._session = None
@@ -43,6 +43,47 @@ class Context(object):
     @workflow.setter
     def workflow(self, workflow):
         self.__workflow = workflow
+
+    @classmethod
+    def check_workspec(cls, workspec, raises=False):
+        """Check the validity of the work specification in this Context.
+
+        Args:
+            workspec: work specification to check
+            raises: Boolean (default False)
+
+        If raises == True, raises exceptions for problems found in the work specification.
+
+        Returns:
+            True if workspec is processable in this Context, else False.
+        """
+        # initialize return value.
+        is_valid = True
+        # Check compatibility
+        if workspec.version != gmx.workflow.workspec_version:
+            is_valid = False
+            if raises:
+                raise exceptions.ApiError("Incompatible workspec version.")
+        # Check that Elements are uniquely identifiable.
+        elements = dict()
+        for element in workspec.elements:
+            if element.name is not None and element.name not in elements:
+                elements[element.name] = element
+            else:
+                is_valid = False
+                if raises:
+                    raise exceptions.ApiError("WorkSpec must contain uniquely named elements.")
+        # Check that the specification is complete. There must be at least one source element and all
+        # dependencies must be fulfilled.
+        sources = set([element.name for element in gmx.workflow.get_source_elements(workspec)])
+        if len(sources) < 1:
+            is_valid = False
+            if raises:
+                raise exceptions.ApiError("WorkSpec must contain at least one source element")
+        for name in workspec.elements:
+            element = gmx.workflow.WorkElement.deserialize()
+        return is_valid
+
 
     def __enter__(self):
         """Implement Python context manager protocol."""

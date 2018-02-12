@@ -131,6 +131,9 @@ from .exceptions import UsageError
 
 __all__ = ['WorkSpec', 'SharedDataElement', 'WorkElement']
 
+# Work specification version string.
+workspec_version = "gmxapi_workspec_1_0"
+
 # module-level constant indicating a workflow implementing parallel array work.
 ARRAY = 0
 
@@ -179,7 +182,7 @@ class WorkSpec(object):
 
     """
     def __init__(self):
-        self.version = "gmxapi_workspec_1_0"
+        self.version = workspec_version
         self.elements = dict()
 
     def add(self, spec):

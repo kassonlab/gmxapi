@@ -9,6 +9,8 @@ import os
 # # Get a test tpr filename
 # from gmx.data import tpr_filename
 
+workspec_version = "gmxapi_workspec_1_0"
+
 try:
     from mpi4py import MPI
     withmpi_only = pytest.mark.skipif(not MPI.Is_initialized() or MPI.COMM_WORLD.Get_size() >= 2,
@@ -19,6 +21,11 @@ except ImportError:
 # Some constants for this test module
 file1 = "a.tpr"
 file2 = "b.tpr"
+
+class WorkSpecApiLevelTestCase(unittest.TestCase):
+    """Make sure the tests match the module."""
+    def test_version(self):
+        assert gmx.workflow.workspec_version == workspec_version
 
 class WorkElementTestCase(unittest.TestCase):
     """Tests for the gmx.workflow.WorkElement class."""
