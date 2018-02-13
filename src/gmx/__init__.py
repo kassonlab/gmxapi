@@ -112,8 +112,8 @@ from . status import Status
 from . import util
 
 # Import top-level components
-from . version import __version__
-from . system import System
+from .version import __version__
+from .system import System
 from .workflow import run
 from .context import get_context
 

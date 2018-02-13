@@ -16,7 +16,7 @@ import os
 class Context(object):
     """ Proxy to API Context provides Python context manager.
 
-    Binds to a workflow and manages computation resources
+    Binds to a workflow and manages computation resources.
 
     Attributes:
         workflow (:obj:`gmx.workflow.WorkSpec`): bound workflow to be executed.
@@ -25,6 +25,10 @@ class Context(object):
         >>> with Context(my_workflow) as session: # doctest: +SKIP
         ...    session.run()
 
+    Things are still fluid, but what we might do is have all of the WorkSpec operations that are supported
+    by a given Context to correspond to member functions in the Context, a SessionBuilder, or Session. In
+    any case, the operations allow a Context implementation to transform a work specification into a
+    directed acyclic graph of schedulable work.
     """
     def __init__(self, workflow=None):
         """Create new context bound to the provided workflow, if any.
@@ -42,6 +46,8 @@ class Context(object):
 
     @workflow.setter
     def workflow(self, workflow):
+        """Before accepting a workflow, the context must check whether it can interpret the work specification."""
+
         self.__workflow = workflow
 
     @classmethod
@@ -86,7 +92,11 @@ class Context(object):
 
 
     def __enter__(self):
-        """Implement Python context manager protocol."""
+        """Implement Python context manager protocol.
+
+        Returns:
+            runnable session object.
+        """
         if self._session is not None:
             raise exceptions.Error("Already running.")
         # The API runner currently has an implicit context.
@@ -150,8 +160,8 @@ class ParallelArrayContext(object):
         >>> import gmx
         >>> import gmx.core
         >>> from gmx.data import tpr_filename # Get a test tpr filename
-        >>> work = gmx.core.from_tpr(tpr_filename)
-        >>> context = gmx.context.ParallelArrayContext([work, work])
+        >>> work = gmx.workflow.from_tpr([tpr_filename, tpr_filename])
+        >>> context = gmx.context.ParallelArrayContext(work)
         >>> with context as session:
         ...    session.run()
         ...    # The session is one abstraction too low to know what rank it is. It lets the spawning context manage
@@ -248,17 +258,58 @@ def get_context(work=None):
 
     The semantics for finding Context implementations needs more consideration, and a more informative exception
     is likely possible.
+
+    A Context can run the provided work if
+
+      * the Context supports can resolve all operations specified in the elements
+      * the Context supports DAG topologies implied by the network of dependencies
+      * the Context supports features required by the elements with the specified parameters, such as synchronous array jobs.
+      * anything else?
+
     """
     from . import workflow
+    import gmx.core
+
     context = None
     if work is None:
+        # Create a new empty Context.
+        # TBD: should there be a global "current context" or default? We'll have to see how this gets used.
         context = Context()
     elif isinstance(work, workflow.WorkSpec):
         # Assume simple simulation for now.
-        # Get source elements.
-        #
+
+        # Get MD simulation elements.
+        sims = [workflow.WorkElement.deserialize(work.elements[element], name=element, workspec=work) for element in work.elements if workflow.WorkElement.deserialize(work.elements[element]).operation == "md"]
+        # \todo Make the above horrible line less complicated.
+        # E.g. sims = [element for element in work.elements if element.operation == "md"]
+        if len(sims) != 1:
+            raise exceptions.UsageError("Simple Context requires exactly one MD element in the work specification.")
+        sim = sims[0]
+
+        # Confirm the availability of dependencies.
+        # Note we are not performing a full recursive check here because we are just preparing the sim.
+        # A valid work specification requires dependencies to be defined.
+        for dependency in sim.depends:
+            assert dependency in work.elements
+
+        # If all is well, bind the work to a Context object and prepare the Context to be able to launch a session.
+        tpr_input = None
+        for dependency in sim.depends:
+            element = workflow.WorkElement.deserialize(work.elements[dependency])
+            if element.operation == "load_tpr":
+                if tpr_input is None:
+                    tpr_input = list(element.params)
+                else:
+                    raise exceptions.ApiError("This Context can only handle work specifications with a single load_tpr operation.")
+        if tpr_input is None:
+            raise exceptions.UsageError("Work specification does not provide any input for MD simulation.")
+        if len(tpr_input) != 1:
+            raise exceptions.UsageError("This Context does not support arrays of simulations.")
+
+
         # Use old-style constructor that takes gmx.core.MDSystem
-        context = Context(work)
+        newsystem = gmx.core.from_tpr(tpr_input[0])
+        context = Context(newsystem)
     else:
         raise exceptions.UsageError("Argument to get_context must be a runnable gmx.workflow.WorkSpec object.")
     return context

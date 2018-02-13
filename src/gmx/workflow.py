@@ -264,6 +264,7 @@ class WorkSpec(object):
             output += '    {}:\n'.format(element)
             output += '        namespace: "{}"\n'.format(data.namespace)
             output += '        operation: {}\n'.format(data.operation)
+            # \todo improve output formatting: don't be lazy about printing these lists.
             if data.params is not None:
                 output += '            params: {}\n'.format(str(data.params))
             if data.depends is not None:
@@ -447,7 +448,14 @@ def from_tpr(input=None):
     return mdelement
 
 def run(work=None):
-    """Run the provided work on available resources."""
+    """Run the provided work on available resources.
+
+    Args:
+        work : either a WorkSpec or an object with a `workspec` attribute containing a WorkSpec object.
+
+    Returns:
+        run status.
+    """
     if isinstance(work, WorkSpec):
         workspec = work
     elif hasattr(work, "workspec") and isinstance(work.workspec, WorkSpec):
@@ -456,4 +464,5 @@ def run(work=None):
         raise exceptions.UsageError("Runnable work must be provided to run.")
     # Find a Context that can run the work and hand it off.
     with gmx.get_context(workspec) as session:
-        session.run()
+        status = session.run()
+    return status

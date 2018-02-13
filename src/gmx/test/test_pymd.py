@@ -14,6 +14,7 @@ import gmx
 import gmx.core
 from gmx.data import tpr_filename
 
+@pytest.mark.skip(reason="updating Context handling...")
 @pytest.mark.usefixtures("cleandir")
 class BindingsTestCase(unittest.TestCase):
     def test_APIObjectsFromTpr(self):
@@ -52,3 +53,11 @@ class BindingsTestCase(unittest.TestCase):
 
         with gmx.context.DefaultContext(system.workflow) as session:
             session.run()
+
+@pytest.mark.usefixtures("cleandir")
+class WorkSpecTestCase(unittest.TestCase):
+    def test_simpleSimulation(self):
+        """Load a work specification with a single TPR file and run."""
+        # use case 1: simple high-level
+        md = gmx.workflow.from_tpr(tpr_filename)
+        gmx.run(md)
