@@ -185,6 +185,38 @@ class WorkSpec(object):
     def __init__(self):
         self.version = workspec_version
         self.elements = dict()
+        self._context = None
+
+    def add_element(self, element):
+        """Add an element to a work specification if possible.
+
+        Adding an element to a WorkSpec must preserve the validity of the workspec, which involves several checks.
+        We do not yet check for element uniqueness beyond a string name.
+
+        If an element is added that was previously in another WorkSpec, it must first be removed from the
+        other WorkSpec.
+        """
+        if hasattr(element, "namespace") and hasattr(element, "operation") and hasattr(element, "serialize"):
+            if not hasattr(element, "name") or element.name is None or len(str(element.name)) < 1:
+                raise exceptions.UsageError("Only named elements may be added to a WorkSpec.")
+            if element.name in self.elements:
+                raise exceptions.UsageError("Elements in WorkSpec must be uniquely identifiable.")
+            if hasattr(element, "depends"):
+                for dependency in element.depends:
+                    if not dependency in self.elements:
+                        raise exceptions.UsageError("Element dependencies must already be specified before an Element may be added.")
+            # Okay, it looks like we have an element we can add
+            if hasattr(element, "workspec") and element.workspec is not None and element.workspec is not self:
+                raise exceptions.Error("Element must be removed from its current WorkSpec to be added to this WorkSpec, but element removal is not yet implemented.")
+            self.elements[element.name] = element.serialize()
+            element.workspec = self
+        else:
+            raise exceptions.ValueError("Provided object does not appear to be compatible with gmx.workflow.WorkElement.")
+
+    # def remove_element(self, name):
+    #     """Remove named element from work specification.
+    #
+    #     Does not delete references to WorkElement objects, but WorkElement objects will be moved to a None WorkSpec."""
 
     def add(self, spec):
         """
@@ -203,8 +235,13 @@ class WorkSpec(object):
 
         :param spec: WorkSpec to be merged into this one.
         :return:
+
+        \todo consider instead a gmx.workflow.merge(workspecA, workspecB) free function that returns a new WorkSpec.
         """
 
+
+    # Not sure we want to do serialization and deserialization yet, since we don't currently have a way to
+    # determine the uniqueness of a work specification.
     # def serialize(self):
 
     # @classmethod deserialize(serialized):
@@ -223,7 +260,7 @@ class WorkSpec(object):
 
         output += 'elements:\n'
         for element in self.elements:
-            data = gmx.workflow.WorkElement.deserialize(self.elements[element])
+            data = WorkElement.deserialize(self.elements[element])
             output += '    {}:\n'.format(element)
             output += '        namespace: "{}"\n'.format(data.namespace)
             output += '        operation: {}\n'.format(data.operation)
@@ -246,7 +283,7 @@ class WorkElement(object):
         if operation is not None:
             self.operation = str(operation)
         else:
-            raise UsageError("Invalid argument type for operation.")
+            raise exceptions.UsageError("Invalid argument type for operation.")
         self.params = params
         self.depends = depends
 
@@ -269,7 +306,7 @@ class WorkElement(object):
         return json.dumps(output_dict)
 
     @classmethod
-    def deserialize(cls, input_string):
+    def deserialize(cls, input_string, name=None, workspec=None):
         """Create a new WorkElement object from a serialized representation.
 
         \todo When subclasses become distinct, this factory function will need to do additional dispatching to create an object of the correct type.
@@ -278,6 +315,13 @@ class WorkElement(object):
         import json
         args = json.loads(input_string)
         element = cls(namespace=args['namespace'], operation=args['operation'], params=args['params'], depends=args['depends'])
+        if name is not None:
+            element.name = name
+            # This conditional is nested because we can only add named elements to a WorkSpec.
+            if workspec is not None:
+                element.workspec = workspec
+                if element.name in workspec.elements:
+                    workspec.add_element(element)
         return element
 
 
@@ -305,7 +349,6 @@ class MDElement(WorkElement):
         If the potential is not already in the same WorkSpec as the MDElement, it will be moved.
         Attempting to add a potential that has dependencies in a different WorkSpec than the MDElement is an error.
         If this appears to be a problem, consider merging the two WorkSpecs first with WorkSpec.add.
-        \todo consider instead a gmx.workflow.merge(workspecA, workspecB) free function that returns a new WorkSpec.
         """
 
 class SharedDataElement(WorkElement):
@@ -374,13 +417,13 @@ def from_tpr(input=None):
         # Assume list-like input
         tpr_list = tuple(input)
     else:
-        raise UsageError(usage)
+        raise exceptions.UsageError(usage)
 
     # Check for valid filenames
     for arg in tpr_list:
         if not (os.path.exists(arg) and os.path.isfile(arg)):
             arg_path = os.path.abspath(arg)
-            raise UsageError(usage + " Got {}".format(arg_path))
+            raise exceptions.UsageError(usage + " Got {}".format(arg_path))
 
     # Create an empty WorkSpec
     workspec = WorkSpec()
@@ -399,9 +442,7 @@ def from_tpr(input=None):
     mdelement = WorkElement(operation="md", depends=[inputelement.name])
     mdelement.name = "md_sim"
     # Check that the element has not already been added, but that its dependency has.
-    if mdelement.name not in workspec.elements and inputelement.name in workspec.elements:
-        workspec.elements[mdelement.name] = mdelement.serialize()
-        mdelement.workspec = workspec
+    workspec.add_element(mdelement)
 
     return mdelement
 
