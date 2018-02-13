@@ -320,7 +320,7 @@ class WorkElement(object):
             # This conditional is nested because we can only add named elements to a WorkSpec.
             if workspec is not None:
                 element.workspec = workspec
-                if element.name in workspec.elements:
+                if element.name not in workspec.elements:
                     workspec.add_element(element)
         return element
 
