@@ -205,19 +205,30 @@ class ParallelArrayContext(object):
 
         Appropriate computing resources need to be knowable when the Context is created.
         """
+        # self.__context_array = list([Context(work_element) for work_element in work])
+        self.__work = None
+        self.work = work
+        self.__work._context = self
+        self.__workdir_list = workdir_list
+
+        self._session = None
+        # This may not belong here. Is it confusing for the Context to have both global and local properties?
+        self.rank = None
+
+    @property
+    def work(self):
+        return self.__work
+
+    @work.setter
+    def work(self, work):
         if isinstance(work, WorkSpec):
             workspec = work
         elif hasattr(work, "workspec") and isinstance(work.workspec, WorkSpec):
             workspec = work.workspec
         else:
             raise ValueError("work argument must provide a gmx.workflow.WorkSpec.")
-        # self.__context_array = list([Context(work_element) for work_element in work])
         self.__work = workspec
-        self.__workdir_list = workdir_list
 
-        self._session = None
-        # This may not belong here. Is it confusing for the Context to have both global and local properties?
-        self.rank = None
 
     def __enter__(self):
         """Implement Python context manager protocol.
@@ -230,10 +241,12 @@ class ParallelArrayContext(object):
         Additional API operations are possible while the Session is active. When used as a Python context manager,
         the Context will close the Session at the end of the `with` block by calling `__exit__`.
         """
-        if self._session is not None:
-            raise exceptions.Error("Already running.")
 
         from mpi4py import MPI
+        import importlib
+
+        if self._session is not None:
+            raise exceptions.Error("Already running.")
 
         # Process the work specification.
         # Our first case is rigid: TPR inputs determine array width, so launch the appropriate number of simulations.
@@ -249,6 +262,14 @@ class ParallelArrayContext(object):
         # Element parameters are the list of inputs that define the work array.
         array_width = len(tpr_inputs.params)
 
+        # Find out what else we need. This is kludgey for now.
+        dependancies = []
+        # Get the associated MD element.
+        for element_name in self.__work.elements:
+            element = workflow.WorkElement.deserialize(self.__work.elements[element_name])
+            if element.operation == "md" and tpr_inputs.name in element.depends:
+                # Check for other dependencies
+                dependancies.extend([d for d in element.depends if d != tpr_inputs.name])
 
         # Prepare working directories. This should probably be moved to some aspect of the Session and either
         # removed from here or made more explicit to the user.
@@ -272,6 +293,12 @@ class ParallelArrayContext(object):
             # \todo Don't raise, just log.
             #raise Warning("MPI context is wider than necessary to run this work: array width {} vs. size {}.".format(array_width, comm_size))
             pass
+        self.rank = communicator.Get_rank()
+
+        if len(self.__work.elements) > 2:
+            assert len(dependancies) > 0
+            assert "test_module" in self.__work.elements
+        assert not self.rank is None
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
         # MDSystem objects are obtained from gmx.core.from_tpr(). They also provide add_potential().
@@ -279,6 +306,7 @@ class ParallelArrayContext(object):
         #
         # Here, I want to find the input appropriate for this rank and get an MDSession for it.
         if self.rank in range(array_width):
+            print("rank {}".format(self.rank))
             # Launch the work for this rank
             self.rank = communicator.Get_rank()
             self.workdir = self.__workdir_list[self.rank]
@@ -287,6 +315,16 @@ class ParallelArrayContext(object):
             infile = tpr_inputs.params[self.rank]
             assert os.path.isfile(infile)
             system = gmx.core.from_tpr(infile)
+
+            for element_name in dependancies:
+                element = workflow.WorkElement.deserialize(self.__work.elements[element_name], name=element_name, workspec=self.__work)
+                element_module = importlib.import_module(element.namespace)
+                element_operation = getattr(element_module, element.operation)
+                args = element.params
+                potential = element_operation(*args)
+                system.add_potential(potential)
+            #
+            #add_potential(potential)
 
             self._session = system.launch()
         else:

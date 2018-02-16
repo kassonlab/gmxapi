@@ -72,9 +72,9 @@ Single-sim with plugin
 
 Array sim with plugin
 
-    >>> work = gmx.workflow.from_tpr([filename1, filename2])
+    >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0)
-    >>> work['md'].add_potential(potential)
+    >>> gmx.add_potential(md, potential)
     >>> gmx.run(work)
 
     >>> # The above is shorthand for
@@ -90,22 +90,21 @@ Array sim with plugin
 
 Array sim with plugin using global resources
 
-    >>> md = gmx.create_md_unit([filename1, filename2])
-    >>> workfile = gmx.SharedDataFile(workfilename)
-    >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0, workfile=workfile)
-    >>> md.add_potential(potential)
+    >>> md = gmx.workflow.from_tpr([filename1, filename2])
+    >>> workdata = gmx.workflow.SharedDataElement()
+    >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0, workdata=workdata)
+    >>> md.add_dependancy(potential)
     >>> gmx.run(md)
 
     >>> # The above is shorthand for
     >>> # Create work spec and get handle to MD work unit
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
-    >>> # Implicitly, the new SharedDataFile has its own otherwise-empty workspec now.
-    >>> workfile = gmx.SharedDataFile(workfilename)
-    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0, workfile=workfile)
-    >>> # EnsembleRestraint is dependent on workfile, so `workfile` must be added to
+    >>> workdata = gmx.workflow.SharedDataElement()
+    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0, workdata=workdata)
+    >>> # EnsembleRestraint is dependent on workdata, so `workdata` must be added to
     >>> # `work` before `potential` can be added to `work`. Combine specs.
-    >>> md.workflow.add(workfile.workflow)
-    >>> md.add_potential(potential)
+    >>> md.workflow.add(workdata)
+    >>> md.add_dependancy(potential)
     >>> # Initialize resources for work or throw appropriate error
     >>> global_context = gmx.get_context(md.workflow)
     >>> # Global resources like SharedDataFile are now available.
@@ -119,6 +118,13 @@ Note that object representing work specification contains a recipe, not referenc
 workflow elements. Distinctly, objects can be created as handles to representations of workflow elements, and these
 objects can hold strong references to objects representing work specification. In other words, the work specification
 is a serialized data structure containing the serialized representations of workflow elements.
+
+Implementation details: When the plugin potential is instantiated, it has a WorkElement interface and can
+provide enough information for the Context to call the same constructor, but we want a portal back to the
+original object handle, too. If data only needs to be pulled by the handle, then it can chase references.
+When it is added as a dependancy to the md operation, it gains a reference to the workspec. When the
+work is launched, that workspec gains a reference to the Context. We need some sort of signal that can
+propagate back to the handles to the work elements.
 
 """
 
@@ -181,6 +187,8 @@ class WorkSpec(object):
                 operation: md
                 depends: [myinput, mypotential]
 
+    \todo Params schema incomplete!
+    We can say params is a list, but what are the elements? What if parameters need to be key--value pairs or vectors? We could assume that the value of params is some serialized data that the operation is required to know how to process, but for the moment, we are assuming it is just a list of positional arguments.
     """
     def __init__(self):
         self.version = workspec_version
@@ -285,12 +293,28 @@ class WorkElement(object):
             self.operation = str(operation)
         else:
             raise exceptions.UsageError("Invalid argument type for operation.")
-        self.params = params
-        self.depends = depends
+        self.params = list(params)
+        self.depends = list(depends)
 
         # The Python class for work elements keeps a strong reference to a WorkSpec object containing its description
         self.name = ""
         self.workspec = None
+
+    def add_dependancy(self, element):
+        """Add another element as a dependancy.
+
+        First move the provided element to the same WorkSpec, if not already here.
+        Then, add to depends and update the WorkSpec.
+        """
+        if element.workspec is None:
+            self.workspec.add_element(element)
+            assert element.workspec is self.workspec
+            assert element.name in self.workspec.elements
+        elif element.workspec is not self.workspec:
+            raise exceptions.ApiError("Element will need to be moved to the same workspec.")
+
+        self.depends.append(element.name)
+        self.workspec.elements[self.name] = self.serialize()
 
     def serialize(self):
         """Create a string representation of the work element.

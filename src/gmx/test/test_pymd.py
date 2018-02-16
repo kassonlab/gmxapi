@@ -76,3 +76,25 @@ class WorkSpecTestCase(unittest.TestCase):
         with context as session:
             session.run()
 
+    @withmpi_only
+    def test_plugin(self):
+        # Test attachment of external code
+        md = gmx.workflow.from_tpr(tpr_filename)
+
+        # Create a WorkElement for the potential
+        #potential = gmx.core.TestModule()
+        potential_element = gmx.workflow.WorkElement(namespace="gmx.core", operation="TestModule")
+        potential_element.name = "test_module"
+        before = md.workspec.elements[md.name]
+        md.add_dependancy(potential_element)
+        assert potential_element.name in md.workspec.elements
+        assert potential_element.workspec is md.workspec
+        after = md.workspec.elements[md.name]
+        assert not before is after
+
+        context = gmx.context.ParallelArrayContext(md)
+        with context as session:
+            if context.rank == 0:
+                print(context.work)
+            session.run()
+
