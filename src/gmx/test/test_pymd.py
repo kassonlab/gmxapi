@@ -14,6 +14,13 @@ import gmx
 import gmx.core
 from gmx.data import tpr_filename
 
+try:
+    from mpi4py import MPI
+    withmpi_only = pytest.mark.skipif(not MPI.Is_initialized() or MPI.COMM_WORLD.Get_size() < 2,
+                                      reason="Test requires at least 2 MPI ranks, but MPI is not initialized or too small.")
+except ImportError:
+    withmpi_only = pytest.mark.skip(reason="Test requires at least 2 MPI ranks, but mpi4py is not available.")
+
 @pytest.mark.skip(reason="updating Context handling...")
 @pytest.mark.usefixtures("cleandir")
 class BindingsTestCase(unittest.TestCase):
@@ -61,3 +68,11 @@ class WorkSpecTestCase(unittest.TestCase):
         # use case 1: simple high-level
         md = gmx.workflow.from_tpr(tpr_filename)
         gmx.run(md)
+
+    @withmpi_only
+    def test_array_context(self):
+        md = gmx.workflow.from_tpr(tpr_filename)
+        context = gmx.context.ParallelArrayContext(md)
+        with context as session:
+            session.run()
+

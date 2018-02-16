@@ -10,6 +10,9 @@ from __future__ import unicode_literals
 __all__ = ['Context', 'DefaultContext']
 
 from gmx import exceptions
+import gmx.core
+from . import workflow
+from .workflow import WorkSpec
 
 import os
 
@@ -66,7 +69,7 @@ class Context(object):
         # initialize return value.
         is_valid = True
         # Check compatibility
-        if workspec.version != gmx.workflow.workspec_version:
+        if workspec.version != workflow.workspec_version:
             is_valid = False
             if raises:
                 raise exceptions.ApiError("Incompatible workspec version.")
@@ -145,8 +148,10 @@ class SerialArrayContext(object):
 class ParallelArrayContext(object):
     """Manage an array of simulation work executing in parallel.
 
-    Hierarchical Context manages simpler contexts for array work that can be decomposed into an array of serial
-    specifications. Additional facilities are available to elements of the array members.
+    This is the first implementation of a new style of Context class that has some extra abstraction
+    and uses the new WorkSpec idea.
+
+    Additional facilities are available to elements of the array members.
 
       * array element corresponding to work in the current sub-context
       * "global" resources managed by the ParallelArrayContext
@@ -156,6 +161,14 @@ class ParallelArrayContext(object):
 
     Example: Use ``mpiexec -n 2 python -m mpi4py myscript.py`` to run two jobs at the same time.
     In this example the jobs are identical. In myscript.py:
+
+        >>> import gmx
+        >>> import gmx.core
+        >>> from gmx.data import tpr_filename # Get a test tpr filename
+        >>> work = gmx.workflow.from_tpr([tpr_filename, tpr_filename])
+        >>> gmx.run(work)
+
+    Example:
 
         >>> import gmx
         >>> import gmx.core
@@ -190,55 +203,115 @@ class ParallelArrayContext(object):
     def __init__(self, work, workdir_list=None):
         """Initialize compute resources.
 
-        Appropriate computing resources need to be available when the
+        Appropriate computing resources need to be knowable when the Context is created.
         """
-        if not isinstance(work, list):
-            raise ValueError("work specification should be a Python list.")
+        if isinstance(work, WorkSpec):
+            workspec = work
+        elif hasattr(work, "workspec") and isinstance(work.workspec, WorkSpec):
+            workspec = work.workspec
+        else:
+            raise ValueError("work argument must provide a gmx.workflow.WorkSpec.")
+        # self.__context_array = list([Context(work_element) for work_element in work])
+        self.__work = workspec
+        self.__workdir_list = workdir_list
+
+        self._session = None
+        # This may not belong here. Is it confusing for the Context to have both global and local properties?
+        self.rank = None
+
+    def __enter__(self):
+        """Implement Python context manager protocol.
+
+        Launch the necessary tasks to perform the specified work.
+
+        Returns:
+            Session object the can be run and/or inspected.
+
+        Additional API operations are possible while the Session is active. When used as a Python context manager,
+        the Context will close the Session at the end of the `with` block by calling `__exit__`.
+        """
+        if self._session is not None:
+            raise exceptions.Error("Already running.")
+
+        from mpi4py import MPI
+
+        # Process the work specification.
+        # Our first case is rigid: TPR inputs determine array width, so launch the appropriate number of simulations.
+        # Find the TPR inputs.
+        work = self.__work
+        tpr_inputs = None
+        for element in workflow.get_source_elements(self.__work):
+            if element.operation == "load_tpr":
+                tpr_inputs = element
+                break
+        if tpr_inputs is None:
+            raise exceptions.ApiError("WorkSpec was expected to have a load_tpr operation.")
+        # Element parameters are the list of inputs that define the work array.
+        array_width = len(tpr_inputs.params)
+
+
+        # Prepare working directories. This should probably be moved to some aspect of the Session and either
+        # removed from here or made more explicit to the user.
+        workdir_list = self.__workdir_list
         if workdir_list is None:
-            workdir_list = [os.path.join('.', str(i)) for i in range(len(work))]
-        self.workdir_list = list([os.path.abspath(dir) for dir in workdir_list])
-        for dir in self.workdir_list:
+            workdir_list = [os.path.join('.', str(i)) for i in range(array_width)]
+        self.__workdir_list = list([os.path.abspath(dir) for dir in workdir_list])
+        for dir in self.__workdir_list:
             if os.path.exists(dir):
                 if not os.path.isdir(dir):
                     raise exceptions.FileError("{} is not a valid working directory.".format(dir))
             else:
                 os.mkdir(dir)
 
-        self.__context_array = list([Context(work_element) for work_element in work])
-        self._session = None
-        # This may not belong here. Is it confusing for the Context to have both global and local properties?
-        self.rank = None
-
-    def __enter__(self):
-        """Implement Python context manager protocol."""
-        if self._session is not None:
-            raise exceptions.Error("Already running.")
-
-        from mpi4py import MPI
-
         # Check the global MPI configuration
         communicator = MPI.COMM_WORLD
-        if (len(self.__context_array) != communicator.Get_size()):
-            raise exceptions.UsageError("ParallelArrayContext requires a work array that matches the MPI communicator size.")
+        comm_size = communicator.Get_size()
+        if (array_width > comm_size):
+            raise exceptions.UsageError("ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.".format(array_width, comm_size))
+        if (array_width < comm_size):
+            # \todo Don't raise, just log.
+            #raise Warning("MPI context is wider than necessary to run this work: array width {} vs. size {}.".format(array_width, comm_size))
+            pass
 
-        # Launch the work for this rank
-        self.rank = communicator.Get_rank()
-        my_workdir = self.workdir_list[self.rank]
-        os.chdir(my_workdir)
+        # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
+        # MDSystem objects are obtained from gmx.core.from_tpr(). They also provide add_potential().
+        # gmxapi::Session objects are exposed as gmx.core.MDSession and provide run() and close() methods.
+        #
+        # Here, I want to find the input appropriate for this rank and get an MDSession for it.
+        if self.rank in range(array_width):
+            # Launch the work for this rank
+            self.rank = communicator.Get_rank()
+            self.workdir = self.__workdir_list[self.rank]
+            os.chdir(self.workdir)
 
-        # The API runner currently has an implicit context.
-        try:
-            # \todo Use API context implementation object
-            self._session = self.__context_array[self.rank].workflow.launch()
-        except:
-            self._session = None
-            raise
+            infile = tpr_inputs.params[self.rank]
+            assert os.path.isfile(infile)
+            system = gmx.core.from_tpr(infile)
+
+            self._session = system.launch()
+        else:
+            # \todo We don't really want a None session so much as a session with no work.
+            # self._session = None
+            class NullSession(object):
+                def run(self):
+                    return gmx.Status()
+                def close(self):
+                    return
+            self._session = NullSession()
+
+        # Make sure session has started on all ranks before continuing?
+
         return self._session
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Implement Python context manager protocol."""
         # Todo: handle exceptions.
-        self._session.close()
+        # \todo: we should not have a None session but rather an API-compliant Session that just has no work.
+        if self._session is not None:
+            self._session.close()
+
+        # \todo Make sure session has ended on all ranks before continuing and handle final errors.
+
         self._session = None
         return False
 
@@ -283,7 +356,7 @@ def get_context(work=None):
         # \todo Make the above horrible line less complicated.
         # E.g. sims = [element for element in work.elements if element.operation == "md"]
         if len(sims) != 1:
-            raise exceptions.UsageError("Simple Context requires exactly one MD element in the work specification.")
+            raise exceptions.UsageError("gmx currently requires exactly one MD element in the work specification.")
         sim = sims[0]
 
         # Confirm the availability of dependencies.
