@@ -329,7 +329,11 @@ class ParallelArrayContext(object):
                 element_module = importlib.import_module(element.namespace)
                 element_operation = getattr(element_module, element.operation)
                 args = element.params
-                potential = element_operation(*args)
+                try:
+                    potential = element_operation(*args)
+                except:
+                    potential = element_operation()
+                    potential.set_params(*args)
                 system.add_potential(potential)
             #
             #add_potential(potential)

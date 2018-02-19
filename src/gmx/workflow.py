@@ -60,7 +60,7 @@ Single-sim with plugin
 
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
-    >>> work['md'].add_potential(potential)
+    >>> work.add_dependancy(potential)
     >>> gmx.run(work)
     >>>
     >>> # The above is shorthand for
@@ -181,7 +181,7 @@ class WorkSpec(object):
                 namespace: "myplugin"
                 operation: create_mdmodule
                 params: [...]
-                depends: mydata
+                depends: [mydata]
             mysim:
                 namespace: "gromacs"
                 operation: md
