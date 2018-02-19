@@ -218,6 +218,7 @@ class ParallelArrayContext(object):
         self._session = None
         # This may not belong here. Is it confusing for the Context to have both global and local properties?
         self.rank = None
+        self.size = None
 
     @property
     def work(self):
@@ -268,7 +269,7 @@ class ParallelArrayContext(object):
         if tpr_inputs is None:
             raise exceptions.ApiError("WorkSpec was expected to have a load_tpr operation.")
         # Element parameters are the list of inputs that define the work array.
-        array_width = len(tpr_inputs.params)
+        self.size = len(tpr_inputs.params)
 
         # Find out what else we need. This is kludgey for now.
         dependancies = []
@@ -283,7 +284,7 @@ class ParallelArrayContext(object):
         # removed from here or made more explicit to the user.
         workdir_list = self.__workdir_list
         if workdir_list is None:
-            workdir_list = [os.path.join('.', str(i)) for i in range(array_width)]
+            workdir_list = [os.path.join('.', str(i)) for i in range(self.size)]
         self.__workdir_list = list([os.path.abspath(dir) for dir in workdir_list])
         for dir in self.__workdir_list:
             if os.path.exists(dir):
@@ -295,11 +296,11 @@ class ParallelArrayContext(object):
         # Check the global MPI configuration
         communicator = MPI.COMM_WORLD
         comm_size = communicator.Get_size()
-        if (array_width > comm_size):
-            raise exceptions.UsageError("ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.".format(array_width, comm_size))
-        if (array_width < comm_size):
+        if (self.size > comm_size):
+            raise exceptions.UsageError("ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.".format(self.size, comm_size))
+        if (self.size < comm_size):
             # \todo Don't raise, just log.
-            #raise Warning("MPI context is wider than necessary to run this work: array width {} vs. size {}.".format(array_width, comm_size))
+            #raise Warning("MPI context is wider than necessary to run this work: array width {} vs. size {}.".format(self.size, comm_size))
             pass
         self.rank = communicator.Get_rank()
 
@@ -310,7 +311,7 @@ class ParallelArrayContext(object):
         # gmxapi::Session objects are exposed as gmx.core.MDSession and provide run() and close() methods.
         #
         # Here, I want to find the input appropriate for this rank and get an MDSession for it.
-        if self.rank in range(array_width):
+        if self.rank in range(self.size):
             # Launch the work for this rank
             self.rank = communicator.Get_rank()
             self.workdir = self.__workdir_list[self.rank]
