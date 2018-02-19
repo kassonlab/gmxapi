@@ -161,6 +161,12 @@ class ParallelArrayContext(object):
       * "global" resources managed by the ParallelArrayContext
 
     Attributes:
+        work :obj:`gmx.workflow.WorkSpec`: specification of work to be performed when a session is launched.
+        rank : numerical index of the current worker in a running session (None if not running)
+        size : Minimum width needed for the parallelism required by the array of work being executed.
+        elements : dictionary of references to running elements of the workflow.
+
+    `rank`, `size`, and `elements` are empty or None until the work is processed, as during session launch.
 
 
     Example: Use ``mpiexec -n 2 python -m mpi4py myscript.py`` to run two jobs at the same time.
@@ -204,6 +210,7 @@ class ParallelArrayContext(object):
     more general case in which the array of simulations are coupled in some way.
 
     """
+
     def __init__(self, work, workdir_list=None):
         """Initialize compute resources.
 
@@ -217,8 +224,41 @@ class ParallelArrayContext(object):
 
         self._session = None
         # This may not belong here. Is it confusing for the Context to have both global and local properties?
+        # Alternatively, maybe a trivial `property` that gets the rank from a bound session, if any.
         self.rank = None
+
+        # `size` notes the required width of an array of synchronous tasks to perform the specified work.
+        # As work elements are processed, self.size will be increased as appropriate.
         self.size = None
+
+        # initialize the operations map. May be extended during the lifetime of a Context.
+        # Note that there may be a difference between built-in operations provided by this module and
+        # additional operations registered at run time.
+        self.__operations = {}
+        # The gmxapi namespace of operations should be consistent with a specified universal set of functionalities
+        self.__operations['gmxapi'] = {'md': self.__md,
+                                       # 'open_global_data_with_barrier'...
+                                      }
+        # Even if TPR file loading were to become a common and stable enough operation to be specified in
+        # and API, it is unlikely to be implemented by any code outside of GROMACS, so let's not clutter
+        # a potentially more universal namespace.
+        self.__operations['gromacs'] = {'load_tpr': self.__load_tpr,
+                                       },
+
+        # Right now we are treating workspec elements and work DAG nodes as equivalent, but they are
+        # emphatically not intended to be tightly coupled. The work specification is intended to be
+        # simple, user-friendly, general, and easy-to-implement. The DAG is an implementation detail
+        # and may differ across context types. It is likely to have stronger typing of nodes and/or
+        # edges. It is not yet specified whether we should translate the work into a graph before, after,
+        # or during processing of the elements, so it is not yet known whether we will need facilities
+        # to allow cross-referencing between the two graph-type structures. If we instantiate API objects
+        # as we process work elements, and the DAG in a context deviates from the work specification
+        # topology, we would need to use named dependencies to look up objects to bind to. Such facilities
+        # could be hidden in the WorkElement class(es), too, to delegate code away from the Context as a
+        # container class growing without bounds...
+        # In actuality, we will have to process the entire workspec to some degree to make sure we can
+        # run it on the available resources.
+        self.elements = None
 
     @property
     def work(self):
@@ -226,14 +266,67 @@ class ParallelArrayContext(object):
 
     @work.setter
     def work(self, work):
+        import importlib
+
         if isinstance(work, WorkSpec):
             workspec = work
         elif hasattr(work, "workspec") and isinstance(work.workspec, WorkSpec):
             workspec = work.workspec
         else:
             raise ValueError("work argument must provide a gmx.workflow.WorkSpec.")
+
+        # Make sure this context knows how to run the specified work.
+        for e in workspec.elements:
+            element = gmx.workflow.WorkElement.deserialize(e)
+
+            if element.namespace not in {'gmxapi', 'gromacs'}:
+                # Non-built-in namespaces are treated as modules to import.
+                try:
+                    element_module = importlib.import_module(element.namespace)
+                except ImportError as e:
+                    raise exceptions.UsageError("This context does not know how to invoke {} from {}. ImportError: {}".format(element.operation, element.namespace, e.message))
+
+                # Don't leave an empty nested dictionary if we couldn't map the operation.
+                if element.namespace in self.__operations:
+                    namespace_map = self.__operations[element.namespace]
+                else:
+                    namespace_map = dict()
+
+                if element.operation not in namespace_map:
+                    try:
+                        element_operation = getattr(element_module, element.operation)
+                        namespace_map[element.operation] = element_operation
+                    except:
+                        raise exceptions.ApiError("Operation {} not found in {}.".format(element.operation, element.namespace))
+                    # Set or update namespace map only if we have something to contribute.
+                    self.__operations[element.namespace] = namespace_map
+            else:
+                # element.namespace should be mapped, but not all operations are necessarily implemented.
+                if element.operation not in self.__operations[element.namespace]:
+                    # This check should be performed when deciding if the context is appropriate for the work.
+                    # If we are just going to use a try/catch block for this test, then we should differentiate
+                    # this exception from those raised due to incorrect usage.
+                    # \todo Consider distinguishing API misuse from API failures.
+                    raise exceptions.ApiError("Specified work cannot be performed due to unimplemented operations.")
+
         self.__work = workspec
 
+    def __load_tpr(self, element):
+        """Implement the gromacs.load_tpr operation.
+        """
+
+        # Note that the actual semantics are to just grab a filename for future reference in a fairly rigid way.
+
+        if not hasattr(self, "_tpr_inputs") or self._tpr_inputs is None:
+            self._tpr_inputs = element
+        else:
+            log.error("Existing tpr_input: {}".format(self._tpr_inputs.serialize()))
+            log.error("Unexpected additional input: {}".format(element.serialize()))
+            raise exceptions.ApiError("Context cannot process multiple load_tpr elements.")
+        self.size = max(self.size, len(self._tpr_inputs.params))
+
+    def __md(self, element):
+        pass
 
     def __enter__(self):
         """Implement Python context manager protocol.
@@ -245,6 +338,12 @@ class ParallelArrayContext(object):
 
         Additional API operations are possible while the Session is active. When used as a Python context manager,
         the Context will close the Session at the end of the `with` block by calling `__exit__`.
+
+        Note: this is probably where we will have to process the work specification to determine whether we
+        have appropriate resources (such as sufficiently wide parallelism). Until we have a better Session
+        abstraction, this means the clean approach should take two passes to first build a DAG and then
+        instantiate objects to perform the work. In the first implementation, we kind of muddle things into
+        a single pass.
         """
 
         from mpi4py import MPI
@@ -253,32 +352,37 @@ class ParallelArrayContext(object):
         if self._session is not None:
             raise exceptions.Error("Already running.")
 
+        # Initialize the work array width.
+        self.size = 0
+        # Initialize the running elements of the workflow.
+        self.elements = {}
+
         # Process the work specification.
-        # Our first case is rigid: TPR inputs determine array width, so launch the appropriate number of simulations.
-        # Find the TPR inputs.
-        work = self.__work
-        tpr_inputs = None
+        self._tpr_inputs = None
         for element in workflow.get_source_elements(self.__work):
-            if element.operation == "load_tpr":
-                if tpr_inputs is None:
-                    tpr_inputs = element
-                else:
-                    log.error("Existing tpr_input: {}".format(tpr_inputs.serialize()))
-                    log.error("Unexpected additional input: {}".format(element.serialize()))
-                    raise exceptions.ApiError("Context cannot process multiple load_tpr elements.")
-        if tpr_inputs is None:
+            # dispatch operation implementation
+            try:
+                operation = self.__operations[element.namespace][element.operation]
+                operation(self, element)
+            except LookupError as e:
+                request = '.'.join([element.namespace, element.operation])
+                message = "Could not find an implementation for the specified operation: {}. ".format(request)
+                message += e.message
+                raise exceptions.ApiError(message)
+
+        if self._tpr_inputs is None:
             raise exceptions.ApiError("WorkSpec was expected to have a load_tpr operation.")
         # Element parameters are the list of inputs that define the work array.
-        self.size = len(tpr_inputs.params)
+        assert self.size == len(self._tpr_inputs.params)
 
         # Find out what else we need. This is kludgey for now.
         dependancies = []
         # Get the associated MD element.
         for element_name in self.__work.elements:
             element = workflow.WorkElement.deserialize(self.__work.elements[element_name])
-            if element.operation == "md" and tpr_inputs.name in element.depends:
+            if element.operation == "md" and self._tpr_inputs.name in element.depends:
                 # Check for other dependencies
-                dependancies.extend([d for d in element.depends if d != tpr_inputs.name])
+                dependancies.extend([d for d in element.depends if d != self._tpr_inputs.name])
 
         # Prepare working directories. This should probably be moved to some aspect of the Session and either
         # removed from here or made more explicit to the user.
@@ -318,7 +422,7 @@ class ParallelArrayContext(object):
             os.chdir(self.workdir)
             log.info("rank {} changed directory to {}".format(self.rank, self.workdir))
 
-            infile = tpr_inputs.params[self.rank]
+            infile = self._tpr_inputs.params[self.rank]
             log.info("TPR input parameter: {}".format(infile))
             infile = os.path.abspath(infile)
             log.info("Loading TPR file: {}".format(infile))

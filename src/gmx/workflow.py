@@ -174,7 +174,7 @@ class WorkSpec(object):
                 operation: load_tpr
                 params: ["tpr_filename1", "tpr_filename2"]
             mydata:
-                namespace: "gromacs"
+                namespace: "gmxapi"
                 operation: open_global_data_with_barrier
                 params: "data_filename"
             mypotential:
@@ -183,7 +183,7 @@ class WorkSpec(object):
                 params: [...]
                 depends: [mydata]
             mysim:
-                namespace: "gromacs"
+                namespace: "gmxapi"
                 operation: md
                 depends: [myinput, mypotential]
 
@@ -286,7 +286,7 @@ class WorkSpec(object):
 
 class WorkElement(object):
     """Encapsulate an element of a work specification."""
-    def __init__(self, namespace="gromacs", operation=None, params=(), depends=()):
+    def __init__(self, namespace="gmxapi", operation=None, params=(), depends=()):
         self.namespace = str(namespace)
         # We can add an operations submodule to validate these. E.g. self.operation = gmx.workflow.operations.normalize(operation)
         if operation is not None:
@@ -361,7 +361,7 @@ class MDElement(WorkElement):
         It may be appropriate to insist on creating objects of this type via helpers or factories, particularly if
         creation requires additional parameters.
         """
-        super(MDElement, self).__init__(namespace="gromacs", operation="md")
+        super(MDElement, self).__init__(namespace="gmxapi", operation="md")
 
     def add_potential(self, potential):
         """Attach an additional MD potential to the simulator.
@@ -387,7 +387,7 @@ class SharedDataElement(WorkElement):
         It may be appropriate to insist on creating objects of this type via helpers or factories, particularly if
         creation requires additional parameters.
         """
-        super(SharedDataElement, self).__init__(namespace="gromacs", operation="open_global_data_with_barrier")
+        super(SharedDataElement, self).__init__(namespace="gmxapi", operation="open_global_data_with_barrier")
 
 def get_source_elements(workspec):
     """Get an iterator of the starting nodes in the work spec.
@@ -426,7 +426,7 @@ def from_tpr(input=None):
                 operation: load_tpr
                 params: ["tpr_filename1", "tpr_filename2"]
             md_sim:
-                namespace: "gromacs"
+                namespace: "gmxapi"
                 operation: md
                 depends: [myinput]
 

@@ -37,7 +37,7 @@ class WorkElementTestCase(unittest.TestCase):
         name = ""
         operation = "load_tpr"
         params = ["filename1", "filename2"]
-        element = gmx.workflow.WorkElement(operation=operation, params=params)
+        element = gmx.workflow.WorkElement(namespace=namespace, operation=operation, params=params)
 
         assert element.name == name
         assert element.workspec == workspec
@@ -56,7 +56,7 @@ class WorkElementTestCase(unittest.TestCase):
         name = ""
         operation = "load_tpr"
         params = ["filename1", "filename2"]
-        element = gmx.workflow.WorkElement(operation=operation, params=params)
+        element = gmx.workflow.WorkElement(namespace=namespace, operation=operation, params=params)
 
         json_data = element.serialize()
         assert "namespace" in json.loads(json_data)
@@ -149,6 +149,9 @@ class WorkflowFreeFunctions(unittest.TestCase):
         assert "md_sim" not in sources
         # confirm sources is a subset of elements and sources does not equal elements
         assert len(sources) < len(elements)
+    #
+    # def test_add_dependancy(self):
+    #     """Check updating of WorkSpec and WorkElements."""
 
 # @withmpi_only
 # class MpiArrayContextTestCase(unittest.TestCase):
