@@ -101,6 +101,10 @@ from __future__ import unicode_literals
 # TODO: what should happen when ``from gmx import *``?
 __all__ = ['Status', 'System', 'get_context', 'run']
 
+# Import system facilities
+import logging
+log = logging.getLogger(__name__)
+
 # Import submodules.
 from . import exceptions
 from . exceptions import *

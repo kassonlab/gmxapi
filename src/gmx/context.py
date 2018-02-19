@@ -10,11 +10,15 @@ from __future__ import unicode_literals
 __all__ = ['Context', 'DefaultContext']
 
 from gmx import exceptions
+from gmx import logging
 import gmx.core
 from . import workflow
 from .workflow import WorkSpec
 
 import os
+
+# Module-level logger
+log = logging.getLogger(__name__)
 
 class Context(object):
     """ Proxy to API Context provides Python context manager.
@@ -255,8 +259,12 @@ class ParallelArrayContext(object):
         tpr_inputs = None
         for element in workflow.get_source_elements(self.__work):
             if element.operation == "load_tpr":
-                tpr_inputs = element
-                break
+                if tpr_inputs is None:
+                    tpr_inputs = element
+                else:
+                    log.error("Existing tpr_input: {}".format(tpr_inputs.serialize()))
+                    log.error("Unexpected additional input: {}".format(element.serialize()))
+                    raise exceptions.ApiError("Context cannot process multiple load_tpr elements.")
         if tpr_inputs is None:
             raise exceptions.ApiError("WorkSpec was expected to have a load_tpr operation.")
         # Element parameters are the list of inputs that define the work array.
@@ -295,9 +303,6 @@ class ParallelArrayContext(object):
             pass
         self.rank = communicator.Get_rank()
 
-        if len(self.__work.elements) > 2:
-            assert len(dependancies) > 0
-            assert "test_module" in self.__work.elements
         assert not self.rank is None
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
@@ -306,13 +311,16 @@ class ParallelArrayContext(object):
         #
         # Here, I want to find the input appropriate for this rank and get an MDSession for it.
         if self.rank in range(array_width):
-            print("rank {}".format(self.rank))
             # Launch the work for this rank
             self.rank = communicator.Get_rank()
             self.workdir = self.__workdir_list[self.rank]
             os.chdir(self.workdir)
+            log.info("rank {} changed directory to {}".format(self.rank, self.workdir))
 
             infile = tpr_inputs.params[self.rank]
+            log.info("TPR input parameter: {}".format(infile))
+            infile = os.path.abspath(infile)
+            log.info("Loading TPR file: {}".format(infile))
             assert os.path.isfile(infile)
             system = gmx.core.from_tpr(infile)
 
