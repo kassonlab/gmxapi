@@ -9,16 +9,18 @@ from __future__ import unicode_literals
 
 __all__ = ['Context', 'DefaultContext']
 
+import os
+import warnings
+
 from gmx import exceptions
 from gmx import logging
 import gmx.core
 from . import workflow
 from .workflow import WorkSpec
 
-import os
-
 # Module-level logger
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+logger.info("Importing gmx.context")
 
 class Context(object):
     """ Proxy to API Context provides Python context manager.
@@ -37,6 +39,9 @@ class Context(object):
     any case, the operations allow a Context implementation to transform a work specification into a
     directed acyclic graph of schedulable work.
     """
+    # \todo Put the following to-do someplace more appropriate
+    # \todo There should be a default Context active from the first `import gmx` or at least before the first logger call.
+    # The Context is the appropriate entity to own or mediate access to an appropriate logging facility.
     def __init__(self, workflow=None):
         """Create new context bound to the provided workflow, if any.
 
@@ -320,8 +325,8 @@ class ParallelArrayContext(object):
         if not hasattr(self, "_tpr_inputs") or self._tpr_inputs is None:
             self._tpr_inputs = element
         else:
-            log.error("Existing tpr_input: {}".format(self._tpr_inputs.serialize()))
-            log.error("Unexpected additional input: {}".format(element.serialize()))
+            logger.error("Existing tpr_input: {}".format(self._tpr_inputs))
+            logger.error("Unexpected additional input: {}".format(params))
             raise exceptions.ApiError("Context cannot process multiple load_tpr elements.")
         self.size = max(self.size, len(self._tpr_inputs.params))
 
@@ -403,9 +408,7 @@ class ParallelArrayContext(object):
         if (self.size > comm_size):
             raise exceptions.UsageError("ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.".format(self.size, comm_size))
         if (self.size < comm_size):
-            # \todo Don't raise, just log.
-            #raise Warning("MPI context is wider than necessary to run this work: array width {} vs. size {}.".format(self.size, comm_size))
-            pass
+            warnings.warn("MPI context is wider than necessary to run this work: array width {} vs. size {}.".format(self.size, comm_size))
         self.rank = communicator.Get_rank()
 
         assert not self.rank is None
@@ -420,12 +423,12 @@ class ParallelArrayContext(object):
             self.rank = communicator.Get_rank()
             self.workdir = self.__workdir_list[self.rank]
             os.chdir(self.workdir)
-            log.info("rank {} changed directory to {}".format(self.rank, self.workdir))
+            logger.info("rank {} changed directory to {}".format(self.rank, self.workdir))
 
             infile = self._tpr_inputs.params[self.rank]
-            log.info("TPR input parameter: {}".format(infile))
+            logger.info("TPR input parameter: {}".format(infile))
             infile = os.path.abspath(infile)
-            log.info("Loading TPR file: {}".format(infile))
+            logger.info("Loading TPR file: {}".format(infile))
             assert os.path.isfile(infile)
             system = gmx.core.from_tpr(infile)
 

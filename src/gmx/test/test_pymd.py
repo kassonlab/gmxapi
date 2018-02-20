@@ -6,9 +6,19 @@
 # I'm increasingly thinking that the CMake-managed C++ extension module should be managed separately than the setuptools
 # primary module. Then we can just do standard things like using CTest and googletest for the more complicated stuff.
 
+import logging
+logging.getLogger().setLevel(logging.DEBUG)
+# create console handler
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+# create formatter and add it to the handler
+formatter = logging.Formatter('%(asctime)s:%(name)s:%(levelname)s: %(message)s')
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logging.getLogger().addHandler(ch)
+
 import unittest
 import pytest
-import os
 
 import gmx
 import gmx.core
@@ -62,39 +72,46 @@ class BindingsTestCase(unittest.TestCase):
             session.run()
 
 @pytest.mark.usefixtures("cleandir")
-class WorkSpecTestCase(unittest.TestCase):
-    def test_simpleSimulation(self):
-        """Load a work specification with a single TPR file and run."""
-        # use case 1: simple high-level
-        md = gmx.workflow.from_tpr(tpr_filename)
-        gmx.run(md)
+@pytest.mark.usefixtures("caplog")
+def test_simpleSimulation():
+    """Load a work specification with a single TPR file and run."""
+    # use case 1: simple high-level
+    md = gmx.workflow.from_tpr(tpr_filename)
+    gmx.run(md)
 
-    @withmpi_only
-    def test_array_context(self):
-        md = gmx.workflow.from_tpr(tpr_filename)
-        context = gmx.context.ParallelArrayContext(md)
-        with context as session:
-            session.run()
+@pytest.mark.usefixtures("cleandir")
+@pytest.mark.usefixtures("caplog")
+@withmpi_only
+def test_array_context():
+    md = gmx.workflow.from_tpr(tpr_filename)
+    context = gmx.context.ParallelArrayContext(md)
+    with context as session:
+        session.run()
 
-    @withmpi_only
-    def test_plugin(self):
-        # Test attachment of external code
-        md = gmx.workflow.from_tpr(tpr_filename)
+@pytest.mark.usefixtures("cleandir")
+@pytest.mark.usefixtures("caplog")
+@withmpi_only
+def test_plugin(caplog):
+    # Test attachment of external code
+    md = gmx.workflow.from_tpr(tpr_filename)
 
-        # Create a WorkElement for the potential
-        #potential = gmx.core.TestModule()
-        potential_element = gmx.workflow.WorkElement(namespace="gmx.core", operation="TestModule")
-        potential_element.name = "test_module"
-        before = md.workspec.elements[md.name]
-        md.add_dependancy(potential_element)
-        assert potential_element.name in md.workspec.elements
-        assert potential_element.workspec is md.workspec
-        after = md.workspec.elements[md.name]
-        assert not before is after
+    # Create a WorkElement for the potential
+    #potential = gmx.core.TestModule()
+    potential_element = gmx.workflow.WorkElement(namespace="gmx.core", operation="TestModule")
+    potential_element.name = "test_module"
+    before = md.workspec.elements[md.name]
+    md.add_dependancy(potential_element)
+    assert potential_element.name in md.workspec.elements
+    assert potential_element.workspec is md.workspec
+    after = md.workspec.elements[md.name]
+    assert not before is after
 
-        context = gmx.context.ParallelArrayContext(md)
-        with context as session:
-            if context.rank == 0:
-                print(context.work)
-            session.run()
+    context = gmx.context.ParallelArrayContext(md)
+    with context as session:
+        if context.rank == 0:
+            print(context.work)
+        session.run()
 
+
+if __name__ == '__main__':
+    unittest.main()
