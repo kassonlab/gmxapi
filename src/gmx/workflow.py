@@ -454,7 +454,7 @@ def from_tpr(input=None):
     workspec = WorkSpec()
 
     # Create and add the Element for the tpr file(s)
-    inputelement = WorkElement(operation="load_tpr", params=tpr_list)
+    inputelement = WorkElement(namespace='gromacs', operation="load_tpr", params=tpr_list)
     inputelement.name = "tpr_input"
     if inputelement.name not in workspec.elements:
         # Operations such as this need to be replaced with accessors or properties that can check the validity of the WorkSpec

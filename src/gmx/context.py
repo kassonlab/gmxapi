@@ -223,8 +223,6 @@ class ParallelArrayContext(object):
         """
         # self.__context_array = list([Context(work_element) for work_element in work])
         self.__work = None
-        self.work = work
-        self.__work._context = self
         self.__workdir_list = workdir_list
 
         self._session = None
@@ -241,14 +239,14 @@ class ParallelArrayContext(object):
         # additional operations registered at run time.
         self.__operations = {}
         # The gmxapi namespace of operations should be consistent with a specified universal set of functionalities
-        self.__operations['gmxapi'] = {'md': self.__md,
+        self.__operations['gmxapi'] = {'md': lambda : self.__md(),
                                        # 'open_global_data_with_barrier'...
                                       }
         # Even if TPR file loading were to become a common and stable enough operation to be specified in
         # and API, it is unlikely to be implemented by any code outside of GROMACS, so let's not clutter
         # a potentially more universal namespace.
-        self.__operations['gromacs'] = {'load_tpr': self.__load_tpr,
-                                       },
+        self.__operations['gromacs'] = {'load_tpr': lambda *params : self.__load_tpr(*params),
+                                       }
 
         # Right now we are treating workspec elements and work DAG nodes as equivalent, but they are
         # emphatically not intended to be tightly coupled. The work specification is intended to be
@@ -264,6 +262,10 @@ class ParallelArrayContext(object):
         # In actuality, we will have to process the entire workspec to some degree to make sure we can
         # run it on the available resources.
         self.elements = None
+
+        # This setter must be called after the operations map has been populated.
+        self.work = work
+        self.work._context = self
 
     @property
     def work(self):
@@ -282,7 +284,7 @@ class ParallelArrayContext(object):
 
         # Make sure this context knows how to run the specified work.
         for e in workspec.elements:
-            element = gmx.workflow.WorkElement.deserialize(e)
+            element = gmx.workflow.WorkElement.deserialize(workspec.elements[e])
 
             if element.namespace not in {'gmxapi', 'gromacs'}:
                 # Non-built-in namespaces are treated as modules to import.
@@ -307,28 +309,33 @@ class ParallelArrayContext(object):
                     self.__operations[element.namespace] = namespace_map
             else:
                 # element.namespace should be mapped, but not all operations are necessarily implemented.
-                if element.operation not in self.__operations[element.namespace]:
+                assert element.namespace in self.__operations
+                if not element.operation in self.__operations[element.namespace]:
+                    if self.rank < 1:
+                        logger.error(self.__operations)
                     # This check should be performed when deciding if the context is appropriate for the work.
                     # If we are just going to use a try/catch block for this test, then we should differentiate
                     # this exception from those raised due to incorrect usage.
                     # \todo Consider distinguishing API misuse from API failures.
-                    raise exceptions.ApiError("Specified work cannot be performed due to unimplemented operations.")
+                    raise exceptions.ApiError("Specified work cannot be performed due to unimplemented operation {}.{}.".format(element.namespace, element.operation))
 
         self.__work = workspec
 
-    def __load_tpr(self, element):
+    def __load_tpr(self, *params):
         """Implement the gromacs.load_tpr operation.
         """
 
         # Note that the actual semantics are to just grab a filename for future reference in a fairly rigid way.
 
         if not hasattr(self, "_tpr_inputs") or self._tpr_inputs is None:
-            self._tpr_inputs = element
+            self._tpr_inputs = params
         else:
             logger.error("Existing tpr_input: {}".format(self._tpr_inputs))
             logger.error("Unexpected additional input: {}".format(params))
             raise exceptions.ApiError("Context cannot process multiple load_tpr elements.")
-        self.size = max(self.size, len(self._tpr_inputs.params))
+        self.size = max(self.size, len(self._tpr_inputs))
+        assert not self._tpr_inputs is None
+        assert self.size > 0
 
     def __md(self, element):
         pass
@@ -357,6 +364,9 @@ class ParallelArrayContext(object):
         if self._session is not None:
             raise exceptions.Error("Already running.")
 
+        # \todo Logically, this is where resources should be detected / initialized / claimed.
+        # At the very least, this would be a good place to identify the current local rank.
+
         # Initialize the work array width.
         self.size = 0
         # Initialize the running elements of the workflow.
@@ -368,7 +378,18 @@ class ParallelArrayContext(object):
             # dispatch operation implementation
             try:
                 operation = self.__operations[element.namespace][element.operation]
-                operation(self, element)
+                args = element.params
+                try:
+                    self.elements[element.name] = operation(*args)
+                except Exception as e:
+                    print(e.message)
+                    try:
+                        self.elements[element.name] = operation()
+                    except Exception as e:
+                        print(element.name, element, operation)
+                        raise e
+                    if not args is None and len(args) > 0:
+                        self.elements[element.name].set_params(*args)
             except LookupError as e:
                 request = '.'.join([element.namespace, element.operation])
                 message = "Could not find an implementation for the specified operation: {}. ".format(request)
@@ -376,18 +397,11 @@ class ParallelArrayContext(object):
                 raise exceptions.ApiError(message)
 
         if self._tpr_inputs is None:
+            print(str(self.work))
+            print(self.elements)
             raise exceptions.ApiError("WorkSpec was expected to have a load_tpr operation.")
         # Element parameters are the list of inputs that define the work array.
-        assert self.size == len(self._tpr_inputs.params)
-
-        # Find out what else we need. This is kludgey for now.
-        dependancies = []
-        # Get the associated MD element.
-        for element_name in self.__work.elements:
-            element = workflow.WorkElement.deserialize(self.__work.elements[element_name])
-            if element.operation == "md" and self._tpr_inputs.name in element.depends:
-                # Check for other dependencies
-                dependancies.extend([d for d in element.depends if d != self._tpr_inputs.name])
+        assert self.size == len(self._tpr_inputs)
 
         # Prepare working directories. This should probably be moved to some aspect of the Session and either
         # removed from here or made more explicit to the user.
@@ -418,6 +432,10 @@ class ParallelArrayContext(object):
         # gmxapi::Session objects are exposed as gmx.core.MDSession and provide run() and close() methods.
         #
         # Here, I want to find the input appropriate for this rank and get an MDSession for it.
+        # \todo In the future, we should set up an object with "ports" configured and then instantiate.
+        # E.g. Make a pass that allows meta-objects to bind (setting md_proxy._input_tpr and md_proxy._plugins,
+        # and then call a routine implemented by each object to run whatever protocol it needs, such
+        # as `system = gmx.core.from_tpr(md._input_tpr); system.add_potential(md._plugins)
         if self.rank in range(self.size):
             # Launch the work for this rank
             self.rank = communicator.Get_rank()
@@ -425,26 +443,31 @@ class ParallelArrayContext(object):
             os.chdir(self.workdir)
             logger.info("rank {} changed directory to {}".format(self.rank, self.workdir))
 
-            infile = self._tpr_inputs.params[self.rank]
+            infile = self._tpr_inputs[self.rank]
             logger.info("TPR input parameter: {}".format(infile))
             infile = os.path.abspath(infile)
             logger.info("Loading TPR file: {}".format(infile))
             assert os.path.isfile(infile)
             system = gmx.core.from_tpr(infile)
 
+            # Agh! This is horrible!
+            for element_name in self.__work.elements:
+                element = workflow.WorkElement.deserialize(self.__work.elements[element_name], name=element_name, workspec=self.__work)
+                if element.operation == 'md':
+                    dependancies = element.depends
             for element_name in dependancies:
                 element = workflow.WorkElement.deserialize(self.__work.elements[element_name], name=element_name, workspec=self.__work)
-                element_module = importlib.import_module(element.namespace)
-                element_operation = getattr(element_module, element.operation)
-                args = element.params
-                try:
-                    potential = element_operation(*args)
-                except:
-                    potential = element_operation()
-                    potential.set_params(*args)
-                system.add_potential(potential)
-            #
-            #add_potential(potential)
+                if element.operation != 'load_tpr':
+
+                    element_module = importlib.import_module(element.namespace)
+                    element_operation = getattr(element_module, element.operation)
+                    args = element.params
+                    try:
+                        potential = element_operation(*args)
+                    except:
+                        potential = element_operation()
+                        potential.set_params(*args)
+                    system.add_potential(potential)
 
             self._session = system.launch()
         else:
