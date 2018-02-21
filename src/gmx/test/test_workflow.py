@@ -34,11 +34,13 @@ class WorkElementTestCase(unittest.TestCase):
         namespace = "gromacs"
         depends = ()
         workspec = None
-        name = ""
+        name = "spam"
         operation = "load_tpr"
         params = ["filename1", "filename2"]
         element = gmx.workflow.WorkElement(namespace=namespace, operation=operation, params=params)
 
+        assert element.name != name
+        element.name = name
         assert element.name == name
         assert element.workspec == workspec
         assert element.namespace == namespace
@@ -53,17 +55,20 @@ class WorkElementTestCase(unittest.TestCase):
         namespace = "gromacs"
         depends = ()
         workspec = None
-        name = ""
+        name = "spam"
         operation = "load_tpr"
         params = ["filename1", "filename2"]
         element = gmx.workflow.WorkElement(namespace=namespace, operation=operation, params=params)
 
         json_data = element.serialize()
         assert "namespace" in json.loads(json_data)
+
         # Two elements with the same name cannot exist in the same workspec, but this is not the case here.
         element = gmx.workflow.WorkElement.deserialize(json_data)
-
+        assert element.name == None
+        element = gmx.workflow.WorkElement.deserialize(json_data, name=name)
         assert element.name == name
+
         assert element.workspec == workspec
         assert element.namespace == namespace
         assert element.operation == operation
@@ -97,6 +102,31 @@ class WorkSpecTestCase(unittest.TestCase):
         assert inputelement.name not in workspec.elements
         workspec.elements[inputelement.name] = inputelement.serialize()
         inputelement.workspec = workspec
+
+    def test_iterator(self):
+        """Test iteration over elements in correct sequence."""
+        workspec = gmx.workflow.WorkSpec()
+        element = gmx.workflow.WorkElement(operation="spam", depends=[])
+        element.name = "a"
+        workspec.add_element(element)
+
+        element = gmx.workflow.WorkElement(operation="spam", depends=[])
+        element.name = "b"
+        workspec.add_element(element)
+
+        element = gmx.workflow.WorkElement(operation="spam", depends=["b"])
+        element.name = "c"
+        workspec.add_element(element)
+
+        element = gmx.workflow.WorkElement(operation="spam", depends=["a", "c"])
+        element.name = "d"
+        workspec.add_element(element)
+
+        sequence = [element.name for element in workspec]
+        index = {name: i for i, name in enumerate(sequence)}
+        assert index['a'] < index['d']
+        assert index['c'] < index['d']
+        assert index['b'] < index['c']
 
 @pytest.mark.usefixtures("cleandir")
 class WorkflowFreeFunctions(unittest.TestCase):

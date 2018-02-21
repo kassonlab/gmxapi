@@ -150,17 +150,26 @@ class WorkSpec(object):
     information and requirements for execution. E.g. once Array elements are added,
     the WorkSpec can only be launched in a context that supports parallel Array
     elements. These attributes can be refined and requirements minimized in the future.
-    WorkSpec instances can be merged with `WorkSpec.add()`. Reference to elements remain valid after the
+
+    Future functionality may allow
+    WorkSpec instances can be merged with `WorkSpec.add()`.
+    Reference to elements remain valid after the
     merge, but may have modified properties (such as unique identifiers or hashes
     associated with their relationship to the rest of the workflow). An element cannot
     be added to a WorkSpec if it has dependencies that are not in the WorkSpec.
 
+    Work is added to the specification by passing a WorkElement object to WorkSpec.add_element().
+    Any dependencies in the WorkElement must already be specified in the target WorkSpec.
+
+    When iterated over, a WorkSpec object yields WorkElement objects in a valid order to
+    keep dependencies satisfied, but not necessarily the same order in which add_element()
+    calls were originally made.
+
+    When iterated over, a WorkSpec object returns WorkElement objects
+
     In the future, for easier accounting, the API could provide each work element with a unique identifier that can be
     used to reconstruct new references from the API objects instead of making sure the Python-level accounting works well.
     TBD.
-
-    Attributes:
-        properties: List of required features that not all Context implementations can provide (default empty list)
 
     Detail:
 
@@ -194,6 +203,42 @@ class WorkSpec(object):
         self.version = workspec_version
         self.elements = dict()
         self._context = None
+
+    def _chase_deps(self, source_set, name_list):
+        """Helper to recursively generate dependancies before dependants.
+
+        Given a set of WorkElement objects and a list of element names, generate WorkElements for
+        the members of name_list plus their dependencies in an order such that dependencies are
+        guaranteed to occur before their dependant elements.
+
+        For example, to sequence an entire work specification into a reasonable order for instantiation, use
+
+            >>> workspec._chase_deps(set(workspec.elements.keys()), list(workspec.elements.keys()))
+
+        Note: as a member function of WorkSpec, we have access to the full WorkSpec elements data at all
+        times, giving us extra flexibility in implementation and arguments.
+
+        Args:
+            source_set: a copy of a set of element names (will be consumed during execution)
+            name_list: name list to be expanded with dependencies and sequenced
+
+        Note that source_set is a reference to an object that is modified arbitrarily.
+        \todo Maybe this shouldn't be a member function, but a closure within WorkSpec.__iter__()
+
+        """
+        assert isinstance(source_set, set)
+        for name in tuple(name_list):
+            if name in source_set:
+                source_set.remove(name)
+                element = WorkElement.deserialize(self.elements[name], name=name, workspec=self)
+                for dep in self._chase_deps(source_set, element.depends):
+                    yield dep
+                yield element
+
+    def __iter__(self):
+        source_set = set(self.elements.keys())
+        for element in self._chase_deps(source_set, source_set):
+            yield element
 
     def add_element(self, element):
         """Add an element to a work specification if possible.
@@ -297,7 +342,7 @@ class WorkElement(object):
         self.depends = list(depends)
 
         # The Python class for work elements keeps a strong reference to a WorkSpec object containing its description
-        self.name = ""
+        self.name = None
         self.workspec = None
 
     def add_dependancy(self, element):

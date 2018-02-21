@@ -533,9 +533,7 @@ def get_context(work=None):
         # Assume simple simulation for now.
 
         # Get MD simulation elements.
-        sims = [workflow.WorkElement.deserialize(work.elements[element], name=element, workspec=work) for element in work.elements if workflow.WorkElement.deserialize(work.elements[element]).operation == "md"]
-        # \todo Make the above horrible line less complicated.
-        # E.g. sims = [element for element in work.elements if element.operation == "md"]
+        sims = [element for element in work if element.operation == "md"]
         if len(sims) != 1:
             raise exceptions.UsageError("gmx currently requires exactly one MD element in the work specification.")
         sim = sims[0]

@@ -107,6 +107,8 @@ def test_plugin(caplog):
     assert not before is after
 
     context = gmx.context.ParallelArrayContext(md)
+    # \todo swallow warning about wide MPI context
+    # \todo use pytest context managers to turn raised exceptions into assertions.
     with context as session:
         if context.rank == 0:
             print(context.work)
