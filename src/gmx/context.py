@@ -20,7 +20,7 @@ from .workflow import WorkSpec
 
 # Module-level logger
 logger = logging.getLogger(__name__)
-logger.info("Importing gmx.context")
+logger.info('Importing gmx.context')
 
 class Context(object):
     """ Proxy to API Context provides Python context manager.
@@ -81,7 +81,7 @@ class Context(object):
         if workspec.version != workflow.workspec_version:
             is_valid = False
             if raises:
-                raise exceptions.ApiError("Incompatible workspec version.")
+                raise exceptions.ApiError('Incompatible workspec version.')
         # Check that Elements are uniquely identifiable.
         elements = dict()
         for element in workspec.elements:
@@ -90,14 +90,14 @@ class Context(object):
             else:
                 is_valid = False
                 if raises:
-                    raise exceptions.ApiError("WorkSpec must contain uniquely named elements.")
+                    raise exceptions.ApiError('WorkSpec must contain uniquely named elements.')
         # Check that the specification is complete. There must be at least one source element and all
         # dependencies must be fulfilled.
         sources = set([element.name for element in gmx.workflow.get_source_elements(workspec)])
         if len(sources) < 1:
             is_valid = False
             if raises:
-                raise exceptions.ApiError("WorkSpec must contain at least one source element")
+                raise exceptions.ApiError('WorkSpec must contain at least one source element')
         for name in workspec.elements:
             element = gmx.workflow.WorkElement.deserialize()
         return is_valid
@@ -110,7 +110,7 @@ class Context(object):
             runnable session object.
         """
         if self._session is not None:
-            raise exceptions.Error("Already running.")
+            raise exceptions.Error('Already running.')
         # The API runner currently has an implicit context.
         try:
             # \todo Pass the API context implementation object to launch
@@ -150,7 +150,7 @@ class SerialArrayContext(object):
     """
     def __init__(self, work):
         if not isinstance(work, list):
-            raise ValueError("work specification should be a Python list.")
+            raise ValueError('work specification should be a Python list.')
         self.__context_array = list([DefaultContext(work_element) for work_element in work])
         self._session = None
 
@@ -199,7 +199,7 @@ class ParallelArrayContext(object):
         ...    rank = context.rank
         ...    output_path = os.path.join(context.workdir_list[rank], 'traj.trr')
         ...    assert(os.path.exists(output_path))
-        ...    print("Worker {} produced {}".format(rank, output_path))
+        ...    print('Worker {} produced {}'.format(rank, output_path))
         ...
 
     One proposal would be that using a Context as a Python context manager would be optional. Context.launch() produces
@@ -277,10 +277,10 @@ class ParallelArrayContext(object):
 
         if isinstance(work, WorkSpec):
             workspec = work
-        elif hasattr(work, "workspec") and isinstance(work.workspec, WorkSpec):
+        elif hasattr(work, 'workspec') and isinstance(work.workspec, WorkSpec):
             workspec = work.workspec
         else:
-            raise ValueError("work argument must provide a gmx.workflow.WorkSpec.")
+            raise ValueError('work argument must provide a gmx.workflow.WorkSpec.')
 
         # Make sure this context knows how to run the specified work.
         for e in workspec.elements:
@@ -291,7 +291,7 @@ class ParallelArrayContext(object):
                 try:
                     element_module = importlib.import_module(element.namespace)
                 except ImportError as e:
-                    raise exceptions.UsageError("This context does not know how to invoke {} from {}. ImportError: {}".format(element.operation, element.namespace, e.message))
+                    raise exceptions.UsageError('This context does not know how to invoke {} from {}. ImportError: {}'.format(element.operation, element.namespace, e.message))
 
                 # Don't leave an empty nested dictionary if we couldn't map the operation.
                 if element.namespace in self.__operations:
@@ -304,7 +304,7 @@ class ParallelArrayContext(object):
                         element_operation = getattr(element_module, element.operation)
                         namespace_map[element.operation] = element_operation
                     except:
-                        raise exceptions.ApiError("Operation {} not found in {}.".format(element.operation, element.namespace))
+                        raise exceptions.ApiError('Operation {} not found in {}.'.format(element.operation, element.namespace))
                     # Set or update namespace map only if we have something to contribute.
                     self.__operations[element.namespace] = namespace_map
             else:
@@ -317,7 +317,7 @@ class ParallelArrayContext(object):
                     # If we are just going to use a try/catch block for this test, then we should differentiate
                     # this exception from those raised due to incorrect usage.
                     # \todo Consider distinguishing API misuse from API failures.
-                    raise exceptions.ApiError("Specified work cannot be performed due to unimplemented operation {}.{}.".format(element.namespace, element.operation))
+                    raise exceptions.ApiError('Specified work cannot be performed due to unimplemented operation {}.{}.'.format(element.namespace, element.operation))
 
         self.__work = workspec
 
@@ -327,12 +327,12 @@ class ParallelArrayContext(object):
 
         # Note that the actual semantics are to just grab a filename for future reference in a fairly rigid way.
 
-        if not hasattr(self, "_tpr_inputs") or self._tpr_inputs is None:
+        if not hasattr(self, '_tpr_inputs') or self._tpr_inputs is None:
             self._tpr_inputs = params
         else:
-            logger.error("Existing tpr_input: {}".format(self._tpr_inputs))
-            logger.error("Unexpected additional input: {}".format(params))
-            raise exceptions.ApiError("Context cannot process multiple load_tpr elements.")
+            logger.error('Existing tpr_input: {}'.format(self._tpr_inputs))
+            logger.error('Unexpected additional input: {}'.format(params))
+            raise exceptions.ApiError('Context cannot process multiple load_tpr elements.')
         self.size = max(self.size, len(self._tpr_inputs))
         assert not self._tpr_inputs is None
         assert self.size > 0
@@ -362,7 +362,7 @@ class ParallelArrayContext(object):
         import importlib
 
         if self._session is not None:
-            raise exceptions.Error("Already running.")
+            raise exceptions.Error('Already running.')
 
         # \todo Logically, this is where resources should be detected / initialized / claimed.
         # At the very least, this would be a good place to identify the current local rank.
@@ -392,14 +392,14 @@ class ParallelArrayContext(object):
                         self.elements[element.name].set_params(*args)
             except LookupError as e:
                 request = '.'.join([element.namespace, element.operation])
-                message = "Could not find an implementation for the specified operation: {}. ".format(request)
+                message = 'Could not find an implementation for the specified operation: {}. '.format(request)
                 message += e.message
                 raise exceptions.ApiError(message)
 
         if self._tpr_inputs is None:
             print(str(self.work))
             print(self.elements)
-            raise exceptions.ApiError("WorkSpec was expected to have a load_tpr operation.")
+            raise exceptions.ApiError('WorkSpec was expected to have a load_tpr operation.')
         # Element parameters are the list of inputs that define the work array.
         assert self.size == len(self._tpr_inputs)
 
@@ -412,7 +412,7 @@ class ParallelArrayContext(object):
         for dir in self.__workdir_list:
             if os.path.exists(dir):
                 if not os.path.isdir(dir):
-                    raise exceptions.FileError("{} is not a valid working directory.".format(dir))
+                    raise exceptions.FileError('{} is not a valid working directory.'.format(dir))
             else:
                 os.mkdir(dir)
 
@@ -420,9 +420,9 @@ class ParallelArrayContext(object):
         communicator = MPI.COMM_WORLD
         comm_size = communicator.Get_size()
         if (self.size > comm_size):
-            raise exceptions.UsageError("ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.".format(self.size, comm_size))
+            raise exceptions.UsageError('ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.'.format(self.size, comm_size))
         if (self.size < comm_size):
-            warnings.warn("MPI context is wider than necessary to run this work: array width {} vs. size {}.".format(self.size, comm_size))
+            warnings.warn('MPI context is wider than necessary to run this work: array width {} vs. size {}.'.format(self.size, comm_size))
         self.rank = communicator.Get_rank()
 
         assert not self.rank is None
@@ -441,12 +441,12 @@ class ParallelArrayContext(object):
             self.rank = communicator.Get_rank()
             self.workdir = self.__workdir_list[self.rank]
             os.chdir(self.workdir)
-            logger.info("rank {} changed directory to {}".format(self.rank, self.workdir))
+            logger.info('rank {} changed directory to {}'.format(self.rank, self.workdir))
 
             infile = self._tpr_inputs[self.rank]
-            logger.info("TPR input parameter: {}".format(infile))
+            logger.info('TPR input parameter: {}'.format(infile))
             infile = os.path.abspath(infile)
-            logger.info("Loading TPR file: {}".format(infile))
+            logger.info('Loading TPR file: {}'.format(infile))
             assert os.path.isfile(infile)
             system = gmx.core.from_tpr(infile)
 
@@ -533,9 +533,9 @@ def get_context(work=None):
         # Assume simple simulation for now.
 
         # Get MD simulation elements.
-        sims = [element for element in work if element.operation == "md"]
+        sims = [element for element in work if element.operation == 'md']
         if len(sims) != 1:
-            raise exceptions.UsageError("gmx currently requires exactly one MD element in the work specification.")
+            raise exceptions.UsageError('gmx currently requires exactly one MD element in the work specification.')
         sim = sims[0]
 
         # Confirm the availability of dependencies.
@@ -548,20 +548,20 @@ def get_context(work=None):
         tpr_input = None
         for dependency in sim.depends:
             element = workflow.WorkElement.deserialize(work.elements[dependency])
-            if element.operation == "load_tpr":
+            if element.operation == 'load_tpr':
                 if tpr_input is None:
                     tpr_input = list(element.params)
                 else:
-                    raise exceptions.ApiError("This Context can only handle work specifications with a single load_tpr operation.")
+                    raise exceptions.ApiError('This Context can only handle work specifications with a single load_tpr operation.')
         if tpr_input is None:
-            raise exceptions.UsageError("Work specification does not provide any input for MD simulation.")
+            raise exceptions.UsageError('Work specification does not provide any input for MD simulation.')
         if len(tpr_input) != 1:
-            raise exceptions.UsageError("This Context does not support arrays of simulations.")
+            raise exceptions.UsageError('This Context does not support arrays of simulations.')
 
 
         # Use old-style constructor that takes gmx.core.MDSystem
         newsystem = gmx.core.from_tpr(tpr_input[0])
         context = Context(newsystem)
     else:
-        raise exceptions.UsageError("Argument to get_context must be a runnable gmx.workflow.WorkSpec object.")
+        raise exceptions.UsageError('Argument to get_context must be a runnable gmx.workflow.WorkSpec object.')
     return context
