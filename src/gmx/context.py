@@ -11,6 +11,8 @@ __all__ = ['Context', 'DefaultContext']
 
 import os
 import warnings
+import networkx as nx
+from networkx import DiGraph as _Graph
 
 from gmx import exceptions
 from gmx import logging
@@ -169,7 +171,7 @@ class ParallelArrayContext(object):
         work :obj:`gmx.workflow.WorkSpec`: specification of work to be performed when a session is launched.
         rank : numerical index of the current worker in a running session (None if not running)
         size : Minimum width needed for the parallelism required by the array of work being executed.
-        elements : dictionary of references to running elements of the workflow.
+        elements : dictionary of references to elements of the workflow.
 
     `rank`, `size`, and `elements` are empty or None until the work is processed, as during session launch.
 
@@ -202,18 +204,31 @@ class ParallelArrayContext(object):
         ...    print('Worker {} produced {}'.format(rank, output_path))
         ...
 
-    One proposal would be that using a Context as a Python context manager would be optional. Context.launch() produces
-    an object with __enter__() and __exit__() to get a session handle, but if these are not called, as by ``with``, then
-    the object produced by launch() attempts to resolve the work it is responsible for during __del__(). This seems
-    problematic and un-Pythonic, though. I think we just need to go with the original plan of having some slight
-    specializations of session classes produced by different contexts and a little extra wrapping to abstract the
-    context management related stuff from the lower level stuff.
+    Implementation notes:
 
-    \todo ParallelArrayContext should not operate on an array of work objects, but on a work object representing a job array.
-    Ultimately, a job array is just a workflow graph that contains multiple pipelines. We don't need to make special
-    provisions for the case where the pipelines have no interdependencies, because that is just a trivial version of the
-    more general case in which the array of simulations are coupled in some way.
+    To produce a running session, the Context __enter__() method is called, according to the Python context manager
+    protocol. At this time, the attached WorkSpec must be feasible on the available resources. To turn the specified
+    work into an executable directed acyclic graph (DAG), handle objects for the elements in the work spec are sequenced
+    in dependancy-compatible order and the context creates a "builder" for each according to the element's operation.
+    Each builder is subscribed to the builders of its dependency elements. The DAG is then assembled by calling each
+    builder in sequence. A builder can add zero, one, or more nodes and edges to the DAG.
 
+    The Session is then launched from the DAG. What happens next is implementation-dependent, and it may take a while for
+    us to decide whether and how to standardize interfaces for the DAG nodes and edges and/or execution protocols. I
+    expect each node will at least have a `launch()` method, but will also probably have typed input and output ports as well as some signalling.
+    A sophisticated and abstract Session implementation could schedule work only to satisfy data dependencies of requested
+    output upon request. Our immediate implementation will use the following protocol.
+
+    Each node has a `launch()` method. When the session is entered, the `launch()` method is called for each node in
+    dependancy order. The launch method returns either a callable (`run()` function) or None, raising an exception in
+    case of an error. The sequence of non-None callables is stored by the Session. When Session.run() is called, the
+    sequence of callables is called in order. If StopIteration is raised by the callable, it is removed from the sequence.
+    The sequence is processed repeatedly until there are no more callables.
+
+    Note that this does not rigorously handle races or deadlocks, or flexibility in automatically chasing dependencies. A more
+    thorough implementation could recursively call launch on dependencies (launch could be idempotent or involve some
+    signalling to dependents when complete), run calls could be entirely event driven, and/or nodes could "publish"
+    output (including just a completion message), blocking for acknowledgement before looking for the next set of subscribed inputs.
     """
 
     def __init__(self, work, workdir_list=None):
@@ -222,7 +237,7 @@ class ParallelArrayContext(object):
         Appropriate computing resources need to be knowable when the Context is created.
         """
         # self.__context_array = list([Context(work_element) for work_element in work])
-        self.__work = None
+        self.__work = workflow.WorkSpec()
         self.__workdir_list = workdir_list
 
         self._session = None
@@ -238,14 +253,20 @@ class ParallelArrayContext(object):
         # Note that there may be a difference between built-in operations provided by this module and
         # additional operations registered at run time.
         self.__operations = {}
+        # The map contains a builder for each operation. The builder is created by passing the element to the function
+        # in the map. The object returned must have the following methods:
+        #
+        #   * add_subscriber(another_builder) : allow other builders to subscribe to this one.
+        #   * build(dag) : Fulfill the builder responsibilities by adding an arbitrary number of nodes and edges to a Graph.
+        #
         # The gmxapi namespace of operations should be consistent with a specified universal set of functionalities
-        self.__operations['gmxapi'] = {'md': lambda : self.__md(),
+        self.__operations['gmxapi'] = {'md': lambda element : self.__md(element),
                                        # 'open_global_data_with_barrier'...
                                       }
         # Even if TPR file loading were to become a common and stable enough operation to be specified in
         # and API, it is unlikely to be implemented by any code outside of GROMACS, so let's not clutter
         # a potentially more universal namespace.
-        self.__operations['gromacs'] = {'load_tpr': lambda *params : self.__load_tpr(*params),
+        self.__operations['gromacs'] = {'load_tpr': lambda element : self.__load_tpr(element),
                                        }
 
         # Right now we are treating workspec elements and work DAG nodes as equivalent, but they are
@@ -321,29 +342,91 @@ class ParallelArrayContext(object):
 
         self.__work = workspec
 
-    def __load_tpr(self, *params):
+    def __load_tpr(self, element):
         """Implement the gromacs.load_tpr operation.
+
+        Updates the minimum width of the workflow parallelism. Stores a null API object.
         """
+        class Builder(object):
+            def __init__(self, tpr_list):
+                self.tpr_list = tpr_list
+            def add_subscriber(self, builder):
+                builder.infile = self.tpr_list
+            def build(self, dag):
+                width = len(self.tpr_list)
+                if 'width' in dag.graph:
+                    width = max(width, dag.graph['width'])
+                dag.graph['width'] = width
 
-        # Note that the actual semantics are to just grab a filename for future reference in a fairly rigid way.
-
-        if not hasattr(self, '_tpr_inputs') or self._tpr_inputs is None:
-            self._tpr_inputs = params
-        else:
-            logger.error('Existing tpr_input: {}'.format(self._tpr_inputs))
-            logger.error('Unexpected additional input: {}'.format(params))
-            raise exceptions.ApiError('Context cannot process multiple load_tpr elements.')
-        self.size = max(self.size, len(self._tpr_inputs))
-        assert not self._tpr_inputs is None
-        assert self.size > 0
+        return Builder(element.params)
 
     def __md(self, element):
-        pass
+        """Implement the gmxapi.md operation by returning a builder that can populate a data flow graph for the element.
+
+        Inspects dependencies to set up the simulation runner.
+
+        The graph node created will have `launch` and `run` attributes with function references, and a `width`
+        attribute declaring the workflow parallelism requirement.
+        """
+
+        class Builder(object):
+            """Translate md work element to a node in the session's DAG."""
+            def __init__(self, element):
+                assert isinstance(element, workflow.WorkElement)
+                self.name = element.name
+                # Note that currently the calling code is in charge of subscribing this builder to its dependencies.
+                # A list of tpr files will be set when the calling code subscribes this builder to a tpr provider.
+                self.infile = None
+                # Other dependencies in the element may register potentials when subscribed to.
+                self.potential = []
+                self.input_nodes = []
+            def add_subscriber(self, builder):
+                """The md operation does not yet have any subscribeable facilities."""
+                pass
+            def build(self, dag):
+                """Add a node to the graph that, when launched, will construct a simulation runner.
+
+                Complete the definition of appropriate graph edges for dependencies.
+
+                The launch() method of the added node creates the runner from the tpr file for the current rank and adds
+                modules from the incoming edges.
+                """
+                assert isinstance(dag, _Graph)
+                name = self.name
+                dag.add_node(name)
+                for neighbor in self.input_nodes:
+                    dag.add_edge(neighbor, name)
+                infile = self.infile
+                assert not infile is None
+                potential_list = self.potential
+                assert dag.graph['width'] >= len(infile)
+
+                # Provide closure with which to execute tasks for this node.
+                def launch(rank=None):
+                    assert not rank is None
+                    tpr_file = infile[rank]
+                    logger.info('Loading TPR file: {}'.format(infile))
+                    system = gmx.core.from_tpr(tpr_file)
+                    dag.nodes[name]['system'] = system
+                    for potential in potential_list:
+                        system.add_potential(potential)
+                    dag.nodes[name]['session'] = system.launch()
+                    dag.nodes[name]['close'] = dag.nodes[name]['session'].close
+                    def runner():
+                        """Currently we only support a single call to run."""
+                        def done():
+                            raise StopIteration()
+                        dag.nodes[name]['run'] = done
+                        return dag.nodes[name]['session'].run()
+                    dag.nodes[name]['run'] = runner
+                    return dag.nodes[name]['run']
+
+                dag.nodes[name]['launch'] = launch
+
+        return Builder(element)
 
     def __enter__(self):
-        """Implement Python context manager protocol.
-
-        Launch the necessary tasks to perform the specified work.
+        """Implement Python context manager protocol, producing a Session for the specified work in this Context.
 
         Returns:
             Session object the can be run and/or inspected.
@@ -364,44 +447,40 @@ class ParallelArrayContext(object):
         if self._session is not None:
             raise exceptions.Error('Already running.')
 
-        # \todo Logically, this is where resources should be detected / initialized / claimed.
-        # At the very least, this would be a good place to identify the current local rank.
+        # Set up the global and local context.
+        # Check the global MPI configuration
+        communicator = MPI.COMM_WORLD
+        comm_size = communicator.Get_size()
+        self.rank = communicator.Get_rank()
 
-        # Initialize the work array width.
-        self.size = 0
-        # Initialize the running elements of the workflow.
-        self.elements = {}
+        assert not self.rank is None
 
+        ###
         # Process the work specification.
-        self._tpr_inputs = None
-        for element in workflow.get_source_elements(self.__work):
-            # dispatch operation implementation
+        ###
+
+        # Get a builder for DAG components for each element
+        builders = {}
+        builder_sequence = []
+        for element in self.work:
+            # dispatch builders for operation implementations
             try:
-                operation = self.__operations[element.namespace][element.operation]
-                args = element.params
-                try:
-                    self.elements[element.name] = operation(*args)
-                except Exception as e:
-                    print(e.message)
-                    try:
-                        self.elements[element.name] = operation()
-                    except Exception as e:
-                        print(element.name, element, operation)
-                        raise e
-                    if not args is None and len(args) > 0:
-                        self.elements[element.name].set_params(*args)
+                new_builder = self.__operations[element.namespace][element.operation](element)
+                for name in element.depends:
+                    builders[name].add_subscriber(new_builder)
+                builders[element.name] = new_builder
+                builder_sequence.append(element.name)
             except LookupError as e:
                 request = '.'.join([element.namespace, element.operation])
                 message = 'Could not find an implementation for the specified operation: {}. '.format(request)
                 message += e.message
                 raise exceptions.ApiError(message)
 
-        if self._tpr_inputs is None:
-            print(str(self.work))
-            print(self.elements)
-            raise exceptions.ApiError('WorkSpec was expected to have a load_tpr operation.')
-        # Element parameters are the list of inputs that define the work array.
-        assert self.size == len(self._tpr_inputs)
+        # Call the builders in dependency order
+        graph = _Graph()
+        for name in builder_sequence:
+            builders[name].build(graph)
+        self.size = graph.graph['width']
 
         # Prepare working directories. This should probably be moved to some aspect of the Session and either
         # removed from here or made more explicit to the user.
@@ -416,16 +495,12 @@ class ParallelArrayContext(object):
             else:
                 os.mkdir(dir)
 
-        # Check the global MPI configuration
-        communicator = MPI.COMM_WORLD
-        comm_size = communicator.Get_size()
+        # Check the session "width" against the available parallelism
         if (self.size > comm_size):
             raise exceptions.UsageError('ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.'.format(self.size, comm_size))
         if (self.size < comm_size):
             warnings.warn('MPI context is wider than necessary to run this work: array width {} vs. size {}.'.format(self.size, comm_size))
-        self.rank = communicator.Get_rank()
 
-        assert not self.rank is None
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
         # MDSystem objects are obtained from gmx.core.from_tpr(). They also provide add_potential().
@@ -438,38 +513,61 @@ class ParallelArrayContext(object):
         # as `system = gmx.core.from_tpr(md._input_tpr); system.add_potential(md._plugins)
         if self.rank in range(self.size):
             # Launch the work for this rank
-            self.rank = communicator.Get_rank()
             self.workdir = self.__workdir_list[self.rank]
             os.chdir(self.workdir)
             logger.info('rank {} changed directory to {}'.format(self.rank, self.workdir))
+            sorted_nodes = nx.topological_sort(graph)
+            runners = []
+            closers = []
+            for name in sorted_nodes:
+                launcher = graph.nodes[name]['launch']
+                runner = launcher(self.rank)
+                if not runner is None:
+                    runners.append(runner)
+                    closers.append(graph.nodes[name]['close'])
+            # Get a session object to return. It must simply provide a `run()` function.
+            class Session(object):
+                def __init__(self, runners, closers):
+                    self.runners = list(runners)
+                    self.closers = list(closers)
 
-            infile = self._tpr_inputs[self.rank]
-            logger.info('TPR input parameter: {}'.format(infile))
-            infile = os.path.abspath(infile)
-            logger.info('Loading TPR file: {}'.format(infile))
-            assert os.path.isfile(infile)
-            system = gmx.core.from_tpr(infile)
+                def run(self):
+                    # Note we are not following the documented protocol of running repeatedly yet.
+                    to_be_deleted = []
+                    for i, runner in enumerate(self.runners):
+                        try:
+                            runner()
+                        except StopIteration:
+                            to_be_deleted.insert(0, i)
+                    for i in to_be_deleted:
+                        del self.runners[i]
 
-            # Agh! This is horrible!
-            for element_name in self.__work.elements:
-                element = workflow.WorkElement.deserialize(self.__work.elements[element_name], name=element_name, workspec=self.__work)
-                if element.operation == 'md':
-                    dependancies = element.depends
-            for element_name in dependancies:
-                element = workflow.WorkElement.deserialize(self.__work.elements[element_name], name=element_name, workspec=self.__work)
-                if element.operation != 'load_tpr':
+                def close(self):
+                    for close in self.closers:
+                        close()
 
-                    element_module = importlib.import_module(element.namespace)
-                    element_operation = getattr(element_module, element.operation)
-                    args = element.params
-                    try:
-                        potential = element_operation(*args)
-                    except:
-                        potential = element_operation()
-                        potential.set_params(*args)
-                    system.add_potential(potential)
+            #
+            # # Agh! This is horrible!
+            # for element_name in self.__work.elements:
+            #     element = workflow.WorkElement.deserialize(self.__work.elements[element_name], name=element_name, workspec=self.__work)
+            #     if element.operation == 'md':
+            #         dependancies = element.depends
+            # for element_name in dependancies:
+            #     element = workflow.WorkElement.deserialize(self.__work.elements[element_name], name=element_name, workspec=self.__work)
+            #     if element.operation != 'load_tpr':
+            #
+            #         element_module = importlib.import_module(element.namespace)
+            #         element_operation = getattr(element_module, element.operation)
+            #         args = element.params
+            #         try:
+            #             potential = element_operation(*args)
+            #         except:
+            #             potential = element_operation()
+            #             potential.set_params(*args)
+            #         system.add_potential(potential)
 
-            self._session = system.launch()
+            #self._session = system.launch()
+            self._session = Session(runners, closers)
         else:
             # \todo We don't really want a None session so much as a session with no work.
             # self._session = None

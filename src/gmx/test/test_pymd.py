@@ -88,6 +88,7 @@ def test_array_context():
     with context as session:
         session.run()
 
+@pytest.mark.skip("not implemented")
 @pytest.mark.usefixtures("cleandir")
 @pytest.mark.usefixtures("caplog")
 @withmpi_only

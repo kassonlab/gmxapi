@@ -109,8 +109,7 @@ Array sim with plugin using global resources
     >>> global_context = gmx.get_context(md.workflow)
     >>> # Global resources like SharedDataFile are now available.
     >>> my_id = global_context.local_id
-    >>> my_work = global_context.work_array[my_id]
-    >>> with gmx.context.Context(my_work) as session:
+    >>> with global_context as session:
     ...    # plugin and simulation are now initialized.
     ...    session.run()
 
@@ -125,6 +124,18 @@ original object handle, too. If data only needs to be pulled by the handle, then
 When it is added as a dependancy to the md operation, it gains a reference to the workspec. When the
 work is launched, that workspec gains a reference to the Context. We need some sort of signal that can
 propagate back to the handles to the work elements.
+
+TBD:
+
+1.  We may decide that there is always a single active Context that can be picked up from a singleton, such that a
+    workspec can always have at least a generic Context. This would imply that a workspec could exist in a Context that
+    couldn't run it, which might be antithetical.
+2.  We may decide that WorkElements are always in some sort of workspec, and that there may be a lot of merging of
+    work specs. This would resolve the ambiguity that a WorkElement may or may not be associated with a work spec, but
+    it cannot happen right now for several reasons.
+    * there is not a clear way to move elements with dependants from one work spec to another without some ugly transient states.
+    * When an element is serialized and deserialized, there is not a good way of finding the original workspec object ref.
+    * We make a lot of use of temporary WorkElement objects for which we don't care about the workspec.
 
 """
 
@@ -176,7 +187,6 @@ class WorkSpec(object):
     The work specification schema needs to be able to represent something like the following.
 
         version: "gmxapi_workspec_1_0"
-        attributes: [requires_synchronous]
         elements:
             myinput:
                 namespace: "gromacs"
