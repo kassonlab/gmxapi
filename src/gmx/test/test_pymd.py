@@ -31,6 +31,31 @@ try:
 except ImportError:
     withmpi_only = pytest.mark.skip(reason="Test requires at least 2 MPI ranks, but mpi4py is not available.")
 
+# Set up an API-conformant plugin.
+# Usually, the Context must be able to import a module and call a function that accepts the gmx.workflow.WorkElement to return a builder.
+# In this case, we will add a function to the operations map before adding the work to the Context.
+# The builder must provide an `add_subscriber(other_builder)` method and a `build(dag)` method.
+# When another builder calls `add_subscriber()`, this builder should add a potential to the calling builder.
+# The `build(dag)` method optionally updates the dag with node(s) / edge(s).
+def my_plugin(element):
+    """Using this test module as a work element module, provide a gmx.core.TestModule for execution."""
+    class Builder(object):
+        def __init__(self, element):
+            self.name = element.name
+            self.subscribers = []
+        def add_subscriber(self, builder):
+            self.subscribers.append(builder)
+        def build(self, dag):
+            # Create and pass the object now and don't bother creating a DAG node.
+            potential = gmx.core.TestModule()
+            for md in self.subscribers:
+                md.potential.append(potential)
+            launcher = None
+            return launcher
+
+    builder = Builder(element)
+    return builder
+
 @pytest.mark.skip(reason="updating Context handling...")
 @pytest.mark.usefixtures("cleandir")
 class BindingsTestCase(unittest.TestCase):
@@ -88,7 +113,6 @@ def test_array_context():
     with context as session:
         session.run()
 
-@pytest.mark.skip("not implemented")
 @pytest.mark.usefixtures("cleandir")
 @pytest.mark.usefixtures("caplog")
 @withmpi_only
@@ -98,7 +122,7 @@ def test_plugin(caplog):
 
     # Create a WorkElement for the potential
     #potential = gmx.core.TestModule()
-    potential_element = gmx.workflow.WorkElement(namespace="gmx.core", operation="TestModule")
+    potential_element = gmx.workflow.WorkElement(namespace="testing", operation="create_test")
     potential_element.name = "test_module"
     before = md.workspec.elements[md.name]
     md.add_dependancy(potential_element)
@@ -107,7 +131,10 @@ def test_plugin(caplog):
     after = md.workspec.elements[md.name]
     assert not before is after
 
-    context = gmx.context.ParallelArrayContext(md)
+    context = gmx.context.ParallelArrayContext()
+    context.add_operation(potential_element.namespace, potential_element.operation, my_plugin)
+    context.work = md
+
     # \todo swallow warning about wide MPI context
     # \todo use pytest context managers to turn raised exceptions into assertions.
     with context as session:

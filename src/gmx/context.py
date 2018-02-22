@@ -231,7 +231,7 @@ class ParallelArrayContext(object):
     output (including just a completion message), blocking for acknowledgement before looking for the next set of subscribed inputs.
     """
 
-    def __init__(self, work, workdir_list=None):
+    def __init__(self, work=None, workdir_list=None):
         """Initialize compute resources.
 
         Appropriate computing resources need to be knowable when the Context is created.
@@ -294,6 +294,10 @@ class ParallelArrayContext(object):
 
     @work.setter
     def work(self, work):
+        if work is None:
+            warnings.warn("A Context without a valid WorkSpec is iffy...")
+            return
+
         import importlib
 
         if isinstance(work, WorkSpec):
@@ -307,7 +311,8 @@ class ParallelArrayContext(object):
         for e in workspec.elements:
             element = gmx.workflow.WorkElement.deserialize(workspec.elements[e])
 
-            if element.namespace not in {'gmxapi', 'gromacs'}:
+
+            if element.namespace not in {'gmxapi', 'gromacs'} and element.namespace not in self.__operations:
                 # Non-built-in namespaces are treated as modules to import.
                 try:
                     element_module = importlib.import_module(element.namespace)
@@ -329,6 +334,7 @@ class ParallelArrayContext(object):
                     # Set or update namespace map only if we have something to contribute.
                     self.__operations[element.namespace] = namespace_map
             else:
+                # The requested element is a built-in operation or otherwise already configured.
                 # element.namespace should be mapped, but not all operations are necessarily implemented.
                 assert element.namespace in self.__operations
                 if not element.operation in self.__operations[element.namespace]:
@@ -341,6 +347,20 @@ class ParallelArrayContext(object):
                     raise exceptions.ApiError('Specified work cannot be performed due to unimplemented operation {}.{}.'.format(element.namespace, element.operation))
 
         self.__work = workspec
+
+    def add_operation(self, namespace, operation, get_builder):
+        if namespace not in self.__operations:
+            if namespace in {'gmxapi', 'gromacs'}:
+                raise exceptions.UsageError("Cannot add operations to built-in namespaces.")
+            else:
+                self.__operations[namespace] = dict()
+        else:
+            assert namespace in self.__operations
+
+        if operation in self.__operations[namespace]:
+            raise exceptions.UsageError("Operation {}.{} already defined in this context.".format(namespace, operation))
+        else:
+            self.__operations[namespace][operation] = get_builder
 
     def __load_tpr(self, element):
         """Implement the gromacs.load_tpr operation.
@@ -442,10 +462,11 @@ class ParallelArrayContext(object):
         """
 
         from mpi4py import MPI
-        import importlib
 
         if self._session is not None:
             raise exceptions.Error('Already running.')
+        if self.work is None:
+            raise exceptions.UsageError('No work to perform!')
 
         # Set up the global and local context.
         # Check the global MPI configuration
