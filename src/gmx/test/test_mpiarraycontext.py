@@ -133,8 +133,6 @@ class TestConsumerBuilder(object):
             return None
 
         dag.nodes[nodename]['launch'] = launch_test_consumer
-        return dag.nodes[nodename]['launch']
-
 
 @withmpi_only
 @pytest.mark.usefixtures("cleandir")

@@ -215,7 +215,7 @@ def shared_data_maker(element):
             self.node['data'] = None
             self.node['comm'] = self.comm
             self.subscriber.input_nodes.append(nodename)
-            return self.__launch
+            self.node['launch'] = self.__launch
 
         def __launch(self, rank=None):
             """Create the shared data resource for subscribed builders.

@@ -50,8 +50,8 @@ def my_plugin(element):
             potential = gmx.core.TestModule()
             for md in self.subscribers:
                 md.potential.append(potential)
-            launcher = None
-            return launcher
+            # We are not adding nodes to the graph and are not contributing any launchers
+            # launcher = None
 
     builder = Builder(element)
     return builder
