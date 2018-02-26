@@ -156,6 +156,87 @@ class SerialArrayContext(object):
         self.__context_array = list([DefaultContext(work_element) for work_element in work])
         self._session = None
 
+def shared_data_maker(element):
+    """Make a shared data element for use by dependant nodes.
+
+    This version uses mpi4py to share data and supports a single downstream node.
+
+    The element provides a serialized argument list for numpy.empty() as two elements, args, and kwargs. Each subscriber receives such
+    an array at launch along with a python function handle to call-back to at some interval (passed to
+    the plugin C++ code).
+
+    By the time the subscriber finishes building, it should provide
+    """
+    import json
+
+    class Builder(object):
+        def __init__(self, element):
+            logger.debug("Processing element {}".format(element.serialize()))
+            context = element.workspec._context
+            self.rank = context.rank
+            self.subscribinging_ranks = []
+            self.subscriber = None
+            self.comm = context._communicator
+            self.name = element.name
+            params = element.params
+            # First draft: params contains two elements: a serialized args and a serialized kwargs
+            logger.debug("Processing parameters {}".format(params))
+            assert len(params) == 2
+            self.args = json.loads(params[0])
+            assert isinstance(self.args, list)
+            self.kwargs = json.loads(params[1])
+            assert isinstance(self.kwargs, dict)
+            # The builder can hold an updater to be provided to the subscriber at launch. The updater is
+            # a function reference that the user provides to perform a desired periodic action. Not sure
+            # how this will work in the future. Allowing arbitrary Python code to be provided during job
+            # configuration would be the hardest thing. The updater could be another user-provided operation.
+            # Hopefully we can provided some canned behaviors that can be selected with element parameters.
+            # Maybe both.
+            self.updater = None
+
+        def add_subscriber(self, builder):
+            # At this point, we could find out how this data will be used (e.g. subscribing ranks)
+            if self.subscriber is None:
+                self.subscriber = builder
+            else:
+                raise exceptions.ApiError("This element does not support multiple consumers")
+
+        def build(self, dag):
+            # Either the builder needs to get the key for the subscribed node(s) so that we can
+            # create the edge now, or this builder needs to provide subscribers with the key of this
+            # DAG node so that the subscriber can create the edge. I think I prefer the latter, so that
+            # edge creation is tied to the binding process of a new node with its upstream nodes.
+            nodename = self.name
+            dag.add_node(nodename)
+            self.node = dag.nodes[nodename]
+
+            self.node['launch'] = self.__launch
+            # To avoid ambiguity, let's assert that only nodes that are active at launch will have data.
+            self.node['data'] = None
+            self.node['comm'] = self.comm
+            self.subscriber.input_nodes.append(nodename)
+            return self.__launch
+
+        def __launch(self, rank=None):
+            """Create the shared data resource for subscribed builders.
+
+            This is the place to provide subscribers with API references for interacting with
+            the shared data facility.
+            """
+            import numpy
+            data = numpy.empty(*self.args, **self.kwargs)
+            self.node['data'] = data
+            self.subscriber.shared_data_updater = self.updater
+            self.subscribinging_ranks = list(range(self.subscriber.width))
+
+            # Later, we can offload consumer responsibilities and the updater function to this runner,
+            # but we aren't there yet.
+            runner = None
+            return runner
+
+    builder = Builder(element)
+    return builder
+
 class ParallelArrayContext(object):
     """Manage an array of simulation work executing in parallel.
 
@@ -261,7 +342,7 @@ class ParallelArrayContext(object):
         #
         # The gmxapi namespace of operations should be consistent with a specified universal set of functionalities
         self.__operations['gmxapi'] = {'md': lambda element : self.__md(element),
-                                       # 'open_global_data_with_barrier'...
+                                       'global_data' : shared_data_maker,
                                       }
         # Even if TPR file loading were to become a common and stable enough operation to be specified in
         # and API, it is unlikely to be implemented by any code outside of GROMACS, so let's not clutter
@@ -286,7 +367,6 @@ class ParallelArrayContext(object):
 
         # This setter must be called after the operations map has been populated.
         self.work = work
-        self.work._context = self
 
     @property
     def work(self):
@@ -306,6 +386,7 @@ class ParallelArrayContext(object):
             workspec = work.workspec
         else:
             raise ValueError('work argument must provide a gmx.workflow.WorkSpec.')
+        workspec._context = self
 
         # Make sure this context knows how to run the specified work.
         for e in workspec.elements:
@@ -349,6 +430,31 @@ class ParallelArrayContext(object):
         self.__work = workspec
 
     def add_operation(self, namespace, operation, get_builder):
+        """Add a builder factory to the operation map.
+
+        Extends the known operations of the Context by mapping an operation in a namespace to a function
+        that returns a builder to process a work element referencing the operation. Must be called before
+        the work specification is added, since the spec is inspected to confirm that the Context can run it.
+
+        It may be more appropriate to add this functionality to the Context constructor or as auxiliary
+        information in the workspec, or to remove it entirely; it is straight-forward to just add snippets
+        of code to additional files in the working directory and to make them available as modules for the
+        Context to import.
+
+        Example:
+
+            >>> # Import some custom extension code.
+            >>> import myplugin
+            >>> myelement = myplugin.new_element()
+            >>> workspec = gmx.workflow.WorkSpec()
+            >>> workspec.add_element(myelement)
+            >>> context = gmx.context.ParallelArrayContext()
+            >>> context.add_operation(myelement.namespace, myelement.operation, myplugin.element_translator)
+            >>> context.work = workspec
+            >>> with get_context() as session:
+            ...    session.run()
+
+        """
         if namespace not in self.__operations:
             if namespace in {'gmxapi', 'gromacs'}:
                 raise exceptions.UsageError("Cannot add operations to built-in namespaces.")
@@ -369,11 +475,19 @@ class ParallelArrayContext(object):
         """
         class Builder(object):
             def __init__(self, tpr_list):
+                logger.debug("Loading tpr builder for tpr_list {}".format(tpr_list))
                 self.tpr_list = tpr_list
+                self.subscribers = []
+                self.width = len(tpr_list)
+
             def add_subscriber(self, builder):
                 builder.infile = self.tpr_list
+                self.subscribers.append(builder)
+
             def build(self, dag):
                 width = len(self.tpr_list)
+                for builder in self.subscribers:
+                    builder.width = width
                 if 'width' in dag.graph:
                     width = max(width, dag.graph['width'])
                 dag.graph['width'] = width
@@ -473,12 +587,14 @@ class ParallelArrayContext(object):
         communicator = MPI.COMM_WORLD
         comm_size = communicator.Get_size()
         self.rank = communicator.Get_rank()
+        self._communicator = communicator
 
         assert not self.rank is None
 
         ###
         # Process the work specification.
         ###
+        logging.debug("Processing workspec:\n{}".format(str(self.work)))
 
         # Get a builder for DAG components for each element
         builders = {}
@@ -487,10 +603,16 @@ class ParallelArrayContext(object):
             # dispatch builders for operation implementations
             try:
                 new_builder = self.__operations[element.namespace][element.operation](element)
+                # Subscribing builders is the Context's responsibility because otherwise the builders
+                # don't know about each other. Builders should not depend on the Context unless they
+                # are a facility provided by the Context, in which case they may be member functions
+                # of the Context. We will probably need to pass at least some
+                # of the Session to the `launch()` method, though...
                 for name in element.depends:
                     builders[name].add_subscriber(new_builder)
                 builders[element.name] = new_builder
                 builder_sequence.append(element.name)
+                logging.info("Collected builder for {}".format(element.name))
             except LookupError as e:
                 request = '.'.join([element.namespace, element.operation])
                 message = 'Could not find an implementation for the specified operation: {}. '.format(request)
@@ -498,7 +620,8 @@ class ParallelArrayContext(object):
                 raise exceptions.ApiError(message)
 
         # Call the builders in dependency order
-        graph = _Graph()
+        graph = _Graph(width=1)
+        logging.info("Building sequence {}".format(builder_sequence))
         for name in builder_sequence:
             builders[name].build(graph)
         self.size = graph.graph['width']
@@ -522,6 +645,8 @@ class ParallelArrayContext(object):
         if (self.size < comm_size):
             warnings.warn('MPI context is wider than necessary to run this work: array width {} vs. size {}.'.format(self.size, comm_size))
 
+        print(graph)
+        logger.debug(("Launching graph {}.".format(graph)))
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
         # MDSystem objects are obtained from gmx.core.from_tpr(). They also provide add_potential().
@@ -533,6 +658,7 @@ class ParallelArrayContext(object):
         # and then call a routine implemented by each object to run whatever protocol it needs, such
         # as `system = gmx.core.from_tpr(md._input_tpr); system.add_potential(md._plugins)
         if self.rank in range(self.size):
+            logging.info("Launching work on rank {}.".format(self.rank))
             # Launch the work for this rank
             self.workdir = self.__workdir_list[self.rank]
             os.chdir(self.workdir)
@@ -567,27 +693,6 @@ class ParallelArrayContext(object):
                     for close in self.closers:
                         close()
 
-            #
-            # # Agh! This is horrible!
-            # for element_name in self.__work.elements:
-            #     element = workflow.WorkElement.deserialize(self.__work.elements[element_name], name=element_name, workspec=self.__work)
-            #     if element.operation == 'md':
-            #         dependancies = element.depends
-            # for element_name in dependancies:
-            #     element = workflow.WorkElement.deserialize(self.__work.elements[element_name], name=element_name, workspec=self.__work)
-            #     if element.operation != 'load_tpr':
-            #
-            #         element_module = importlib.import_module(element.namespace)
-            #         element_operation = getattr(element_module, element.operation)
-            #         args = element.params
-            #         try:
-            #             potential = element_operation(*args)
-            #         except:
-            #             potential = element_operation()
-            #             potential.set_params(*args)
-            #         system.add_potential(potential)
-
-            #self._session = system.launch()
             self._session = Session(runners, closers)
         else:
             # \todo We don't really want a None session so much as a session with no work.
@@ -601,6 +706,7 @@ class ParallelArrayContext(object):
 
         # Make sure session has started on all ranks before continuing?
 
+        self._session.graph = graph
         return self._session
 
     def __exit__(self, exception_type, exception_value, traceback):

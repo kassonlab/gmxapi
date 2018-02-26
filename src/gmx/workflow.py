@@ -92,7 +92,8 @@ Array sim with plugin using global resources
 
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> workdata = gmx.workflow.SharedDataElement()
-    >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0, workdata=workdata)
+    >>> numsteps = int(1e-9 / 5e-15) # every nanosecond or so...
+    >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0, workdata=workdata, data_update_period=numsteps)
     >>> md.add_dependancy(potential)
     >>> gmx.run(md)
 
@@ -146,11 +147,17 @@ from __future__ import unicode_literals
 
 from . import exceptions
 import gmx
+from gmx import logging
 
 __all__ = ['WorkSpec', 'SharedDataElement', 'WorkElement']
 
+# Module-level logger
+logger = logging.getLogger(__name__)
+logger.info('Importing gmx.workflow')
+
 # Work specification version string.
 workspec_version = "gmxapi_workspec_1_0"
+logger.info("Using schema version {}.".format(workspec_version))
 
 # module-level constant indicating a workflow implementing parallel array work.
 ARRAY = 0
@@ -275,6 +282,7 @@ class WorkSpec(object):
             element.workspec = self
         else:
             raise exceptions.ValueError("Provided object does not appear to be compatible with gmx.workflow.WorkElement.")
+        logger.info("Added element {} to workspec.".format(element.name))
 
     # def remove_element(self, name):
     #     """Remove named element from work specification.
@@ -339,6 +347,9 @@ class WorkSpec(object):
         """Generate Pythonic representation for repr(workspec)."""
         return 'gmx.workflow.WorkSpec()'
 
+# A possible alternative name for WorkElement would be Operator, since there is a one-to-one
+# mapping between WorkElements and applications of "operation"s. We need to keep in mind the
+# sensible distinction between the WorkElement abstraction and the API objects and DAG nodes.
 class WorkElement(object):
     """Encapsulate an element of a work specification."""
     def __init__(self, namespace="gmxapi", operation=None, params=(), depends=()):
@@ -348,6 +359,8 @@ class WorkElement(object):
             self.operation = str(operation)
         else:
             raise exceptions.UsageError("Invalid argument type for operation.")
+
+        # \todo It is currently non-sensical to update any attributes after adding to a workspec, but nothing prevents it.
         self.params = list(params)
         self.depends = list(depends)
 
@@ -436,13 +449,19 @@ class SharedDataElement(WorkElement):
 
     The schema may not need to be changed, but the API object may be expected to provide additional functionality.
     """
-    def __init__(self):
+    def __init__(self, args, kwargs, name=None):
         """Create a blank SharedDataElement representation.
 
         It may be appropriate to insist on creating objects of this type via helpers or factories, particularly if
         creation requires additional parameters.
         """
-        super(SharedDataElement, self).__init__(namespace="gmxapi", operation="open_global_data_with_barrier")
+        import json
+        self.args = json.dumps(args)
+        self.kwargs = json.dumps(kwargs)
+        super(SharedDataElement, self).__init__(namespace="gmxapi",
+                                                operation="global_data",
+                                                params=[self.args, self.kwargs])
+        self.name = name
 
 def get_source_elements(workspec):
     """Get an iterator of the starting nodes in the work spec.
