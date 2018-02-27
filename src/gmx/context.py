@@ -43,7 +43,8 @@ class Context(object):
     """
     # \todo Put the following to-do someplace more appropriate
     # \todo There should be a default Context active from the first `import gmx` or at least before the first logger call.
-    # The Context is the appropriate entity to own or mediate access to an appropriate logging facility.
+    # The Context is the appropriate entity to own or mediate access to an appropriate logging facility,
+    # but right now we are using the module-level Python logger.
     def __init__(self, workflow=None):
         """Create new context bound to the provided workflow, if any.
 
@@ -164,9 +165,14 @@ def shared_data_maker(element):
     The element provides a serialized argument list for numpy.empty() as two elements, args, and kwargs. Each subscriber receives such
     an array at launch along with a python function handle to call-back to at some interval (passed to
     the plugin C++ code).
-
-    By the time the subscriber finishes building, it should provide
     """
+
+    # New idea: Instead of being dependent on a shared data node, let participants add a downstream node
+    # that performs the reduce operation. A context can determine unsuitability for this parallelism with
+    # lack of support for a reduce with a period less than the length of the specified trajectories.
+    # To support reduce operations for ensembles wider than the Context, the Context could provide an
+    # additional tier in the reduction for batches of co-scheduled tasks.
+
     import json
 
     class Builder(object):
@@ -594,7 +600,7 @@ class ParallelArrayContext(object):
         ###
         # Process the work specification.
         ###
-        logging.debug("Processing workspec:\n{}".format(str(self.work)))
+        logger.debug("Processing workspec:\n{}".format(str(self.work)))
 
         # Get a builder for DAG components for each element
         builders = {}
@@ -603,27 +609,34 @@ class ParallelArrayContext(object):
             # dispatch builders for operation implementations
             try:
                 new_builder = self.__operations[element.namespace][element.operation](element)
-                # Subscribing builders is the Context's responsibility because otherwise the builders
-                # don't know about each other. Builders should not depend on the Context unless they
-                # are a facility provided by the Context, in which case they may be member functions
-                # of the Context. We will probably need to pass at least some
-                # of the Session to the `launch()` method, though...
-                for name in element.depends:
-                    builders[name].add_subscriber(new_builder)
-                builders[element.name] = new_builder
-                builder_sequence.append(element.name)
-                logging.info("Collected builder for {}".format(element.name))
+                assert hasattr(new_builder, 'add_subscriber')
+                assert hasattr(new_builder, 'build')
+
+                logger.info("Collected builder for {}".format(element.name))
             except LookupError as e:
                 request = '.'.join([element.namespace, element.operation])
                 message = 'Could not find an implementation for the specified operation: {}. '.format(request)
                 message += e.message
                 raise exceptions.ApiError(message)
+            # Subscribing builders is the Context's responsibility because otherwise the builders
+            # don't know about each other. Builders should not depend on the Context unless they
+            # are a facility provided by the Context, in which case they may be member functions
+            # of the Context. We will probably need to pass at least some
+            # of the Session to the `launch()` method, though...
+            for name in element.depends:
+                logger.info("Subscribing {} to {}.".format(element.name, name))
+                builders[name].add_subscriber(new_builder)
+            builders[element.name] = new_builder
+            builder_sequence.append(element.name)
 
         # Call the builders in dependency order
         graph = _Graph(width=1)
-        logging.info("Building sequence {}".format(builder_sequence))
+        logger.info("Building sequence {}".format(builder_sequence))
         for name in builder_sequence:
-            builders[name].build(graph)
+            builder = builders[name]
+            logger.debug("Building {}".format(builder))
+            logger.debug("Has build attribute {}.".format(builder.build))
+            builder.build(graph)
         self.size = graph.graph['width']
 
         # Prepare working directories. This should probably be moved to some aspect of the Session and either
@@ -658,7 +671,7 @@ class ParallelArrayContext(object):
         # and then call a routine implemented by each object to run whatever protocol it needs, such
         # as `system = gmx.core.from_tpr(md._input_tpr); system.add_potential(md._plugins)
         if self.rank in range(self.size):
-            logging.info("Launching work on rank {}.".format(self.rank))
+            logger.info("Launching work on rank {}.".format(self.rank))
             # Launch the work for this rank
             self.workdir = self.__workdir_list[self.rank]
             os.chdir(self.workdir)
