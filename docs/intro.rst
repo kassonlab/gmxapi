@@ -23,23 +23,23 @@ to allow incremental forward progress, but components are unified in an architec
 to meet a variety of client needs.
 
 * Data manipulation
-  * file i/o parsing, editing and conversion
-  * editing of data structures (topology, structure, input, trajectory)
+    * file i/o parsing, editing and conversion
+    * editing of data structures (topology, structure, input, trajectory)
 * Data analysis
-  * third party interaction with Gromacs data without reinventing wheels
-  * use of existing Gromacs analysis tools
+    * third party interaction with Gromacs data without reinventing wheels
+    * use of existing Gromacs analysis tools
 * Driving simulation workflows
-  * scripting high-level tasks
-  * "bottling" research methods into tools
+    * scripting high-level tasks
+    * "bottling" research methods into tools
 * Optimizing nontrivial workflows, pipelines, and tool chains
-  * data graph execution
-  * optimization based on data locality
-  * optimization based on compute locality
-  * connect simulation and analysis in a pipeline
+    * data graph execution
+    * optimization based on data locality
+    * optimization based on compute locality
+    * connect simulation and analysis in a pipeline
 * Sustainable interfaces to external software
-  * plug-in interface
-  * Python as a common language for API implementations
-  * High-level C++ API on which to build Gromacs tools and external interfaces.
+    * plug-in interface
+    * Python as a common language for API implementations
+    * High-level C++ API on which to build Gromacs tools and external interfaces.
 
 Layers
 ======

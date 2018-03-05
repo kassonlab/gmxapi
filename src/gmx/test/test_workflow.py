@@ -9,7 +9,9 @@ import os
 # # Get a test tpr filename
 # from gmx.data import tpr_filename
 
-workspec_version = "gmxapi_workspec_1_0"
+# These tests will need to be updated when the workspec schema changes. These features appear in
+# release 0.0.4, and schema changes that break these tests warrant a bump in workspec_version.
+workspec_version = "gmxapi_workspec_0_1"
 
 try:
     from mpi4py import MPI
@@ -82,7 +84,10 @@ class WorkSpecTestCase(unittest.TestCase):
     def test_creation(self):
         """Create an empty workspec and check API features."""
         workspec = gmx.workflow.WorkSpec()
-        assert workspec.version == "gmxapi_workspec_1_0"
+        # Release 0.0.4 will mark the finalization of workspec version 0.1.
+        assert gmx.__version__ == "0.0.4"
+        assert workspec.version == "gmxapi_workspec_0_1"
+        # \todo better python package version checking.
     def test_methods(self):
         workspec = gmx.workflow.WorkSpec()
         assert str(workspec) is not None

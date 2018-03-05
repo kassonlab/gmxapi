@@ -21,13 +21,7 @@ Refer to the Python source code itself for additional clarification.
 .. automodule:: gmx.workflow
     :members:
 
-.. automodule:: gmx.runner
-    :members:
-
 .. automodule:: gmx.context
-    :members:
-
-.. automodule:: gmx.md
     :members:
 
 .. automodule:: gmx.status
@@ -38,15 +32,7 @@ Refer to the Python source code itself for additional clarification.
 
 .. automodule:: gmx.core
 
-.. autofunction:: gmx.core.from_tpr
-
 .. skipping gmx.core.md_from_tpr
-
-.. autoclass:: gmx.core.MD
-    :members:
-
-.. autoclass:: gmx.core.SimpleRunner
-    :members:
 
 .. autoclass:: gmx.core.MDSystem
     :members:

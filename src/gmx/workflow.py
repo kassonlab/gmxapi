@@ -18,11 +18,11 @@ Properties
 Various symbols are defined in the gmx.workflow namespace to indicate requirements of workflows. Context implementations
 inspect the properties of a WorkSpec to determine if the work can be launched on the available resources.
 
-``ARRAY``: work requires parallel execution to satisfy data dependencies.
+.. ``ARRAY``: work requires parallel execution to satisfy data dependencies.
 
 
 Single-sim example
-
+::
     >>> md = gmx.workflow.from_tpr(filename)
     >>> gmx.run(md)
     >>>
@@ -35,10 +35,9 @@ Single-sim example
     >>> md = gmx.workflow.from_tpr(filename)
     >>> with gmx.context.Context(md.workspec) as session:
     ...    session.run()
-    ...
 
 Array sim example
-
+::
     >>> work = gmx.workflow.from_tpr([filename1, filename2])
     >>> gmx.run(work)
     >>>
@@ -54,10 +53,9 @@ Array sim example
     >>> my_work = global_context.work_array[my_id]
     >>> with gmx.context.Context(my_work) as session:
     ...    session.run()
-    ...
 
 Single-sim with plugin
-
+::
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
     >>> work.add_dependancy(potential)
@@ -71,13 +69,14 @@ Single-sim with plugin
     ...    session.run()
 
 Array sim with plugin
-
+::
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0)
     >>> gmx.add_potential(md, potential)
     >>> gmx.run(work)
 
-    >>> # The above is shorthand for
+The above is shorthand for
+::
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
     >>> work['md'].add_potential(potential)
@@ -89,7 +88,7 @@ Array sim with plugin
 
 
 Array sim with plugin using global resources
-
+::
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> workdata = gmx.workflow.SharedDataElement()
     >>> numsteps = int(1e-9 / 5e-15) # every nanosecond or so...
@@ -97,7 +96,8 @@ Array sim with plugin using global resources
     >>> md.add_dependancy(potential)
     >>> gmx.run(md)
 
-    >>> # The above is shorthand for
+The above is shorthand for
+::
     >>> # Create work spec and get handle to MD work unit
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> workdata = gmx.workflow.SharedDataElement()
@@ -156,11 +156,11 @@ logger = logging.getLogger(__name__)
 logger.info('Importing gmx.workflow')
 
 # Work specification version string.
-workspec_version = "gmxapi_workspec_1_0"
+workspec_version = "gmxapi_workspec_0_1"
 logger.info("Using schema version {}.".format(workspec_version))
 
 # module-level constant indicating a workflow implementing parallel array work.
-ARRAY = 0
+# ARRAY = 0
 
 class WorkSpec(object):
     """
@@ -192,28 +192,28 @@ class WorkSpec(object):
     Detail:
 
     The work specification schema needs to be able to represent something like the following.
-
+    ::
         version: "gmxapi_workspec_1_0"
         elements:
             myinput:
                 namespace: "gromacs"
-                operation: load_tpr
+                operation: "load_tpr"
                 params: ["tpr_filename1", "tpr_filename2"]
             mydata:
                 namespace: "gmxapi"
-                operation: open_global_data_with_barrier
-                params: "data_filename"
+                operation: "open_global_data_with_barrier"
+                params: ["data_filename"]
             mypotential:
                 namespace: "myplugin"
-                operation: create_mdmodule
+                operation: "create_mdmodule"
                 params: [...]
                 depends: [mydata]
             mysim:
                 namespace: "gmxapi"
-                operation: md
+                operation: "md"
                 depends: [myinput, mypotential]
 
-    \todo Params schema incomplete!
+    todo: Params schema incomplete!
     We can say params is a list, but what are the elements? What if parameters need to be key--value pairs or vectors? We could assume that the value of params is some serialized data that the operation is required to know how to process, but for the moment, we are assuming it is just a list of positional arguments.
     """
     def __init__(self):
@@ -240,7 +240,7 @@ class WorkSpec(object):
             name_list: name list to be expanded with dependencies and sequenced
 
         Note that source_set is a reference to an object that is modified arbitrarily.
-        \todo Maybe this shouldn't be a member function, but a closure within WorkSpec.__iter__()
+        .. todo:: Maybe this shouldn't be a member function, but a closure within WorkSpec.__iter__()
 
         """
         assert isinstance(source_set, set)
