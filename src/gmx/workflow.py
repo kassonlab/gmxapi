@@ -337,9 +337,9 @@ class WorkSpec(object):
             output += '        operation: {}\n'.format(data.operation)
             # \todo improve output formatting: don't be lazy about printing these lists.
             if data.params is not None:
-                output += '            params: {}\n'.format(str(data.params))
+                output += '        params: {}\n'.format(str(data.params))
             if data.depends is not None:
-                output += '            depends: {}\n'.format(str(data.depends))
+                output += '        depends: {}\n'.format(str(data.depends))
 
         return output
 
