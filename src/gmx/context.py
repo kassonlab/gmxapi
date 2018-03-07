@@ -158,7 +158,7 @@ class SerialArrayContext(object):
         self._session = None
 
 def shared_data_maker(element):
-    """Make a shared data element for use by dependant nodes.
+    """Make a shared data element for use by dependent nodes.
 
     This version uses mpi4py to share data and supports a single downstream node.
 
@@ -296,7 +296,7 @@ class ParallelArrayContext(object):
     To produce a running session, the Context __enter__() method is called, according to the Python context manager
     protocol. At this time, the attached WorkSpec must be feasible on the available resources. To turn the specified
     work into an executable directed acyclic graph (DAG), handle objects for the elements in the work spec are sequenced
-    in dependancy-compatible order and the context creates a "builder" for each according to the element's operation.
+    in dependency-compatible order and the context creates a "builder" for each according to the element's operation.
     Each builder is subscribed to the builders of its dependency elements. The DAG is then assembled by calling each
     builder in sequence. A builder can add zero, one, or more nodes and edges to the DAG.
 
@@ -307,7 +307,7 @@ class ParallelArrayContext(object):
     output upon request. Our immediate implementation will use the following protocol.
 
     Each node has a `launch()` method. When the session is entered, the `launch()` method is called for each node in
-    dependancy order. The launch method returns either a callable (`run()` function) or None, raising an exception in
+    dependency order. The launch method returns either a callable (`run()` function) or None, raising an exception in
     case of an error. The sequence of non-None callables is stored by the Session. When Session.run() is called, the
     sequence of callables is called in order. If StopIteration is raised by the callable, it is removed from the sequence.
     The sequence is processed repeatedly until there are no more callables.

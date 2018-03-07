@@ -124,7 +124,7 @@ def test_plugin(caplog):
     potential_element = gmx.workflow.WorkElement(namespace="testing", operation="create_test")
     potential_element.name = "test_module"
     before = md.workspec.elements[md.name]
-    md.add_dependancy(potential_element)
+    md.add_dependency(potential_element)
     assert potential_element.name in md.workspec.elements
     assert potential_element.workspec is md.workspec
     after = md.workspec.elements[md.name]

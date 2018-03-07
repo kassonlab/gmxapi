@@ -185,7 +185,7 @@ class WorkflowFreeFunctions(unittest.TestCase):
         # confirm sources is a subset of elements and sources does not equal elements
         assert len(sources) < len(elements)
     #
-    # def test_add_dependancy(self):
+    # def test_add_dependency(self):
     #     """Check updating of WorkSpec and WorkElements."""
 
 # @withmpi_only

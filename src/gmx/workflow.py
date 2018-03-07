@@ -58,7 +58,7 @@ Single-sim with plugin
 ::
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
-    >>> work.add_dependancy(potential)
+    >>> work.add_dependency(potential)
     >>> gmx.run(work)
     >>>
     >>> # The above is shorthand for
@@ -93,7 +93,7 @@ Array sim with plugin using global resources
     >>> workdata = gmx.workflow.SharedDataElement()
     >>> numsteps = int(1e-9 / 5e-15) # every nanosecond or so...
     >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0, workdata=workdata, data_update_period=numsteps)
-    >>> md.add_dependancy(potential)
+    >>> md.add_dependency(potential)
     >>> gmx.run(md)
 
 The above is shorthand for
@@ -105,7 +105,7 @@ The above is shorthand for
     >>> # EnsembleRestraint is dependent on workdata, so `workdata` must be added to
     >>> # `work` before `potential` can be added to `work`. Combine specs.
     >>> md.workflow.add(workdata)
-    >>> md.add_dependancy(potential)
+    >>> md.add_dependency(potential)
     >>> # Initialize resources for work or throw appropriate error
     >>> global_context = gmx.get_context(md.workflow)
     >>> # Global resources like SharedDataFile are now available.
@@ -122,7 +122,7 @@ is a serialized data structure containing the serialized representations of work
 Implementation details: When the plugin potential is instantiated, it has a WorkElement interface and can
 provide enough information for the Context to call the same constructor, but we want a portal back to the
 original object handle, too. If data only needs to be pulled by the handle, then it can chase references.
-When it is added as a dependancy to the md operation, it gains a reference to the workspec. When the
+When it is added as a dependency to the md operation, it gains a reference to the workspec. When the
 work is launched, that workspec gains a reference to the Context. We need some sort of signal that can
 propagate back to the handles to the work elements.
 
@@ -134,7 +134,7 @@ TBD:
 2.  We may decide that WorkElements are always in some sort of workspec, and that there may be a lot of merging of
     work specs. This would resolve the ambiguity that a WorkElement may or may not be associated with a work spec, but
     it cannot happen right now for several reasons.
-    * there is not a clear way to move elements with dependants from one work spec to another without some ugly transient states.
+    * there is not a clear way to move elements with dependents from one work spec to another without some ugly transient states.
     * When an element is serialized and deserialized, there is not a good way of finding the original workspec object ref.
     * We make a lot of use of temporary WorkElement objects for which we don't care about the workspec.
 
@@ -222,11 +222,11 @@ class WorkSpec(object):
         self._context = None
 
     def _chase_deps(self, source_set, name_list):
-        """Helper to recursively generate dependancies before dependants.
+        """Helper to recursively generate dependencies before dependents.
 
         Given a set of WorkElement objects and a list of element names, generate WorkElements for
         the members of name_list plus their dependencies in an order such that dependencies are
-        guaranteed to occur before their dependant elements.
+        guaranteed to occur before their dependent elements.
 
         For example, to sequence an entire work specification into a reasonable order for instantiation, use
 
@@ -368,8 +368,8 @@ class WorkElement(object):
         self.name = None
         self.workspec = None
 
-    def add_dependancy(self, element):
-        """Add another element as a dependancy.
+    def add_dependency(self, element):
+        """Add another element as a dependency.
 
         First move the provided element to the same WorkSpec, if not already here.
         Then, add to depends and update the WorkSpec.
