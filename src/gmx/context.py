@@ -549,7 +549,7 @@ class ParallelArrayContext(object):
                     system = gmx.core.from_tpr(tpr_file)
                     dag.nodes[name]['system'] = system
                     for potential in potential_list:
-                        system.add_potential(potential)
+                        system.add_mdmodule(potential)
                     dag.nodes[name]['session'] = system.launch()
                     dag.nodes[name]['close'] = dag.nodes[name]['session'].close
                     def runner():

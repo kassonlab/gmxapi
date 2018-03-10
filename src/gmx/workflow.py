@@ -64,7 +64,7 @@ Single-sim with plugin
     >>> # The above is shorthand for
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
-    >>> work['md'].add_potential(potential)
+    >>> work['md'].add_mdmodule(potential)
     >>> with gmx.context.Context(work) as session:
     ...    session.run()
 
@@ -79,7 +79,7 @@ The above is shorthand for
 ::
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
-    >>> work['md'].add_potential(potential)
+    >>> work['md'].add_mdmodule(potential)
     >>> global_context = gmx.context.ParallelArrayContext(work)
     >>> my_id = global_context.local_id
     >>> my_work = global_context.work_array[my_id]
