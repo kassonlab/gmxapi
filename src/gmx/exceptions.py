@@ -18,7 +18,15 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 
-__all__ = ['Error', 'UsageError', 'OptionalFeatureNotAvailableError', 'TypeError']
+__all__ = ['Error',
+           'ApiError',
+           'FileError',
+           'OptionalFeatureNotAvailableError',
+           'OptionalFeatureNotAvailableWarning',
+           'TypeError',
+           'UsageError',
+           'ValueError',
+           ]
 
 class Error(Exception):
     """Base exception for gmx.exceptions classes."""
@@ -28,6 +36,9 @@ class UsageError(Error):
 
     Generic usage error for Gromacs gmx module.
     """
+
+class ApiError(Error):
+    """An API operation was attempted with an incompatible object."""
 
 class FileError(Error):
     """Problem with a file or filename."""
@@ -47,3 +58,6 @@ class TypeError(Error):
         if got is not None:
             message += " Got type {}.".format(type(got))
         super(TypeError, self).__init__(message)
+
+class ValueError(Error):
+    """A user-provided value cannot be interpreted or doesn't make sense."""

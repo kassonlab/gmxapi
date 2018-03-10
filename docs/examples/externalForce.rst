@@ -43,10 +43,10 @@ in a new class, defining the input and output parameters, and registering the po
 Refer to the sample plugin for a step-by-step walk-through of implementing a new pair restraint.
 
 At the Python level, restraint classes are just classes that provide a registration function
- suitable for a call to gmx.md.ExtendedMD.add_potential() (TBD).
+suitable for a call to gmx.md.ExtendedMD.add_potential() (TBD).
 At the C++ level, restraint classes implement the restraint interface...
 
-In the most basic case, all restraint classes will have a `params` property to serve as a
+In the most basic case, all restraint classes will have a ``params`` property to serve as a
 flexible container for run-time parameters.
 
 
@@ -55,5 +55,5 @@ There just isn't a good way to automatically name Python attributes. One alterna
 rely on ordered arguments to a constructor for the plugin and do some magic at the Python level.
 Another is to use SWIG or Cython to simultaneously generate the Python and C++. It may be
 reasonable, though, to use Python data structures and/or string-mapped accessors in the
-C++ code. For instance, in addition to the `calculate()` method, the restraint class
-could have a `register()` method in which a series of `addParameter()` calls are made.
+C++ code. For instance, in addition to the ``calculate()`` method, the restraint class
+could have a ``register()`` method in which a series of ``addParameter()`` calls are made.

@@ -73,8 +73,6 @@ set_target_properties(pygmx_core PROPERTIES OUTPUT_NAME core)
 #    pygmx_core
 #    PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${PYGMX_DIRECTORY}")
 
-target_link_libraries(pygmx_core PRIVATE Gromacs::gmxapi)
-
 target_include_directories(pygmx_core PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_BINARY_DIR}
@@ -91,6 +89,9 @@ set_target_properties(pygmx_core PROPERTIES SKIP_BUILD_RPATH FALSE)
 # If building with setuptools, CMake will not be performing the install
 set_target_properties(pygmx_core PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
 #set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH ${PYGMX_RPATH})
+
+target_link_libraries(pygmx_core PRIVATE Gromacs::gmxapi)
+
 # workaround for relocated package when installing nested gromacs on readthedocs.org
 if($ENV{READTHEDOCS})
     set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH "$ORIGIN/:$ORIGIN/data/gromacs/lib/")
