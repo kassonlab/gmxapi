@@ -37,7 +37,7 @@ and load the appropriate gmxrc or note the installation location
 Download this repository and indicate to python where to look for a local GROMACS installation.
 Either first source the GMXRC as described in GROMACS documentation or provide a hint on the command line.
 
-    $ git clone https://github.com/gmxapi/gmxapi
+    $ git clone https://github.com/gmxapi/gmxapi.git
     $ cd gmxapi
 
 Then, if you have sourced your gmxrc or exported GROMACS environment variables, you can just
