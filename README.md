@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/gmxapi/gmxapi.svg?branch=dev_0_0_4)](https://travis-ci.org/gmxapi/gmxapi)
+
 The gmxapi project provides interfaces for managing and extending molecular dynamics simulation workflows.
 In this repository, a Python package provides the `gmx` module for high-level interaction with GROMACS.
 `gmx.core` provides Python bindings to the `gmxapi` C++ GROMACS external API.
@@ -6,10 +8,6 @@ The project is hosted on [GitHub](https://github.com/gmxapi/gmxapi) and includes
 the `gmxapi` repository along with supporting respositories.
 the `gromacs-gmxapi` repository includes a modified version of GROMACS that
 supports the latest `gmxapi` features not yet available through an official GROMACS distribution.
-
-# Documentation
-
-Documentation for released versions can be viewed on readthedocs or can be built locally.
 
 # Installation
 
@@ -32,15 +30,15 @@ If you will be running the testing suite, you also need `virtualenv` and `tox`.
 ## Python setuptools with existing or shared GROMACS installation
 
 Make sure that you have GROMACS installed with the gmxapi library.
-See https://bitbucket.org/kassonlab/gromacs
+See https://github.com/kassonlab/gromacs-gmxapi
 and load the appropriate gmxrc or note the installation location
 (`/Users/eric/gromacs` in the following example).
 
-Download the gmxpy repository and indicate to python where to look for a local GROMACS installation.
+Download this repository and indicate to python where to look for a local GROMACS installation.
 Either first source the GMXRC as described in GROMACS documentation or provide a hint on the command line.
 
-    $ git clone git clone https://bitbucket.org:kassonlab/gmxpy.git
-    $ cd gmxpy
+    $ git clone https://github.com/gmxapi/gmxapi
+    $ cd gmxapi
 
 Then, if you have sourced your gmxrc or exported GROMACS environment variables, you can just
 
@@ -74,21 +72,14 @@ If you have not installed GROMACS already or if `gmxapi_DIR` does not contain di
       provides a separate development package or SDK, be sure it has been
       installed.
 
-If you are not a system administrator you are encouraged to install in a virtual environment,
-such as is created with Anaconda or virtualenv.
+If you are not a system administrator you are encouraged to install in a Python virtual environment,
+created with virtualenv or Conda.
 Otherwise, you will need to specify the `--user` flag to install to your home directory.
-
-## During or from GROMACS installation
-
-Instead of building directly from the gmxpy repository,
-get a copy of GROMACS and enable simultaneous installation of the Python module
-via CMake, using the instructions at the
-[gmxapi repository](https://bitbucket.org/kassonlab/gromacs).
 
 ## Python setuptools (or pip) with private GROMACS installation
 
 This installation option has been made available to allow automatic builds on readthedocs.org
-but is not likely to be a supported use case unless a need is demonstrated. Download the gmxpy repository.
+but is not likely to be a supported use case unless a need is demonstrated. Download the repository.
 Use the READTHEDOCS environment variable to tell setup.py to download and install a private copy of
 GROMACS with the Python module.
 
@@ -98,8 +89,8 @@ In the world of Python, a virtual environment is a Python installation that is s
 and easy to activate or deactivate to allow normal Python use without additional concerns of
 software compatibility.
 
-Several systems of managing virtual environments exist. Pygmx is tested with Anaconda and with
-Python 3's built-in virtualenv.
+Several systems of managing virtual environments exist. gmxapi is tested with
+Python 3's built-in virtualenv and the add-on virtualenv package for Python 2.
 
 The following documentation assumes you have installed a compatible version of GROMACS and
 installed it in the directory `/path/to/gromacs`. Replace `/path/to/gromacs` with the actual
@@ -142,24 +133,24 @@ Todo: Dockerfile and/or images for building, using, developing, or reading docs.
 # Testing
 
 Unit tests are performed individually with `pytest` or as a full installation and test
-suite with `tox`. Tests can be invoked from the root of the repository in the standard way.
+suite with `tox`.
 
-    $ python setup.py test
-    
-or, if Python cannot find the path to your GROMACS installation or you need to specify one of several:
-
-    $ gmxapi_DIR=/path/to/gromacs python setup.py test
-
-or
+From the root of the repository:
 
     $ gmxapi_DIR=/path/to/gromacs tox
 
+For pytest, first install the package as above. Then,
+
+    $ pytest --pyargs gmx -s --verbose
+
+For a more thorough test that includes the parallel workflow features, make sure you have MPI set up and the `mpi4py` Python package.
+
+    mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose
+
 Note: `tox` may get confused when it tries to create virtual environments when run from within
 a virtual environment. If you get errors, try running the tests from the native Python environment
-or a different virtual environment manager (i.e. conda versus virtualenvwrapper). And let us know
+or a different virtual environment manager (i.e. not conda). And let us know
 if you come up with any tips or tricks!
-
-Note: `python setup.py test` seems not to invoke the correct C++ standards...
 
 # Documentation
 
@@ -172,19 +163,19 @@ To build the user documentation locally, first make sure you have sphinx install
 a `pip install sphinx` or by using whatever package management system you are familiar with.
 You may also need to install a `sphinx_rtd_theme` package.
 
-Build *and install* the gmxpy module.
+Build *and install* the gmx module.
 
 Then decide what directory you want to put the docs in and call `sphinx-build` to build `html` docs
 from the configuration in the `docs` directory of the gmxpy repository.
 
-Assuming you downloaded the repository to `/path/to/gmxpy` and you want to build the docs in `/path/to/docs`,
+Assuming you downloaded the repository to `/path/to/gmxapi` and you want to build the docs in `/path/to/docs`,
 do
 
-    sphinx-build -b html /path/to/gmxpy/docs /path/to/docs
+    sphinx-build -b html /path/to/gmxapi/docs /path/to/docs
     
 or
 
-    python -m sphinx -b html /path/to/gmxpy/docs /path/to/docs
+    python -m sphinx -b html /path/to/gmxapi/docs /path/to/docs
 
 Then open `/path/to/docs/index.html` in a browser.
 
@@ -193,15 +184,15 @@ Note:
 If you try to run `sphinx-build` from the root directory of the repository, it will get confused
 and not realize that it should use the package you just installed instead of the unbuilt source code.
 Therefore, I recommend the following complete procedure to download, install, and build docs for the
-`gmxpy` package:
+`gmxapi` package:
 
     $ python -m pip install --upgrade pip
     $ pip install --upgrade setuptools
     $ pip install --upgrade cmake
     $ pip install --upgrade sphinx
     $ pip install --upgrade sphinx_rtd_theme
-    $ git clone git clone https://bitbucket.org:kassonlab/gmxpy.git
-    $ cd gmxpy
+    $ git clone https://github.com/gmxapi/gmxapi.git
+    $ cd gmxapi
     $ gmxapi_DIR=/path/to/gromacs pip install .
     $ cd docs
     $ python -m sphinx -b html . ../html
@@ -227,9 +218,9 @@ then do it again and repeat until `pip` can no longer find any version of any of
     $ pip uninstall cmake
     ...
 
-Successfully running the test suite is not essential to having a working `gmxpy` package.
+Successfully running the test suite is not essential to having a working `gmxapi` package.
 We are working to make the testing more robust, but right now the test suite is a bit delicate
-and may not work right, even though you have a successfully built `gmxpy` package. If you
+and may not work right, even though you have a successfully built `gmxapi` package. If you
 want to troubleshoot, though, the main problems seem to be that automatic installation of
 required python packages may not work (requiring manual installations, such as with `pip install somepackage`)
 and ambiguities between python versions. The testing attempts to run under both Python 2 and
