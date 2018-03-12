@@ -1,10 +1,10 @@
-[![Build Status](https://travis-ci.org/gmxapi/gmxapi.svg?branch=dev_0_0_4)](https://travis-ci.org/gmxapi/gmxapi)
+[![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=dev_0_0_4)](https://travis-ci.org/kassonlab/gmxapi)
 
 The gmxapi project provides interfaces for managing and extending molecular dynamics simulation workflows.
 In this repository, a Python package provides the `gmx` module for high-level interaction with GROMACS.
 `gmx.core` provides Python bindings to the `gmxapi` C++ GROMACS external API.
 
-The project is hosted on [GitHub](https://github.com/gmxapi/gmxapi) and includes
+The project is hosted on [GitHub](https://github.com/kassonlab/gmxapi) and includes
 the `gmxapi` repository along with supporting respositories.
 the `gromacs-gmxapi` repository includes a modified version of GROMACS that
 supports the latest `gmxapi` features not yet available through an official GROMACS distribution.
@@ -37,7 +37,7 @@ and load the appropriate gmxrc or note the installation location
 Download this repository and indicate to python where to look for a local GROMACS installation.
 Either first source the GMXRC as described in GROMACS documentation or provide a hint on the command line.
 
-    $ git clone https://github.com/gmxapi/gmxapi.git
+    $ git clone https://github.com/kassonlab/gmxapi.git
     $ cd gmxapi
 
 Then, if you have sourced your gmxrc or exported GROMACS environment variables, you can just
@@ -191,7 +191,7 @@ Therefore, I recommend the following complete procedure to download, install, an
     $ pip install --upgrade cmake
     $ pip install --upgrade sphinx
     $ pip install --upgrade sphinx_rtd_theme
-    $ git clone https://github.com/gmxapi/gmxapi.git
+    $ git clone https://github.com/kassonlab/gmxapi.git
     $ cd gmxapi
     $ gmxapi_DIR=/path/to/gromacs pip install .
     $ cd docs
