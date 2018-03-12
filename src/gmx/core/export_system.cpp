@@ -23,7 +23,7 @@ void export_system(py::module &m)
     system.def("launch",
                [](::gmxapi::System* system){ return system->launch(); },
                "Launch the configured workflow in the default context.");
-    system.def("add_potential",
+    system.def("add_mdmodule",
                [](::gmxapi::System* system, py::object force_object){
                    // If force_object has a bind method, give it a PyCapsule with a pointer
                    // to our C++ object.

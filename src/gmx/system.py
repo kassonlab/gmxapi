@@ -86,9 +86,9 @@ class System(object):
 
         return system
 
-    def add_potential(self, potential):
+    def add_mdmodule(self, potential):
         if (hasattr(potential, "bind")):
-            self.workflow.add_potential(potential)
+            self.workflow.add_mdmodule(potential)
         else:
             raise exceptions.UsageError("Cannot add a potential that does not have a 'bind' method.")
 
