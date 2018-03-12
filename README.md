@@ -1,14 +1,21 @@
-gmxpy is
-a Python package providing the `gmx` module for interfacing with GROMACS.
+The gmxapi project provides interfaces for managing and extending molecular dynamics simulation workflows.
+In this repository, a Python package provides the `gmx` module for high-level interaction with GROMACS.
+`gmx.core` provides Python bindings to the `gmxapi` C++ GROMACS external API.
 
-The project is hosted on [BitBucket](https://bitbucket.org/kassonlab/gmxpy).
+The project is hosted on [GitHub](https://github.com/gmxapi/gmxapi) and includes
+the `gmxapi` repository along with supporting respositories.
+the `gromacs-gmxapi` repository includes a modified version of GROMACS that
+supports the latest `gmxapi` features not yet available through an official GROMACS distribution.
+
+# Documentation
+
 Documentation for released versions can be viewed on readthedocs or can be built locally.
+
+# Installation
 
 A compatible version of GROMACS must either be already installed or may be installed
 as part of package installation.
 Alternatively, the Python module can be installed during a CMake-driven GROMACS installation.
-
-# Installation
 
 You will need a few packages installed that are hard for gmxpy to install automatically.
 Before proceeding, install / upgrade the Python package for `cmake`. Note that it is not

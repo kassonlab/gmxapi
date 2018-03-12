@@ -1,0 +1,55 @@
+language: cpp
+sudo: false
+
+# At some point, we will test specific combinations of options, but not all permutations, so we use explicit matrix.
+matrix:
+
+  include:
+
+  - os: linux
+    compiler: gcc
+    addons:
+      apt:
+        sources:
+        - ubuntu-toolchain-r-test
+        packages:
+        - doxygen
+        - python
+        - mpich
+        - libmpich-dev
+        - libxml2-dev
+        - libblas-dev
+        - cmake
+        - cmake-data
+        - liblapack-dev
+        - g++-6
+        - gcc-6
+    env:
+      - GMX_MPI=OFF
+      - GMX_THREAD_MPI=ON
+      - gmxapi_DIR=$HOME/gromacs
+      - GROMACS_DIR=$HOME/gromacs
+
+before_install:
+  - uname -a
+  - apt list --installed
+  - test -n $CC  && unset CC
+  - test -n $CXX && unset CXX
+  - git clone https://github.com/kassonlab/gromacs-gmxapi.git
+
+install:
+  - pushd gromacs-gmxapi
+  - mkdir build
+  - pushd build
+  - cmake -DCMAKE_INSTALL_PREFIX=$HOME -DGMX_BUILD_OWN_FFTW=ON -DGMX_MPI=$GMX_MPI -DGMX_THREAD_MPI=$GMX_THREAD_MPI ..
+  - make -j4 install
+  - popd
+  - popd
+  - python -m pip install --upgrade pip
+  - pip install --upgrade setuptools --user
+  - pip install virtualenv pytest cmake numpy mpi4py networkx --user
+
+script:
+  - python setup.py install --verbose --user
+  - mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose 
+
