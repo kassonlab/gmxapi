@@ -53,17 +53,19 @@ def get_gromacs(url, cmake_args=[], build_args=[]):
     except:
         from urllib2 import urlopen
     import tempfile
-    import tarfile
+    # import tarfile
+    import zipfile
     import shutil
     # make temporary source directory
     sourcedir = tempfile.mkdtemp()
     try:
-        with tempfile.TemporaryFile(suffix='.tgz', dir=sourcedir) as fh:
+        with tempfile.TemporaryFile(suffix='.zip', dir=sourcedir) as fh:
             fh.write(urlopen(url).read())
             fh.seek(0)
-            archive = tarfile.open(fileobj=fh)
-            # Get top-level directory name in archive
-            root = archive.next().name
+            # archive = tarfile.open(fileobj=fh)
+            archive = zipfile.ZipFile(fh)
+            # # Get top-level directory name in archive
+            # root = archive.next().name
             # Extract all under top-level to source directory
             archive.extractall(path=sourcedir)
     except:
@@ -194,7 +196,7 @@ class CMakeGromacsBuild(build_ext):
         # Linking is a pain because the package is relocated to the site-packages directory. We should really do this
         # in two stages.
         if build_gromacs:
-            gromacs_url = "https://bitbucket.org/kassonlab/gromacs/get/0.0.1.tar.gz"
+            gromacs_url = "https://github.com/kassonlab/gromacs-gmxapi/archive/dev_0_0_4.zip"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
             extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
                                 '-DGMX_FFT_LIBRARY=fftpack']
