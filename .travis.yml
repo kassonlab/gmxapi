@@ -35,10 +35,11 @@ before_install:
   - apt list --installed
   - test -n $CC  && unset CC
   - test -n $CXX && unset CXX
-  - git clone https://github.com/kassonlab/gromacs-gmxapi.git
+  - wget https://github.com/kassonlab/gromacs-gmxapi/archive/dev_0_0_4.zip
+  - unzip dev_0_0_4.zip
 
 install:
-  - pushd gromacs-gmxapi
+  - pushd gromacs-gmxapi-dev_0_0_4
   - mkdir build
   - pushd build
   - cmake -DCMAKE_INSTALL_PREFIX=$HOME -DGMX_BUILD_OWN_FFTW=ON -DGMX_MPI=$GMX_MPI -DGMX_THREAD_MPI=$GMX_THREAD_MPI ..
