@@ -426,7 +426,7 @@ class ParallelArrayContext(object):
                 assert element.namespace in self.__operations
                 if not element.operation in self.__operations[element.namespace]:
                     if self.rank < 1:
-                        logger.error(self.__operations)
+                        logger.error("Operation {} not found in map {}".format(element.operation, str(self.__operations)))
                     # This check should be performed when deciding if the context is appropriate for the work.
                     # If we are just going to use a try/catch block for this test, then we should differentiate
                     # this exception from those raised due to incorrect usage.
@@ -658,7 +658,7 @@ class ParallelArrayContext(object):
         if (self.size < comm_size):
             warnings.warn('MPI context is wider than necessary to run this work: array width {} vs. size {}.'.format(self.size, comm_size))
 
-        print(graph)
+        # print(graph)
         logger.debug(("Launching graph {}.".format(graph)))
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
