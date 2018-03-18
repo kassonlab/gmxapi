@@ -38,7 +38,7 @@ class WorkElementTestCase(unittest.TestCase):
         workspec = None
         name = "spam"
         operation = "load_tpr"
-        params = ["filename1", "filename2"]
+        params = {'input': ["filename1", "filename2"]}
         element = gmx.workflow.WorkElement(namespace=namespace, operation=operation, params=params)
 
         assert element.name != name
@@ -47,7 +47,7 @@ class WorkElementTestCase(unittest.TestCase):
         assert element.workspec == workspec
         assert element.namespace == namespace
         assert element.operation == operation
-        for a, b in zip(params, element.params):
+        for a, b in zip(params['input'], element.params['input']):
             assert a == b
         for a, b in zip(depends, element.depends):
             assert a == b
@@ -59,7 +59,7 @@ class WorkElementTestCase(unittest.TestCase):
         workspec = None
         name = "spam"
         operation = "load_tpr"
-        params = ["filename1", "filename2"]
+        params = {'input': ["filename1", "filename2"]}
         element = gmx.workflow.WorkElement(namespace=namespace, operation=operation, params=params)
 
         json_data = element.serialize()
@@ -74,7 +74,7 @@ class WorkElementTestCase(unittest.TestCase):
         assert element.workspec == workspec
         assert element.namespace == namespace
         assert element.operation == operation
-        for a, b in zip(params, element.params):
+        for a, b in zip(params['input'], element.params['input']):
             assert a == b
         for a, b in zip(depends, element.depends):
             assert a == b
@@ -102,7 +102,7 @@ class WorkSpecTestCase(unittest.TestCase):
         to be processed by the context manager.
         """
         workspec = gmx.workflow.WorkSpec()
-        inputelement = gmx.workflow.WorkElement(operation="load_tpr", params=[])
+        inputelement = gmx.workflow.WorkElement(operation="load_tpr", params={})
         inputelement.name = "tpr_input"
         assert inputelement.name not in workspec.elements
         workspec.elements[inputelement.name] = inputelement.serialize()

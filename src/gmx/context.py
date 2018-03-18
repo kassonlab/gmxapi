@@ -185,13 +185,13 @@ def shared_data_maker(element):
             self.comm = context._communicator
             self.name = element.name
             params = element.params
-            # First draft: params contains two elements: a serialized args and a serialized kwargs
+            # Params contains a dictionary of kwargs
             logger.debug("Processing parameters {}".format(params))
-            assert len(params) == 2
-            self.args = json.loads(params[0])
-            assert isinstance(self.args, list)
-            self.kwargs = json.loads(params[1])
-            assert isinstance(self.kwargs, dict)
+            assert isinstance(params, dict)
+            kwargs = {name: params[name] for name in params}
+            self.args = kwargs['args']
+            self.kwargs = kwargs['kwargs']
+
             # The builder can hold an updater to be provided to the subscriber at launch. The updater is
             # a function reference that the user provides to perform a desired periodic action. Not sure
             # how this will work in the future. Allowing arbitrary Python code to be provided during job
@@ -477,7 +477,7 @@ class ParallelArrayContext(object):
     def __load_tpr(self, element):
         """Implement the gromacs.load_tpr operation.
 
-        Updates the minimum width of the workflow parallelism. Stores a null API object.
+        Updates the minimum width of the workflow parallelism. Does not add any API object to the graph.
         """
         class Builder(object):
             def __init__(self, tpr_list):
@@ -498,7 +498,7 @@ class ParallelArrayContext(object):
                     width = max(width, dag.graph['width'])
                 dag.graph['width'] = width
 
-        return Builder(element.params)
+        return Builder(element.params['input'])
 
     def __md(self, element):
         """Implement the gmxapi.md operation by returning a builder that can populate a data flow graph for the element.
@@ -788,7 +788,7 @@ def get_context(work=None):
             element = workflow.WorkElement.deserialize(work.elements[dependency])
             if element.operation == 'load_tpr':
                 if tpr_input is None:
-                    tpr_input = list(element.params)
+                    tpr_input = list(element.params['input'])
                 else:
                     raise exceptions.ApiError('This Context can only handle work specifications with a single load_tpr operation.')
         if tpr_input is None:
