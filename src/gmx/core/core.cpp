@@ -110,5 +110,6 @@ PYBIND11_MODULE(core, m) {
 
     // Get bindings exported by the various components.
     export_md(m);
+    export_context(m);
     export_system(m);
 }

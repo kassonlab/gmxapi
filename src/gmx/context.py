@@ -374,6 +374,8 @@ class ParallelArrayContext(object):
         # This setter must be called after the operations map has been populated.
         self.work = work
 
+        self._api_object = gmx.core.Context()
+
     @property
     def work(self):
         return self.__work
@@ -550,7 +552,7 @@ class ParallelArrayContext(object):
                     dag.nodes[name]['system'] = system
                     for potential in potential_list:
                         system.add_mdmodule(potential)
-                    dag.nodes[name]['session'] = system.launch()
+                    dag.nodes[name]['session'] = system.launch(element.workspec._context._api_object)
                     dag.nodes[name]['close'] = dag.nodes[name]['session'].close
                     def runner():
                         """Currently we only support a single call to run."""
