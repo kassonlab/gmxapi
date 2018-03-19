@@ -36,9 +36,9 @@ namespace py = pybind11;
 void setMDArgs(std::vector<std::string>* mdargs, py::dict params)
 {
     mdargs->clear();
-    if(params.contains("grid"))
+    if (params.contains("grid"))
     {
-        auto vals = py::cast<std::vector<std::string>>(params("grid"));
+        auto vals = py::cast<std::vector<std::string>>(params["grid"]);
         mdargs->emplace_back("-dd");
         for(auto&& val : vals)
         {
@@ -47,43 +47,43 @@ void setMDArgs(std::vector<std::string>* mdargs, py::dict params)
     }
     if (params.contains("pme_ranks"))
     {
-        auto val = py::cast<std::string>(params("pme_ranks"));
+        auto val = py::cast<std::string>(params["pme_ranks"]);
         mdargs->emplace_back("-npme");
         mdargs->emplace_back(val);
     }
     if (params.contains("threads"))
     {
-        auto val = py::cast<std::string>(params("threads"));
+        auto val = py::cast<std::string>(params["threads"]);
         mdargs->emplace_back("-nt");
         mdargs->emplace_back(val);
     }
     if (params.contains("tmpi"))
     {
-        auto val = py::cast<std::string>(params("tmpi"));
+        auto val = py::cast<std::string>(params["tmpi"]);
         mdargs->emplace_back("-ntmpi");
         mdargs->emplace_back(val);
     }
     if (params.contains("threads_per_rank"))
     {
-        auto val = py::cast<std::string>(params("threads_per_rank"));
+        auto val = py::cast<std::string>(params["threads_per_rank"]);
         mdargs->emplace_back("-ntomp");
         mdargs->emplace_back(val);
     }
     if (params.contains("pme_threads_per_rank"))
     {
-        auto val = py::cast<std::string>(params("pme_threads_per_rank"));
+        auto val = py::cast<std::string>(params["pme_threads_per_rank"]);
         mdargs->emplace_back("-ntomp_pme");
         mdargs->emplace_back(val);
     }
     if (params.contains("steps"))
     {
-        auto val = py::cast<std::string>(params("steps"));
+        auto val = py::cast<std::string>(params["steps"]);
         mdargs->emplace_back("-nsteps");
         mdargs->emplace_back(val);
     }
     if (params.contains("max_hours"))
     {
-        auto val = py::cast<std::string>(params("max_hours"));
+        auto val = py::cast<std::string>(params["max_hours"]);
         mdargs->emplace_back("-maxh");
         mdargs->emplace_back(val);
     }
