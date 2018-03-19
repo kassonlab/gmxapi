@@ -149,7 +149,7 @@ from . import exceptions
 import gmx
 from gmx import logging
 
-__all__ = ['WorkSpec', 'SharedDataElement', 'WorkElement']
+__all__ = ['WorkSpec', 'WorkElement']
 
 # Module-level logger
 logger = logging.getLogger(__name__)
@@ -481,11 +481,24 @@ def get_source_elements(workspec):
             element.workspec = workspec
             yield(element)
 
-def from_tpr(input=None):
+def from_tpr(input=None, **kwargs):
     """Create a WorkSpec from a (list of) tpr file(s).
 
-    :param input: string or list of strings giving the filename(s) of simulation input
-    :return: simulation member of a gmx.workflow.WorkSpec object
+    Required Args:
+        input: string or list of strings giving the filename(s) of simulation input
+
+    Optional Keyword Args:
+        grid (tuple): Domain decomposition grid divisions (nx, ny, nz). (-dd)
+        pme_ranks (int): number of separate ranks to be used for PME electrostatics. (-npme)
+        threads (int): Total number of threads to start. (-nt)
+        tmpi (int): number of thread-MPI ranks to start. (-ntmpi)
+        threads_per_rank (int): number of OpenMP threads to start per MPI rank. (-ntomp)
+        pme_threads_per_rank (int): Number of OpenMP threads per PME rank. (-ntomp_pme)
+        steps (int): Override input files and run for this many steps. (-nsteps)
+        max_hours (float): Terminate after 0.99 times this many hours if simulation is still running. (-maxh)
+
+    Returns:
+        simulation member of a gmx.workflow.WorkSpec object
 
     Produces a WorkSpec with the following data.
 
@@ -503,7 +516,7 @@ def from_tpr(input=None):
     """
     import os
 
-    usage = "argument to from_tpr() should be a valid filename or list of filenames."
+    usage = "argument to from_tpr() should be a valid filename or list of filenames, followed by optional key word arguments."
 
     # Normalize to tuple input type.
     if isinstance(input, str):
@@ -519,6 +532,29 @@ def from_tpr(input=None):
         if not (os.path.exists(arg) and os.path.isfile(arg)):
             arg_path = os.path.abspath(arg)
             raise exceptions.UsageError(usage + " Got {}".format(arg_path))
+
+    # \todo These are runner parameters, not MD parameters, and should be in the call to gmx.run() instead of here.
+    params = {}
+    for arg_key in kwargs:
+        if arg_key == 'grid' or arg_key == 'dd':
+            params['grid'] = tuple(kwargs[arg_key])
+        elif arg_key == 'pme_ranks' or arg_key == 'npme':
+            params['pme_ranks'] = int(kwargs[arg_key])
+        elif arg_key == 'threads' or arg_key == 'nt':
+            params['threads'] = int(kwargs[arg_key])
+        elif arg_key == 'tmpi' or arg_key == 'ntmpi':
+            params['tmpi'] = int(kwargs[arg_key])
+        elif arg_key == 'threads_per_rank' or arg_key == 'ntomp':
+            params['threads_per_rank'] = int(kwargs[arg_key])
+        elif arg_key == 'pme_threads_per_rank' or arg_key == 'ntomp_pme':
+            params['pme_threads_per_rank'] = int(kwargs[arg_key])
+        elif arg_key == 'steps' or arg_key == 'nsteps':
+            params['steps'] = int(kwargs[arg_key])
+        elif arg_key == 'max_hours' or arg_key == 'maxh':
+            params['max_hours'] = float(kwargs[arg_key])
+        else:
+            raise exceptions.UsageError("Invalid key word argument: {}. {}".format(arg_key, usage))
+
 
     # Create an empty WorkSpec
     workspec = WorkSpec()

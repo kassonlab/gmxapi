@@ -522,6 +522,7 @@ class ParallelArrayContext(object):
                 # Other dependencies in the element may register potentials when subscribed to.
                 self.potential = []
                 self.input_nodes = []
+                self.runtime_params = element.params
             def add_subscriber(self, builder):
                 """The md operation does not yet have any subscribeable facilities."""
                 pass
@@ -552,12 +553,17 @@ class ParallelArrayContext(object):
                     dag.nodes[name]['system'] = system
                     for potential in potential_list:
                         system.add_mdmodule(potential)
-                    dag.nodes[name]['session'] = system.launch(element.workspec._context._api_object)
+                    mdargs = gmx.core.MDArgs()
+                    mdargs.set(self.runtime_params)
+                    context = element.workspec._context._api_object
+                    context.setMDArgs(mdargs)
+                    dag.nodes[name]['session'] = system.launch(context)
                     dag.nodes[name]['close'] = dag.nodes[name]['session'].close
                     def runner():
                         """Currently we only support a single call to run."""
                         def done():
                             raise StopIteration()
+                        # Replace the runner with a stop condition for subsequent passes.
                         dag.nodes[name]['run'] = done
                         return dag.nodes[name]['session'].run()
                     dag.nodes[name]['run'] = runner

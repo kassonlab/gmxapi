@@ -38,14 +38,13 @@
  * \ingroup module_python
  */
 
-#include <memory>
 #include "core.h"
+#include <memory>
 
 #include "gmxpy_api.h"
-
 #include "gmxapi/status.h"
 
-#include <pybind11/pybind11.h>
+#include "pybind11/pybind11.h"
 
 namespace py = pybind11;
 using namespace gmxpy;

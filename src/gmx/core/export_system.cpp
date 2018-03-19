@@ -35,7 +35,10 @@ void export_system(py::module &m)
                [](System* system){ return system->launch(); },
                "Launch the configured workflow in the default context.");
     system.def("launch",
-                [](System* system, std::shared_ptr<Context> context){ return system->launch(context); },
+                [](System* system, std::shared_ptr<Context> context)
+                {
+                    return system->launch(context);
+                },
                 "Launch the configured workflow in the provided context.");
 
     system.def("add_mdmodule",
@@ -74,7 +77,6 @@ void export_system(py::module &m)
                    }
                },
                "Set a restraint potential for the system.");
-
 
     // Export session class
     // \todo relocate
