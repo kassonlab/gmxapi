@@ -28,7 +28,7 @@ try:
 except ImportError:
     withmpi_only = pytest.mark.skip(reason="Test requires at least 2 MPI ranks, but mpi4py is not available.")
 
-class TestConsumerElement(gmx.workflow.WorkElement):
+class ConsumerElement(gmx.workflow.WorkElement):
     """Simple workflow element to test the shared data resource."""
     def __init__(self, name):
         gmx.workflow.WorkElement.__init__(self, namespace="testing",
@@ -36,20 +36,20 @@ class TestConsumerElement(gmx.workflow.WorkElement):
         self.name = name
 
 def translate_test_consumer(element):
-    """Translate the TestConsumerElement into Session resources."""
-    width = element.params[0]
+    """Translate the ConsumerElement into Session resources."""
+    width = element.params['width']
     logging.debug("Translating test_consumer of width {}".format(width))
-    builder = TestConsumerBuilder(element.name, width)
+    builder = ConsumerBuilder(element.name, width)
     return builder
 
-class TestConsumerBuilder(object):
+class ConsumerBuilder(object):
     """Implement the DAG builder interface for TestConsumer."""
     def __init__(self, name, width):
         self.input_nodes = []
         self.shared_data_updater = None
         self.name = name
         self.width = width
-        logging.info("Created TestConsumerBuilder named {}".format(self.name))
+        logging.info("Created ConsumerBuilder named {}".format(self.name))
 
     def add_subscriber(self, builder):
         """We don't accept any subscribers."""
@@ -161,13 +161,13 @@ class ArrayContextTestCase(unittest.TestCase):
         args = [(10,3)]
         kwargs = {'dtype': 'int'}
 
-        data = gmx.workflow.SharedDataElement(args, kwargs, name='mydata')
+        data = gmx.workflow.SharedDataElement({'args': args, 'kwargs': kwargs}, name='mydata')
 
         # Make a consumer of width 3, which we expect to be too big since we typically test on 2 ranks.
         width = 3
-        consumer = TestConsumerElement('mytester')
+        consumer = ConsumerElement('mytester')
         consumer.depends = [data.name]
-        consumer.params.append(width)
+        consumer.params['width'] = width
 
         workspec = gmx.workflow.WorkSpec()
         workspec.add_element(data)
@@ -188,7 +188,7 @@ class ArrayContextTestCase(unittest.TestCase):
         consumer.workspec = None
         data.workspec = None
         width = size
-        consumer.params[0] = width
+        consumer.params['width'] = width
         workspec = gmx.workflow.WorkSpec()
         workspec.add_element(data)
         workspec.add_element(consumer)

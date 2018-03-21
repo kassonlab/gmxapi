@@ -38,14 +38,13 @@
  * \ingroup module_python
  */
 
-#include <memory>
 #include "core.h"
+#include <memory>
 
 #include "gmxpy_api.h"
-
 #include "gmxapi/status.h"
 
-#include <pybind11/pybind11.h>
+#include "pybind11/pybind11.h"
 
 namespace py = pybind11;
 using namespace gmxpy;
@@ -110,5 +109,6 @@ PYBIND11_MODULE(core, m) {
 
     // Get bindings exported by the various components.
     export_md(m);
+    export_context(m);
     export_system(m);
 }

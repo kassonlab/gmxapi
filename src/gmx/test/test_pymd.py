@@ -97,7 +97,7 @@ class BindingsTestCase(unittest.TestCase):
 
 @pytest.mark.usefixtures("cleandir")
 @pytest.mark.usefixtures("caplog")
-def test_simpleSimulation():
+def test_simpleSimulation(caplog):
     """Load a work specification with a single TPR file and run."""
     # use case 1: simple high-level
     md = gmx.workflow.from_tpr(tpr_filename)
@@ -106,7 +106,7 @@ def test_simpleSimulation():
 @pytest.mark.usefixtures("cleandir")
 @pytest.mark.usefixtures("caplog")
 @withmpi_only
-def test_array_context():
+def test_array_context(caplog):
     md = gmx.workflow.from_tpr(tpr_filename)
     context = gmx.context.ParallelArrayContext(md)
     with context as session:
