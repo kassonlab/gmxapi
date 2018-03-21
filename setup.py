@@ -170,12 +170,11 @@ class CMakeGromacsBuild(build_ext):
         build_args = ['--config', cfg]
         cmake_args = ['-DPYTHON_EXECUTABLE=' + sys.executable,
                       ]
-
         env = os.environ.copy()
         if 'CC' in env:
-            cmake_args += "-DCMAKE_C_COMPILER={}".format(env['CC'])
+            cmake_args.append("-DCMAKE_C_COMPILER={}".format(env['CC']))
         if 'CXX' in env:
-            cmake_args += "-DCMAKE_CXX_COMPILER={}".format(env['CXX'])
+            cmake_args.append("-DCMAKE_CXX_COMPILER={}".format(env['CXX']))
 
         if platform.system() == "Windows":
             if sys.maxsize > 2**32:
