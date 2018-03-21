@@ -35,9 +35,13 @@ build_for_readthedocs = False
 if os.getenv('READTHEDOCS') is not None:
     build_for_readthedocs = True
 
-build_gromacs = False
-if build_for_readthedocs:
+if os.getenv('BUILDGROMACS') is not None:
     build_gromacs = True
+else:
+    if build_for_readthedocs:
+        build_gromacs = True
+    else:
+        build_gromacs = False
 
 
 def get_gromacs(url, cmake_args=[], build_args=[]):
@@ -66,6 +70,7 @@ def get_gromacs(url, cmake_args=[], build_args=[]):
             archive = zipfile.ZipFile(fh)
             # # Get top-level directory name in archive
             # root = archive.next().name
+            root = archive.namelist()[0]
             # Extract all under top-level to source directory
             archive.extractall(path=sourcedir)
     except:
@@ -165,6 +170,13 @@ class CMakeGromacsBuild(build_ext):
         build_args = ['--config', cfg]
         cmake_args = ['-DPYTHON_EXECUTABLE=' + sys.executable,
                       ]
+
+        env = os.environ.copy()
+        if 'CC' in env:
+            cmake_args += "-DCMAKE_C_COMPILER={}".format(env['CC'])
+        if 'CXX' in env:
+            cmake_args += "-DCMAKE_CXX_COMPILER={}".format(env['CXX'])
+
         if platform.system() == "Windows":
             if sys.maxsize > 2**32:
                 cmake_args += ['-A', 'x64']
@@ -185,7 +197,8 @@ class CMakeGromacsBuild(build_ext):
             gmxapi_DIR = os.getenv('gmxapi_DIR')
             if gmxapi_DIR is not None:
                 GROMACS_DIR = gmxapi_DIR
-            GROMACS_DIR = ""
+            else:
+                GROMACS_DIR = ""
 
         # Build and install a private copy of GROMACS, if necessary.
 
@@ -199,13 +212,16 @@ class CMakeGromacsBuild(build_ext):
             gromacs_url = "https://github.com/kassonlab/gromacs-gmxapi/archive/dev_0_0_4.zip"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
             extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
-                                '-DGMX_FFT_LIBRARY=fftpack']
+                                '-DGMX_FFT_LIBRARY=fftpack',
+                                '-DGMX_GPU=OFF',
+                                '-DGMX_THREAD_MPI=ON']
 
             # Warning: make sure not to recursively build the Python module...
             get_gromacs(gromacs_url,
                         cmake_args + extra_cmake_args,
                         build_args)
             GROMACS_DIR = gmxapi_DIR
+        env['GROMACS_DIR'] = GROMACS_DIR
 
         #
         staging_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gmx')
@@ -218,24 +234,26 @@ class CMakeGromacsBuild(build_ext):
         # CMake will be run in working directory build_temp
         print("build_temp is {}".format(self.build_temp))
 
-        env = os.environ.copy()
-        env['GROMACS_DIR'] = GROMACS_DIR
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
-        cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir]
-        if platform.system() == "Windows":
-            cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
+
+        # cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir]
+        cmake_args += ['-DCMAKE_INSTALL_PREFIX=' + extdir]
+        # if platform.system() == "Windows":
+        #     cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
         try:
             import cmake
             cmake_bin = os.path.join(cmake.CMAKE_BIN_DIR, 'cmake')
         except:
             raise
+
         cmake_command = [cmake_bin, ext.sourcedir] + cmake_args
         print("Calling CMake: {}".format(' '.join(cmake_command)))
-        subprocess.check_call([cmake_bin, ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
-        cmake_command = [cmake_bin, '--build', '.'] + build_args
+        subprocess.check_call(cmake_command, cwd=self.build_temp, env=env)
+
+        cmake_command = [cmake_bin, '--build', '.', '--target', 'install'] + build_args
         print("Calling CMake: {}".format(' '.join(cmake_command)))
-        subprocess.check_call([cmake_bin, '--build', '.'] + build_args, cwd=self.build_temp)
+        subprocess.check_call(cmake_command, cwd=self.build_temp)
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
@@ -274,7 +292,7 @@ setup(
     # optional targets:
     #   docs requires 'docutils', 'sphinx>=1.4', 'sphinx_rtd_theme'
     #   build_gromacs requires 'cmake>=3.4'
-    install_requires=['setuptools>=28', 'scikit-build', 'cmake', 'mpi4py'],
+    install_requires=['setuptools>=28', 'scikit-build', 'cmake', 'mpi4py', 'networkx'],
 
     author='M. Eric Irrgang',
     author_email='ericirrgang@gmail.com',
@@ -289,10 +307,8 @@ setup(
 
     # Bundle some files needed for testing
     package_data = package_data,
-    # test suite is invoked via `tox` or with `pytest`
-    #tests_require = ['virtualenv', 'tox', 'numpy'],
+
     cmdclass={'build_ext': CMakeGromacsBuild},
-#    test_suite = 'gmx.test.test_gmx',
 
     zip_safe=False
 )
