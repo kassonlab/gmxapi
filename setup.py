@@ -291,7 +291,7 @@ setup(
     # optional targets:
     #   docs requires 'docutils', 'sphinx>=1.4', 'sphinx_rtd_theme'
     #   build_gromacs requires 'cmake>=3.4'
-    install_requires=['setuptools>=28', 'scikit-build', 'cmake', 'mpi4py', 'networkx'],
+    install_requires=['setuptools>=28', 'scikit-build', 'cmake', 'networkx'],
 
     author='M. Eric Irrgang',
     author_email='ericirrgang@gmail.com',
