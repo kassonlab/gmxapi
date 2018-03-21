@@ -185,13 +185,13 @@ def shared_data_maker(element):
             self.comm = context._communicator
             self.name = element.name
             params = element.params
-            # First draft: params contains two elements: a serialized args and a serialized kwargs
+            # Params contains a dictionary of kwargs
             logger.debug("Processing parameters {}".format(params))
-            assert len(params) == 2
-            self.args = json.loads(params[0])
-            assert isinstance(self.args, list)
-            self.kwargs = json.loads(params[1])
-            assert isinstance(self.kwargs, dict)
+            assert isinstance(params, dict)
+            kwargs = {name: params[name] for name in params}
+            self.args = kwargs['args']
+            self.kwargs = kwargs['kwargs']
+
             # The builder can hold an updater to be provided to the subscriber at launch. The updater is
             # a function reference that the user provides to perform a desired periodic action. Not sure
             # how this will work in the future. Allowing arbitrary Python code to be provided during job
@@ -374,6 +374,8 @@ class ParallelArrayContext(object):
         # This setter must be called after the operations map has been populated.
         self.work = work
 
+        self._api_object = gmx.core.Context()
+
     @property
     def work(self):
         return self.__work
@@ -426,7 +428,7 @@ class ParallelArrayContext(object):
                 assert element.namespace in self.__operations
                 if not element.operation in self.__operations[element.namespace]:
                     if self.rank < 1:
-                        logger.error(self.__operations)
+                        logger.error("Operation {} not found in map {}".format(element.operation, str(self.__operations)))
                     # This check should be performed when deciding if the context is appropriate for the work.
                     # If we are just going to use a try/catch block for this test, then we should differentiate
                     # this exception from those raised due to incorrect usage.
@@ -477,7 +479,7 @@ class ParallelArrayContext(object):
     def __load_tpr(self, element):
         """Implement the gromacs.load_tpr operation.
 
-        Updates the minimum width of the workflow parallelism. Stores a null API object.
+        Updates the minimum width of the workflow parallelism. Does not add any API object to the graph.
         """
         class Builder(object):
             def __init__(self, tpr_list):
@@ -498,7 +500,7 @@ class ParallelArrayContext(object):
                     width = max(width, dag.graph['width'])
                 dag.graph['width'] = width
 
-        return Builder(element.params)
+        return Builder(element.params['input'])
 
     def __md(self, element):
         """Implement the gmxapi.md operation by returning a builder that can populate a data flow graph for the element.
@@ -520,6 +522,7 @@ class ParallelArrayContext(object):
                 # Other dependencies in the element may register potentials when subscribed to.
                 self.potential = []
                 self.input_nodes = []
+                self.runtime_params = element.params
             def add_subscriber(self, builder):
                 """The md operation does not yet have any subscribeable facilities."""
                 pass
@@ -550,12 +553,17 @@ class ParallelArrayContext(object):
                     dag.nodes[name]['system'] = system
                     for potential in potential_list:
                         system.add_mdmodule(potential)
-                    dag.nodes[name]['session'] = system.launch()
+                    mdargs = gmx.core.MDArgs()
+                    mdargs.set(self.runtime_params)
+                    context = element.workspec._context._api_object
+                    context.setMDArgs(mdargs)
+                    dag.nodes[name]['session'] = system.launch(context)
                     dag.nodes[name]['close'] = dag.nodes[name]['session'].close
                     def runner():
                         """Currently we only support a single call to run."""
                         def done():
                             raise StopIteration()
+                        # Replace the runner with a stop condition for subsequent passes.
                         dag.nodes[name]['run'] = done
                         return dag.nodes[name]['session'].run()
                     dag.nodes[name]['run'] = runner
@@ -658,7 +666,7 @@ class ParallelArrayContext(object):
         if (self.size < comm_size):
             warnings.warn('MPI context is wider than necessary to run this work: array width {} vs. size {}.'.format(self.size, comm_size))
 
-        print(graph)
+        # print(graph)
         logger.debug(("Launching graph {}.".format(graph)))
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
@@ -788,7 +796,7 @@ def get_context(work=None):
             element = workflow.WorkElement.deserialize(work.elements[dependency])
             if element.operation == 'load_tpr':
                 if tpr_input is None:
-                    tpr_input = list(element.params)
+                    tpr_input = list(element.params['input'])
                 else:
                     raise exceptions.ApiError('This Context can only handle work specifications with a single load_tpr operation.')
         if tpr_input is None:

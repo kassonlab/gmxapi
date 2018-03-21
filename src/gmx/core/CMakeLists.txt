@@ -51,6 +51,7 @@ find_package(gmxapi 0.0.4 REQUIRED
 pybind11_add_module(pygmx_core
                     core.h
 					core.cpp
+					export_context.cpp
 					export_md.cpp
 					export_system.cpp
 					gmxpy_api.h

@@ -1,10 +1,18 @@
+#include "core.h"
+
 #include <iostream>
-#include "pysystem.h"
 
 #include "gmxapi/md.h"
+#include "gmxapi/context.h"
 #include "gmxapi/session.h"
 #include "gmxapi/status.h"
 #include "gmxapi/system.h"
+
+#include "pysystem.h"
+
+// Note that PyCapsule symbols from Python.h should be imported by way of the pybind headers, so let's not
+// muddy the waters by explicitly including Python.h here unless we want to get more particular about the
+// CMake configuration.
 
 namespace gmxpy
 {
@@ -17,14 +25,24 @@ namespace py = pybind11;
 
 void export_system(py::module &m)
 {
+    using ::gmxapi::System;
+    using ::gmxapi::Context;
+
     // Export system container class
-    py::class_< ::gmxapi::System, std::shared_ptr<::gmxapi::System> > system(m, "MDSystem");
+    py::class_<System, std::shared_ptr<System> > system(m, "MDSystem");
     system.def(py::init(), "A blank system object is possible, but not useful. Use a helper function.");
     system.def("launch",
-               [](::gmxapi::System* system){ return system->launch(); },
+               [](System* system){ return system->launch(); },
                "Launch the configured workflow in the default context.");
+    system.def("launch",
+                [](System* system, std::shared_ptr<Context> context)
+                {
+                    return system->launch(context);
+                },
+                "Launch the configured workflow in the provided context.");
+
     system.def("add_mdmodule",
-               [](::gmxapi::System* system, py::object force_object){
+               [](System* system, py::object force_object){
                    // If force_object has a bind method, give it a PyCapsule with a pointer
                    // to our C++ object.
                    if (py::hasattr(force_object, "bind"))
@@ -41,6 +59,7 @@ void export_system(py::module &m)
                            {
                                auto holder_ptr = (gmxapi::MDHolder*) PyCapsule_GetPointer(o, gmxapi::MDHolder_Name);
                                delete holder_ptr;
+                               // \todo double-check whether there is something we should do to invalidate a PyCapsule.
                            };
                        };
                        auto capsule = py::capsule(holder, gmxapi::MDHolder_Name, deleter);
@@ -58,7 +77,6 @@ void export_system(py::module &m)
                    }
                },
                "Set a restraint potential for the system.");
-
 
     // Export session class
     // \todo relocate

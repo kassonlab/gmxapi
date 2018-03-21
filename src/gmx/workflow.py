@@ -57,13 +57,13 @@ Array sim example
 Single-sim with plugin
 ::
     >>> work = gmx.workflow.from_tpr(filename)
-    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
+    >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
     >>> work.add_dependency(potential)
     >>> gmx.run(work)
     >>>
     >>> # The above is shorthand for
     >>> work = gmx.workflow.from_tpr(filename)
-    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
+    >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
     >>> work['md'].add_mdmodule(potential)
     >>> with gmx.context.Context(work) as session:
     ...    session.run()
@@ -71,14 +71,14 @@ Single-sim with plugin
 Array sim with plugin
 ::
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
-    >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0)
+    >>> potential = myplugin.EnsembleRestraint(sites=[1,4], R0=2.0, k=10000.0)
     >>> gmx.add_potential(md, potential)
     >>> gmx.run(work)
 
 The above is shorthand for
 ::
     >>> work = gmx.workflow.from_tpr(filename)
-    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0)
+    >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
     >>> work['md'].add_mdmodule(potential)
     >>> global_context = gmx.context.ParallelArrayContext(work)
     >>> my_id = global_context.local_id
@@ -101,7 +101,7 @@ The above is shorthand for
     >>> # Create work spec and get handle to MD work unit
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> workdata = gmx.workflow.SharedDataElement()
-    >>> potential = myplugin.HarmonicRestraint([1,4], R0=2.0, k=10000.0, workdata=workdata)
+    >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0, workdata=workdata)
     >>> # EnsembleRestraint is dependent on workdata, so `workdata` must be added to
     >>> # `work` before `potential` can be added to `work`. Combine specs.
     >>> md.workflow.add(workdata)
@@ -149,7 +149,7 @@ from . import exceptions
 import gmx
 from gmx import logging
 
-__all__ = ['WorkSpec', 'SharedDataElement', 'WorkElement']
+__all__ = ['WorkSpec', 'WorkElement']
 
 # Module-level logger
 logger = logging.getLogger(__name__)
@@ -193,28 +193,40 @@ class WorkSpec(object):
 
     The work specification schema needs to be able to represent something like the following.
     ::
-        version: "gmxapi_workspec_1_0"
-        elements:
-            myinput:
-                namespace: "gromacs"
-                operation: "load_tpr"
-                params: ["tpr_filename1", "tpr_filename2"]
-            mydata:
-                namespace: "gmxapi"
-                operation: "open_global_data_with_barrier"
-                params: ["data_filename"]
-            mypotential:
-                namespace: "myplugin"
-                operation: "create_mdmodule"
-                params: [...]
+    {
+        "version": "gmxapi_workspec_1_0",
+        "elements":
+        {
+            "myinput":
+            {
+                "namespace": "gromacs",
+                "operation": "load_tpr",
+                "params": {"input": ["tpr_filename1", "tpr_filename2"]}
+            },
+            "mydata":
+            {
+                "namespace": "gmxapi",
+                "operation": "open_global_data_with_barrier",
+                "params": ["data_filename"]
+            },
+            "mypotential":
+            {
+                "namespace": "myplugin",
+                "operation": "create_mdmodule",
+                params: {...},
                 depends: [mydata]
-            mysim:
-                namespace: "gmxapi"
-                operation: "md"
-                depends: [myinput, mypotential]
+            },
+            "mysim":
+            {
+                "namespace": "gmxapi",
+                "operation": "md",
+                "depends": ["myinput", "mypotential"]
+            }
+        }
+    }
 
     todo: Params schema incomplete!
-    We can say params is a list, but what are the elements? What if parameters need to be key--value pairs or vectors? We could assume that the value of params is some serialized data that the operation is required to know how to process, but for the moment, we are assuming it is just a list of positional arguments.
+    Working definition: params is a key--value map in which keys are strings and values can be any JSON-serializeable data.
     """
     def __init__(self):
         self.version = workspec_version
@@ -288,6 +300,9 @@ class WorkSpec(object):
     #     """Remove named element from work specification.
     #
     #     Does not delete references to WorkElement objects, but WorkElement objects will be moved to a None WorkSpec."""
+    # To implement, WorkElement attributes should be reworked as properties that dynamically act on the
+    # workspec reference. Additionally, WorkSpec may have to keep weak references to WorkElements in order
+    # to reset the WorkElement.workspec strong reference.
 
     def add(self, spec):
         """
@@ -324,6 +339,9 @@ class WorkSpec(object):
         format is unspecified.
 
         For json output, use WorkSpec.serialize(). For output in the form of valid Python, use repr().
+
+        \todo I don't see a compelling reason not to make str(WorkSpec) == WorkSpec.serialize()
+        with index=4
         """
         output = ""
 
@@ -352,7 +370,7 @@ class WorkSpec(object):
 # sensible distinction between the WorkElement abstraction and the API objects and DAG nodes.
 class WorkElement(object):
     """Encapsulate an element of a work specification."""
-    def __init__(self, namespace="gmxapi", operation=None, params=(), depends=()):
+    def __init__(self, namespace="gmxapi", operation=None, params=None, depends=()):
         self.namespace = str(namespace)
         # We can add an operations submodule to validate these. E.g. self.operation = gmx.workflow.operations.normalize(operation)
         if operation is not None:
@@ -361,7 +379,12 @@ class WorkElement(object):
             raise exceptions.UsageError("Invalid argument type for operation.")
 
         # \todo It is currently non-sensical to update any attributes after adding to a workspec, but nothing prevents it.
-        self.params = list(params)
+        if params is None:
+            self.params = {}
+        elif isinstance(params, dict):
+            self.params = {name: params[name] for name in params}
+        else:
+            raise exceptions.UsageError("If provided, params must be a dictionary of keyword arguments")
         self.depends = list(depends)
 
         # The Python class for work elements keeps a strong reference to a WorkSpec object containing its description
@@ -417,51 +440,24 @@ class WorkElement(object):
                     workspec.add_element(element)
         return element
 
-
-class MDElement(WorkElement):
-    """Work element with MD-specific extensions.
-
-    The schema may not need to be changed, but the API object may be expected to provide additional functionality.
-    """
-    def __init__(self):
-        """Create a blank MDElement representation.
-
-        It may be appropriate to insist on creating objects of this type via helpers or factories, particularly if
-        creation requires additional parameters.
-        """
-        super(MDElement, self).__init__(namespace="gmxapi", operation="md")
-
-    def add_potential(self, potential):
-        """Attach an additional MD potential to the simulator.
-
-        Args:
-            potential :
-
-        This operation creates a dependency in a WorkSpec.
-        If the MDElement is not already in a WorkSpec, one will be created.
-        If the potential is not already in the same WorkSpec as the MDElement, it will be moved.
-        Attempting to add a potential that has dependencies in a different WorkSpec than the MDElement is an error.
-        If this appears to be a problem, consider merging the two WorkSpecs first with WorkSpec.add.
-        """
-
 class SharedDataElement(WorkElement):
     """Work element with MD-specific extensions.
 
     The schema may not need to be changed, but the API object may be expected to provide additional functionality.
     """
-    def __init__(self, args, kwargs, name=None):
+    def __init__(self, params, name=None):
         """Create a blank SharedDataElement representation.
 
         It may be appropriate to insist on creating objects of this type via helpers or factories, particularly if
         creation requires additional parameters.
         """
-        import json
-        self.args = json.dumps(args)
-        self.kwargs = json.dumps(kwargs)
+        self.args = params['args']
+        self.kwargs = params['kwargs']
         super(SharedDataElement, self).__init__(namespace="gmxapi",
                                                 operation="global_data",
-                                                params=[self.args, self.kwargs])
+                                                params={'args': self.args, 'kwargs': self.kwargs})
         self.name = name
+
 
 def get_source_elements(workspec):
     """Get an iterator of the starting nodes in the work spec.
@@ -485,11 +481,24 @@ def get_source_elements(workspec):
             element.workspec = workspec
             yield(element)
 
-def from_tpr(input=None):
+def from_tpr(input=None, **kwargs):
     """Create a WorkSpec from a (list of) tpr file(s).
 
-    :param input: string or list of strings giving the filename(s) of simulation input
-    :return: simulation member of a gmx.workflow.WorkSpec object
+    Required Args:
+        input: string or list of strings giving the filename(s) of simulation input
+
+    Optional Keyword Args:
+        grid (tuple): Domain decomposition grid divisions (nx, ny, nz). (-dd)
+        pme_ranks (int): number of separate ranks to be used for PME electrostatics. (-npme)
+        threads (int): Total number of threads to start. (-nt)
+        tmpi (int): number of thread-MPI ranks to start. (-ntmpi)
+        threads_per_rank (int): number of OpenMP threads to start per MPI rank. (-ntomp)
+        pme_threads_per_rank (int): Number of OpenMP threads per PME rank. (-ntomp_pme)
+        steps (int): Override input files and run for this many steps. (-nsteps)
+        max_hours (float): Terminate after 0.99 times this many hours if simulation is still running. (-maxh)
+
+    Returns:
+        simulation member of a gmx.workflow.WorkSpec object
 
     Produces a WorkSpec with the following data.
 
@@ -507,7 +516,7 @@ def from_tpr(input=None):
     """
     import os
 
-    usage = "argument to from_tpr() should be a valid filename or list of filenames."
+    usage = "argument to from_tpr() should be a valid filename or list of filenames, followed by optional key word arguments."
 
     # Normalize to tuple input type.
     if isinstance(input, str):
@@ -524,11 +533,34 @@ def from_tpr(input=None):
             arg_path = os.path.abspath(arg)
             raise exceptions.UsageError(usage + " Got {}".format(arg_path))
 
+    # \todo These are runner parameters, not MD parameters, and should be in the call to gmx.run() instead of here.
+    params = {}
+    for arg_key in kwargs:
+        if arg_key == 'grid' or arg_key == 'dd':
+            params['grid'] = tuple(kwargs[arg_key])
+        elif arg_key == 'pme_ranks' or arg_key == 'npme':
+            params['pme_ranks'] = int(kwargs[arg_key])
+        elif arg_key == 'threads' or arg_key == 'nt':
+            params['threads'] = int(kwargs[arg_key])
+        elif arg_key == 'tmpi' or arg_key == 'ntmpi':
+            params['tmpi'] = int(kwargs[arg_key])
+        elif arg_key == 'threads_per_rank' or arg_key == 'ntomp':
+            params['threads_per_rank'] = int(kwargs[arg_key])
+        elif arg_key == 'pme_threads_per_rank' or arg_key == 'ntomp_pme':
+            params['pme_threads_per_rank'] = int(kwargs[arg_key])
+        elif arg_key == 'steps' or arg_key == 'nsteps':
+            params['steps'] = int(kwargs[arg_key])
+        elif arg_key == 'max_hours' or arg_key == 'maxh':
+            params['max_hours'] = float(kwargs[arg_key])
+        else:
+            raise exceptions.UsageError("Invalid key word argument: {}. {}".format(arg_key, usage))
+
+
     # Create an empty WorkSpec
     workspec = WorkSpec()
 
     # Create and add the Element for the tpr file(s)
-    inputelement = WorkElement(namespace='gromacs', operation="load_tpr", params=tpr_list)
+    inputelement = WorkElement(namespace='gromacs', operation="load_tpr", params={'input': tpr_list})
     inputelement.name = "tpr_input"
     if inputelement.name not in workspec.elements:
         # Operations such as this need to be replaced with accessors or properties that can check the validity of the WorkSpec
@@ -538,7 +570,7 @@ def from_tpr(input=None):
     # Create and add the simulation element
     # We can add smarter handling of the `depends` argument, but it is only critical to check when adding the element
     # to a WorkSpec.
-    mdelement = WorkElement(operation="md", depends=[inputelement.name])
+    mdelement = WorkElement(operation="md", depends=[inputelement.name], params=params)
     mdelement.name = "md_sim"
     # Check that the element has not already been added, but that its dependency has.
     workspec.add_element(mdelement)

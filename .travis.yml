@@ -46,7 +46,7 @@ install:
   - make -j4 install
   - popd
   - popd
-  - python -m pip install --upgrade pip
+  - python -m pip install --upgrade pip --user
   - pip install --upgrade setuptools --user
   - pip install virtualenv pytest cmake numpy mpi4py networkx --user
 
