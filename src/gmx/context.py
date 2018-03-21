@@ -589,7 +589,10 @@ class ParallelArrayContext(object):
         a single pass.
         """
 
-        from mpi4py import MPI
+        try:
+            from mpi4py import MPI
+        except:
+            raise exceptions.OptionalFeatureNotAvailableError("ParallelArrayContext requires Python package mpi4py to function.")
 
         if self._session is not None:
             raise exceptions.Error('Already running.')
