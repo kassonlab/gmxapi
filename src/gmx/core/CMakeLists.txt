@@ -93,12 +93,14 @@ set_target_properties(pygmx_core PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
 
 target_link_libraries(pygmx_core PRIVATE Gromacs::gmxapi)
 
+include(GNUInstallDirs)
+
 # workaround for relocated package when installing nested gromacs on readthedocs.org
 if(DEFINED ENV{READTHEDOCS} OR DEFINED ENV{BUILDGROMACS})
 	if(UNIX AND NOT APPLE)
-    	set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH "$ORIGIN/data/gromacs/lib/")
+    	set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH "$ORIGIN/data/gromacs/${CMAKE_INSTALL_LIBDIR}")
 	elseif(APPLE)
-		set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH "@loader_path/data/gromacs/lib")
+		set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH "@loader_path/data/gromacs/${CMAKE_INSTALL_LIBDIR}")
 	endif()
 endif()
 set_target_properties(pygmx_core PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
