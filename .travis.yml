@@ -51,6 +51,6 @@ install:
   - pip install virtualenv pytest cmake numpy mpi4py networkx --user
 
 script:
-  - python setup.py install --verbose --user
+  - GROMACS_DIR=$HOME pip install . --verbose --user
   - mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose 
 
