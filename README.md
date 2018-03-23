@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=dev_0_0_4)](https://travis-ci.org/kassonlab/gmxapi)
+[![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=readthedocs)](http://gmxapi.readthedocs.io/en/readthedocs/?badge=readthedocs)
 
 The gmxapi project provides interfaces for managing and extending molecular dynamics simulation workflows.
 In this repository, a Python package provides the `gmx` module for high-level interaction with GROMACS.
@@ -204,7 +205,7 @@ if you come up with any tips or tricks!
 Documentation for the Python classes and functions in the gmx module can be accessed in the usual ways, using `pydoc`
 from the command line or `help()` in an interactive Python session.
 
-Additional documentation can be browsed on readthedocs.org or built with Sphinx after installation.
+Additional documentation can be browsed on [readthedocs.org](http://gmxapi.readthedocs.io/en/readthedocs/) or built with Sphinx after installation.
 
 To build the user documentation locally, first make sure you have sphinx installed, such as by doing
 a `pip install sphinx` or by using whatever package management system you are familiar with.
