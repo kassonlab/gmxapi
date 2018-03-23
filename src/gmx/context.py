@@ -612,7 +612,8 @@ class ParallelArrayContext(object):
         # Set up a simple ensemble resource
         def update(send, recv):
             self._communicator.Allreduce(send, recv)
-            recv /= self.size
+            buffer = numpy.array(recv, copy=False)
+            buffer /= self.size
             # These will end up in the working directory and each ensemble member will have one
             filename = "rank{}part{:04d}".format(self.rank, self.part)
             numpy.savez(filename, recv=recv)
