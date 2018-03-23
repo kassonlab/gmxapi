@@ -251,6 +251,17 @@ are no spaces before or after the equals sign ('=') when specifying the GROMACS 
 
 # Troubleshooting
 
+Two of the easiest problems to run into are incompatible compilers and incompatible Python.
+Try to make sure that you use the same C and C++ compilers for GROMACS, for the Python package,
+and for the sample plugin. These compilers should also correspond to the `mpicc` compiler
+wrapper used to compile `mpi4py`. In order to build the Python package, you will need the
+Python headers or development installation, which might not already be installed on the machine
+you are using. (If not, then you will get an error about missing `Python.h` at some point.)
+If you have multiple Python installations (or modules available on an HPC system), you could
+try one of the other Python installations, or you or a system administrator could install an
+appropriate Python dev package. Alternatively, you might try installing your own Anaconda or
+MiniConda in your home directory.
+
 If an attempted installation fails with CMake errors about missing "gmxapi", make
 sure that Gromacs is installed and can be found during installation. For instance,
 
