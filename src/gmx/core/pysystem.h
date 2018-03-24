@@ -1,10 +1,10 @@
 #ifndef PYGMX_SYSTEM_H
 #define PYGMX_SYSTEM_H
 
+#include "core.h"
+
 #include <memory>
 #include <string>
-
-#include "core.h"
 
 #include "gmxapi/gmxapi.h"
 #include "gmxapi/system.h"

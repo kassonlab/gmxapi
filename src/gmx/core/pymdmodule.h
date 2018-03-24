@@ -5,11 +5,11 @@
 #ifndef GMXPY_PYMDMODULE_H
 #define GMXPY_PYMDMODULE_H
 
+#include "pybind11/pybind11.h"
+
 #include <memory>
 #include "gmxapi/md.h"
 #include "gmxapi/md/mdmodule.h"
-
-#include "pybind11/pybind11.h"
 
 namespace gmxpy
 {
