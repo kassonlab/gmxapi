@@ -1,7 +1,7 @@
-#include <gmxapi/gmxapi.h>
-#include <iostream>
 #include "core.h"
+#include <iostream>
 
+#include "gmxapi/gmxapi.h"
 #include "gmxapi/md.h"
 #include "gmxapi/md/mdmodule.h"
 

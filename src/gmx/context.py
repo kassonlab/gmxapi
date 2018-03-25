@@ -588,7 +588,7 @@ class ParallelArrayContext(object):
         instantiate objects to perform the work. In the first implementation, we kind of muddle things into
         a single pass.
         """
-
+        import numpy
         try:
             from mpi4py import MPI
         except:
@@ -607,6 +607,20 @@ class ParallelArrayContext(object):
         self._communicator = communicator
 
         assert not self.rank is None
+
+        self.part = 0
+        # Set up a simple ensemble resource
+        def update(send, recv):
+            self._communicator.Allreduce(send, recv)
+            buffer = numpy.array(recv, copy=False)
+            buffer /= self.size
+            # These will end up in the working directory and each ensemble member will have one
+            filename = "rank{}part{:04d}".format(self.rank, self.part)
+            numpy.savez(filename, recv=recv)
+            self.part += 1
+
+        self.ensemble_update = update
+
 
         ###
         # Process the work specification.
