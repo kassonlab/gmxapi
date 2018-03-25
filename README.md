@@ -96,7 +96,13 @@ install location below.
 
 ## Anaconda
 
-Get and install Anaconda https://docs.anaconda.com/anaconda/install/
+Get and install [Anaconda](https://docs.anaconda.com/anaconda/install/). Alternatively, on an HPC system
+it may already be provided with a `module`s system. For example:
+
+    $ module load gcc
+    $ module load cmake
+    $ module load anaconda3
+    $ module load openmpi
 
 You don't have to follow all of the instructions for setting up your login profile if you don't want to,
 but if you don't, then the `conda` and `activate` commands below will have to be prefixed by your
@@ -104,17 +110,39 @@ conda installation location. E.g. `~/miniconda3/bin/conda info` or `source ~/min
 
 Create a conda virtual environment. Replace `myEnv` below with whatever convenient name you choose.
 
-    conda create -n myEnv python=3
+    $ conda create -n myGmxapiEnv python=3 pip setuptools cmake networkx mpi4py
 
 Activate, or enter the environment.
 
-    source activate myEnv
+    $ source activate myGmxapiEnv
 
-Install the Python module. At some point, this will be simplified, but for right now please use the instructions above.
+Install the GROMACS gmxapi fork.
 
-Note: we do not yet have a robust suggestion for setting up `tox` for running the test suite.
+    $ git clone https://github.com/kassonlab/gromacs-gmxapi.git gromacs
+    $ mkdir build
+    $ cd build
+    $ cmake ../gromacs -DGMX_GPU=OFF -DGMX_THREAD_MPI=ON -DCMAKE_CXX_COMPILER=`which g++` -DCMAKE_C_COMPILER=`which gcc` -DCMAKE_INSTALL_PREFIX=$HOME/gromacs-gmxapi
+    $ make -j12 && make install
+    $ source $HOME/gromacs-gmxapi/bin/GMXRC
+
+Make sure dependencies are up to date.
+
+    $ python -m pip install --upgrade pip
+    $ pip install --upgrade setuptools
+    $ pip install --upgrade scikit-build cmake networkx
+    $ MPICC=`which mpicc` pip install --upgrade mpi4py
+    $ git clone 
+
+Install the Python module.
+
+    $ git clone https://github.com/kassonlab/gmxapi.git gmxapi
+    $ cd gmxapi
+    $ CC=`which gcc` CXX=`which g++` pip install .
+
+Note: we do not yet have a robust suggestion for setting up `tox` for running the test suite in a conda environment.
 If you come up with a recipe, please let us know. Otherwise, don't worry if you are able to install
-the package but can't get weird errors when you try to run the tests.
+the package but can't get weird errors when you try to run the tests with tox. Instead, just use `pytest` or run the tests in a regular
+(non-conda) Python virtualenv or no virtualenv at all.
 
 ## virtualenv
 
