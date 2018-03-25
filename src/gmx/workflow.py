@@ -21,8 +21,8 @@ inspect the properties of a WorkSpec to determine if the work can be launched on
 .. ``ARRAY``: work requires parallel execution to satisfy data dependencies.
 
 
-Single-sim example
-::
+Single-sim example::
+
     >>> md = gmx.workflow.from_tpr(filename)
     >>> gmx.run(md)
     >>>
@@ -36,8 +36,8 @@ Single-sim example
     >>> with gmx.context.Context(md.workspec) as session:
     ...    session.run()
 
-Array sim example
-::
+Array sim example::
+
     >>> work = gmx.workflow.from_tpr([filename1, filename2])
     >>> gmx.run(work)
     >>>
@@ -54,8 +54,8 @@ Array sim example
     >>> with gmx.context.Context(my_work) as session:
     ...    session.run()
 
-Single-sim with plugin
-::
+Single-sim with plugin::
+
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
     >>> work.add_dependency(potential)
@@ -68,15 +68,15 @@ Single-sim with plugin
     >>> with gmx.context.Context(work) as session:
     ...    session.run()
 
-Array sim with plugin
-::
+Array sim with plugin::
+
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> potential = myplugin.EnsembleRestraint(sites=[1,4], R0=2.0, k=10000.0)
     >>> gmx.add_potential(md, potential)
     >>> gmx.run(work)
 
-The above is shorthand for
-::
+The above is shorthand for::
+
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
     >>> work['md'].add_mdmodule(potential)
@@ -87,8 +87,8 @@ The above is shorthand for
     ...    session.run()
 
 
-Array sim with plugin using global resources
-::
+Array sim with plugin using global resources::
+
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> workdata = gmx.workflow.SharedDataElement()
     >>> numsteps = int(1e-9 / 5e-15) # every nanosecond or so...
@@ -96,8 +96,8 @@ Array sim with plugin using global resources
     >>> md.add_dependency(potential)
     >>> gmx.run(md)
 
-The above is shorthand for
-::
+The above is shorthand for::
+
     >>> # Create work spec and get handle to MD work unit
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> workdata = gmx.workflow.SharedDataElement()
@@ -134,6 +134,7 @@ TBD:
 2.  We may decide that WorkElements are always in some sort of workspec, and that there may be a lot of merging of
     work specs. This would resolve the ambiguity that a WorkElement may or may not be associated with a work spec, but
     it cannot happen right now for several reasons.
+
     * there is not a clear way to move elements with dependents from one work spec to another without some ugly transient states.
     * When an element is serialized and deserialized, there is not a good way of finding the original workspec object ref.
     * We make a lot of use of temporary WorkElement objects for which we don't care about the workspec.
@@ -193,37 +194,38 @@ class WorkSpec(object):
 
     The work specification schema needs to be able to represent something like the following.
     ::
-    {
-        "version": "gmxapi_workspec_1_0",
-        "elements":
+
         {
-            "myinput":
+            "version": "gmxapi_workspec_1_0",
+            "elements":
             {
-                "namespace": "gromacs",
-                "operation": "load_tpr",
-                "params": {"input": ["tpr_filename1", "tpr_filename2"]}
-            },
-            "mydata":
-            {
-                "namespace": "gmxapi",
-                "operation": "open_global_data_with_barrier",
-                "params": ["data_filename"]
-            },
-            "mypotential":
-            {
-                "namespace": "myplugin",
-                "operation": "create_mdmodule",
-                params: {...},
-                depends: [mydata]
-            },
-            "mysim":
-            {
-                "namespace": "gmxapi",
-                "operation": "md",
-                "depends": ["myinput", "mypotential"]
+                "myinput":
+                {
+                    "namespace": "gromacs",
+                    "operation": "load_tpr",
+                    "params": {"input": ["tpr_filename1", "tpr_filename2"]}
+                },
+                "mydata":
+                {
+                    "namespace": "gmxapi",
+                    "operation": "open_global_data_with_barrier",
+                    "params": ["data_filename"]
+                },
+                "mypotential":
+                {
+                    "namespace": "myplugin",
+                    "operation": "create_mdmodule",
+                    params: {...},
+                    depends: [mydata]
+                },
+                "mysim":
+                {
+                    "namespace": "gmxapi",
+                    "operation": "md",
+                    "depends": ["myinput", "mypotential"]
+                }
             }
         }
-    }
 
     todo: Params schema incomplete!
     Working definition: params is a key--value map in which keys are strings and values can be any JSON-serializeable data.
@@ -304,26 +306,26 @@ class WorkSpec(object):
     # workspec reference. Additionally, WorkSpec may have to keep weak references to WorkElements in order
     # to reset the WorkElement.workspec strong reference.
 
-    def add(self, spec):
-        """
-        Merge the provided spec into this one.
-
-        We can't easily replace references to ``spec`` with references to the WorkSpec we are merging into, but we can
-        steal the work elements out of ``spec`` and leave it empty. We could also set an ``alias`` attribute in it or
-        something, but that seems unnecessary. Alternatively, we can set the new and old spec to be equal, but we would
-        need an additional abstraction layer to keep them from diverging again. Since client code will retain references
-        to the elements in the work spec, we need to be clear about when we are duplicating a WorkSpec versus obtaining
-        different references to the same.
-
-        This is an implementation detail that can be unresolved and hidden for now. The high-level interface only
-        requires that client code can bind different workflow elements together in a sensible way and get expected
-        results.
-
-        :param spec: WorkSpec to be merged into this one.
-        :return:
-
-        \todo consider instead a gmx.workflow.merge(workspecA, workspecB) free function that returns a new WorkSpec.
-        """
+    # def add(self, spec):
+    #     """
+    #     Merge the provided spec into this one.
+    #
+    #     We can't easily replace references to ``spec`` with references to the WorkSpec we are merging into, but we can
+    #     steal the work elements out of ``spec`` and leave it empty. We could also set an ``alias`` attribute in it or
+    #     something, but that seems unnecessary. Alternatively, we can set the new and old spec to be equal, but we would
+    #     need an additional abstraction layer to keep them from diverging again. Since client code will retain references
+    #     to the elements in the work spec, we need to be clear about when we are duplicating a WorkSpec versus obtaining
+    #     different references to the same.
+    #
+    #     This is an implementation detail that can be unresolved and hidden for now. The high-level interface only
+    #     requires that client code can bind different workflow elements together in a sensible way and get expected
+    #     results.
+    #
+    #     :param spec: WorkSpec to be merged into this one.
+    #     :return:
+    #
+    #     To do: consider instead a gmx.workflow.merge(workspecA, workspecB) free function that returns a new WorkSpec.
+    #     """
 
 
     # Not sure we want to do serialization and deserialization yet, since we don't currently have a way to
@@ -425,7 +427,7 @@ class WorkElement(object):
     def deserialize(cls, input_string, name=None, workspec=None):
         """Create a new WorkElement object from a serialized representation.
 
-        \todo When subclasses become distinct, this factory function will need to do additional dispatching to create an object of the correct type.
+        When subclasses become distinct, this factory function will need to do additional dispatching to create an object of the correct type.
         Alternatively, instead of subclassing, a slightly heavier single class may suffice, or more flexible duck typing might be better.
         """
         import json

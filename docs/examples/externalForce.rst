@@ -3,27 +3,25 @@ External Force
 ==============
 
 Limited, external potentials can be applied during an MD simulation by attaching additional
-:py:class:`gmx.core.MDModule` objects to the :py:class:`gmx.md.MD` object.
+objects to the MD element.
 
 Example:
 
     >>> import gmx
     >>> import myplugin
     >>> # initialize molecular system
-    >>> my_sim = gmx.System._from_file(tpr_filename)
+    >>> my_sim = gmx.workflow.from_tpr(tpr_filename)
     >>>
     >>> # access custom code
-    >>> potential = myplugin.SomePotential()
-    >>> # bind custom code to simulation
-    >>> my_sim.md.add_potential(potential)
-    >>>
-    >>> # set additional parameters
-    >>> my_params = potential.params
-    >>> my_params.someParam = 10
-    >>> my_params.someOtherParam = "foo"
+    >>> potential = gmx.workflow.WorkElement(namespace="myplugin",
+    ...                                      operation="ensemble_restraint",
+    ...                                      params=params)
+    >>> potential.name = "ensemble_restraint"
+    >>> md.add_dependency(potential)
     >>>
     >>> # run simulation
-    >>> my_sim.run()
+    >>> with gmx.context.ParallelArrayContext(md) as session:
+    ...     session.run()
 
 Restraints
 ==========
@@ -40,7 +38,7 @@ is boiler-plate, so adding a new potential consists of implementing a single fun
 in a new class, defining the input and output parameters, and registering the potential
 (instantiating the templates).
 
-Refer to the sample plugin for a step-by-step walk-through of implementing a new pair restraint.
+Refer to the `sample plugin <https://github.com/kassonlab/sample_restraint>`_ for a step-by-step walk-through of implementing a new pair restraint.
 
 At the Python level, restraint classes are just classes that provide a registration function
 suitable for a call to gmx.md.ExtendedMD.add_potential() (TBD).
