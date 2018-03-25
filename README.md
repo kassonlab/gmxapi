@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=dev_0_0_4)](https://travis-ci.org/kassonlab/gmxapi)
+[![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=master)](https://travis-ci.org/kassonlab/gmxapi)
 [![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=readthedocs)](http://gmxapi.readthedocs.io/en/readthedocs/?badge=readthedocs)
 
 The gmxapi project provides interfaces for managing and extending molecular dynamics simulation workflows.
