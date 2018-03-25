@@ -6,7 +6,7 @@ Build and install
 =================
 
 Download the repository from
-`bitbucket.org/kassonlab/gmxpy <https://bitbucket.org/kassonlab/gmxpy/>`_
+`github.com/kassonlab/gmxapi <https://github.com/kassonlab/gmxapi/>`_
 and refer to the ``README.md`` file for details.
 
 How to
