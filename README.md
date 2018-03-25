@@ -185,15 +185,14 @@ If you will be running the testing suite, you also need `virtualenv` and `tox`.
 
 Get a copy of this repository, if you haven't already. For a released version, you can just download a source package.
 
-    (myenv)$ wget https://github.com/kassonlab/gmxapi/archive/dev_0_0_4.zip
-    (myenv)$ unzip dev_0_0_4.zip
-    (myenv)$ cd gmxapi-dev_0_0_4
+    (myenv)$ wget https://github.com/kassonlab/gmxapi/archive/v0.0.4.zip
+    (myenv)$ unzip v0_0_4.zip
+    (myenv)$ cd gmxapi-v0_0_4
 
 For a development branch, you should probably clone the repository. You may not already have `git` installed on your system or you may need to load a module for it on an HPC system, which you will need to do before trying the following.
 
     (myenv)$ git clone https://github.com/kassonlab/gmxapi.git
     (myenv)$ cd gmxapi
-    (myenv)$ git checkout dev_0_0_4
 
 For simplicity, let this package build and install a local GROMACS for you by setting the BUILDGROMACS environment variable. To be on the safe side, make sure to give hints to use the compilers you intend.
 For instance, if we loaded a gcc module, help make sure pip doesn't default to the system `/bin/cc` or some such.
