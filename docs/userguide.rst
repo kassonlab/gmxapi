@@ -9,6 +9,12 @@ Download the repository from
 `github.com/kassonlab/gmxapi <https://github.com/kassonlab/gmxapi/>`_
 and refer to the ``README.md`` file for details.
 
+Also see
+
+.. toctree::
+
+    examples/externalForce
+
 How to
 ======
 
