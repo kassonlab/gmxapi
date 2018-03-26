@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=master)](https://travis-ci.org/kassonlab/gmxapi)
-[![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=readthedocs)](http://gmxapi.readthedocs.io/en/readthedocs/?badge=readthedocs)
+[![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=latest)](http://gmxapi.readthedocs.io/en/latest/?badge=latest)
 
 The gmxapi project provides interfaces for managing and extending molecular dynamics simulation workflows.
 In this repository, a Python package provides the `gmx` module for high-level interaction with GROMACS.
