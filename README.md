@@ -187,9 +187,9 @@ If you will be running the testing suite, you also need `virtualenv` and `tox`.
 
 Get a copy of this repository, if you haven't already. For a released version, you can just download a source package.
 
-    (myenv)$ wget https://github.com/kassonlab/gmxapi/archive/v0.0.4.zip
-    (myenv)$ unzip v0_0_4.zip
-    (myenv)$ cd gmxapi-v0_0_4
+    (myenv)$ wget https://github.com/kassonlab/gmxapi/archive/master.zip
+    (myenv)$ unzip master.zip
+    (myenv)$ cd gmxapi-master
 
 For a development branch, you should probably clone the repository. You may not already have `git` installed on your system or you may need to load a module for it on an HPC system, which you will need to do before trying the following.
 
