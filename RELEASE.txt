@@ -1,0 +1,18 @@
+Future release notes go here...
+
+When a new release is about to be tagged, version and release information needs to be updated in a few places.
+
+Once the required features in gromacs-gmxapi have been merged to its master branch, update the several lines in
+.travis.yml to reference the gromacs-gmxapi release archive instead of master or a development branch.
+
+Similarly, update the `gromacs_url` embedded in setup.py
+
+After merging the gmxapi development branch to master and before tagging the release, 
+update setup.py so that it writes a version.py file with `release = True`.
+
+Once the release is tagged and any last-minute essentials are cherry-picked to the refreshed development branch,
+bump the version in the development branch in CMakeLists.txt _and_ in setup.py. If / when feature branches
+require new libgmxapi features, `find_package(gmxapi...` can be updated in `src/gmx/core/CMakeLists.txt`. While
+we have the package version check set to REQUIRED, this is probably an immediate update. Sometime after 0.1.0,
+though, we hope we can have some backwards compatibility and leave the libgmxapi version more flexible.
+
