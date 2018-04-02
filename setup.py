@@ -210,10 +210,19 @@ class CMakeGromacsBuild(build_ext):
         if build_gromacs:
             gromacs_url = "https://github.com/kassonlab/gromacs-gmxapi/archive/v0.0.4.zip"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
-            extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
-                                '-DGMX_FFT_LIBRARY=fftpack',
-                                '-DGMX_GPU=OFF',
-                                '-DGMX_THREAD_MPI=ON']
+            if build_for_readthedocs:
+                extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
+                                    '-DGMX_FFT_LIBRARY=fftpack',
+                                    '-DGMX_GPU=OFF',
+                                    '-DGMX_OPENMP=OFF',
+                                    '-DGMX_SIMD=None',
+                                    '-DGMX_USE_RDTSCP=OFF',
+                                    '-DGMX_MPI=OFF']
+            else:
+                extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
+                                    '-DGMX_BUILD_OWN_FFTW=ON',
+                                    '-DGMX_GPU=OFF',
+                                    '-DGMX_THREAD_MPI=ON']
 
             # Warning: make sure not to recursively build the Python module...
             get_gromacs(gromacs_url,
