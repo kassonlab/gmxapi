@@ -208,7 +208,7 @@ class CMakeGromacsBuild(build_ext):
         # Linking is a pain because the package is relocated to the site-packages directory. We should really do this
         # in two stages.
         if build_gromacs:
-            gromacs_url = "https://github.com/kassonlab/gromacs-gmxapi/archive/master.zip"
+            gromacs_url = "https://github.com/kassonlab/gromacs-gmxapi/archive/dev_5.zip"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
             if build_for_readthedocs:
                 extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
