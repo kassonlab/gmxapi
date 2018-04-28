@@ -1,9 +1,0 @@
-======
-Guides
-======
-
-
-.. toctree::
-
-    userguide
-    developerguide

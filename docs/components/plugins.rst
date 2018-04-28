@@ -1,7 +1,10 @@
 ====================
 Simulation internals
 ====================
+.. toctree::
+    :hidden:
 
+    ../examples/externalForce
 
 The applied_forces facility implemented for the electric field module has become
 the starting point for discussions on API requirements to allow less tightly
@@ -16,6 +19,8 @@ during, or after a simulation run. Again, for each use case, we need to conside
 an interface that prevents misuse, provides the minimal access, and hides the
 implementation sufficiently that external or higher-level code cannot invalidate
 assumptions made for optimizations in the core code.
+
+Simulation plugins are further discussed in :doc:`../examples/externalForce`
 
 Simulation loop
 ===============

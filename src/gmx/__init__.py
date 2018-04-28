@@ -33,8 +33,8 @@ new methods, debugging of unexpected simulation behavior, and adaptive workflows
 Installation
 ------------
 
-Download the ``gmxpy`` repository from https://github.com/kassonlab/gmxapi and refer
-to the README.md file for details on installing this Python module.
+Download the repository from https://github.com/kassonlab/gmxapi and refer
+to `docs/install.rst <./install.html>`_ for details on installing this Python module.
 
 The gmxapi library must be installed to build and install the gmx module.
 Retrieve the GROMACS fork from https://github.com/kassonlab/gromacs-gmxapi and
