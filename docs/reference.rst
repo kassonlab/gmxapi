@@ -1,19 +1,9 @@
-=========
-Reference
-=========
+===========================
+gmx Python module reference
+===========================
 
-.. toctree::
-    :hidden:
-
-    reference/python.rst
-
-Concise reference documentation extracted directly from code.
-For more curated instruction, see the :doc:`userguide` and :doc:`developerguide`.
-
+.. Concise reference documentation extracted directly from code.
 .. For new and non-backwards-compatible features, API versions must be given.
-
-Python module reference
-=======================
 
 The Gromacs Python interface is implemented as a high-level scripting interface implemented in pure Python and a lower-level API implemented as a C++ extension.
 The pure Python implementation provides the basic ``gmx`` module and
@@ -22,19 +12,46 @@ while mapping to lower level interfaces that may take a while to sort out. The
 separation also serves as a reminder that different execution contexts may be
 implemented quite diffently, though Python scripts using only the high-level
 interface should execute on all. Bindings to the ``libgromacs`` C++ API are
-provided in the submodule ``gmx.core``.
+provided in the submodule :module:`gmx.core`.
 
-:doc:`reference/python`
+The following documentation is extracted from the ``gmx`` Python module and is also available
+directly, using either ``pydoc`` from the command line or ``help()`` from within Python, such
+as during an interactive session.
 
-C++ API reference
-=================
+Refer to the Python source code itself for additional clarification.
 
-Documentation extracted for public C++ API. All symbols and names appearing in
-the public API headers must be documented to the extent of their visibility to
-external code. Design details are described in the :doc:`developerguide`
-and more implementation details may be available separately in the library
-documentation. If the API components are built in developer mode, links are
-provided for classes that provide additional interfaces to library code. All
-documentation must indicate relevant API versions.
+.. testsetup::
 
-`CPP docs <../doxygen/api-user/html/group__gmxapi.html>`_
+    import gmx
+    from gmx.data import tpr_filename
+
+.. automodule:: gmx
+
+.. automodule:: gmx.system
+    :members:
+
+.. automodule:: gmx.workflow
+    :members:
+
+.. automodule:: gmx.context
+    :members:
+
+.. automodule:: gmx.status
+    :members:
+
+.. automodule:: gmx.exceptions
+    :members:
+
+.. automodule:: gmx.core
+
+.. skipping gmx.core.md_from_tpr
+
+.. autoclass:: gmx.core.MDSystem
+    :members:
+
+.. autoclass:: gmx.core.Status
+    :members:
+
+.. autoclass:: gmx.core.MDModule
+    :members:
+
