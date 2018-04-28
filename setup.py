@@ -208,6 +208,8 @@ class CMakeGromacsBuild(build_ext):
         # Linking is a pain because the package is relocated to the site-packages directory. We should really do this
         # in two stages.
         if build_gromacs:
+            # TODO! We need to distinguish dev branch builds from master branch builds or always build with the
+            # master branch of the dependency. For one thing, as is, this line needs to be toggled for every release.
             gromacs_url = "https://github.com/kassonlab/gromacs-gmxapi/archive/dev_5.zip"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
             if build_for_readthedocs:
