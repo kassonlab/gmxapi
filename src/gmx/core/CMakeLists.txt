@@ -7,7 +7,7 @@
 # cmake was invoked with `-DCMAKE_PREFIX_PATH=...` pointing to the GROMACS
 # installation directory. We can also check now for a GROMACS_DIR environment
 # variable and provide it with the HINTS option.
-find_package(gmxapi 0.0.4 REQUIRED
+find_package(gmxapi 0.0.5 REQUIRED
              HINTS "$ENV{GROMACS_DIR}"
              )
 

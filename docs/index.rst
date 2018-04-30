@@ -9,9 +9,8 @@ based on a GROMACS fork hosted at https://bitbucket.org/kassonlab/gromacs
     :maxdepth: 2
     :caption: Documentation sections
 
-    intro
-    guides
-    reference
+    userguide
+    developerguide
     changelog
 
 ..

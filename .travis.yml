@@ -30,6 +30,11 @@ matrix:
       - gmxapi_DIR=$HOME/gromacs
       - GROMACS_DIR=$HOME/gromacs
 
+# It is clearly a bad idea to have the development branch of a project requiring the development branch
+# of another project in the primary build recipe. We either need to build and test development and master
+# branches distinctly in a build matrix, only build off of tagged releases or the master branch of the
+# dependency, or otherwise find a better solution that allows the master branch to be entirely included in
+# the develop branch.
 before_install:
   - uname -a
   - apt list --installed
@@ -46,7 +51,7 @@ install:
   - make -j4 install
   - popd
   - popd
-  # pip 10 appears to be broken
+  # pip 10.0.0 appears to be broken
   - python -m pip install --upgrade pip==9 --user
   - python -m pip install --upgrade setuptools --user
   - python -m pip install virtualenv --user

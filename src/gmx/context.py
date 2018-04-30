@@ -608,16 +608,21 @@ class ParallelArrayContext(object):
 
         assert not self.rank is None
 
-        self.part = 0
+        self.part = {}
         # Set up a simple ensemble resource
-        def update(send, recv):
+        def update(send, recv, tag=None):
+            assert not tag is None
+            assert str(tag) != ''
+            if not tag in self.part:
+                self.part[tag] = 0
             self._communicator.Allreduce(send, recv)
             buffer = numpy.array(recv, copy=False)
             buffer /= self.size
+            suffix = '_{}.npz'.format(tag)
             # These will end up in the working directory and each ensemble member will have one
-            filename = "rank{}part{:04d}".format(self.rank, self.part)
+            filename = "rank{}part{:04d}{}".format(self.rank, int(self.part[tag]), suffix)
             numpy.savez(filename, recv=recv)
-            self.part += 1
+            self.part[tag] += 1
 
         self.ensemble_update = update
 
