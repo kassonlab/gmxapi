@@ -40,11 +40,11 @@ before_install:
   - apt list --installed
   - test -n $CC  && unset CC
   - test -n $CXX && unset CXX
-  - wget https://github.com/kassonlab/gromacs-gmxapi/archive/dev_5.zip
-  - unzip dev_5.zip
+  - wget https://github.com/kassonlab/gromacs-gmxapi/archive/master.zip
+  - unzip master.zip
 
 install:
-  - pushd gromacs-gmxapi-dev_5
+  - pushd gromacs-gmxapi-master
   - mkdir build
   - pushd build
   - cmake -DCMAKE_INSTALL_PREFIX=$HOME/gromacs -DGMX_FFT_LIBRARY=fftpack -DGMX_GPU=OFF -DGMX_OPENMP=OFF -DGMX_SIMD=None -DGMX_USE_RDTSCP=OFF -DGMX_MPI=$GMX_MPI -DGMX_THREAD_MPI=$GMX_THREAD_MPI ..
