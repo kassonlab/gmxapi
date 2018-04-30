@@ -22,10 +22,11 @@ RUN pip install --upgrade setuptools --user
 
 RUN wget https://github.com/kassonlab/gmxapi/archive/$BRANCH.zip && \
     unzip $BRANCH.zip && \
-    mv gmxapi-$BRANCH /home/jovyan/gmxpy
+    mv gmxapi-$BRANCH /home/jovyan/gmxpy && \
+    rm $BRANCH.zip
 
 RUN (cd /home/jovyan/gmxpy && \
     gmxapi_DIR=/home/jovyan/install/gromacs pip install . --upgrade --verbose)
 
 # Test with
-#    docker run --rm -ti gmxapi/gmxapi bash -c "cd gmxpy && mpiexec -n 2 python -m mpi4py -m pytest  --log-cli-level=DEBUG --pyargs gmx -s --verbose"
+#    docker run --cpus 2 --rm -ti gmxapi/gmxapi bash -c "cd gmxpy && mpiexec -n 2 python -m mpi4py -m pytest  --log-cli-level=DEBUG --pyargs gmx -s --verbose"
