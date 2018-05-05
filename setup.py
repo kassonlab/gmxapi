@@ -248,7 +248,7 @@ class CMakeGromacsBuild(build_ext):
             os.makedirs(self.build_temp)
 
         # cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir]
-        cmake_args += ['-DCMAKE_INSTALL_PREFIX=' + extdir]
+        cmake_args += ['-DGMXAPI_INSTALL_PATH=' + extdir]
         # if platform.system() == "Windows":
         #     cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
         try:
