@@ -9,6 +9,8 @@ from __future__ import unicode_literals
 
 __all__ = ['Context', 'DefaultContext']
 
+
+import contextlib
 import os
 import warnings
 import networkx as nx
@@ -23,6 +25,21 @@ from .workflow import WorkSpec
 # Module-level logger
 logger = logging.getLogger(__name__)
 logger.info('Importing gmx.context')
+
+# ref http://code.activestate.com/recipes/576620-changedirectory-context-manager/#c3
+# Does this really not already exist in os.path or something?
+@contextlib.contextmanager
+def working_directory(path):
+    """A context manager which changes the working directory to the given
+    path, and then changes it back to its previous value on exit.
+
+    """
+    prev_cwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
 
 class Context(object):
     """ Proxy to API Context provides Python context manager.
@@ -588,6 +605,7 @@ class ParallelArrayContext(object):
         instantiate objects to perform the work. In the first implementation, we kind of muddle things into
         a single pass.
         """
+        self.__cwd = os.getcwd()
         import numpy
         try:
             from mpi4py import MPI
@@ -675,12 +693,6 @@ class ParallelArrayContext(object):
         if workdir_list is None:
             workdir_list = [os.path.join('.', str(i)) for i in range(self.size)]
         self.__workdir_list = list([os.path.abspath(dir) for dir in workdir_list])
-        for dir in self.__workdir_list:
-            if os.path.exists(dir):
-                if not os.path.isdir(dir):
-                    raise exceptions.FileError('{} is not a valid working directory.'.format(dir))
-            else:
-                os.mkdir(dir)
 
         # Check the session "width" against the available parallelism
         if (self.size > comm_size):
@@ -704,6 +716,13 @@ class ParallelArrayContext(object):
             logger.info("Launching work on rank {}.".format(self.rank))
             # Launch the work for this rank
             self.workdir = self.__workdir_list[self.rank]
+            if os.path.exists(self.workdir):
+                if not os.path.isdir(self.workdir):
+                    raise exceptions.FileError('{} is not a valid working directory.'.format(self.workdir))
+            else:
+                os.mkdir(self.workdir)
+
+            # This session will live in a subdirectory of the working directory
             os.chdir(self.workdir)
             logger.info('rank {} changed directory to {}'.format(self.rank, self.workdir))
             sorted_nodes = nx.topological_sort(graph)
@@ -762,6 +781,7 @@ class ParallelArrayContext(object):
         # \todo Make sure session has ended on all ranks before continuing and handle final errors.
 
         self._session = None
+        os.chdir(self.__cwd)
         return False
 
 def get_context(work=None):

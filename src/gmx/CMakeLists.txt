@@ -16,6 +16,9 @@ configure_file(version.in ${CMAKE_BINARY_DIR}/gmx/version.py @ONLY)
 
 file(COPY test DESTINATION ${CMAKE_BINARY_DIR}/gmx/)
 
+# Todo: we need a target dependent on these files to force fresh configure / copy and to do python -m compileall
+# for the install target.
+
 install(DIRECTORY ${CMAKE_BINARY_DIR}/gmx/
         DESTINATION ${GMXAPI_INSTALL_PATH}
         FILES_MATCHING PATTERN "*.py" PATTERN "*.ini"

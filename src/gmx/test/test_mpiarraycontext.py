@@ -148,8 +148,8 @@ class ArrayContextTestCase(unittest.TestCase):
         with context as session:
             session.run()
             # This is a sloppy way to see if the current rank had work to do.
-            if hasattr(context, "workdir"):
-                rank = context.rank
+            rank = context.rank
+            if rank == 0:
                 output_path = os.path.join(context.workdir, 'traj.trr')
                 assert(os.path.exists(output_path))
                 print("Worker {} produced {}".format(rank, output_path))

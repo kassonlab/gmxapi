@@ -6,6 +6,7 @@
 
 #include "gmxapi/context.h"
 
+#include "gromacs/utility/init.h"
 
 namespace gmxpy
 {
@@ -97,15 +98,42 @@ void setMDArgs(std::vector<std::string>* mdargs, py::dict params)
 void export_context(py::module &m)
 {
     using ::gmxapi::Context;
-    // Export execution context class
-    py::class_<Context, std::shared_ptr<Context>> context(m, "Context");
-    context.def(py::init(), "Create a default execution context.");
-    context.def("setMDArgs", &Context::setMDArgs, "Set MD runtime parameters.");
 
     using MDArgs = std::vector<std::string>;
     py::class_<MDArgs, std::unique_ptr<MDArgs>> mdargs(m, "MDArgs");
     mdargs.def(py::init(), "Create an empty MDArgs object.");
     mdargs.def("set", &setMDArgs, "Assign parameters in MDArgs from Python dict.");
+
+    // Export execution context class
+    py::class_<Context, std::shared_ptr<Context>> context(m, "Context");
+    context.def(py::init(), "Create a default execution context.");
+    context.def("setMDArgs", &Context::setMDArgs, "Set MD runtime parameters.");
+
+    // During the registration of the gmx.core.Context Python type, perform appropriate environment initialization
+    // and deinitialize when the type object is destroyed at module destruction.
+
+    // Register a callback function that is invoked when the gmx.core.Context type object is collected
+    // ref http://pybind11.readthedocs.io/en/stable/advanced/misc.html?highlight=weakref#module-destructors
+    py::cpp_function cleanup_callback(
+        [](py::handle weakref) {
+            // perform cleanup here -- this function is called with the GIL held
+            // This may not be good enough. What if MPI_Init is called before gmx::init, but MPI_Finalize is called
+            // before the Context type object is destructed?
+            gmx::finalize();
+
+            weakref.dec_ref(); // release weak reference
+        }
+    );
+
+    if (Context::hasMPI())
+    {
+        gmx::init(nullptr,
+                  nullptr);
+        // Create a weak reference with a cleanup callback and initially leak it
+        (void) py::weakref(m.attr("Context"), cleanup_callback).release();
+    }
+    // Should we add an IProgramContext implementation? If so, how should we find the libgromacs install location?
+
 }
 
 } // end namespace gmxpy::detail
