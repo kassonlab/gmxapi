@@ -29,6 +29,8 @@ matrix:
       - GMX_THREAD_MPI=ON
       - gmxapi_DIR=$HOME/gromacs
       - GROMACS_DIR=$HOME/gromacs
+      - GROMACS_TAG=devel
+# Todo: GROMACS_TAG=devel needs to be fixed before merging to a release branch.
 
 # It is clearly a bad idea to have the development branch of a project requiring the development branch
 # of another project in the primary build recipe. We either need to build and test development and master
@@ -40,11 +42,11 @@ before_install:
   - apt list --installed
   - test -n $CC  && unset CC
   - test -n $CXX && unset CXX
-  - wget https://github.com/kassonlab/gromacs-gmxapi/archive/master.zip
-  - unzip master.zip
+  - wget https://github.com/kassonlab/gromacs-gmxapi/archive/$GROMACS_TAG.zip
+  - unzip $GROMACS_TAG.zip
 
 install:
-  - pushd gromacs-gmxapi-master
+  - pushd gromacs-gmxapi-$GROMACS_TAG
   - mkdir build
   - pushd build
   - cmake -DCMAKE_INSTALL_PREFIX=$HOME/gromacs -DGMX_FFT_LIBRARY=fftpack -DGMX_GPU=OFF -DGMX_OPENMP=OFF -DGMX_SIMD=None -DGMX_USE_RDTSCP=OFF -DGMX_MPI=$GMX_MPI -DGMX_THREAD_MPI=$GMX_THREAD_MPI ..

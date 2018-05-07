@@ -26,7 +26,7 @@ from setuptools.command.build_ext import build_ext
 from setuptools.command.test import test as TestCommand
 
 #import gmx.version
-__version__ = '0.0.5'
+__version__ = '0.0.6'
 
 extra_link_args=[]
 
@@ -210,7 +210,7 @@ class CMakeGromacsBuild(build_ext):
         if build_gromacs:
             # TODO! We need to distinguish dev branch builds from master branch builds or always build with the
             # master branch of the dependency. For one thing, as is, this line needs to be toggled for every release.
-            gromacs_url = "https://github.com/kassonlab/gromacs-gmxapi/archive/dev_5.zip"
+            gromacs_url = "https://github.com/kassonlab/gromacs-gmxapi/archive/devel.zip"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
             if build_for_readthedocs:
                 extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
