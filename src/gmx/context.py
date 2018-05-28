@@ -557,6 +557,7 @@ class ParallelArrayContext(object):
                     mdargs.set(self.runtime_params)
                     context = element.workspec._context._api_object
                     context.setMDArgs(mdargs)
+                    context.potentials = potential_list
                     dag.nodes[name]['session'] = system.launch(context)
                     dag.nodes[name]['close'] = dag.nodes[name]['session'].close
                     def runner():
