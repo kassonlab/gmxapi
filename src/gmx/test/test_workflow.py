@@ -105,8 +105,8 @@ class WorkSpecTestCase(unittest.TestCase):
         inputelement = gmx.workflow.WorkElement(operation="load_tpr", params={})
         inputelement.name = "tpr_input"
         assert inputelement.name not in workspec.elements
-        workspec.elements[inputelement.name] = inputelement.serialize()
-        inputelement.workspec = workspec
+        workspec.add_element(inputelement)
+        assert inputelement.name in workspec.elements
 
     def test_iterator(self):
         """Test iteration over elements in correct sequence."""
@@ -132,6 +132,50 @@ class WorkSpecTestCase(unittest.TestCase):
         assert index['a'] < index['d']
         assert index['c'] < index['d']
         assert index['b'] < index['c']
+
+    def test_uniqueness(self):
+        """Test that serialization/deserialization works and preserves uniqueness, correctly determined by the hash
+        and uid() methods."""
+
+        # Build a dummy workspec
+        workspecA = gmx.workflow.WorkSpec()
+        element = gmx.workflow.WorkElement(operation="spam", depends=[])
+        element.name = "a"
+        workspecA.add_element(element)
+
+        element = gmx.workflow.WorkElement(operation="spam", depends=[])
+        element.name = "b"
+        workspecA.add_element(element)
+
+        element = gmx.workflow.WorkElement(operation="spam", depends=["b"])
+        element.name = "c"
+        workspecA.add_element(element)
+
+        element = gmx.workflow.WorkElement(operation="spam", depends=["a", "c"])
+        element.name = "d"
+        workspecA.add_element(element)
+
+        # Assemble the same workspec in a different order.
+        workspecB = gmx.workflow.WorkSpec()
+        elements = {element.name: gmx.workflow.WorkElement.deserialize(element.serialize(), name=element.name) for element in workspecA}
+        workspecB.add_element(elements['b'])
+        workspecB.add_element(elements['c'])
+        workspecB.add_element(elements['a'])
+        workspecB.add_element(elements['d'])
+
+        # Assemble a similar but non-equivalent workspec.
+        workspecC = gmx.workflow.WorkSpec()
+        elements = {element.name: gmx.workflow.WorkElement.deserialize(element.serialize(), name=element.name) for element in workspecA}
+        elements['b'].depends.append('a')
+        workspecC.add_element(elements['a'])
+        workspecC.add_element(elements['b'])
+        workspecC.add_element(elements['c'])
+        workspecC.add_element(elements['d'])
+
+        assert hash(workspecA) == hash(workspecB)
+        assert hash(workspecA) != hash(workspecC)
+        assert workspecA.uid() == workspecB.uid()
+        assert workspecA.uid() != workspecC.uid()
 
 @pytest.mark.usefixtures("cleandir")
 class WorkflowFreeFunctions(unittest.TestCase):
