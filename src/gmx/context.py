@@ -555,7 +555,9 @@ class ParallelArrayContext(object):
                         system.add_mdmodule(potential)
                     mdargs = gmx.core.MDArgs()
                     mdargs.set(self.runtime_params)
-                    context = element.workspec._context._api_object
+                    pycontext = element.workspec._context
+                    pycontext.potentials = potential_list
+                    context = pycontext._api_object
                     context.setMDArgs(mdargs)
                     context.potentials = potential_list
                     dag.nodes[name]['session'] = system.launch(context)
