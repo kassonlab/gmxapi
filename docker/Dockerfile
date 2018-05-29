@@ -22,6 +22,7 @@ RUN pip install --upgrade setuptools --user
 
 RUN wget https://github.com/kassonlab/gmxapi/archive/$BRANCH.zip && \
     unzip $BRANCH.zip && \
+    rm -rf /home/jovyan/gmxpy && \
     mv gmxapi-$BRANCH /home/jovyan/gmxpy && \
     rm $BRANCH.zip
 
