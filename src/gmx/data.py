@@ -18,6 +18,6 @@ except:
     raise exceptions.OptionalFeatureNotAvailableWarning("Need pkg_resources from setuptools package to access gmx package data.")
 
 if os.path.exists(_tpr_filename) and os.path.isfile(_tpr_filename):
-    tpr_filename = _tpr_filename
+    tpr_filename = os.path.abspath(_tpr_filename)
 else:
     raise exceptions.OptionalFeatureNotAvailableError('Package data file data/topol.tpr not accessible at {}'.format(_tpr_filename))

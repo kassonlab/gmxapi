@@ -2,10 +2,13 @@
 // Created by Eric Irrgang on 3/18/18.
 //
 
+#include <iostream>
+#include <zconf.h>
 #include "core.h"
 
 #include "gmxapi/context.h"
 
+#include "gromacs/utility/init.h"
 
 namespace gmxpy
 {
@@ -97,15 +100,21 @@ void setMDArgs(std::vector<std::string>* mdargs, py::dict params)
 void export_context(py::module &m)
 {
     using ::gmxapi::Context;
-    // Export execution context class
-    py::class_<Context, std::shared_ptr<Context>> context(m, "Context");
-    context.def(py::init(), "Create a default execution context.");
-    context.def("setMDArgs", &Context::setMDArgs, "Set MD runtime parameters.");
 
     using MDArgs = std::vector<std::string>;
     py::class_<MDArgs, std::unique_ptr<MDArgs>> mdargs(m, "MDArgs");
     mdargs.def(py::init(), "Create an empty MDArgs object.");
     mdargs.def("set", &setMDArgs, "Assign parameters in MDArgs from Python dict.");
+
+    // Export execution context class
+    py::class_<Context, std::shared_ptr<Context>> context(m, "Context");
+    context.def(py::init(), "Create a default execution context.");
+    context.def("setMDArgs", &Context::setMDArgs, "Set MD runtime parameters.");
+
+    // During the registration of the gmx.core.Context Python type, perform appropriate environment initialization
+    // and deinitialize at module destruction.
+    gmx::init(nullptr, nullptr);
+    m.add_object("_current_context", py::capsule([](){ gmx::finalize(); std::cout << "Shutting down GROMACS" << std::endl; }));
 }
 
 } // end namespace gmxpy::detail

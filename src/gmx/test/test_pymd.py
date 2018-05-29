@@ -62,19 +62,6 @@ class BindingsTestCase(unittest.TestCase):
         apisystem = gmx.core.from_tpr(tpr_filename)
         assert isinstance(apisystem, gmx.core.MDSystem)
         assert hasattr(apisystem, 'launch')
-        session = apisystem.launch()
-        assert hasattr(session, 'run')
-        session.run()
-        # Test rerunability
-        # system = gmx.System()
-        # runner = gmx.runner.SimpleRunner()
-        # runner._runner = apirunner
-        # system.runner = runner
-        # assert isinstance(system, gmx.System)
-        # assert isinstance(system.runner, gmx.runner.Runner)
-        # assert isinstance(system.runner._runner, gmx.core.SimpleRunner)
-        # with gmx.context.DefaultContext(system.runner) as session:
-        #     session.run()
     def test_SystemFromTpr(self):
         system = gmx.System._from_file(tpr_filename)
         system.run()

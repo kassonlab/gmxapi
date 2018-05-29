@@ -32,7 +32,9 @@ void export_system(py::module &m)
     py::class_<System, std::shared_ptr<System> > system(m, "MDSystem");
     system.def(py::init(), "A blank system object is possible, but not useful. Use a helper function.");
     system.def("launch",
-               [](System* system){ return system->launch(); },
+               [](System* system){
+                   return system->launch();
+               },
                "Launch the configured workflow in the default context.");
     system.def("launch",
                 [](System* system, std::shared_ptr<Context> context)
