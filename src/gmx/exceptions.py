@@ -20,6 +20,7 @@ from __future__ import unicode_literals
 
 __all__ = ['Error',
            'ApiError',
+           'CompatibilityError',
            'FileError',
            'OptionalFeatureNotAvailableError',
            'OptionalFeatureNotAvailableWarning',
@@ -39,6 +40,9 @@ class UsageError(Error):
 
 class ApiError(Error):
     """An API operation was attempted with an incompatible object."""
+
+class CompatibilityError(Error):
+    """An operation or data is incompatible with the current gmxapi environment."""
 
 class FileError(Error):
     """Problem with a file or filename."""
