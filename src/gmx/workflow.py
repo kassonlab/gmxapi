@@ -174,7 +174,9 @@ class WorkSpec(object):
     WorkSpec instances can be merged with `WorkSpec.add()`.
     Reference to elements remain valid after the
     merge, but may have modified properties (such as unique identifiers or hashes
-    associated with their relationship to the rest of the workflow). An element cannot
+    associated with their relationship to the rest of the workflow).
+
+    An element cannot
     be added to a WorkSpec if it has dependencies that are not in the WorkSpec.
 
     Work is added to the specification by passing a WorkElement object to WorkSpec.add_element().
@@ -184,19 +186,15 @@ class WorkSpec(object):
     keep dependencies satisfied, but not necessarily the same order in which add_element()
     calls were originally made.
 
-    When iterated over, a WorkSpec object returns WorkElement objects
+    When iterated over, a WorkSpec object returns WorkElement objects.
 
-    In the future, for easier accounting, the API could provide each work element with a unique identifier that can be
-    used to reconstruct new references from the API objects instead of making sure the Python-level accounting works well.
-    TBD.
+    The string representation of a WorkSpec object is a valid JSON serialized data object.
 
-    Detail:
-
-    The work specification schema needs to be able to represent something like the following.
+    The schema for version 0.1 of the specification has the following layout.
     ::
 
         {
-            "version": "gmxapi_workspec_1_0",
+            "version": "gmxapi_workspec_0_1",
             "elements":
             {
                 "myinput":
@@ -227,8 +225,13 @@ class WorkSpec(object):
             }
         }
 
-    todo: Params schema incomplete!
-    Working definition: params is a key--value map in which keys are strings and values can be any JSON-serializeable data.
+    The first mapping (``version``) is required as shown. The ``elements`` map contains uniquely named elements specifying
+    an operation, the operation's namespace, and parameters and dependencies of the operation for this element. ``depends``
+    is a sequence of string names of elements that are also in the work spec. ``params`` is a key-value map with string
+    keys and values that are valid JSON data. Namespace and operation are strings that the Context can map to directors
+    it can use to construct the session. Namespace "gmxapi" is reserved for operations specified by the API. Namespace
+    "gromacs" is reserved for operations implemented as GROMACS adapters (versioned separately from gmxapi). The period
+    character ("`.`") has special meaning and should not be used in naming elements, namespaces, or operations.
     """
     def __init__(self):
         self.version = workspec_version
@@ -270,6 +273,17 @@ class WorkSpec(object):
         source_set = set(self.elements.keys())
         for element in self._chase_deps(source_set, source_set):
             yield element
+
+    def __hash__(self):
+        """Uniquely identify this work specification.
+
+        Allows the spec to be used as a dictionary key in Python. Note that this hash is possibly dependent on the Python
+        implementation. It is not part of the gmxapi specification and should not be used outside of a single invocation
+        of a script.
+        """
+        # Hash the serialized elements, concatenated as a single string. Note that the order of elements and their
+        # contents is not guaranteed, but should be consistent within a script invocation.
+        return hash(''.join([element.serialize() for element in self]))
 
     def add_element(self, element):
         """Add an element to a work specification if possible.
@@ -330,9 +344,64 @@ class WorkSpec(object):
 
     # Not sure we want to do serialization and deserialization yet, since we don't currently have a way to
     # determine the uniqueness of a work specification.
-    # def serialize(self):
+    def serialize(self):
+        """Serialize the work specification in a form suitable to pass to any Context implementation.
 
-    # @classmethod deserialize(serialized):
+        Serialization is performed with the JSON data serialization module.
+
+        To simplify unique identification of work specifications, this function will also impose rules for reproducibility.
+
+        1. All key-value maps are sorted alphanumerically by their string keys
+        2. Strings must be valid ASCII characters
+        3. Output character encoding is 'utf-8'
+        """
+        import json
+        # Build the normalized dictionary
+        dict_representation = {'version': self.version,
+                               'elements': {}
+                               }
+        for name, element in [(e, json.loads(self.elements[e])) for e in sorted(self.elements.keys())]:
+            dict_representation['elements'][name] = element
+        return json.dumps(dict_representation, ensure_ascii=True, sort_keys=True, separators=(',',':'))
+
+    @classmethod
+    def deserialize(serialized):
+        import json
+        workspec = gmx.workflow.WorkSpec()
+        dict_representation = json.loads(serialized)
+        ver_in = dict_representation['version']
+        ver_out = workspec.version
+        if ver_in != ver_out:
+            message = "Expected work spec version {}. Got work spec version {}.".format(ver_out, ver_in)
+            raise gmx.exceptions.CompatibilityError(message)
+        for element in dict_representation['elements']:
+            workspec.elements[element] = dict_representation['elements'][element]
+        return workspec
+
+    def uid(self):
+        """Get a unique identifier for this work specification.
+
+        Generate a cryptographic hash of this work specification that is guaranteed to match that of another equivalent
+        work specification. The returned string is a 64-character hexadecimal encoded SHA-256 hash digest of the
+        serialized workspec.
+
+        The definition of equivalence is likely to evolve, but currently means a work spec of the
+        same version with the same named elements containing the same operations, dependencies, and parameters, as
+        represented in the serialized version of the work specification. Note that this does not include checks on the
+        actual contents of input files or anything that does not appear in the work specification directly. Also, the
+        hash is lossy, so it is remotely conceivable that two specs could have the same hash. The work specs
+        should be compared before making any expensive decisions based on work spec equivalence, such as with hash(workspec).
+
+        Element names probably shouldn't be included in the unique identifying information (so that we can optimize out
+        duplicated artifacts), but they are. A future API specification may add unique identification to the elements...
+        """
+        # Get an alphanumeric string of the checksum of the serialized work spec. SHA-256 should require about 43 characters
+        # of base64 to represent, which seems reasonable. We need to replace some of the base64 characters to make them
+        # filesystem friendly, though. Hexadecimal may be more friendly, but would require 64 characters.
+        import hashlib
+        string_repr = self.serialize()
+        result = hashlib.sha256(string_repr)
+        return result.hexdigest()
 
     def __str__(self):
         """Generate string representation for str() or print().
