@@ -53,3 +53,5 @@ message(STATUS "Python module will be installed to GMXAPI_INSTALL_PATH cache val
 add_subdirectory(pybind11)
 
 add_subdirectory(src/gmx)
+
+add_subdirectory(docs)

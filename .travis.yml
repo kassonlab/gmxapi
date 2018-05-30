@@ -31,12 +31,9 @@ matrix:
       - GROMACS_DIR=$HOME/gromacs
       - GROMACS_TAG=devel
 # Todo: GROMACS_TAG=devel needs to be fixed before merging to a release branch.
+# What makes me uncomfortable is that this is not automatic, but maybe that is for the best. We should check the
+# version dependencies before issuing a release or merging to master. This is described in RELEASE.txt
 
-# It is clearly a bad idea to have the development branch of a project requiring the development branch
-# of another project in the primary build recipe. We either need to build and test development and master
-# branches distinctly in a build matrix, only build off of tagged releases or the master branch of the
-# dependency, or otherwise find a better solution that allows the master branch to be entirely included in
-# the develop branch.
 before_install:
   - uname -a
   - apt list --installed
@@ -53,17 +50,33 @@ install:
   - make -j4 install
   - popd
   - popd
-  # pip 10.0.0 appears to be broken
-  - python -m pip install --upgrade pip==9 --user
+  - python -m pip install --upgrade pip --user
   - python -m pip install --upgrade setuptools --user
   - python -m pip install virtualenv --user
   - python -m pip install pytest --user
-  - python -m pip install cmake --user
   - python -m pip install numpy --user
   - python -m pip install mpi4py --user
   - python -m pip install networkx --user
 
 script:
-  - GROMACS_DIR=$HOME/gromacs python -m pip install . --verbose --user
-  - mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose 
+  - mkdir build
+  - pushd build
+  # install in user site-packages directory
+  - GROMACS_DIR=$HOME/gromacs cmake .. -DPYTHON_EXECUTABLE=`which python` -DGMXAPI_USER_INSTALL=ON
+  - make -j4 install
+  - popd
+  - mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose
+  - pip uninstall -y gmx
+  # install in virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
+  - pip install numpy mpi4py networkx pytest
+  - pushd build
+  # Do an intentionally non-thorough job of removing previous build: test unclean build directory.
+  - rm CMakeCache.txt
+  - GROMACS_DIR=$HOME/gromacs cmake .. -DPYTHON_EXECUTABLE=`which python`
+  - make -j4 install
+  - popd
+  - mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose
+
 
