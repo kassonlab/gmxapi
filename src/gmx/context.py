@@ -286,10 +286,20 @@ class ParallelArrayContext(object):
         ...    # rank = session.rank
         ...    # The local context object knows where it fits in the global array.
         ...    rank = context.rank
-        ...    output_path = os.path.join(context.workdir_list[rank], 'traj.trr')
-        ...    assert(os.path.exists(output_path))
-        ...    print('Worker {} produced {}'.format(rank, output_path))
+        ...    output = work[0]['traj.trr']
         ...
+        >>> output_path = str(output.extract())
+        >>> assert(os.path.exists(output_path))
+
+    When the session is created to run the workflow, a uniquely named directory is created in the filesystem to be the
+    session's working directory. This directory name is available in the attribute `context.path`. Each
+    operation on each rank has its own subdirectory. In the example above, the directory for MD artifacts for each of
+    the two ranks used can be accessed through `work.path[0]` and `work.path[1]`. Artifacts in each path can be accessed
+    as dictionary keys. E.g. `work.path[0]['traj.trr']`.
+
+    Note that these attributes are proxy objects that may not exist at the time they are referenced with this syntax.
+    To force the artifacts to be made available locally, use the `extract` method. The string representation of the
+    returned object is a valid local absolute filename.
 
     Implementation notes:
 
@@ -479,7 +489,17 @@ class ParallelArrayContext(object):
     def __load_tpr(self, element):
         """Implement the gromacs.load_tpr operation.
 
-        Updates the minimum width of the workflow parallelism. Does not add any API object to the graph.
+        File paths are taken to be relative to the session directory. Helper functions implemented for the Context
+        should make sure to copy files into place or to ensure that the files are expected outputs of other operations.
+        If the element has other elements listed in `depends` then the working directories of those elements are used
+        to replace occurrences of the element names in the tpr filename arguments, using a forward slash (`/`) to separate
+        the part of the string naming an element and the part of the string naming a relative file path.
+
+        Absolute filenames are not allowed, as they imply relation to an element named with a null string, which we
+        would not want to respect even if it existed.
+
+        Updates the minimum width of the workflow parallelism. This operation is fused with the MD operation and does
+        not add any API object to the graph.
         """
         class Builder(object):
             def __init__(self, tpr_list):
@@ -578,17 +598,15 @@ class ParallelArrayContext(object):
     def __enter__(self):
         """Implement Python context manager protocol, producing a Session for the specified work in this Context.
 
+        A session directory is created (if not yet present) with a unique key for the work specification. This prevents
+        different work specifications from getting mixed in the same output directory. Each element in the work has its
+        own subdirectory or subdirectories (one per worker) to hold artifacts and checkpoint information. The
+
         Returns:
             Session object the can be run and/or inspected.
 
         Additional API operations are possible while the Session is active. When used as a Python context manager,
         the Context will close the Session at the end of the `with` block by calling `__exit__`.
-
-        Note: this is probably where we will have to process the work specification to determine whether we
-        have appropriate resources (such as sufficiently wide parallelism). Until we have a better Session
-        abstraction, this means the clean approach should take two passes to first build a DAG and then
-        instantiate objects to perform the work. In the first implementation, we kind of muddle things into
-        a single pass.
         """
         import numpy
         try:

@@ -28,3 +28,53 @@ class MDArgsTestCase(unittest.TestCase):
             mdargs.set(param)
             context = gmx.core.Context()
             context.setMDArgs(mdargs)
+
+class PathManagementTestCase(unittest.TestCase):
+    """Test proper directory management for load_tpr and Session startup.
+
+    - [ ] Session should use working directory keyed by WorkSpec unique identifier.
+    - [ ] Existing directory should not be corrupted.
+    - [ ] Existing directory should be checked for state.
+    - [ ] File inputs should be made accessible to the Session.
+    - [ ] Filesystem artifacts from an element should be accessible by another element.
+    - [ ] Filesystem artifacts should be made accessible to the client.
+    """
+    # Use the harness features to set up a reusable temporary directory
+    def setUp(self):
+        return
+
+    def tearDown(self):
+        return
+
+    def test_directory_creation(self):
+        """Check that the session launched but not run in setUp() got created."""
+        return
+
+    def test_directory_safety(self):
+        """Check that the Session logic refuses to overwrite existing data."""
+        return
+
+class PathManagementTestCase(unittest.TestCase):
+    """Test proper directory management for load_tpr and Session startup.
+
+    - [ ] Session should use working directory keyed by WorkSpec unique identifier.
+    - [ ] Existing directory should not be corrupted.
+    - [ ] Existing directory should be checked for state.
+    - [ ] File inputs should be made accessible to the Session.
+    - [ ] Filesystem artifacts from an element should be accessible by another element.
+    - [ ] Filesystem artifacts should be made accessible to the client.
+    """
+    # Use the harness features to set up a reusable temporary directory
+    def setUp(self):
+        return
+
+    def tearDown(self):
+        return
+
+    def test_directory_creation(self):
+        """Check that the session launched but not run in setUp() got created."""
+        return
+
+    def test_directory_safety(self):
+        """Check that the Session logic refuses to overwrite existing data."""
+        return
