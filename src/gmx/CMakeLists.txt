@@ -1,3 +1,5 @@
+# Clean the staging area.
+file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/gmx)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/gmx/data)
 
 configure_file(__init__.py ${CMAKE_BINARY_DIR}/gmx/ COPYONLY)
