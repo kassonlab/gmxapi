@@ -555,6 +555,13 @@ def get_source_elements(workspec):
 def from_tpr(input=None, **kwargs):
     """Create a WorkSpec from a (list of) tpr file(s).
 
+    Absolute filenames are interpreted in reference to the local filesystems where the script is run, but the path is
+    removed from the recorded work specification and the file is made available in the Session working directory.
+
+    Relative path names (or filenames without paths) are assumed to refer to files that already exist relative to the
+    Session working directory. They are either outputs from other elements or must be put in place between session
+    launch and session run. (See gmx.context)
+
     Required Args:
         input: string or list of strings giving the filename(s) of simulation input
 
@@ -573,7 +580,7 @@ def from_tpr(input=None, **kwargs):
 
     Produces a WorkSpec with the following data.
 
-        version: "gmxapi_workspec_1_0"
+        version: "gmxapi_workspec_0_1"
         elements:
             tpr_input:
                 namespace: "gromacs"
@@ -604,7 +611,6 @@ def from_tpr(input=None, **kwargs):
             arg_path = os.path.abspath(arg)
             raise exceptions.UsageError(usage + " Got {}".format(arg_path))
 
-    # \todo These are runner parameters, not MD parameters, and should be in the call to gmx.run() instead of here.
     params = {}
     for arg_key in kwargs:
         if arg_key == 'grid' or arg_key == 'dd':
