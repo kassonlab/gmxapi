@@ -21,6 +21,8 @@ from __future__ import unicode_literals
 __all__ = ['Error',
            'ApiError',
            'CompatibilityError',
+           'FeatureNotAvailableError',
+           'FeatureNotAvailableWarning',
            'FileError',
            'OptionalFeatureNotAvailableError',
            'OptionalFeatureNotAvailableWarning',
@@ -31,6 +33,9 @@ __all__ = ['Error',
 
 class Error(Exception):
     """Base exception for gmx.exceptions classes."""
+
+class Warning(Warning):
+    """Base warning class for gmx.exceptions."""
 
 class UsageError(Error):
     """Unsupported syntax or call signatures.
@@ -47,11 +52,25 @@ class CompatibilityError(Error):
 class FileError(Error):
     """Problem with a file or filename."""
 
-class OptionalFeatureNotAvailableError(Error):
-    """Optional feature is not installed or is missing dependencies."""
+class FeatureNotAvailableError(Error):
+    """Feature is not installed, is missing dependencies, or is not compatible."""
 
-class OptionalFeatureNotAvailableWarning(Warning):
-    """A feature is not installed or is missing dependencies."""
+class OptionalFeatureNotAvailableError(FeatureNotAvailableError):
+    """Optional feature is not installed or is missing dependencies.
+    Deprecated. The 'Optional" word is confusing."""
+    def __init__(self, message, *args, **kwargs):
+        forwarded_message = message + "\nThis Error is deprecated and the code that issued it should be updated."
+        super(OptionalFeatureNotAvailableError, self).__init__(forwarded_message, *args, **kwargs)
+
+class FeatureNotAvailableWarning(Warning):
+    """Feature is not installed, is missing dependencies, or is not compatible."""
+
+class OptionalFeatureNotAvailableWarning(FeatureNotAvailableWarning):
+    """A feature is not installed or is missing dependencies.
+    Deprecated. The 'Optional" word is confusing."""
+    def __init__(self, message, *args, **kwargs):
+        forwarded_message = message + "\nThis Warning is deprecated and the code that issued it should be updated."
+        super(OptionalFeatureNotAvailableWarning, self).__init__(forwarded_message, *args, **kwargs)
 
 class TypeError(Error):
     """An object is of a type incompatible with the API operation."""
