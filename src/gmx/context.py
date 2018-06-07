@@ -590,6 +590,10 @@ class ParallelArrayContext(object):
         instantiate objects to perform the work. In the first implementation, we kind of muddle things into
         a single pass.
         """
+        # Cache the working directory from which we were launched so that __exit__() can give us proper context management behavior.
+        self.__initial_cwd = os.getcwd()
+        logger.debug("Launching session from {}".format(self.__initial_cwd))
+
         import numpy
         try:
             from mpi4py import MPI
@@ -677,12 +681,6 @@ class ParallelArrayContext(object):
         if workdir_list is None:
             workdir_list = [os.path.join('.', str(i)) for i in range(self.size)]
         self.__workdir_list = list([os.path.abspath(dir) for dir in workdir_list])
-        for dir in self.__workdir_list:
-            if os.path.exists(dir):
-                if not os.path.isdir(dir):
-                    raise exceptions.FileError('{} is not a valid working directory.'.format(dir))
-            else:
-                os.mkdir(dir)
 
         # Check the session "width" against the available parallelism
         if (self.size > comm_size):
@@ -706,6 +704,11 @@ class ParallelArrayContext(object):
             logger.info("Launching work on rank {}.".format(self.rank))
             # Launch the work for this rank
             self.workdir = self.__workdir_list[self.rank]
+            if os.path.exists(self.workdir):
+                if not os.path.isdir(self.workdir):
+                    raise exceptions.FileError('{} is not a valid working directory.'.format(self.workdir))
+            else:
+                os.mkdir(self.workdir)
             os.chdir(self.workdir)
             logger.info('rank {} changed directory to {}'.format(self.rank, self.workdir))
             sorted_nodes = nx.topological_sort(graph)
@@ -760,7 +763,7 @@ class ParallelArrayContext(object):
         # \todo: we should not have a None session but rather an API-compliant Session that just has no work.
         if self._session is not None:
             self._session.close()
-
+        os.chdir(self.__initial_cwd)
         # \todo Make sure session has ended on all ranks before continuing and handle final errors.
 
         self._session = None
