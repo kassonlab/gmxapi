@@ -1,10 +1,10 @@
 # Build container for gmxapi/gmxapi:<tag>
 # Initially we will use a tmpi libgromacs and openmpi mpi4py
 
-FROM gmxapi/gromacs-gmxapi:0.0.5
+FROM gmxapi/gromacs-gmxapi:devel
 
 # Allow build for an arbitrary branch or tag, but default to the tip of `master`
-ARG BRANCH=master
+ARG BRANCH=devel
 
 RUN conda install pytest tox cmake
 
