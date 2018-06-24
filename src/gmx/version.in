@@ -34,5 +34,5 @@ def api_is_at_least(major_version, minor_version=0, patch_version=0):
     from gmx.exceptions import TypeError
     if not isinstance(major_version, int) or not isinstance(minor_version, int) or not isinstance(patch_version, int):
         raise TypeError('Version levels must be provided as integers.')
-    return (major >= major_version) and (minor >= minor_version and (patch >= patch_version)
+    return (major >= major_version) and (minor >= minor_version) and (patch >= patch_version)
 
