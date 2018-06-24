@@ -1,7 +1,9 @@
 class Status(object):
     """Ultimately hold status for API operation.
 
-    This should probably inherit from gmx.core.Status.
+    Either this should be inherited by gmx.core.Status or a reference to it or it gets
+    much more complicated to maintain the transition between Python and C++ implementation
+    code and a consistent interface.
     """
     def __init__(self, success=True):
         self.success = bool(success)

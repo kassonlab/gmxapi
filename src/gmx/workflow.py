@@ -194,33 +194,33 @@ class WorkSpec(object):
     ::
 
         {
-            "version": "gmxapi_workspec_0_1",
-            "elements":
+            'version': 'gmxapi_workspec_0_1',
+            'elements':
             {
-                "myinput":
+                'myinput':
                 {
-                    "namespace": "gromacs",
-                    "operation": "load_tpr",
-                    "params": {"input": ["tpr_filename1", "tpr_filename2"]}
+                    'namespace': 'gromacs',
+                    'operation': 'load_tpr',
+                    'params': {'input': ['tpr_filename1', 'tpr_filename2']}
                 },
-                "mydata":
+                'mydata':
                 {
-                    "namespace": "gmxapi",
-                    "operation": "open_global_data_with_barrier",
-                    "params": ["data_filename"]
+                    'namespace': 'gmxapi',
+                    'operation': 'open_global_data_with_barrier',
+                    'params': ['data_filename']
                 },
-                "mypotential":
+                'mypotential':
                 {
-                    "namespace": "myplugin",
-                    "operation": "create_mdmodule",
+                    'namespace': 'myplugin',
+                    'operation': 'create_mdmodule',
                     params: {...},
                     depends: [mydata]
                 },
-                "mysim":
+                'mysim':
                 {
-                    "namespace": "gmxapi",
-                    "operation": "md",
-                    "depends": ["myinput", "mypotential"]
+                    'namespace': 'gmxapi',
+                    'operation': 'md',
+                    'depends': ['myinput', 'mypotential']
                 }
             }
         }
@@ -229,9 +229,9 @@ class WorkSpec(object):
     an operation, the operation's namespace, and parameters and dependencies of the operation for this element. ``depends``
     is a sequence of string names of elements that are also in the work spec. ``params`` is a key-value map with string
     keys and values that are valid JSON data. Namespace and operation are strings that the Context can map to directors
-    it can use to construct the session. Namespace "gmxapi" is reserved for operations specified by the API. Namespace
-    "gromacs" is reserved for operations implemented as GROMACS adapters (versioned separately from gmxapi). The period
-    character ("`.`") has special meaning and should not be used in naming elements, namespaces, or operations.
+    it can use to construct the session. Namespace ``gmxapi`` is reserved for operations specified by the API. Namespace
+    ``gromacs`` is reserved for operations implemented as GROMACS adapters (versioned separately from gmxapi). The period
+    character (".") has special meaning and should not be used in naming elements, namespaces, or operations.
     """
     def __init__(self):
         self.version = workspec_version

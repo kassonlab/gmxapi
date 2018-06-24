@@ -37,7 +37,7 @@ Assuming you are in the source directory of the gmxapi repository,
 
     $ mkdir build
     $ cd build
-    $ gmxapi_DIR=/path/to/gromacs cmake .. -DPYTHON_EXECUTABLE=``which python`` -DGMXAPI_USER_INSTALL=ON
+    $ gmxapi_DIR=/path/to/gromacs cmake .. -DPYTHON_EXECUTABLE=`which python` -DGMXAPI_USER_INSTALL=ON
     $ make install
 
 Explicitly setting PYTHON_EXECUTABLE helps to make sure your preferred interpreter (version 2.7 or 3.x) is detected.
