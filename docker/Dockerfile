@@ -1,6 +1,31 @@
 # Build container for gmxapi/gmxapi:<tag>
 # Initially we will use a tmpi libgromacs and openmpi mpi4py
 
+# The default entry point for the resulting container is a jupyter notebook server, so
+# assuming you have port 8888 free locally, access the web interface by binding the 8888 ports
+# on host and container.
+#
+#    docker build -t gmxapi .
+#    docker run --rm -ti -p 8888:8888 gmxapi
+#
+# Then use the URL in the terminal output to access the web server in the docker container on
+# the local host. Documentation for the gmxapi Python module is accessible in the `docs` directory.
+# Click on the `docs` link and then `index.html`
+#
+# To build from a branch other than 'master,' pass a build arg. For example:
+#
+#    docker build --build-arg BRANCH=devel -t gmxapi .
+#
+# Tagged docker images are available through Docker Hub by pulling / running gmxapi/gmxapi:master
+# or gmxapi/gmxapi:devel
+#
+#    docker run --rm -ti gmxapi/gmxapi:devel
+#
+# Note that the `--rm` flag in the above commands means that the container you run from the image
+# will be temporary. If you want to keep changes that you make, refer to Docker documentation on
+# container naming, committing snapshots, and managing containers and disk space.
+#
+
 FROM gmxapi/gromacs-gmxapi:devel
 
 # Allow build for an arbitrary branch or tag, but default to the tip of `master`
@@ -14,7 +39,7 @@ RUN conda install pytest tox cmake
 
 # Note default for the base image at this point is Python3
 RUN pip install --upgrade pip && \
-    pip install sphinx mpi4py
+    pip install sphinx sphinx-rtd-theme mpi4py
 
 RUN pip install --upgrade setuptools --user
 
@@ -27,7 +52,14 @@ RUN wget https://github.com/kassonlab/gmxapi/archive/$BRANCH.zip && \
     rm $BRANCH.zip
 
 RUN (cd /home/jovyan/gmxpy && \
-    gmxapi_DIR=/home/jovyan/install/gromacs pip install . --upgrade --verbose)
+    mkdir build && \
+    cd build && \
+    gmxapi_DIR=/home/jovyan/install/gromacs cmake .. && \
+    make install)
+
+RUN (cd /home/jovyan/gmxpy/build && \
+    make docs && \
+    mv docs /home/jovyan/)
 
 # Test with
 #    docker run --cpus 2 --rm -ti gmxapi/gmxapi bash -c "cd gmxpy && mpiexec -n 2 python -m mpi4py -m pytest  --log-cli-level=DEBUG --pyargs gmx -s --verbose"
