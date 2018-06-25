@@ -38,23 +38,26 @@ void export_md(py::module &m)
     py::class_< TestModule, std::shared_ptr<TestModule> >(m, "TestModule", gmxapi_mdmodule).def(py::init<>(), "Test module...");
 
     // Consider whether to bother exporting base class and whether/how to overload methods for testing.
-    gmxapi_mdmodule.def("bind",
-                         [](std::shared_ptr<TestModule> self, py::object object){
-                             if (PyCapsule_IsValid(object.ptr(), gmxapi::MDHolder::api_name))
-                             {
-                                 auto holder = (gmxapi::MDHolder*) PyCapsule_GetPointer(object.ptr(), gmxapi::MDHolder::api_name);;
-                                 auto spec = holder->getSpec();
-                                 std::cout << self->name() << " received " << holder->name();
-                                 std::cout << " containing spec of size ";
-                                 std::cout << spec->getModules().size();
-                                 std::cout << std::endl;
-                                 spec->addModule(self);
-                             }
-                             else
-                             {
-                                 throw gmxapi::ProtocolError("MDModule bind method requires properly named PyCapsule input.");
-                             }
-                         }
+    gmxapi_mdmodule.def(
+        "bind",
+        [](std::shared_ptr<TestModule> self, py::object object){
+            if (PyCapsule_IsValid(object.ptr(), gmxapi::MDHolder::api_name))
+            {
+                auto holder = (gmxapi::MDHolder*) PyCapsule_GetPointer(
+                    object.ptr(),
+                    gmxapi::MDHolder::api_name);
+                auto spec = holder->getSpec();
+                std::cout << self->name() << " received " << holder->name();
+                std::cout << " containing spec of size ";
+                std::cout << spec->getModules().size();
+                std::cout << std::endl;
+                spec->addModule(self);
+            }
+            else
+            {
+                throw gmxapi::ProtocolError("MDModule bind method requires properly named PyCapsule input.");
+            }
+        }
     );
 
 
