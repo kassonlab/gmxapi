@@ -28,21 +28,44 @@ Refer to the Python source code itself for additional clarification.
 
 .. automodule:: gmx
 
-User interface
-==============
+Procedural interface
+====================
+
+.. autofunction:: gmx.run
+
+.. autofunction:: gmx.get_context
+
+.. autofunction:: gmx.workflow.from_tpr
+
+.. autofunction:: gmx.workflow.get_source_elements
+
+Python API
+==========
+
+gmx.system module
+-----------------
 
 .. automodule:: gmx.system
     :members:
 
+gmx.workflow module
+-------------------
+
 .. automodule:: gmx.workflow
     :members:
 
+gmx.context module
+------------------
 .. automodule:: gmx.context
     :members:
 
+gmx.status
+----------
 .. automodule:: gmx.status
     :members:
 
+gmx.exceptions
+--------------
 .. automodule:: gmx.exceptions
     :members:
 
@@ -50,6 +73,11 @@ Core API
 ========
 
 .. automodule:: gmx.core
+
+Functions
+---------
+
+.. autofunction:: gmx.core.from_tpr
 
 Classes
 -------
@@ -71,8 +99,3 @@ Classes
 
 .. autoclass:: gmx.core.TestModule
     :members:
-
-Functions
----------
-
-.. autofunction:: gmx.core.from_tpr

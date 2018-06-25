@@ -41,42 +41,40 @@ void export_system(py::module &m)
                 },
                 "Launch the configured workflow in the provided context.");
 
-    system.def("add_mdmodule",
-               [](System* system, py::object force_object){
-                   // If force_object has a bind method, give it a PyCapsule with a pointer
-                   // to our C++ object.
-                   if (py::hasattr(force_object, "bind"))
-                   {
-                    //        // Wrap the work specification in an API object.
-                    //        auto holder = std::make_shared<gmxapi::MDHolder>(spec_);
-                    //        holder->name_ = "pygmx holder";
-                    //        // Get a reference to a Python object with the bindings defined in this module.
-                       auto spec = system->getSpec();
-                       auto holder = new gmxapi::MDHolder(spec);
-                       holder->name_ = "pygmx holder";
-                       auto deleter = [](PyObject* o){
-                           if (PyCapsule_IsValid(o, gmxapi::MDHolder_Name))
-                           {
-                               auto holder_ptr = (gmxapi::MDHolder*) PyCapsule_GetPointer(o, gmxapi::MDHolder_Name);
-                               delete holder_ptr;
-                               // \todo double-check whether there is something we should do to invalidate a PyCapsule.
-                           };
-                       };
-                       auto capsule = py::capsule(holder, gmxapi::MDHolder_Name, deleter);
-
-                       py::object bind = force_object.attr("bind");
-                       // py::capsule does not have bindings and does not implicitly convert to py::object
-                       py::object obj = capsule;
-                       bind(obj);
-                       std::cout << "Work specification now has " << spec->getModules().size() << " modules." << std::endl;
-                   }
-                   else
-                   {
-                       // Need to bind the exceptions...
-                       throw PyExc_RuntimeError;
-                   }
-               },
-               "Set a restraint potential for the system.");
+    system.def(
+        "add_mdmodule",
+        [](System* system, py::object force_object){
+            // If force_object has a bind method, give it a PyCapsule with a pointer
+            // to our C++ object.
+            if (py::hasattr(force_object, "bind"))
+            {
+                auto spec = system->getSpec();
+                auto holder = new gmxapi::MDHolder(spec);
+                holder->name_ = "pygmx holder";
+                auto deleter = [](PyObject *o) {
+                    if (PyCapsule_IsValid(o, gmxapi::MDHolder_Name))
+                    {
+                        auto holder_ptr = (gmxapi::MDHolder *) PyCapsule_GetPointer(o, gmxapi::MDHolder_Name);
+                        delete holder_ptr;
+                        // \todo double-check whether there is something we should do to invalidate a PyCapsule.
+                    };
+                };
+                auto capsule = py::capsule(holder,
+                                           gmxapi::MDHolder_Name,
+                                           deleter);
+                py::object bind = force_object.attr("bind");
+                // py::capsule does not have bindings and does not implicitly convert to py::object
+                py::object obj = capsule;
+                bind(obj);
+                std::cout << "Work specification now has " << spec->getModules().size() << " modules." << std::endl;
+            }
+            else
+            {
+                // Todo: Need to bind the exceptions...
+                throw PyExc_RuntimeError;
+            }
+        },
+        "Set a restraint potential for the system.");
 
     // Export session class
     // \todo relocate

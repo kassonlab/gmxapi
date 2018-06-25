@@ -2,25 +2,6 @@
 Provide workflow-level utilities and classes
 ============================================
 
-`class gmx.workflow.WorkSpec`:
-Container of workflow elements with data dependency
-information and requirements for execution. E.g. once Array elements are added,
-the WorkSpec can only be launched in a context that supports parallel Array
-elements. These attributes can be refined and requirements minimized in the future.
-WorkSpec instances can be merged with `WorkSpec.add()`. Reference to elements remain valid after the
-merge, but may have modified properties (such as unique identifiers or hashes
-associated with their relationship to the rest of the workflow). An element cannot
-be added to a WorkSpec if it has dependencies that are not in the WorkSpec.
-
-Properties
-----------
-
-Various symbols are defined in the gmx.workflow namespace to indicate requirements of workflows. Context implementations
-inspect the properties of a WorkSpec to determine if the work can be launched on the available resources.
-
-.. ``ARRAY``: work requires parallel execution to satisfy data dependencies.
-
-
 Single-sim example::
 
     >>> md = gmx.workflow.from_tpr(filename)
@@ -35,6 +16,8 @@ Single-sim example::
     >>> md = gmx.workflow.from_tpr(filename)
     >>> with gmx.context.Context(md.workspec) as session:
     ...    session.run()
+
+.. This comment line seems to be necessary to help parsing in some cases.
 
 Array sim example::
 
@@ -54,6 +37,8 @@ Array sim example::
     >>> with gmx.context.Context(my_work) as session:
     ...    session.run()
 
+.. This comment line seems to be necessary to help parsing in some cases.
+
 Single-sim with plugin::
 
     >>> work = gmx.workflow.from_tpr(filename)
@@ -68,12 +53,16 @@ Single-sim with plugin::
     >>> with gmx.context.Context(work) as session:
     ...    session.run()
 
+.. This comment line seems to be necessary to help parsing in some cases.
+
 Array sim with plugin::
 
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> potential = myplugin.EnsembleRestraint(sites=[1,4], R0=2.0, k=10000.0)
     >>> gmx.add_potential(md, potential)
     >>> gmx.run(work)
+
+.. This comment line seems to be necessary to help parsing in some cases.
 
 The above is shorthand for::
 
@@ -86,6 +75,7 @@ The above is shorthand for::
     >>> with gmx.context.Context(my_work) as session:
     ...    session.run()
 
+.. This comment line seems to be necessary to help parsing in some cases.
 
 Array sim with plugin using global resources::
 
@@ -95,6 +85,8 @@ Array sim with plugin using global resources::
     >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0, workdata=workdata, data_update_period=numsteps)
     >>> md.add_dependency(potential)
     >>> gmx.run(md)
+
+.. This comment line seems to be necessary to help parsing in some cases.
 
 The above is shorthand for::
 
@@ -555,10 +547,8 @@ def get_source_elements(workspec):
 def from_tpr(input=None, **kwargs):
     """Create a WorkSpec from a (list of) tpr file(s).
 
-    Required Args:
-        input: string or list of strings giving the filename(s) of simulation input
-
-    Optional Keyword Args:
+    Arguments:
+        input (str): *Required* string or list of strings giving the filename(s) of simulation input
         grid (tuple): Domain decomposition grid divisions (nx, ny, nz). (-dd)
         pme_ranks (int): number of separate ranks to be used for PME electrostatics. (-npme)
         threads (int): Total number of threads to start. (-nt)
@@ -571,20 +561,19 @@ def from_tpr(input=None, **kwargs):
     Returns:
         simulation member of a gmx.workflow.WorkSpec object
 
-    Produces a WorkSpec with the following data.
+    Produces a WorkSpec with the following data::
 
-        version: "gmxapi_workspec_1_0"
+        version: gmxapi_workspec_0_1
         elements:
             tpr_input:
-                namespace: "gromacs"
+                namespace: gromacs
                 operation: load_tpr
-                params: ["tpr_filename1", "tpr_filename2"]
+                params: ['tpr_filename1', 'tpr_filename2']
             md_sim:
-                namespace: "gmxapi"
+                namespace: gmxapi
                 operation: md
                 depends: [myinput]
-
-    """
+"""
     import os
 
     usage = "argument to from_tpr() should be a valid filename or list of filenames, followed by optional key word arguments."
