@@ -57,6 +57,8 @@ install:
   - python -m pip install numpy --user
   - python -m pip install mpi4py --user
   - python -m pip install networkx --user
+  - python -m pip install sphinx --user
+  - python -m pip install sphinx_rtd_theme --user
 
 script:
   - mkdir build
@@ -64,6 +66,7 @@ script:
   # install in user site-packages directory
   - GROMACS_DIR=$HOME/gromacs cmake .. -DPYTHON_EXECUTABLE=`which python` -DGMXAPI_USER_INSTALL=ON
   - make -j4 install
+  - make -j4 docs
   - popd
   - mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose
   - pip uninstall -y gmx

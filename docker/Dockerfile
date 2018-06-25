@@ -16,6 +16,8 @@
 #
 #    docker build --build-arg BRANCH=devel -t gmxapi .
 #
+# If the repository has been updated, but the Dockerfile has not, specify `--no-cache` to `docker build`.
+#
 # Tagged docker images are available through Docker Hub by pulling / running gmxapi/gmxapi:master
 # or gmxapi/gmxapi:devel
 #
@@ -42,8 +44,6 @@ RUN pip install --upgrade pip && \
     pip install sphinx sphinx-rtd-theme mpi4py
 
 RUN pip install --upgrade setuptools --user
-
-#ADD --chown=1000:100 gmxpy /home/jovyan/gmxpy
 
 RUN wget https://github.com/kassonlab/gmxapi/archive/$BRANCH.zip && \
     unzip $BRANCH.zip && \
