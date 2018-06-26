@@ -557,6 +557,7 @@ def from_tpr(input=None, **kwargs):
         pme_threads_per_rank (int): Number of OpenMP threads per PME rank. (-ntomp_pme)
         steps (int): Override input files and run for this many steps. (-nsteps)
         max_hours (float): Terminate after 0.99 times this many hours if simulation is still running. (-maxh)
+        append_output (bool): Append output for continuous trajectories if True, truncate existing output data if False. (default True)
 
     Returns:
         simulation member of a gmx.workflow.WorkSpec object
@@ -612,6 +613,9 @@ def from_tpr(input=None, **kwargs):
             params['steps'] = int(kwargs[arg_key])
         elif arg_key == 'max_hours' or arg_key == 'maxh':
             params['max_hours'] = float(kwargs[arg_key])
+        elif arg_key == 'append_output':
+            # Try not to encourage confusion with the `mdrun` `-noappend` flag, which would be a confusing double negative if represented as a bool.
+            params['append_output'] = bool(kwargs[arg_key])
         else:
             raise exceptions.UsageError("Invalid key word argument: {}. {}".format(arg_key, usage))
 

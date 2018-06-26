@@ -92,6 +92,23 @@ void setMDArgs(std::vector<std::string>* mdargs, py::dict params)
         mdargs->emplace_back("-maxh");
         mdargs->emplace_back(val);
     }
+    if (params.contains("append_output"))
+    {
+        try
+        {
+            if (! params["append_output"].cast<bool>())
+            {
+                mdargs->emplace_back("-noappend");
+            }
+        }
+        catch (const py::cast_error& e)
+        {
+            // Couldn't cast to bool for some reason.
+            // Convert to gmxapi exception (not implemented)
+            // ref. https://github.com/kassonlab/gmxapi/issues/125
+            throw;
+        }
+    }
 }
 
 void export_context(py::module &m)
