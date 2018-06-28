@@ -547,6 +547,20 @@ def get_source_elements(workspec):
 def from_tpr(input=None, **kwargs):
     """Create a WorkSpec from a (list of) tpr file(s).
 
+    Generates a work specification based on the provided simulation input and returns a handle to the
+    MD simulation element of the workflow. Key word arguments can override simulation behavior from
+    ``input``.
+
+    If the MD operation discovers artifacts from a previous simulation that was launched from the same input,
+    the simulation resumes from the last checkpointed step. If ``append_output`` is set ``False``, existing
+    artifacts are discarded, and new output begins from the last checkpointed step, if any.
+
+    The stop condition for the MD operation may be overridden. If ``steps=N`` is provided and N is an integer
+    greater than or equal to 1, the MD operation advances the trajectory by ``N`` steps, regardless of the number
+    of simulation steps specified in ``input``. For convenience, setting ``steps=None`` does not override ``input``.
+
+    Where key word arguments correspond to ``gmx mdrun`` command line options, the corresponding flags are noted below.
+
     Arguments:
         input (str): *Required* string or list of strings giving the filename(s) of simulation input
         grid (tuple): Domain decomposition grid divisions (nx, ny, nz). (-dd)
@@ -569,11 +583,20 @@ def from_tpr(input=None, **kwargs):
             tpr_input:
                 namespace: gromacs
                 operation: load_tpr
-                params: ['tpr_filename1', 'tpr_filename2']
+                params: {'input': ['tpr_filename1', 'tpr_filename2', ...]}
             md_sim:
                 namespace: gmxapi
                 operation: md
-                depends: [myinput]
+                depends: ['tpr_input']
+                params: {'kw1': arg1, 'kw2': arg2, ...}
+
+    Bugs:
+        version 0.0.6
+        * If on-disk trajectory state is at a simulation step greater than that specified in ``input`` and
+          ``steps`` is not specified or is None, the MD operation will try to produce a trajectory of infinite
+          length. See https://github.com/kassonlab/gmxapi/issues/130
+        * There is not a way to programatically check the current step number on disk.
+          See https://github.com/kassonlab/gmxapi/issues/56 and https://github.com/kassonlab/gmxapi/issues/85
 """
     import os
 
@@ -610,7 +633,19 @@ def from_tpr(input=None, **kwargs):
         elif arg_key == 'pme_threads_per_rank' or arg_key == 'ntomp_pme':
             params['pme_threads_per_rank'] = int(kwargs[arg_key])
         elif arg_key == 'steps' or arg_key == 'nsteps':
-            params['steps'] = int(kwargs[arg_key])
+            if kwargs[arg_key] is None:
+                # None means "don't override the input" which is indicated by a parameter value of -2 in gmxapi 0.0.6
+                steps = -2
+            else:
+                # Otherwise we require steps to be a positive integer
+                try:
+                    steps = int(kwargs[arg_key])
+                    if steps < 1:
+                        raise exceptions.ValueError('steps to run must be at least 1')
+                except (TypeError, ValueError) as e:
+                    # steps is not an integer.
+                    raise exceptions.TypeError('"steps" could not be interpreted as an integer.')
+            params['steps'] = steps
         elif arg_key == 'max_hours' or arg_key == 'maxh':
             params['max_hours'] = float(kwargs[arg_key])
         elif arg_key == 'append_output':
