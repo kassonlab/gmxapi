@@ -138,12 +138,12 @@ class ConsumerBuilder(object):
 @pytest.mark.usefixtures("cleandir")
 class ArrayContextTestCase(unittest.TestCase):
     def test_basic(self):
-        md = gmx.workflow.from_tpr(tpr_filename)
+        md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
         context = gmx.context.ParallelArrayContext(md)
         with context as session:
             session.run()
 
-        md = gmx.workflow.from_tpr([tpr_filename, tpr_filename])
+        md = gmx.workflow.from_tpr([tpr_filename, tpr_filename], threads_per_rank=1)
         context = gmx.context.ParallelArrayContext(md)
         with context as session:
             session.run()

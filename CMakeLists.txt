@@ -7,6 +7,8 @@ cmake_minimum_required(VERSION 3.4.3)
 # Sets the PROJECT_VERSION variable, as well...
 project(gmxpy VERSION 0.0.6)
 
+include(Ccache.cmake)
+
 # If the user is not in a virtual environment and is not a privileged user and has not specified an install location
 # for the Python module (GMXAPI_INSTALL_PATH), this option causes the automatic install location to query the user
 # site-packages directory instead of using the default site-packages directory for the interpreter.

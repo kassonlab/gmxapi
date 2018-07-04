@@ -548,7 +548,7 @@ class ParallelArrayContext(object):
                 def launch(rank=None):
                     assert not rank is None
                     tpr_file = infile[rank]
-                    logger.info('Loading TPR file: {}'.format(infile))
+                    logger.info('Loading TPR file: {}'.format(tpr_file))
                     system = gmx.core.from_tpr(tpr_file)
                     dag.nodes[name]['system'] = system
                     for potential in potential_list:
