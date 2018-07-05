@@ -6,6 +6,9 @@ import pytest
 import gmx
 import json
 import os
+from gmx.util import to_string
+from gmx.util import to_utf8
+
 # # Get a test tpr filename
 # from gmx.data import tpr_filename
 
@@ -62,13 +65,13 @@ class WorkElementTestCase(unittest.TestCase):
         params = {'input': ["filename1", "filename2"]}
         element = gmx.workflow.WorkElement(namespace=namespace, operation=operation, params=params)
 
-        json_data = element.serialize()
-        assert "namespace" in json.loads(json_data)
+        serialization = element.serialize()
+        assert "namespace" in json.loads(to_string(serialization))
 
         # Two elements with the same name cannot exist in the same workspec, but this is not the case here.
-        element = gmx.workflow.WorkElement.deserialize(json_data)
+        element = gmx.workflow.WorkElement.deserialize(serialization)
         assert element.name == None
-        element = gmx.workflow.WorkElement.deserialize(json_data, name=name)
+        element = gmx.workflow.WorkElement.deserialize(serialization, name=name)
         assert element.name == name
 
         assert element.workspec == workspec
@@ -182,7 +185,7 @@ class WorkflowFreeFunctions(unittest.TestCase):
     """Test helpers and other free functions in gmx.workflow submodule."""
     def setUp(self):
         # check that we actually got an empty directory form "cleandir"
-        assert os.listdir(os.getcwd()) == []
+        assert len(os.listdir(os.getcwd())) == 0
         # Make sure that we have some "input files".
         # Expectations for sanity-checking input are open to discussion...
         with open(file1, 'wb'):

@@ -141,6 +141,8 @@ from __future__ import unicode_literals
 from . import exceptions
 import gmx
 from gmx import logging
+from gmx.util import to_string
+from gmx.util import to_utf8
 
 __all__ = ['WorkSpec', 'WorkElement']
 
@@ -275,7 +277,7 @@ class WorkSpec(object):
         """
         # Hash the serialized elements, concatenated as a single string. Note that the order of elements and their
         # contents is not guaranteed, but should be consistent within a script invocation.
-        return hash(''.join([element.serialize() for element in self]))
+        return hash(to_string(self.serialize()))
 
     def add_element(self, element):
         """Add an element to a work specification if possible.
@@ -333,9 +335,6 @@ class WorkSpec(object):
     #     To do: consider instead a gmx.workflow.merge(workspecA, workspecB) free function that returns a new WorkSpec.
     #     """
 
-
-    # Not sure we want to do serialization and deserialization yet, since we don't currently have a way to
-    # determine the uniqueness of a work specification.
     def serialize(self):
         """Serialize the work specification in a form suitable to pass to any Context implementation.
 
@@ -343,24 +342,36 @@ class WorkSpec(object):
 
         To simplify unique identification of work specifications, this function will also impose rules for reproducibility.
 
-        1. All key-value maps are sorted alphanumerically by their string keys
-        2. Strings must be valid ASCII characters
-        3. Output character encoding is 'utf-8'
+        1. All key-value maps are sorted alphanumerically by their string keys.
+        2. Strings must consist of valid ASCII characters.
+        3. Output is a byte sequence of the utf-8 encoded densely formatted JSON document.
+
+        Returns:
+            py:unicode object in Python 2, py:bytes object in Python 3
+
+        Output of serialize() should be explicitly converted to a string before passing to a JSON deserializer.
+
+            >>> my_object = my_workspec.serialize()
+            >>> my_data_structure = json.loads(my_object.decode('utf-8'))
+            >>> # or...
+            >>> my_data_structure = json.loads(my_object, encoding='utf-8')
+
         """
         import json
         # Build the normalized dictionary
         dict_representation = {'version': self.version,
                                'elements': {}
                                }
-        for name, element in [(e, json.loads(self.elements[e])) for e in sorted(self.elements.keys())]:
-            dict_representation['elements'][name] = element
-        return json.dumps(dict_representation, ensure_ascii=True, sort_keys=True, separators=(',',':'))
+        for name, element in [(e, json.loads(to_string(self.elements[e]))) for e in sorted(self.elements.keys())]:
+            dict_representation['elements'][str(name)] = element
+        serialization = json.dumps(dict_representation, ensure_ascii=True, sort_keys=True, separators=(',',':'))
+        return serialization.encode('utf-8')
 
     @classmethod
     def deserialize(serialized):
         import json
         workspec = gmx.workflow.WorkSpec()
-        dict_representation = json.loads(serialized)
+        dict_representation = json.loads(to_string(serialized))
         ver_in = dict_representation['version']
         ver_out = workspec.version
         if ver_in != ver_out:
@@ -391,38 +402,23 @@ class WorkSpec(object):
         # of base64 to represent, which seems reasonable. We need to replace some of the base64 characters to make them
         # filesystem friendly, though. Hexadecimal may be more friendly, but would require 64 characters.
         import hashlib
-        string_repr = self.serialize()
-        result = hashlib.sha256(string_repr)
+        data = to_utf8(self.serialize())
+        result = hashlib.sha256(data)
         return result.hexdigest()
 
     def __str__(self):
         """Generate string representation for str() or print().
 
         The string output should look like the abstract schema for gmxapi_workspec_1_0, but the exact
-        format is unspecified.
+        format is unspecified and may change in future versions.
 
-        For json output, use WorkSpec.serialize(). For output in the form of valid Python, use repr().
-
-        \todo I don't see a compelling reason not to make str(WorkSpec) == WorkSpec.serialize()
-        with index=4
+        For consistent JSON output, use WorkSpec.serialize().
         """
-        output = ""
-
-        output += 'version: "{}"\n'.format(self.version)
-
-        output += 'elements:\n'
-        for element in self.elements:
-            data = WorkElement.deserialize(self.elements[element])
-            output += '    {}:\n'.format(element)
-            output += '        namespace: "{}"\n'.format(data.namespace)
-            output += '        operation: {}\n'.format(data.operation)
-            # \todo improve output formatting: don't be lazy about printing these lists.
-            if data.params is not None:
-                output += '        params: {}\n'.format(str(data.params))
-            if data.depends is not None:
-                output += '        depends: {}\n'.format(str(data.depends))
-
-        return output
+        import json
+        string = to_string(self.serialize())
+        data = json.loads(string)
+        reserialized = json.dumps(data, indent=4, sort_keys=True)
+        return str(reserialized)
 
     def __repr__(self):
         """Generate Pythonic representation for repr(workspec)."""
@@ -434,10 +430,10 @@ class WorkSpec(object):
 class WorkElement(object):
     """Encapsulate an element of a work specification."""
     def __init__(self, namespace="gmxapi", operation=None, params=None, depends=()):
-        self.namespace = str(namespace)
+        self.namespace = to_string(namespace)
         # We can add an operations submodule to validate these. E.g. self.operation = gmx.workflow.operations.normalize(operation)
         if operation is not None:
-            self.operation = str(operation)
+            self.operation = to_string(operation)
         else:
             raise exceptions.UsageError("Invalid argument type for operation.")
 
@@ -445,14 +441,30 @@ class WorkElement(object):
         if params is None:
             self.params = {}
         elif isinstance(params, dict):
-            self.params = {name: params[name] for name in params}
+            self.params = {to_string(name): params[name] for name in params}
         else:
             raise exceptions.UsageError("If provided, params must be a dictionary of keyword arguments")
         self.depends = list(depends)
 
         # The Python class for work elements keeps a strong reference to a WorkSpec object containing its description
-        self.name = None
-        self.workspec = None
+        self._name = None
+        self._workspec = None
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, new_name):
+        self._name = to_string(new_name)
+
+    @property
+    def workspec(self):
+        return self._workspec
+
+    @workspec.setter
+    def workspec(self, input):
+        self._workspec = input
 
     def add_dependency(self, element):
         """Add another element as a dependency.
@@ -471,27 +483,38 @@ class WorkElement(object):
         self.workspec.elements[self.name] = self.serialize()
 
     def serialize(self):
-        """Create a string representation of the work element.
+        """Create a byte sequence representation of the work element.
 
         The WorkElement class exists just to provide convenient handles in Python. The WorkSpec is not actually a
         container of WorkElement objects.
+
+        Returns:
+            Byte sequence of utf-8 encoded JSON document. May need to be decoded if needed as a (Unicode) string.
+
         """
         import json
-        output_dict = {"namespace": self.namespace,
-                       "operation": self.operation,
-                       "params": self.params,
-                       "depends": self.depends
+        output_dict = {'namespace': self.namespace,
+                       'operation': self.operation,
+                       'params': self.params,
+                       'depends': self.depends
                        }
-        return json.dumps(output_dict)
+        serialization = json.dumps(output_dict)
+        return to_utf8(serialization)
 
     @classmethod
-    def deserialize(cls, input_string, name=None, workspec=None):
+    def deserialize(cls, input, name=None, workspec=None):
         """Create a new WorkElement object from a serialized representation.
+
+        Arguments:
+            input: a serialized WorkElement
+            name: new element name (optional) (deprecated)
+            workspec: an existing workspec to attach this element to (optional)
 
         When subclasses become distinct, this factory function will need to do additional dispatching to create an object of the correct type.
         Alternatively, instead of subclassing, a slightly heavier single class may suffice, or more flexible duck typing might be better.
         """
         import json
+        input_string = to_string(input)
         args = json.loads(input_string)
         element = cls(namespace=args['namespace'], operation=args['operation'], params=args['params'], depends=args['depends'])
         if name is not None:
@@ -544,6 +567,7 @@ def get_source_elements(workspec):
             element.workspec = workspec
             yield(element)
 
+
 def from_tpr(input=None, **kwargs):
     """Create a WorkSpec from a (list of) tpr file(s).
 
@@ -590,26 +614,25 @@ def from_tpr(input=None, **kwargs):
                 depends: ['tpr_input']
                 params: {'kw1': arg1, 'kw2': arg2, ...}
 
-    Bugs:
-        version 0.0.6
+    Bugs: version 0.0.6
         * If on-disk trajectory state is at a simulation step greater than that specified in ``input`` and
           ``steps`` is not specified or is None, the MD operation will try to produce a trajectory of infinite
           length. See https://github.com/kassonlab/gmxapi/issues/130
         * There is not a way to programatically check the current step number on disk.
           See https://github.com/kassonlab/gmxapi/issues/56 and https://github.com/kassonlab/gmxapi/issues/85
-"""
+    """
     import os
 
     usage = "argument to from_tpr() should be a valid filename or list of filenames, followed by optional key word arguments."
 
     # Normalize to tuple input type.
-    if isinstance(input, str):
-        tpr_list = (input,)
-    elif hasattr(input, "__iter__"):
-        # Assume list-like input
-        tpr_list = tuple(input)
+    if isinstance(input, list) or isinstance(input, tuple):
+        tpr_list = tuple([to_string(element) for element in input])
     else:
-        raise exceptions.UsageError(usage)
+        try:
+            tpr_list = (to_string(input),)
+        except:
+            raise exceptions.UsageError(usage)
 
     # Check for valid filenames
     for arg in tpr_list:
@@ -659,8 +682,8 @@ def from_tpr(input=None, **kwargs):
     workspec = WorkSpec()
 
     # Create and add the Element for the tpr file(s)
-    inputelement = WorkElement(namespace='gromacs', operation="load_tpr", params={'input': tpr_list})
-    inputelement.name = "tpr_input"
+    inputelement = WorkElement(namespace='gromacs', operation='load_tpr', params={'input': tpr_list})
+    inputelement.name = 'tpr_input'
     if inputelement.name not in workspec.elements:
         # Operations such as this need to be replaced with accessors or properties that can check the validity of the WorkSpec
         workspec.elements[inputelement.name] = inputelement.serialize()
@@ -669,8 +692,8 @@ def from_tpr(input=None, **kwargs):
     # Create and add the simulation element
     # We can add smarter handling of the `depends` argument, but it is only critical to check when adding the element
     # to a WorkSpec.
-    mdelement = WorkElement(operation="md", depends=[inputelement.name], params=params)
-    mdelement.name = "md_sim"
+    mdelement = WorkElement(operation='md', depends=[inputelement.name], params=params)
+    mdelement.name = 'md_sim'
     # Check that the element has not already been added, but that its dependency has.
     workspec.add_element(mdelement)
 
