@@ -13,7 +13,9 @@ sudo: false
 # Note the heuristics for whether cache is shared or distinct:
 # https://docs.travis-ci.com/user/caching/#Caches-and-build-matrices
 cache:
-  pip: true
+# I think the pip cache may not distinguish between Python versions, causing it to corrupt the cache if Python version
+# is the only distinction between parallel jobs.
+#  pip: true
   apt: true
   directories:
     - $HOME/.ccache_gromacs
