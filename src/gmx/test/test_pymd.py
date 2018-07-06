@@ -61,8 +61,12 @@ class BindingsTestCase(unittest.TestCase):
     def test_APIObjectsFromTpr(self):
         apisystem = gmx.core.from_tpr(tpr_filename)
         assert isinstance(apisystem, gmx.core.MDSystem)
+        context = gmx.core.Context()
+        mdargs = gmx.core.MDArgs()
+        mdargs.set({'threads_per_rank': 1})
+        context.setMDArgs(mdargs)
         assert hasattr(apisystem, 'launch')
-        session = apisystem.launch()
+        session = apisystem.launch(context)
         assert hasattr(session, 'run')
         session.run()
         # Test rerunability
@@ -100,14 +104,14 @@ class BindingsTestCase(unittest.TestCase):
 def test_simpleSimulation(caplog):
     """Load a work specification with a single TPR file and run."""
     # use case 1: simple high-level
-    md = gmx.workflow.from_tpr(tpr_filename)
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
     gmx.run(md)
 
 @pytest.mark.usefixtures("cleandir")
 @pytest.mark.usefixtures("caplog")
 @withmpi_only
 def test_array_context(caplog):
-    md = gmx.workflow.from_tpr(tpr_filename)
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
     context = gmx.context.ParallelArrayContext(md)
     with context as session:
         session.run()
@@ -117,7 +121,7 @@ def test_array_context(caplog):
 @withmpi_only
 def test_plugin(caplog):
     # Test attachment of external code
-    md = gmx.workflow.from_tpr(tpr_filename)
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
 
     # Create a WorkElement for the potential
     #potential = gmx.core.TestModule()

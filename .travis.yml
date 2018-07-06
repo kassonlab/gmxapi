@@ -1,85 +1,298 @@
+# Recipe for build and integration testing on Travis-CI
+
+# Try beta version of new travis-yml checker
+version: "= 0"
+# For extra debugging of failed jobs, see
+# https://docs.travis-ci.com/user/common-build-problems/#Troubleshooting-Locally-in-a-Docker-Image
+
 language: cpp
 sudo: false
 
-# At some point, we will test specific combinations of options, but not all permutations, so we use explicit matrix.
+# Different compiler or env are supposed to trigger different caches, but I had a hard time diagnosing problems
+# in gromacs-gmxapi until I specified a separate ccache for each matrix build element.
+# Note the heuristics for whether cache is shared or distinct:
+# https://docs.travis-ci.com/user/caching/#Caches-and-build-matrices
+cache:
+  pip: true
+  apt: true
+  directories:
+    - $HOME/.ccache_gromacs
+# This should be in a separate cache already because of the different compiler
+#    - $HOME/.ccache_gromacs_mpi
+    - $HOME/.ccache_py27
+    - $HOME/.ccache_py33
+    - $HOME/install
+    - $HOME/py2venv
+    - $HOME/py2venv_devel
+    - $HOME/py3venv
+    - $HOME/py3venv_devel
+os: linux
+
+# When building for the master branch, we want to know if building against the devel branch of a collaborating
+# repository breaks, but we don't want it to cause the CI test to be considered "failed"
+#
+# Permutations to test (ultimately):
+# - build gmaxpi against gromacs-gmxapi master (if gmxapi devel fails against gromacs master, decide whether or not
+#   this is okay and then disable the build for that release tag)
+# - build against gromacs-gmxapi devel, unless gmxapi branch is master (because we presumably just did a tested merge)
+# - build with MPI GROMACS and with tMPI GROMACS
+# - build with Python 2.7 and Python 3.4 for sample_restraint devel branch, but don't fail on sample_restraint errors (use after_script).
+# - clang, gcc 4.9+,... , intel compiler
+#
+# A pruned list of explicit permutations:
+# - Py 2.7, gromacs devel, tMPI, sample_restraint devel, clang
+# - Py 3.4, gromacs devel, MPI, sample_restraint devel, gcc 4.8.5 (good enough for pybind?)
+#
+# We can also use build staging (and maybe cache installation directories?) to reduce the combinatorics.
+# Note: "Stages group jobs that run in parallel, while their stages run sequentially."
+# E.g. stage1: build and install gromacs release >= 0.0.6 with and without MPI (preferably with several compilers). Skip for Py3 env.
+#      stage2: build gromacs and install devel with and without MPI unless gmxapi branch is master.
+#      stage3a: build gmxapi with Python 2.7 and Python 3.4 for both with and without MPI against gromacs release >= 0.0.6
+#      stage3b: repeat 3a for gromacs devel unless gmxapi branch is master
+#      stage3c: build but don't install with mismatched compilers according to 'env' against devel unless gmxapi is master
+#      stage4: build sample_restraint devel for each stage3b output unless gmxapi branch is master
+# The idea is that there are fewest permutations at stage1, which is our most expensive stage.
+#
+# We should also test both static and dynamically linked builds...
+#
+# Reference https://docs.travis-ci.com/user/customizing-the-build/#The-Build-Lifecycle
+
 matrix:
 
   include:
 
-  - os: linux
-    compiler: gcc
+  # Build and install gromacs release
+#  - stage: GROMACS 0.0.6
+
+  # Build and install gromacs devel
+  - stage: GROMACS devel
+    compiler: gcc # MPI
+    env:
+      - MATRIX_EVAL="CI_MPI=1 && CC=`which mpicc` && CXX=`which mpic++`"
+    addons:
+      apt:
+        sources:
+          - ubuntu-toolchain-r-test
+        packages:
+          - ccache
+          - cmake
+          - cmake-data
+          - doxygen
+          - libblas-dev
+          - libcr-dev
+          - libfftw3-dev
+          - liblapack-dev
+          - libmpich-dev
+          - libxml2-dev
+          - mpich
+    before_script: true
+    script: true
+    after_script: true
+
+  - compiler: gcc # non-MPI, upgraded gcc
+    env:
+      - MATRIX_EVAL="CI_MPI=0 && CC=`which gcc-6` && CXX=`which g++-6`"
+    addons:
+      apt:
+        sources:
+          - ubuntu-toolchain-r-test
+        packages:
+          - ccache
+          - cmake
+          - cmake-data
+          - doxygen
+          - gcc-6
+          - g++-6
+          - libblas-dev
+          - libcr-dev
+          - libfftw3-dev
+          - liblapack-dev
+          - libmpich-dev
+          - libxml2-dev
+          - mpich
+    before_script: true
+    script: true
+    after_script: true
+
+  # Build and install gmxapi with Py2.7 and Py3.4 both with and without MPI
+  - stage: GMXAPI with GROMACS
+    compiler: gcc # tMPI, Py2.7
+    env:
+      - MATRIX_EVAL="CI_MPI=0 && CC=`which gcc-6` && CXX=`which g++-6`"
+    install: true
     addons:
       apt:
         sources:
         - ubuntu-toolchain-r-test
         packages:
-        - doxygen
-        - python
-        - mpich
-        - libmpich-dev
-        - libxml2-dev
-        - libblas-dev
         - cmake
         - cmake-data
-        - liblapack-dev
-        - g++-6
+        - doxygen
         - gcc-6
-    env:
-      - GMX_MPI=OFF
-      - GMX_THREAD_MPI=ON
-      - gmxapi_DIR=$HOME/gromacs
-      - GROMACS_DIR=$HOME/gromacs
-      - GROMACS_TAG=devel
-# Todo: GROMACS_TAG=devel needs to be fixed before merging to a release branch.
-# What makes me uncomfortable is that this is not automatic, but maybe that is for the best. We should check the
-# version dependencies before issuing a release or merging to master. This is described in RELEASE.txt
+        - g++-6
+        - libblas-dev
+        - libcr-dev
+        - libfftw3-dev
+        - liblapack-dev
+        - libmpich-dev
+        - libxml2-dev
+        - mpich
+        - python
+    # Python environment set-up
+    before_script:
+      - python -m virtualenv $HOME/py2venv_devel
+      - source $HOME/py2venv_devel/bin/activate
+      - ls $HOME/install && ls $HOME/install/gromacs_devel && ls $HOME/install/gromacs_devel/bin
+      - source $HOME/install/gromacs_devel/bin/GMXRC
+      - export CCACHE_DIR=$HOME/.ccache_py27
+      - export PYTHON=`which python`
 
+  - compiler: gcc  # tMPI, Py3.4
+    env:
+      - MATRIX_EVAL="CI_MPI=0 && CC=`which gcc-6` && CXX=`which g++-6`"
+    install: true
+    # Python environment set-up
+    addons:
+      apt:
+        sources:
+        - ubuntu-toolchain-r-test
+        packages:
+        - cmake
+        - cmake-data
+        - doxygen
+        - gcc-6
+        - g++-6
+        - libblas-dev
+        - libcr-dev
+        - libfftw3-dev
+        - liblapack-dev
+        - libmpich-dev
+        - libxml2-dev
+        - mpich
+        - python3
+        - python3.4-venv
+# package name changes in Ubuntu 15
+#        - python3-venv
+    before_script:
+      - python3 -m venv $HOME/py3venv_devel
+      - source $HOME/py3venv_devel/bin/activate
+      - ls $HOME/install && ls $HOME/install/gromacs_devel && ls $HOME/install/gromacs_devel/bin
+      - source $HOME/install/gromacs_devel/bin/GMXRC
+      - export CCACHE_DIR=$HOME/.ccache_py34
+      - export PYTHON=`which python`
+
+  - compiler: gcc # MPI, Py2.7
+    env:
+      - MATRIX_EVAL="CI_MPI=1 && CC=`which mpicc` && CXX=`which mpic++`"
+    install: true
+    addons:
+      apt:
+        sources:
+        - ubuntu-toolchain-r-test
+        packages:
+        - cmake
+        - cmake-data
+        - doxygen
+        - libblas-dev
+        - libcr-dev
+        - libfftw3-dev
+        - liblapack-dev
+        - libmpich-dev
+        - libxml2-dev
+        - mpich
+        - python
+    # Python environment set-up
+    before_script:
+      - python -m virtualenv $HOME/py2venv_devel
+      - source $HOME/py2venv_devel/bin/activate
+      - ls $HOME/install && ls $HOME/install/gromacs_devel && ls $HOME/install/gromacs_devel/bin
+      - source $HOME/install/gromacs_devel/bin/GMXRC
+      - export CCACHE_DIR=$HOME/.ccache_py27
+      - export PYTHON=`which python`
+
+  - compiler: gcc # MPI, Py3.4
+    env:
+      - MATRIX_EVAL="CI_MPI=1 && CC=`which mpicc` && CXX=`which mpic++`"
+    install: true
+    addons:
+      apt:
+        sources:
+        - ubuntu-toolchain-r-test
+        packages:
+        - cmake
+        - cmake-data
+        - doxygen
+        - libblas-dev
+        - libcr-dev
+        - libfftw3-dev
+        - liblapack-dev
+        - libmpich-dev
+        - libxml2-dev
+        - mpich
+        - python3
+        - python3.4-venv
+# package name changes in Ubuntu 15
+#        - python3-venv
+    # Python environment set-up
+    before_script:
+      - python3 -m venv $HOME/py3venv_devel
+      - source $HOME/py3venv_devel/bin/activate
+      - ls $HOME/install && ls $HOME/install/gromacs_devel && ls $HOME/install/gromacs_devel/bin
+      - source $HOME/install/gromacs_devel/bin/GMXRC
+      - export CCACHE_DIR=$HOME/.ccache_py34
+      - export PYTHON=`which python`
+
+
+# We also have access to tricks like [[ $TRAVIS_PULL_REQUEST == “false” ]] && [[ $TRAVIS_BRANCH == “master” ]]
+# but note that TRAVIS_BRANCH is the target branch and not the source branch for a pull request.
+# See also https://docs.travis-ci.com/user/environment-variables/#Default-Environment-Variables
+
+# Set up for all jobs
 before_install:
   - uname -a
   - apt list --installed
-  - test -n $CC  && unset CC
-  - test -n $CXX && unset CXX
-  - wget https://github.com/kassonlab/gromacs-gmxapi/archive/$GROMACS_TAG.zip
-  - unzip $GROMACS_TAG.zip
+  - dpkg-query -L doxygen
+  - eval "${MATRIX_EVAL}"
+  - export CCACHE_COMPILERCHECK=content
+  - export CCACHE_SLOPPINESS="file_macro,include_file_ctime,include_file_mtime,no_system_headers,pch_defines,time_macros"
+  - ${CC} --version
+  - ${CXX} --version
 
+# Skip install step by setting `install: true` when skipping gromacs build stages
 install:
-  - pushd gromacs-gmxapi-$GROMACS_TAG
-  - mkdir build
-  - pushd build
-  - cmake -DCMAKE_INSTALL_PREFIX=$HOME/gromacs -DGMX_FFT_LIBRARY=fftpack -DGMX_GPU=OFF -DGMX_OPENMP=OFF -DGMX_SIMD=None -DGMX_USE_RDTSCP=OFF -DGMX_MPI=$GMX_MPI -DGMX_THREAD_MPI=$GMX_THREAD_MPI ..
-  - make -j4 install
+  - export CCACHE_DIR=$HOME/.ccache_gromacs
+  - ccache -s
+  - git clone --depth=1 --no-single-branch https://github.com/kassonlab/gromacs-gmxapi.git
+  - pushd gromacs-gmxapi
+  - git branch -a
+  # \todo add 0.0.6 build
+  - git checkout devel
+  - pwd
+  - mkdir build && pushd build && cmake -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_C_COMPILER=$CC -DBUILD_TESTING=ON -DGMX_DOUBLE=$GMX_DOUBLE -DGMX_MPI=$GMX_MPI -DGMX_THREAD_MPI=$GMX_THREAD_MPI -DCMAKE_INSTALL_PREFIX=$HOME/install/gromacs_devel .. && make -j1 install
   - popd
-  - popd
-  - python -m pip install --upgrade pip --user
-  - python -m pip install --upgrade setuptools --user
-  - python -m pip install virtualenv --user
-  - python -m pip install pytest --user
-  - python -m pip install numpy --user
-  - python -m pip install mpi4py --user
-  - python -m pip install networkx --user
-  - python -m pip install sphinx --user
-  - python -m pip install sphinx_rtd_theme --user
+  - ccache -s
 
+
+# Python build steps
 script:
+  - ccache -s
+  - $PYTHON -m pip install --upgrade pip
+  - $PYTHON -m pip install --upgrade setuptools
+  - $PYTHON -m pip install virtualenv
+  - $PYTHON -m pip install pytest numpy mpi4py networkx sphinx sphinx_rtd_theme
   - mkdir build
   - pushd build
-  # install in user site-packages directory
-  - GROMACS_DIR=$HOME/gromacs cmake .. -DPYTHON_EXECUTABLE=`which python` -DGMXAPI_USER_INSTALL=ON
+  - cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_C_COMPILER=$CC -DPYTHON_EXECUTABLE=$PYTHON
   - make -j4 install
   - make -j4 docs
   - popd
-  - mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose
-  - pip uninstall -y gmx
-  # install in virtualenv
-  - virtualenv venv
-  - source venv/bin/activate
-  - pip install numpy mpi4py networkx pytest
-  - pushd build
-  # Do an intentionally non-thorough job of removing previous build: test unclean build directory.
-  - rm CMakeCache.txt
-  - GROMACS_DIR=$HOME/gromacs cmake .. -DPYTHON_EXECUTABLE=`which python`
-  - make -j4 install
-  - popd
-  - mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose
+  - mpiexec -n 2 $PYTHON -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose
+  - ccache -s
 
+# We can use this step to remove something we don't want cached, like the gmx Python package in the site-packages
+# directory, though right now our clumsy cmake should just replace it without question.
+before_cache: true
+
+# Sample restraint
+after_script: true
 
