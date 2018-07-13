@@ -93,7 +93,7 @@ matrix:
 
   - compiler: gcc # non-MPI, upgraded gcc
     env:
-      - MATRIX_EVAL="CI_MPI=0 && CC=`which gcc-6` && CXX=`which g++-6`"
+      - MATRIX_EVAL="CI_MPI=0 && CC=`which mpicc` && CXX=`which mpicxx`"
     addons:
       apt:
         sources:
@@ -103,8 +103,6 @@ matrix:
           - cmake
           - cmake-data
           - doxygen
-          - gcc-6
-          - g++-6
           - libblas-dev
           - libcr-dev
           - libfftw3-dev
@@ -120,7 +118,7 @@ matrix:
   - stage: GMXAPI with GROMACS
     compiler: gcc # tMPI, Py2.7
     env:
-      - MATRIX_EVAL="CI_MPI=0 && CC=`which gcc-6` && CXX=`which g++-6`"
+      - MATRIX_EVAL="CI_MPI=0 && CC=`which mpicc` && CXX=`which mpicxx`"
     install: true
     addons:
       apt:
@@ -130,8 +128,6 @@ matrix:
         - cmake
         - cmake-data
         - doxygen
-        - gcc-6
-        - g++-6
         - libblas-dev
         - libcr-dev
         - libfftw3-dev
@@ -151,7 +147,7 @@ matrix:
 
   - compiler: gcc  # tMPI, Py3.4
     env:
-      - MATRIX_EVAL="CI_MPI=0 && CC=`which gcc-6` && CXX=`which g++-6`"
+      - MATRIX_EVAL="CI_MPI=0 && CC=`which mpicc` && CXX=`which mpicxx`"
     install: true
     # Python environment set-up
     addons:
@@ -162,8 +158,6 @@ matrix:
         - cmake
         - cmake-data
         - doxygen
-        - gcc-6
-        - g++-6
         - libblas-dev
         - libcr-dev
         - libfftw3-dev
@@ -278,10 +272,13 @@ install:
 # Python build steps
 script:
   - ccache -s
+  - export CC=${CC}
+  - export CXX=${CXX}
   - $PYTHON -m pip install --upgrade pip
   - $PYTHON -m pip install --upgrade setuptools
+  - MPICC=${CC} $PYTHON -m pip install --no-cache-dir --upgrade --no-binary ":all:" --force-reinstall --verbose networkx mpi4py MarkupSafe
   - $PYTHON -m pip install virtualenv
-  - $PYTHON -m pip install pytest numpy mpi4py networkx sphinx sphinx_rtd_theme
+  - $PYTHON -m pip install pytest numpy networkx sphinx sphinx_rtd_theme
   - mkdir build
   - pushd build
   - cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_C_COMPILER=$CC -DPYTHON_EXECUTABLE=$PYTHON
