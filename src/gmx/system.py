@@ -2,6 +2,8 @@ import gmx
 import gmx.util
 from gmx import exceptions
 
+__all__ = ['System']
+
 class System(object):
     """Gromacs simulation system objects.
 
