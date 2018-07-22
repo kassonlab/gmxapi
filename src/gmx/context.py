@@ -157,91 +157,92 @@ class SerialArrayContext(object):
         self.__context_array = list([DefaultContext(work_element) for work_element in work])
         self._session = None
 
-def shared_data_maker(element):
-    """Make a shared data element for use by dependent nodes.
-
-    This version uses mpi4py to share data and supports a single downstream node.
-
-    The element provides a serialized argument list for numpy.empty() as two elements, args, and kwargs. Each subscriber receives such
-    an array at launch along with a python function handle to call-back to at some interval (passed to
-    the plugin C++ code).
-    """
-
-    # New idea: Instead of being dependent on a shared data node, let participants add a downstream node
-    # that performs the reduce operation. A context can determine unsuitability for this parallelism with
-    # lack of support for a reduce with a period less than the length of the specified trajectories.
-    # To support reduce operations for ensembles wider than the Context, the Context could provide an
-    # additional tier in the reduction for batches of co-scheduled tasks.
-
-    import json
-
-    class Builder(object):
-        def __init__(self, element):
-            logger.debug("Processing element {}".format(element.serialize()))
-            context = element.workspec._context
-            self.rank = context.rank
-            self.subscribinging_ranks = []
-            self.subscriber = None
-            self.comm = context._communicator
-            self.name = element.name
-            params = element.params
-            # Params contains a dictionary of kwargs
-            logger.debug("Processing parameters {}".format(params))
-            assert isinstance(params, dict)
-            kwargs = {name: params[name] for name in params}
-            self.args = kwargs['args']
-            self.kwargs = kwargs['kwargs']
-
-            # The builder can hold an updater to be provided to the subscriber at launch. The updater is
-            # a function reference that the user provides to perform a desired periodic action. Not sure
-            # how this will work in the future. Allowing arbitrary Python code to be provided during job
-            # configuration would be the hardest thing. The updater could be another user-provided operation.
-            # Hopefully we can provided some canned behaviors that can be selected with element parameters.
-            # Maybe both.
-            self.updater = None
-
-        def add_subscriber(self, builder):
-            # At this point, we could find out how this data will be used (e.g. subscribing ranks)
-            if self.subscriber is None:
-                self.subscriber = builder
-            else:
-                raise exceptions.ApiError("This element does not support multiple consumers")
-
-        def build(self, dag):
-            # Either the builder needs to get the key for the subscribed node(s) so that we can
-            # create the edge now, or this builder needs to provide subscribers with the key of this
-            # DAG node so that the subscriber can create the edge. I think I prefer the latter, so that
-            # edge creation is tied to the binding process of a new node with its upstream nodes.
-            nodename = self.name
-            dag.add_node(nodename)
-            self.node = dag.nodes[nodename]
-
-            self.node['launch'] = self.__launch
-            # To avoid ambiguity, let's assert that only nodes that are active at launch will have data.
-            self.node['data'] = None
-            self.node['comm'] = self.comm
-            self.subscriber.input_nodes.append(nodename)
-            self.node['launch'] = self.__launch
-
-        def __launch(self, rank=None):
-            """Create the shared data resource for subscribed builders.
-
-            This is the place to provide subscribers with API references for interacting with
-            the shared data facility.
-            """
-            import numpy
-            data = numpy.empty(*self.args, **self.kwargs)
-            self.node['data'] = data
-            self.subscriber.shared_data_updater = self.updater
-            self.subscribinging_ranks = list(range(self.subscriber.width))
-
-            # Later, we can offload consumer responsibilities and the updater function to this runner,
-            # but we aren't there yet.
-            runner = None
-            return runner
-
-    builder = Builder(element)
-    return builder
+# def shared_data_maker(element):
+#     """Make a shared data element for use by dependent nodes.
+#
+#     Note: outdated. This code is in limbo and should not be used.
+#
+#     This version uses mpi4py to share data and supports a single downstream node.
+#
+#     The element provides a serialized argument list for numpy.empty() as two elements, args, and kwargs. Each subscriber receives such
+#     an array at launch along with a python function handle to call-back to at some interval (passed to
+#     the plugin C++ code).
+#     """
+#
+#     # New idea: Instead of being dependent on a shared data node, let participants add a downstream node
+#     # that performs the reduce operation. A context can determine unsuitability for this parallelism with
+#     # lack of support for a reduce with a period less than the length of the specified trajectories.
+#     # To support reduce operations for ensembles wider than the Context, the Context could provide an
+#     # additional tier in the reduction for batches of co-scheduled tasks.
+#
+#     import json
+#
+#     class Builder(object):
+#         def __init__(self, element):
+#             logger.debug("Processing element {}".format(element.serialize()))
+#             self.context = element.workspec._context
+#             self.rank = self.context.rank
+#             self.subscriber = None
+#             self.name = element.name
+#             params = element.params
+#             # Params contains a dictionary of kwargs
+#             logger.debug("Processing parameters {}".format(params))
+#             assert isinstance(params, dict)
+#             kwargs = {name: params[name] for name in params}
+#             self.args = kwargs['args']
+#             self.kwargs = kwargs['kwargs']
+#
+#             # The builder can hold an updater to be provided to the subscriber at launch. The updater is
+#             # a function reference that the user provides to perform a desired periodic action. Not sure
+#             # how this will work in the future. Allowing arbitrary Python code to be provided during job
+#             # configuration would be the hardest thing. The updater could be another user-provided operation.
+#             # Hopefully we can provided some canned behaviors that can be selected with element parameters.
+#             # Maybe both.
+#             #self.updater = None
+#
+#         def add_subscriber(self, builder):
+#             # At this point, we could find out how this data will be used (e.g. subscribing ranks)
+#             if self.subscriber is None:
+#                 self.subscriber = builder
+#             else:
+#                 raise exceptions.ApiError("This element does not support multiple consumers")
+#
+#         def build(self, dag):
+#             # Either the builder needs to get the key for the subscribed node(s) so that we can
+#             # create the edge now, or this builder needs to provide subscribers with the key of this
+#             # DAG node so that the subscriber can create the edge. I think I prefer the latter, so that
+#             # edge creation is tied to the binding process of a new node with its upstream nodes.
+#             nodename = self.name
+#             dag.add_node(nodename)
+#             self.node = dag.nodes[nodename]
+#
+#             self.node['launch'] = self.__launch
+#             # To avoid ambiguity, let's assert that only nodes that are active at launch will have data.
+#             self.node['data'] = None
+#             self.subscriber.input_nodes.append(nodename)
+#             self.node['launch'] = self.__launch
+#
+#         def __launch(self, rank=None):
+#             """Create the shared data resource for subscribed builders.
+#
+#             This is the place to provide subscribers with API references for interacting with
+#             the shared data facility.
+#             """
+#             import numpy
+#             data = numpy.empty(*self.args, **self.kwargs)
+#             self.node['data'] = data
+#             self.comm = self.context._communicator
+#             self.node['comm'] = self.context._session_ensemble_communicator
+#             # self.subscriber.shared_data_updater = self.updater
+#             self.subscribinging_ranks = list(range(self.subscriber.width))
+#
+#             # Later, we can offload consumer responsibilities and the updater function to this runner,
+#             # but we aren't there yet.
+#             runner = None
+#             return runner
+#
+#     builder = Builder(element)
+#     return builder
 
 class ParallelArrayContext(object):
     """Manage an array of simulation work executing in parallel.
@@ -323,6 +324,9 @@ class ParallelArrayContext(object):
 
         Appropriate computing resources need to be knowable when the Context is created.
         """
+        import numpy
+        self._numpy = numpy
+
         # self.__context_array = list([Context(work_element) for work_element in work])
         self.__work = workflow.WorkSpec()
         self.__workdir_list = workdir_list
@@ -348,7 +352,7 @@ class ParallelArrayContext(object):
         #
         # The gmxapi namespace of operations should be consistent with a specified universal set of functionalities
         self.__operations['gmxapi'] = {'md': lambda element : self.__md(element),
-                                       'global_data' : shared_data_maker,
+                                       # 'global_data' : shared_data_maker,
                                       }
         # Even if TPR file loading were to become a common and stable enough operation to be specified in
         # and API, it is unlikely to be implemented by any code outside of GROMACS, so let's not clutter
@@ -483,7 +487,7 @@ class ParallelArrayContext(object):
         """
         class Builder(object):
             def __init__(self, tpr_list):
-                logger.debug("Loading tpr builder for tpr_list {}".format(tpr_list))
+                logger.info("Loading tpr builder for tpr_list {}".format(tpr_list))
                 self.tpr_list = tpr_list
                 self.subscribers = []
                 self.width = len(tpr_list)
@@ -575,6 +579,23 @@ class ParallelArrayContext(object):
 
         return Builder(element)
 
+    # Set up a simple ensemble resource
+    # This should be implemented for Session, not Context, and use an appropriate subcommunicator
+    # that is created and freed as the Session launches and exits.
+    def ensemble_update(self, send, recv, tag=None):
+        assert not tag is None
+        assert str(tag) != ''
+        if not tag in self.part:
+            self.part[tag] = 0
+        self._session_ensemble_communicator.Allreduce(send, recv)
+        buffer = self._numpy.array(recv, copy=False)
+        buffer /= self.size
+        suffix = '_{}.npz'.format(tag)
+        # These will end up in the working directory and each ensemble member will have one
+        filename = str("rank{}part{:04d}{}".format(self.rank, int(self.part[tag]), suffix))
+        self._numpy.savez(filename, recv=recv)
+        self.part[tag] += 1
+
     def __enter__(self):
         """Implement Python context manager protocol, producing a Session for the specified work in this Context.
 
@@ -607,31 +628,19 @@ class ParallelArrayContext(object):
 
         # Set up the global and local context.
         # Check the global MPI configuration
-        communicator = MPI.COMM_WORLD
-        comm_size = communicator.Get_size()
-        self.rank = communicator.Get_rank()
-        self._communicator = communicator
+        # Since the Context doesn't have a destructor, if we use an MPI communicator at this scope then
+        # it has to be owned and managed outside of Context.
+        context_communicator = MPI.COMM_WORLD
+        context_comm_size = context_communicator.Get_size()
+        context_rank = context_communicator.Get_rank()
+        self.rank = context_rank
+        # self._communicator = communicator
+        logger.debug("Context rank {} in context {} of size {}".format(context_rank, context_communicator, context_comm_size))
 
         assert not self.rank is None
 
-        self.part = {}
         # Set up a simple ensemble resource
-        def update(send, recv, tag=None):
-            assert not tag is None
-            assert str(tag) != ''
-            if not tag in self.part:
-                self.part[tag] = 0
-            self._communicator.Allreduce(send, recv)
-            buffer = numpy.array(recv, copy=False)
-            buffer /= self.size
-            suffix = '_{}.npz'.format(tag)
-            # These will end up in the working directory and each ensemble member will have one
-            filename = "rank{}part{:04d}{}".format(self.rank, int(self.part[tag]), suffix)
-            numpy.savez(filename, recv=recv)
-            self.part[tag] += 1
-
-        self.ensemble_update = update
-
+        self.part = {}
 
         ###
         # Process the work specification.
@@ -670,7 +679,7 @@ class ParallelArrayContext(object):
         logger.info("Building sequence {}".format(builder_sequence))
         for name in builder_sequence:
             builder = builders[name]
-            logger.debug("Building {}".format(builder))
+            logger.info("Building {}".format(builder))
             logger.debug("Has build attribute {}.".format(builder.build))
             builder.build(graph)
         self.size = graph.graph['width']
@@ -683,13 +692,33 @@ class ParallelArrayContext(object):
         self.__workdir_list = list([os.path.abspath(dir) for dir in workdir_list])
 
         # Check the session "width" against the available parallelism
-        if (self.size > comm_size):
-            raise exceptions.UsageError('ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.'.format(self.size, comm_size))
-        if (self.size < comm_size):
-            warnings.warn('MPI context is wider than necessary to run this work: array width {} vs. size {}.'.format(self.size, comm_size))
+        if (self.size > context_comm_size):
+            raise exceptions.UsageError('ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.'.format(self.size, context_comm_size))
+        if (self.size < context_comm_size):
+            warnings.warn('MPI context is wider than necessary to run this work: array width {} vs. size {}.'.format(self.size, context_comm_size))
 
-        # print(graph)
-        logger.debug(("Launching graph {}.".format(graph)))
+        # Create an appropriate sub-communicator for the present work. Extra ranks will be in a
+        # subcommunicator with no work.
+        if context_rank < self.size:
+            color = 0
+        else:
+            color = MPI.UNDEFINED
+
+        self._session_ensemble_communicator = context_communicator.Split(color, context_rank)
+        try:
+            self._session_ensemble_size = self._session_ensemble_communicator.Get_size()
+            self._session_ensemble_rank = self._session_ensemble_communicator.Get_rank()
+        except:
+            self._session_ensemble_size = 0
+            self._session_ensemble_rank = None
+        logger.info("Context rank {} assigned to rank {} of subcommunicator {} of size {}".format(
+            self.rank,
+            self._session_ensemble_rank,
+            self._session_ensemble_communicator,
+            self._session_ensemble_size
+        ))
+        if self._session_ensemble_size > 0:
+            assert self._session_ensemble_size == self.size
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
         # MDSystem objects are obtained from gmx.core.from_tpr(). They also provide add_potential().
@@ -700,8 +729,14 @@ class ParallelArrayContext(object):
         # E.g. Make a pass that allows meta-objects to bind (setting md_proxy._input_tpr and md_proxy._plugins,
         # and then call a routine implemented by each object to run whatever protocol it needs, such
         # as `system = gmx.core.from_tpr(md._input_tpr); system.add_potential(md._plugins)
-        if self.rank in range(self.size):
-            logger.info("Launching work on rank {}.".format(self.rank))
+        if self._session_ensemble_size > 0:
+            # print(graph)
+            logger.debug(("Launching graph {}.".format(graph.graph)))
+            logger.debug("Graph nodes: {}".format(str(list(graph.nodes))))
+            logger.debug("Graph edges: {}".format(str(list(graph.edges))))
+
+            logger.info("Launching work on context rank {}, subcommunicator rank {}.".format(self.rank, self._session_ensemble_rank))
+
             # Launch the work for this rank
             self.workdir = self.__workdir_list[self.rank]
             if os.path.exists(self.workdir):
@@ -739,18 +774,21 @@ class ParallelArrayContext(object):
 
                 def close(self):
                     for close in self.closers:
+                        logger.debug("Closing node: {}".format(close))
                         close()
 
             self._session = Session(runners, closers)
         else:
-            # \todo We don't really want a None session so much as a session with no work.
-            # self._session = None
+            logger.info("Context rank {} has no work to do".format(self.rank))
             class NullSession(object):
                 def run(self):
+                    logger.info("Running null session on rank {}.".format(self.rank))
                     return gmx.Status()
                 def close(self):
+                    logger.info("Closing null session.")
                     return
             self._session = NullSession()
+            self._session.rank = self.rank
 
         # Make sure session has started on all ranks before continuing?
 
@@ -761,12 +799,25 @@ class ParallelArrayContext(object):
         """Implement Python context manager protocol."""
         # Todo: handle exceptions.
         # \todo: we should not have a None session but rather an API-compliant Session that just has no work.
+        logger.info("Exiting session on context rank {}.".format(self.rank))
         if self._session is not None:
+            logger.info("Calling session.close().")
             self._session.close()
+            self._session = None
+        else:
+            logger.info("No _session known to context or session already closed.")
+        if hasattr(self, '_session_ensemble_communicator'):
+            from mpi4py import MPI
+            if self._session_ensemble_communicator != MPI.COMM_NULL:
+                logger.info("Freeing sub-communicator {} on rank {}".format(self._session_ensemble_communicator, self.rank))
+                self._session_ensemble_communicator.Free()
+            del self._session_ensemble_communicator
+        else:
+            logger.debug("No ensemble subcommunicator on context rank {}.".format(self.rank))
         os.chdir(self.__initial_cwd)
+        logger.info("Session closed on context rank {}.".format(self.rank))
         # \todo Make sure session has ended on all ranks before continuing and handle final errors.
 
-        self._session = None
         return False
 
 def get_context(work=None):
