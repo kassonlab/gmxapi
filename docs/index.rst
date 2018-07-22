@@ -2,8 +2,8 @@
 Gromacs External Interfaces
 ===========================
 
-This project is hosted at https://bitbucket.org/kassonlab/gmxpy and is
-based on a GROMACS fork hosted at https://bitbucket.org/kassonlab/gromacs
+This project is hosted at https://www.github.com/kassonlab/gmxapi and is
+based on a GROMACS fork hosted at https://www.github.com/kassonlab/gromacs-gmxapi
 
 ..  toctree::
     :maxdepth: 2
