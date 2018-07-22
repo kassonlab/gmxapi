@@ -28,10 +28,10 @@
 # container naming, committing snapshots, and managing containers and disk space.
 #
 
-FROM gmxapi/gromacs-gmxapi:devel
+FROM gmxapi/gromacs-gmxapi:0.0.6
 
 # Allow build for an arbitrary branch or tag, but default to the tip of `master`
-ARG BRANCH=devel
+ARG BRANCH=master
 
 RUN conda install pytest tox cmake
 
