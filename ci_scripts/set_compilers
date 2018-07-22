@@ -1,0 +1,7 @@
+export MPICC=`which mpicc`
+export MPICXX=`which mpicxx`
+export CC=`which gcc`
+export CXX=`which g++`
+export CCACHE_COMPILERCHECK=content
+${CC} --version
+${CXX} --version

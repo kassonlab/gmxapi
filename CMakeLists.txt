@@ -7,6 +7,8 @@ cmake_minimum_required(VERSION 3.4.3)
 # Sets the PROJECT_VERSION variable, as well...
 project(gmxpy VERSION 0.0.6)
 
+# Only interpret if() arguments as variables or keywords when unquoted.
+cmake_policy(SET CMP0054 NEW)
 include(Ccache.cmake)
 
 # If the user is not in a virtual environment and is not a privileged user and has not specified an install location
@@ -22,10 +24,12 @@ option(GMXAPI_USER_INSTALL "Override the default site-packages directory with th
 
 unset(PYTHONINTERP_FOUND)
 unset(PYTHONLIBS_FOUND)
+# This will get cleaner with FindPython in CMake 3.12 and higher. We're a ways from requiring that, but
+# we can add logic for it soon to be ready.
 find_package(PythonInterp)
 if (PYTHONINTERP_FOUND)
     message(STATUS "Found Python interpreter: ${PYTHON_EXECUTABLE}")
-    find_package(PythonLibs)
+    find_package(PythonLibs ${PYTHON_VERSION_STRING} EXACT)
     if (PYTHONLIBS_FOUND)
         if (GMXAPI_USER_INSTALL)
             execute_process(COMMAND ${PYTHON_EXECUTABLE} "-m" "site" "--user-site" OUTPUT_VARIABLE GMXAPI_DEFAULT_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -35,11 +39,11 @@ if (PYTHONINTERP_FOUND)
             message(STATUS "Python site-packages directory is ${GMXAPI_DEFAULT_SITE_PACKAGES}")
         endif()
     else()
-        message(FATAL "Found Python interpreter ${PYTHON_EXECUTABLE} but this Python installation does not have developer tools."
+        message(FATAL_ERROR "Found Python interpreter ${PYTHON_EXECUTABLE} but this Python installation does not have developer tools."
                 "Set PYTHON_EXECUTABLE to the Python interpreter that was installed with a working Python.h header file.")
     endif()
 else()
-    message(FATAL "Could not find Python interpreter. Set CMake flag -DPYTHON_EXECUTABLE=/path/to/python to hint.")
+    message(FATAL_ERROR "Could not find Python interpreter. Set CMake flag -DPYTHON_EXECUTABLE=/path/to/python to hint.")
 endif()
 
 # At some point this may be part of a CMake package with several components for which a single CMAKE_INSTALL_PREFIX does
