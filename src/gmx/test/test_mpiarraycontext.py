@@ -154,48 +154,49 @@ class ArrayContextTestCase(unittest.TestCase):
                 assert(os.path.exists(output_path))
                 print("Worker {} produced {}".format(rank, output_path))
 
-    def test_shared_data(self):
-        """Test that a shared data facility can be used across an ensemble."""
-
-        # constructor arguments for numpy.empty()
-        args = [(10,3)]
-        kwargs = {'dtype': 'int'}
-
-        data = gmx.workflow.SharedDataElement({'args': args, 'kwargs': kwargs}, name='mydata')
-
-        # Make a consumer of width 3, which we expect to be too big since we typically test on 2 ranks.
-        width = 3
-        consumer = ConsumerElement('mytester')
-        consumer.depends = [data.name]
-        consumer.params['width'] = width
-
-        workspec = gmx.workflow.WorkSpec()
-        workspec.add_element(data)
-        workspec.add_element(consumer)
-
-        context = gmx.context.ParallelArrayContext()
-        context.add_operation(consumer.namespace, consumer.operation, translate_test_consumer)
-        context.work = workspec
-
-        # Confirm that oversized width is caught
-        import mpi4py
-        size = mpi4py.MPI.COMM_WORLD.Get_size()
-        if size < width:
-            with pytest.raises(gmx.exceptions.UsageError):
-                context.__enter__()
-
-        # Create a workspec that we expect to be runnable.
-        consumer.workspec = None
-        data.workspec = None
-        width = size
-        consumer.params['width'] = width
-        workspec = gmx.workflow.WorkSpec()
-        workspec.add_element(data)
-        workspec.add_element(consumer)
-        context = gmx.context.ParallelArrayContext()
-        context.add_operation(consumer.namespace, consumer.operation, translate_test_consumer)
-        context.work = workspec
-
-        with context as session:
-            session.run()
-            assert session.graph.nodes[consumer.name]['check'] == True
+    # uses deprecated interface...
+    # def test_shared_data(self):
+    #     """Test that a shared data facility can be used across an ensemble."""
+    #
+    #     # constructor arguments for numpy.empty()
+    #     args = [(10,3)]
+    #     kwargs = {'dtype': 'int'}
+    #
+    #     data = gmx.workflow.SharedDataElement({'args': args, 'kwargs': kwargs}, name='mydata')
+    #
+    #     # Make a consumer of width 3, which we expect to be too big since we typically test on 2 ranks.
+    #     width = 3
+    #     consumer = ConsumerElement('mytester')
+    #     consumer.depends = [data.name]
+    #     consumer.params['width'] = width
+    #
+    #     workspec = gmx.workflow.WorkSpec()
+    #     workspec.add_element(data)
+    #     workspec.add_element(consumer)
+    #
+    #     context = gmx.context.ParallelArrayContext()
+    #     context.add_operation(consumer.namespace, consumer.operation, translate_test_consumer)
+    #     context.work = workspec
+    #
+    #     # Confirm that oversized width is caught
+    #     import mpi4py
+    #     size = mpi4py.MPI.COMM_WORLD.Get_size()
+    #     if size < width:
+    #         with pytest.raises(gmx.exceptions.UsageError):
+    #             context.__enter__()
+    #
+    #     # Create a workspec that we expect to be runnable.
+    #     consumer.workspec = None
+    #     data.workspec = None
+    #     width = size
+    #     consumer.params['width'] = width
+    #     workspec = gmx.workflow.WorkSpec()
+    #     workspec.add_element(data)
+    #     workspec.add_element(consumer)
+    #     context = gmx.context.ParallelArrayContext()
+    #     context.add_operation(consumer.namespace, consumer.operation, translate_test_consumer)
+    #     context.work = workspec
+    #
+    #     with context as session:
+    #         session.run()
+    #         assert session.graph.nodes[consumer.name]['check'] == True
