@@ -611,7 +611,8 @@ class ParallelArrayContext(object):
         instantiate objects to perform the work. In the first implementation, we kind of muddle things into
         a single pass.
         """
-        # Cache the working directory from which we were launched so that __exit__() can give us proper context management behavior.
+        # Cache the working directory from which we were launched so that __exit__() can give us proper context
+        # management behavior.
         self.__initial_cwd = os.getcwd()
         logger.debug("Launching session from {}".format(self.__initial_cwd))
 
@@ -619,7 +620,8 @@ class ParallelArrayContext(object):
         try:
             from mpi4py import MPI
         except:
-            raise exceptions.OptionalFeatureNotAvailableError("ParallelArrayContext requires Python package mpi4py to function.")
+            raise exceptions.OptionalFeatureNotAvailableError(
+                "ParallelArrayContext requires Python package mpi4py to function.")
 
         if self._session is not None:
             raise exceptions.Error('Already running.')
@@ -635,7 +637,9 @@ class ParallelArrayContext(object):
         context_rank = context_communicator.Get_rank()
         self.rank = context_rank
         # self._communicator = communicator
-        logger.debug("Context rank {} in context {} of size {}".format(context_rank, context_communicator, context_comm_size))
+        logger.debug("Context rank {} in context {} of size {}".format(context_rank,
+                                                                       context_communicator,
+                                                                       context_comm_size))
 
         assert not self.rank is None
 
@@ -693,9 +697,13 @@ class ParallelArrayContext(object):
 
         # Check the session "width" against the available parallelism
         if (self.size > context_comm_size):
-            raise exceptions.UsageError('ParallelArrayContext requires a work array that fits in the MPI communicator: array width {} > size {}.'.format(self.size, context_comm_size))
+            msg = 'ParallelArrayContext requires a work array that fits in the MPI communicator: '
+            msg += 'array width {} > size {}.'
+            msg = msg.format(self.size, context_comm_size)
+            raise exceptions.UsageError(msg)
         if (self.size < context_comm_size):
-            warnings.warn('MPI context is wider than necessary to run this work: array width {} vs. size {}.'.format(self.size, context_comm_size))
+            msg = 'MPI context is wider than necessary to run this work:  array width {} vs. size {}.'
+            warnings.warn(msg.format(self.size, context_comm_size))
 
         # Create an appropriate sub-communicator for the present work. Extra ranks will be in a
         # subcommunicator with no work.
@@ -735,7 +743,9 @@ class ParallelArrayContext(object):
             logger.debug("Graph nodes: {}".format(str(list(graph.nodes))))
             logger.debug("Graph edges: {}".format(str(list(graph.edges))))
 
-            logger.info("Launching work on context rank {}, subcommunicator rank {}.".format(self.rank, self._session_ensemble_rank))
+            logger.info("Launching work on context rank {}, subcommunicator rank {}.".format(
+                self.rank,
+                self._session_ensemble_rank))
 
             # Launch the work for this rank
             self.workdir = self.__workdir_list[self.rank]
@@ -809,7 +819,8 @@ class ParallelArrayContext(object):
         if hasattr(self, '_session_ensemble_communicator'):
             from mpi4py import MPI
             if self._session_ensemble_communicator != MPI.COMM_NULL:
-                logger.info("Freeing sub-communicator {} on rank {}".format(self._session_ensemble_communicator, self.rank))
+                logger.info("Freeing sub-communicator {} on rank {}".format(self._session_ensemble_communicator,
+                                                                            self.rank))
                 self._session_ensemble_communicator.Free()
             del self._session_ensemble_communicator
         else:
@@ -841,7 +852,8 @@ def get_context(work=None):
 
       * the Context supports can resolve all operations specified in the elements
       * the Context supports DAG topologies implied by the network of dependencies
-      * the Context supports features required by the elements with the specified parameters, such as synchronous array jobs.
+      * the Context supports features required by the elements with the specified parameters,
+        such as synchronous array jobs.
       * anything else?
 
     """
@@ -876,7 +888,8 @@ def get_context(work=None):
                 if tpr_input is None:
                     tpr_input = list(element.params['input'])
                 else:
-                    raise exceptions.ApiError('This Context can only handle work specifications with a single load_tpr operation.')
+                    raise exceptions.ApiError(
+                        'This Context can only handle work specifications with a single load_tpr operation.')
         if tpr_input is None:
             raise exceptions.UsageError('Work specification does not provide any input for MD simulation.')
         if len(tpr_input) != 1:

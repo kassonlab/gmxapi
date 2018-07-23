@@ -16,8 +16,10 @@ Interface and feature updates
 
 - Updates to :mod:`gmx.version` module
 - Automatically set and restore from MD simulation checkpoints in the session working directory.
-- Allow control of whether simulation output is appended or truncated (PR `#126 <https://github.com/kassonlab/gmxapi/pull/126>`_).
-- Allow plugins to issue a stop signal to MD simulations (reference `#62 <https://github.com/kassonlab/gmxapi/issues/62>`_ for gromacs-gmxapi and sample_restraint repos).
+- Allow control of whether simulation output is appended or truncated
+  (PR `#126 <https://github.com/kassonlab/gmxapi/pull/126>`_).
+- Allow plugins to issue a stop signal to MD simulations
+  (reference `#62 <https://github.com/kassonlab/gmxapi/issues/62>`_ for gromacs-gmxapi and sample_restraint repos).
 - Changes to :mod:`gmx.exceptions`
 - Allow full CMake-driven install
 - Updated example notebooks in sample_restraint repository.

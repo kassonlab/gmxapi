@@ -8,7 +8,8 @@ gmx Python module reference
 .. Concise reference documentation extracted directly from code.
 .. For new and non-backwards-compatible features, API versions must be given.
 
-The Gromacs Python interface is implemented as a high-level scripting interface implemented in pure Python and a lower-level API implemented as a C++ extension.
+The Gromacs Python interface is implemented as a high-level scripting interface implemented in pure Python and a
+lower-level API implemented as a C++ extension.
 The pure Python implementation provides the basic ``gmx`` module and
 classes with a very stable syntax that can be maintained with maximal compatibility
 while mapping to lower level interfaces that may take a while to sort out. The

@@ -34,14 +34,24 @@ based on a GROMACS fork hosted at https://www.github.com/kassonlab/gromacs-gmxap
 
   Terminology conventions:
 
-  "User stories" are very concise expression of features from a user's perspective, as favored in Agile development. We can use this format as a uniform way to transcribe feature requests and, in the absence of a Scrum system, express them in the User Guide. When implemented, the user story becomes a link to a "how to" or other relevant documentation.
+  "User stories" are very concise expression of features from a user's perspective,
+  as favored in Agile development. We can use this format as a uniform way to
+  transcribe feature requests and, in the absence of a Scrum system, express them
+  in the User Guide. When implemented, the user story becomes a link to a "how to
+  or other relevant documentation.
 
-  "Use case" is a set of scenarios describing a user goal, used to capture functional requirements. Use cases inform feature targets for development iterations. Use cases are expressed at a specific level of interaction or API layer, but a step in a use case can be another use case.
+  "Use case" is a set of scenarios describing a user goal, used to capture
+  functional requirements. Use cases inform feature targets for development
+  iterations. Use cases are expressed at a specific level of interaction or API
+  layer, but a step in a use case can be another use case.
 
   "Scenario" is a sequence of steps for a client to carry out a task.
   Exceptions describe alternate paths.
 
-  "Feature" expresses the target of a development iteration targeting use case(s) from the developer perspective.
+  "Feature" expresses the target of a development iteration targeting use case(s)
+  from the developer perspective.
 
   "Requirements" are clear and verifiable design constraints.
-  Functional requirements are implementation-agnostic specifications on a feature, expressed by the developer as interpreted from a targeted use case, that can be verified to show the API does what it claims.
+  Functional requirements are implementation-agnostic specifications on a feature,
+  expressed by the developer as interpreted from a targeted use case, that can be
+  verified to show the API does what it claims.

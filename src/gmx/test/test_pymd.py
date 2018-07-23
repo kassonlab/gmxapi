@@ -26,13 +26,15 @@ from gmx.data import tpr_filename
 
 try:
     from mpi4py import MPI
-    withmpi_only = pytest.mark.skipif(not MPI.Is_initialized() or MPI.COMM_WORLD.Get_size() < 2,
-                                      reason="Test requires at least 2 MPI ranks, but MPI is not initialized or too small.")
+    withmpi_only = \
+        pytest.mark.skipif(not MPI.Is_initialized() or MPI.COMM_WORLD.Get_size() < 2,
+                           reason="Test requires at least 2 MPI ranks, but MPI is not initialized or too small.")
 except ImportError:
     withmpi_only = pytest.mark.skip(reason="Test requires at least 2 MPI ranks, but mpi4py is not available.")
 
 # Set up an API-conformant plugin.
-# Usually, the Context must be able to import a module and call a function that accepts the gmx.workflow.WorkElement to return a builder.
+# Usually, the Context must be able to import a module and call a function that accepts the gmx.workflow.WorkElement
+# to return a builder.
 # In this case, we will add a function to the operations map before adding the work to the Context.
 # The builder must provide an `add_subscriber(other_builder)` method and a `build(dag)` method.
 # When another builder calls `add_subscriber()`, this builder should add a potential to the calling builder.

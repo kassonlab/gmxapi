@@ -13,6 +13,12 @@ between the module manager and the user interface, unlike the current
 architecture in which the modules and runners are deeply coupled to
 their command line invocation.
 
-Modular tasks for simulation and analysis can be implemented in libgromacs or external software to be executed in a Gromacs execution context with a common runner (see :doc:`context`). Development iterations will improve functionality and performance of pipelined simulation/analysis and more complex data graphs. High-level user-friendly tools can be implemented in terms of API features.
+Modular tasks for simulation and analysis can be implemented in libgromacs or
+external software to be executed in a Gromacs execution context with a common
+runner (see :doc:`context`). Development iterations will improve functionality
+and performance of pipelined simulation/analysis and more complex data graphs.
+High-level user-friendly tools can be implemented in terms of API features.
 
-Trivial access to low-level modular functionality (e.g. evaluating energy of a configuration) may be allowed through a simpler API component (see :doc:`microstate`) and/or a distinct trivial module runner.
+Trivial access to low-level modular functionality (e.g. evaluating energy of a
+configuration) may be allowed through a simpler API component
+(see :doc:`microstate`) and/or a distinct trivial module runner.

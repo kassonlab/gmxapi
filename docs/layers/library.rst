@@ -59,7 +59,9 @@ references to other simulation objects before the loop is run.
 Supporting infrastructure
 =========================
 
-Updates in the core Gromacs library are necessary to support compartmentalization, but are distinct from this project. Such dependencies belong in an issue tracking system, but can be linked from here for convenience before public release.
+Updates in the core Gromacs library are necessary to support compartmentalization,
+but are distinct from this project. Such dependencies belong in an issue tracking
+system, but can be linked from here for convenience before public release.
 
 Various abstraction in libgromacs will be necessary in these projects. Some is already underway.
 

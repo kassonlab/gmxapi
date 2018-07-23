@@ -14,10 +14,16 @@ abstraction, performance, and invasiveness into the existing code.
 In rough order of increasing invasiveness.
 
 1. Post-run analysis (expose and extend the current C++ API, file readers, wrapped tools)
-2. Preparation, preprocessing, and editing of simulation jobs or on-disk information (encapsulation of tools like `pdb2gmx`, `grompp`, `trajedit`, `solvate`, and of data structures such as topologies, `tpr` files, trajectories and checkpoints)
-3. Controlling Gromacs code (scripting, managing compute resources, high level workflow and data flow, clearly separating model parameters / simulation parameters / workflow parameters / runtime parameters)
+2. Preparation, preprocessing, and editing of simulation jobs or on-disk
+   information (encapsulation of tools like `pdb2gmx`, `grompp`, `trajedit`,
+   `solvate`, and of data structures such as topologies, `tpr` files,
+   trajectories and checkpoints)
+3. Controlling Gromacs code (scripting, managing compute resources, high level
+   workflow and data flow, clearly separating model parameters / simulation
+   parameters / workflow parameters / runtime parameters)
 4. Live analysis (hooks into MD loop: callbacks, custom loggers)
-5. Extension of Gromacs code (adding custom potentials, logic, low level workflow and data flow)
+5. Extension of Gromacs code (adding custom potentials, logic, low level
+   workflow and data flow)
 
 The APIs developed should allow access to these functionalities.
 A user should be able to link together tasks programatically, dynamically, and
@@ -211,7 +217,7 @@ Alternate scenarios
 |  4b. Queuing system job dependencies chain tasks (unreliable in practice) using shared filesystem
 
 pilot-managed jobs on HPC cluster
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Traditional independent bag-of-jobs on pilot-managed HPC resource allocation
 
 |  1. User submits pilot job
@@ -416,7 +422,10 @@ can just implicitly retrieve state to the calling Python interpreter every
 ``period`` timesteps. In such a case, it would be the remote execution
 context that holds a thin proxy object representing the (Sink) callback node.
 
-Note that rather than try to figure out what data a call-back needs, the call-back can be constructed as a functor or with a closure that binds to the system or integrator API objects before the simulation launches, allowing the library freedom to provide a call-back with only the access and data it needs.
+Note that rather than try to figure out what data a call-back needs, the call-back
+can be constructed as a functor or with a closure that binds to the system or
+integrator API objects before the simulation launches, allowing the library
+freedom to provide a call-back with only the access and data it needs.
 
 Continuing the notion that data constitutes graph edges and computation constitutes
 graph nodes. Special terminal nodes are Source and Sink objects that only provide
@@ -491,7 +500,9 @@ just as well use if desiring more control or additional data handles.
         options.integrator.nsteps += 10000
         status = gmx.run(nvt)
 
-Note: A task like energy minimization can be implemented as a "bottled workflow" implemented at the highest level, as a series of API objects connected in the simulation--analysis graph, as a plugin, or as an "integrator".
+Note: A task like energy minimization can be implemented as a "bottled workflow"
+implemented at the highest level, as a series of API objects connected in the
+simulation--analysis graph, as a plugin, or as an "integrator".
 
 For additional musings, see :doc:`library`
 
