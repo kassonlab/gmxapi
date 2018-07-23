@@ -51,6 +51,14 @@ user's choice of Python installation. Python virtual environments are recommende
 If you have trouble installing this software in a Python virtual environment and
 find the accompanying documentation inadequate, please open an issue ticket at
 https://github.com/kassonlab/gmxapi/issues
+
+Citing
+------
+
+Irrgang, M. E., Hays, J. M., & Kasson, P. M.
+gmxapi: a high-level interface for advanced control and extension of molecular dynamics simulations.
+*Bioinformatics* 2018.
+DOI: `10.1093/bioinformatics/bty484 <https://doi.org/10.1093/bioinformatics/bty484>`_
 """
 
 from __future__ import absolute_import
