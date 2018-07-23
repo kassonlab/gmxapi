@@ -14,8 +14,8 @@ major = @PROJECT_VERSION_MAJOR@
 minor = @PROJECT_VERSION_MINOR@
 patch = @PROJECT_VERSION_PATCH@
 
-# Todo: Release status needs to be automatically maintained.
-release = False
+# Note: this is not automatically updated. See RELEASE.txt and https://github.com/kassonlab/gmxapi/issues/152
+release = True
 
 def api_is_at_least(major_version, minor_version=0, patch_version=0):
     """Allow client to check whether installed module supports the requested API level.

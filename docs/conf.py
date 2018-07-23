@@ -15,9 +15,6 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# todo: find location of breathe package
-import os
-import sys
 from pkg_resources import get_distribution, DistributionNotFound
 # sys.path.insert(0, os.path.abspath('.'))
 #sys.path.insert(0, '@CMAKE_INSTALL_PREFIX@/@PYMOD_INSTALL_DIR@')
@@ -42,7 +39,6 @@ extensions = [
 #    'breathe',
 ]
 
-# todo: need to figure out how to use breathe correctly...
 # Tell breathe about the projects
 #breathe_projects = {'gmxapi': "@GMXAPI_USERDOC_OUTPUT@/xml",
 #                    'dev': "@GMXAPI_DEVDOC_OUTPUT@/xml"}

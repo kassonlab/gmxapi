@@ -8,7 +8,7 @@ Once the required features in gromacs-gmxapi have been merged to its master bran
 Similarly, update the `gromacs_url` embedded in setup.py
 
 After merging the gmxapi development branch to master and before tagging the release, 
-update setup.py so that it writes a version.py file with `release = True`.
+update version.in so that it writes a version.py file with `release = True`.
 
 Once the release is tagged and any last-minute essentials are cherry-picked to the refreshed development branch,
 bump the version in the development branch in CMakeLists.txt _and_ in setup.py. If / when feature branches

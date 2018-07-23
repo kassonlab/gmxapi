@@ -90,7 +90,6 @@ class WorkSpecTestCase(unittest.TestCase):
         # Release 0.0.4 will mark the finalization of workspec version 0.1.
         assert gmx.version.api_is_at_least(0,0,5)
         assert workspec.version == "gmxapi_workspec_0_1"
-        # \todo better python package version checking.
     def test_methods(self):
         workspec = gmx.workflow.WorkSpec()
         assert str(workspec) is not None

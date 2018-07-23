@@ -70,14 +70,14 @@ void export_system(py::module &m)
             }
             else
             {
-                // Todo: Need to bind the exceptions...
+                // Note: Exception behavior is likely to change.
+                // Ref: https://github.com/kassonlab/gmxapi/issues/125
                 throw PyExc_RuntimeError;
             }
         },
         "Set a restraint potential for the system.");
 
     // Export session class
-    // \todo relocate
     // We can't completely surrender ownership to Python because other API objects may refer to it.
     py::class_<::gmxapi::Session, std::shared_ptr<::gmxapi::Session>> session(m, "MDSession");
     session.def("run", &::gmxapi::Session::run, "Run the simulation workflow");
