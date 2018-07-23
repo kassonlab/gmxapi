@@ -2,7 +2,9 @@
 Provide workflow-level utilities and classes
 ============================================
 
-Single-sim example::
+Single-sim example:
+
+.. code-block:: python
 
     >>> md = gmx.workflow.from_tpr(filename)
     >>> gmx.run(md)
@@ -17,9 +19,9 @@ Single-sim example::
     >>> with gmx.context.Context(md.workspec) as session:
     ...    session.run()
 
-.. This comment line seems to be necessary to help parsing in some cases.
+Array sim example:
 
-Array sim example::
+.. code-block:: python
 
     >>> work = gmx.workflow.from_tpr([filename1, filename2])
     >>> gmx.run(work)
@@ -37,9 +39,9 @@ Array sim example::
     >>> with gmx.context.Context(my_work) as session:
     ...    session.run()
 
-.. This comment line seems to be necessary to help parsing in some cases.
+Single-sim with plugin:
 
-Single-sim with plugin::
+.. code-block:: python
 
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
@@ -53,18 +55,18 @@ Single-sim with plugin::
     >>> with gmx.context.Context(work) as session:
     ...    session.run()
 
-.. This comment line seems to be necessary to help parsing in some cases.
+Array sim with plugin:
 
-Array sim with plugin::
+.. code-block:: python
 
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> potential = myplugin.EnsembleRestraint(sites=[1,4], R0=2.0, k=10000.0)
     >>> gmx.add_potential(md, potential)
     >>> gmx.run(work)
 
-.. This comment line seems to be necessary to help parsing in some cases.
+The above is shorthand for:
 
-The above is shorthand for::
+.. code-block:: python
 
     >>> work = gmx.workflow.from_tpr(filename)
     >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
@@ -75,9 +77,9 @@ The above is shorthand for::
     >>> with gmx.context.Context(my_work) as session:
     ...    session.run()
 
-.. This comment line seems to be necessary to help parsing in some cases.
+Array sim with plugin using global resources:
 
-Array sim with plugin using global resources::
+.. code-block:: python
 
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
     >>> workdata = gmx.workflow.SharedDataElement()
@@ -86,9 +88,9 @@ Array sim with plugin using global resources::
     >>> md.add_dependency(potential)
     >>> gmx.run(md)
 
-.. This comment line seems to be necessary to help parsing in some cases.
+The above is shorthand for:
 
-The above is shorthand for::
+.. code-block:: python
 
     >>> # Create work spec and get handle to MD work unit
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
