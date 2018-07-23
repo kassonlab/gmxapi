@@ -316,7 +316,7 @@ setup(
     author_email='ericirrgang@gmail.com',
     description='GROMACS Python module',
     license = 'LGPL',
-    url = 'https://bitbucket.org/kassonlab/gmxpy',
+    url = 'https://github.com/kassonlab/gmxapi',
     #keywords = '',
 
     ext_modules = [CMakeExtension(

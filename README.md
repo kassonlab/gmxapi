@@ -14,6 +14,11 @@ The whole thing is driven at the highest level by a simple Python interface.
 
 See the latest gmxapi documentation at [http://gmxapi.readthedocs.io/en/latest/](http://gmxapi.readthedocs.io/en/latest/)
 
+##### Reference:
+Irrgang, M. E., Hays, J. M., & Kasson, P. M.
+gmxapi: a high-level interface for advanced control and extension of molecular dynamics simulations.
+_Bioinformatics_ 2018.
+DOI: [10.1093/bioinformatics/bty484](https://doi.org/10.1093/bioinformatics/bty484)
 ## Current master branch
 [![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=master)](https://travis-ci.org/kassonlab/gmxapi)
 [![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=latest)](http://gmxapi.readthedocs.io/en/latest/?badge=latest)
