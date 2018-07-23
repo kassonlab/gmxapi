@@ -58,8 +58,11 @@ class System(object):
         context and create a System object. If no Context is currently bound, a
         local default context is created and bound.
 
-        TODO: clarify the file location relative to the execution context.
-        Until then, this helper method should not be part of the public
+        We are still refining the meanings of paths and file locations, and the
+        semantics of turning file objects into API objects. For reference, see
+        https://github.com/kassonlab/gmxapi/issues/96
+
+        Until resolved, this helper method should not be part of the public
         interface.
 
         Args:

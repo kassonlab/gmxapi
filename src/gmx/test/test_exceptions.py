@@ -6,7 +6,7 @@ Make sure the documented exceptions are defined correctly.
 Throwing of appropriate exceptions is tested using assertRaises
 in test for the components that throw them.
 
-\todo these tests are stale but we probably should update and use them...
+Reference: https://github.com/kassonlab/gmxapi/issues/125
 """
 
 import unittest

@@ -41,10 +41,9 @@ class Context(object):
     any case, the operations allow a Context implementation to transform a work specification into a
     directed acyclic graph of schedulable work.
     """
-    # \todo Put the following to-do someplace more appropriate
-    # \todo There should be a default Context active from the first `import gmx` or at least before the first logger call.
     # The Context is the appropriate entity to own or mediate access to an appropriate logging facility,
     # but right now we are using the module-level Python logger.
+    # Reference https://github.com/kassonlab/gmxapi/issues/135
     def __init__(self, workflow=None):
         """Create new context bound to the provided workflow, if any.
 
@@ -101,8 +100,6 @@ class Context(object):
             is_valid = False
             if raises:
                 raise exceptions.ApiError('WorkSpec must contain at least one source element')
-        for name in workspec.elements:
-            element = gmx.workflow.WorkElement.deserialize()
         return is_valid
 
 
@@ -116,17 +113,23 @@ class Context(object):
             raise exceptions.Error('Already running.')
         # The API runner currently has an implicit context.
         try:
-            # \todo Pass the API context implementation object to launch
+            # launch() with no arguments is deprecated.
+            # Ref: https://github.com/kassonlab/gmxapi/issues/124
             self._session = self.workflow.launch()
-            # \todo Let the session provide a reference to its parent context instance.
         except:
             self._session = None
             raise
         return self._session
 
     def __exit__(self, exception_type, exception_value, traceback):
-        """Implement Python context manager protocol."""
-        # Todo: handle exceptions.
+        """Implement Python context manager protocol.
+
+        Closing a session should not produce Python exceptions. Instead, exit
+        state is accessible through API objects like Status.
+        For evolving design points, see
+        - https://github.com/kassonlab/gmxapi/issues/41
+        - https://github.com/kassonlab/gmxapi/issues/121
+        """
         self._session.close()
         self._session = None
         return False
@@ -387,6 +390,18 @@ class ParallelArrayContext(object):
 
     @work.setter
     def work(self, work):
+        """Set `work` attribute.
+
+        Raises:
+            gmx.exceptions.ApiError: work is not compatible with schema or
+                known operations.
+            gmx.exceptions.UsageError: Context can not access operations in
+                the name space given for an Element
+            gmx.exceptions.ValueError: assignment operation cannot be performed
+                for the provided object (rhs)
+
+        For discussion on error handling, see https://github.com/kassonlab/gmxapi/issues/125
+        """
         if work is None:
             warnings.warn("A Context without a valid WorkSpec is iffy...")
             return
@@ -398,20 +413,23 @@ class ParallelArrayContext(object):
         elif hasattr(work, 'workspec') and isinstance(work.workspec, WorkSpec):
             workspec = work.workspec
         else:
-            raise ValueError('work argument must provide a gmx.workflow.WorkSpec.')
+            raise exceptions.ValueError('work argument must provide a gmx.workflow.WorkSpec.')
         workspec._context = self
 
         # Make sure this context knows how to run the specified work.
         for e in workspec.elements:
             element = gmx.workflow.WorkElement.deserialize(workspec.elements[e])
 
-
             if element.namespace not in {'gmxapi', 'gromacs'} and element.namespace not in self.__operations:
                 # Non-built-in namespaces are treated as modules to import.
                 try:
                     element_module = importlib.import_module(element.namespace)
                 except ImportError as e:
-                    raise exceptions.UsageError('This context does not know how to invoke {} from {}. ImportError: {}'.format(element.operation, element.namespace, e.message))
+                    raise exceptions.UsageError(
+                        'This context does not know how to invoke {} from {}. ImportError: {}'.format(
+                            element.operation,
+                            element.namespace,
+                            e.message))
 
                 # Don't leave an empty nested dictionary if we couldn't map the operation.
                 if element.namespace in self.__operations:
@@ -424,7 +442,8 @@ class ParallelArrayContext(object):
                         element_operation = getattr(element_module, element.operation)
                         namespace_map[element.operation] = element_operation
                     except:
-                        raise exceptions.ApiError('Operation {} not found in {}.'.format(element.operation, element.namespace))
+                        raise exceptions.ApiError('Operation {} not found in {}.'.format(element.operation,
+                                                                                         element.namespace))
                     # Set or update namespace map only if we have something to contribute.
                     self.__operations[element.namespace] = namespace_map
             else:
@@ -433,12 +452,16 @@ class ParallelArrayContext(object):
                 assert element.namespace in self.__operations
                 if not element.operation in self.__operations[element.namespace]:
                     if self.rank < 1:
-                        logger.error("Operation {} not found in map {}".format(element.operation, str(self.__operations)))
+                        logger.error("Operation {} not found in map {}".format(element.operation,
+                                                                               str(self.__operations)))
                     # This check should be performed when deciding if the context is appropriate for the work.
                     # If we are just going to use a try/catch block for this test, then we should differentiate
                     # this exception from those raised due to incorrect usage.
-                    # \todo Consider distinguishing API misuse from API failures.
-                    raise exceptions.ApiError('Specified work cannot be performed due to unimplemented operation {}.{}.'.format(element.namespace, element.operation))
+                    # The exception thrown here may evolve with https://github.com/kassonlab/gmxapi/issues/125
+                    raise exceptions.ApiError(
+                        'Specified work cannot be performed due to unimplemented operation {}.{}.'.format(
+                            element.namespace,
+                            element.operation))
 
         self.__work = workspec
 
@@ -734,10 +757,10 @@ class ParallelArrayContext(object):
         # gmxapi::Session objects are exposed as gmx.core.MDSession and provide run() and close() methods.
         #
         # Here, I want to find the input appropriate for this rank and get an MDSession for it.
-        # \todo In the future, we should set up an object with "ports" configured and then instantiate.
         # E.g. Make a pass that allows meta-objects to bind (setting md_proxy._input_tpr and md_proxy._plugins,
         # and then call a routine implemented by each object to run whatever protocol it needs, such
         # as `system = gmx.core.from_tpr(md._input_tpr); system.add_potential(md._plugins)
+        # For future design plans, reference https://github.com/kassonlab/gmxapi/issues/65
         if self._session_ensemble_size > 0:
             # print(graph)
             logger.debug(("Launching graph {}.".format(graph.graph)))
@@ -808,14 +831,14 @@ class ParallelArrayContext(object):
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Implement Python context manager protocol."""
-        # Todo: handle exceptions.
-        # \todo: we should not have a None session but rather an API-compliant Session that just has no work.
         logger.info("Exiting session on context rank {}.".format(self.rank))
         if self._session is not None:
             logger.info("Calling session.close().")
             self._session.close()
             self._session = None
         else:
+            # Note: we should not have a None session but rather an API-compliant Session that just has no work.
+            # Reference: https://github.com/kassonlab/gmxapi/issues/41
             logger.info("No _session known to context or session already closed.")
         if hasattr(self, '_session_ensemble_communicator'):
             from mpi4py import MPI
@@ -828,8 +851,11 @@ class ParallelArrayContext(object):
             logger.debug("No ensemble subcommunicator on context rank {}.".format(self.rank))
         os.chdir(self.__initial_cwd)
         logger.info("Session closed on context rank {}.".format(self.rank))
-        # \todo Make sure session has ended on all ranks before continuing and handle final errors.
+        # Note: Since sessions running in different processes can have different work, sessions have not necessarily
+        # ended on all ranks. As a result, starting another session on the same resources could block until the
+        # resources are available.
 
+        # Python context managers return False when there were no exceptions to handle.
         return False
 
 def get_context(work=None):

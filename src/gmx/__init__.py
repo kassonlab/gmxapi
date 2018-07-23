@@ -66,7 +66,6 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-# TODO: what should happen when ``from gmx import *``?
 __all__ = ['Status', 'System', 'get_context', 'run']
 
 # Import system facilities

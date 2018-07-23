@@ -6,6 +6,7 @@
 # I'm increasingly thinking that the CMake-managed C++ extension module should be managed separately than the setuptools
 # primary module. Then we can just do standard things like using CTest and googletest for the more complicated stuff.
 
+import warnings
 import logging
 logging.getLogger().setLevel(logging.DEBUG)
 # create console handler
@@ -140,12 +141,13 @@ def test_plugin(caplog):
     context.add_operation(potential_element.namespace, potential_element.operation, my_plugin)
     context.work = md
 
-    # \todo swallow warning about wide MPI context
-    # \todo use pytest context managers to turn raised exceptions into assertions.
-    with context as session:
-        if context.rank == 0:
-            print(context.work)
-        session.run()
+    with warnings.catch_warnings():
+        # Swallow warning about wide MPI context
+        warnings.simplefilter("ignore")
+        with context as session:
+            if context.rank == 0:
+                print(context.work)
+            session.run()
 
 
 if __name__ == '__main__':

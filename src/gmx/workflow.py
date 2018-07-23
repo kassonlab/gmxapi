@@ -253,7 +253,6 @@ class WorkSpec(object):
             name_list: name list to be expanded with dependencies and sequenced
 
         Note that source_set is a reference to an object that is modified arbitrarily.
-        .. todo:: Maybe this shouldn't be a member function, but a closure within WorkSpec.__iter__()
 
         """
         assert isinstance(source_set, set)
@@ -439,7 +438,8 @@ class WorkElement(object):
         else:
             raise exceptions.UsageError("Invalid argument type for operation.")
 
-        # \todo It is currently non-sensical to update any attributes after adding to a workspec, but nothing prevents it.
+        # Note: Nothing currently prevents attribute updates by assignment after adding the element to a workspec,
+        # but this protocol will be clarified with https://github.com/kassonlab/gmxapi/issues/92
         if params is None:
             self.params = {}
         elif isinstance(params, dict):
@@ -642,7 +642,8 @@ def from_tpr(input=None, **kwargs):
             arg_path = os.path.abspath(arg)
             raise exceptions.UsageError(usage + " Got {}".format(arg_path))
 
-    # \todo These are runner parameters, not MD parameters, and should be in the call to gmx.run() instead of here.
+    # Note: These are runner parameters, not MD parameters, and should be in the call to gmx.run() instead of here.
+    # Reference https://github.com/kassonlab/gmxapi/issues/95
     params = {}
     for arg_key in kwargs:
         if arg_key == 'grid' or arg_key == 'dd':
