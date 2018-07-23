@@ -14,7 +14,8 @@ include(Ccache.cmake)
 # If the user is not in a virtual environment and is not a privileged user and has not specified an install location
 # for the Python module (GMXAPI_INSTALL_PATH), this option causes the automatic install location to query the user
 # site-packages directory instead of using the default site-packages directory for the interpreter.
-option(GMXAPI_USER_INSTALL "Override the default site-packages directory with the user-specific Python packages directory. \
+option(GMXAPI_USER_INSTALL
+       "Override the default site-packages directory with the user-specific Python packages directory. \
        (Do not use with virtual environments.) \
        Has no effect if GMXAPI_INSTALL_PATH is defined or cached. \
        Use -UGMXAPI_INSTALL_PATH to force recalculation." OFF)
@@ -32,14 +33,30 @@ if (PYTHONINTERP_FOUND)
     find_package(PythonLibs ${PYTHON_VERSION_STRING} EXACT)
     if (PYTHONLIBS_FOUND)
         if (GMXAPI_USER_INSTALL)
-            execute_process(COMMAND ${PYTHON_EXECUTABLE} "-m" "site" "--user-site" OUTPUT_VARIABLE GMXAPI_DEFAULT_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
+            execute_process(COMMAND ${PYTHON_EXECUTABLE} "-m" "site" "--user-site"
+                            OUTPUT_VARIABLE GMXAPI_DEFAULT_SITE_PACKAGES
+                            OUTPUT_STRIP_TRAILING_WHITESPACE)
             message(STATUS "Python user site-packages directory is ${GMXAPI_DEFAULT_SITE_PACKAGES}")
         else()
-            execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import sys; import os; print(os.path.abspath(os.path.join(sys.prefix, 'lib', 'python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}', 'site-packages')))" OUTPUT_VARIABLE GMXAPI_DEFAULT_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
+            execute_process(COMMAND
+                            ${PYTHON_EXECUTABLE} -c
+                                "import sys; import os; \
+                                print(\
+                                    os.path.abspath(os.path.join(\
+                                        sys.prefix, \
+                                        'lib', \
+                                        'python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}',\
+                                         'site-packages')\
+                                     )\
+                                 )"
+                            OUTPUT_VARIABLE GMXAPI_DEFAULT_SITE_PACKAGES
+                            OUTPUT_STRIP_TRAILING_WHITESPACE)
             message(STATUS "Python site-packages directory is ${GMXAPI_DEFAULT_SITE_PACKAGES}")
         endif()
     else()
-        message(FATAL_ERROR "Found Python interpreter ${PYTHON_EXECUTABLE} but this Python installation does not have developer tools."
+        message(FATAL_ERROR
+                "Found Python interpreter ${PYTHON_EXECUTABLE} \
+                but this Python installation does not have developer tools."
                 "Set PYTHON_EXECUTABLE to the Python interpreter that was installed with a working Python.h header file.")
     endif()
 else()

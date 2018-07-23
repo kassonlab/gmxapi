@@ -8,8 +8,8 @@ available from `github.com/kassonlab/gromacs-gmxapi <https://github.com/kassonla
 Download the Python package from
 `github.com/kassonlab/gmxapi <https://github.com/kassonlab/gmxapi/>`_.
 
-A `sample plugin <https://github.com/kassonlab/sample_restraint>`_ demonstrates extending GROMACS with C++ code to be controlled
-from the Python interface.
+A `sample plugin <https://github.com/kassonlab/sample_restraint>`_ demonstrates extending GROMACS with C++ code to be
+controlled from the Python interface.
 
 We recommend installing the Python package in a virtual environment.
 If not installing in a virtual environment, you may not be able to install
@@ -22,7 +22,8 @@ Build System
 The gmxapi Python package can be installed with ``pip`` (deprecated) or with ``cmake``.
 
 Either way there are some Python modules that you will want to have installed either on the system or in a virtual
-environment (see below). These are ``numpy``, ``networkx``, and ``mpi4py``. If you are on a system with multiple compilers or
+environment (see below). These are ``numpy``, ``networkx``, and ``mpi4py``. If you are on a system with multiple
+compilers or
 multiple MPI implementations, refer to the mpi4py documentation to make sure you install it with the same compiler you
 use for GROMACS and gmxapi. Namely, set the ``MPICC`` environment variable before running ``pip``.
 
@@ -169,24 +170,31 @@ CMake
 Take note whether the correct python executable is found. You may need to specify ``-DPYTHON_EXECUTABLE=`which python```
 to cmake.
 
-Note: we do not yet have a robust suggestion for setting up `tox` for running the test suite in a conda environment.
+Note: we do not yet have a robust suggestion for setting up ``tox`` for running the test suite in a conda environment.
 If you come up with a recipe, please let us know. Otherwise, don't worry if you are able to install
-the package but can't get weird errors when you try to run the tests with tox. Instead, just use `pytest` or run the tests in a regular
+the package but can't get weird errors when you try to run the tests with tox. Instead, just use ``pytest`` or run the
+tests in a regular
 (non-conda) Python virtualenv or no virtualenv at all.
 
 virtualenv
 ~~~~~~~~~~
 
-For the ensemble simulations features, you will need an MPI installation. On an HPC system, this means you will probably have to use ``module load`` to load a compatible set of MPI tools and compilers. Check your HPC documentation or try ``module avail`` to look for an ``openmpi``, ``mpich``, or ``mvapich`` module and matching compiler module. This may be as simple as
+For the ensemble simulations features, you will need an MPI installation. On an HPC system, this means you will
+probably have to use ``module load`` to load a compatible set of MPI tools and compilers. Check your HPC
+documentation or try ``module avail`` to look for an ``openmpi``, ``mpich``, or ``mvapich`` module and matching compiler
+module. This may be as simple as
 ::
 
     $ module load gcc
     $ module load mpicc
 
-Note that the compilers loaded might not be the first compilers discovered automatically by the build tools we will use below, so you may have to specify compilers on the command line for consistency. It may be necessary to require that GROMACS, gmxapi, and the sample code are built with the same compiler(s).
+Note that the compilers loaded might not be the first compilers discovered automatically by the build tools we will use
+below, so you may have to specify compilers on the command line for consistency. It may be necessary to require that
+GROMACS, gmxapi, and the sample code are built with the same compiler(s).
 
 Create a Python virtual environment.
-If using Python 2, use the ``virtualenv`` module. If it is initially not found, install it with ``python -m pip install virtualenv --user``. Then,
+If using Python 2, use the ``virtualenv`` module. If it is initially not found, install it with
+``python -m pip install virtualenv --user``. Then,
 ::
 
     $ python -m virtualenv $HOME/myvenv
@@ -196,7 +204,8 @@ For Python 3, use the ``venv`` module.
 
     $ python -m venv $HOME/myvenv
 
-Activate the virtual environment. Your shell prompt will probably be updated with the name of the environment you created to make it more obvious.
+Activate the virtual environment. Your shell prompt will probably be updated with the name of the environment you
+created to make it more obvious.
 ::
 
     $ source $HOME/myvenv/bin/activate
@@ -204,7 +213,8 @@ Activate the virtual environment. Your shell prompt will probably be updated wit
 
 Don't do it now, but you can deactivate the environment by running ``deactivate``.
 
-Install some dependencies. For MPI, we use mpi4py. Make sure it is using the same MPI installation that we are building GROMACS against and building with compatible compilers.
+Install some dependencies. For MPI, we use mpi4py. Make sure it is using the same MPI installation that we are building
+GROMACS against and building with compatible compilers.
 ::
 
     (myvenv)$ python -m pip install --upgrade pip networkx
@@ -222,7 +232,8 @@ Get a copy of this repository, if you haven't already. For a released version, y
     (myvenv)$ unzip v0_0_4.zip
     (myvenv)$ cd gmxapi-v0_0_4
 
-For a development branch, you should probably clone the repository. You may not already have ``git`` installed on your system or you may need to load a module for it on an HPC system, which you will need to do before trying the following.
+For a development branch, you should probably clone the repository. You may not already have ``git`` installed on your
+system or you may need to load a module for it on an HPC system, which you will need to do before trying the following.
 ::
 
     (myenv)$ git clone https://github.com/kassonlab/gmxapi.git
@@ -239,13 +250,15 @@ Update your environment and install some dependencies.
     (myvenv)$ pip install --upgrade setuptools
     (myvenv)$ pip install --upgrade scikit-build cmake networkx
 
-For simplicity, let this package build and install a local GROMACS for you by setting the BUILDGROMACS environment variable. To be on the safe side, make sure to give hints to use the compilers you intend.
+For simplicity, let this package build and install a local GROMACS for you by setting the BUILDGROMACS environment
+variable. To be on the safe side, make sure to give hints to use the compilers you intend.
 For instance, if we loaded a gcc module, help make sure pip doesn't default to the system ``/bin/cc`` or some such.
 ::
 
     (myenv)$ BUILDGROMACS=TRUE CC=`which gcc` CXX=`which g++` pip install .
 
-This will take a while because it has to download and install GROMACS as well. If you want more visual stimulation, you can add ``--verbose`` to the end of the pip command line.
+This will take a while because it has to download and install GROMACS as well. If you want more visual stimulation, you
+can add ``--verbose`` to the end of the pip command line.
 
 Documentation
 =============
@@ -275,7 +288,8 @@ Note that this only puts the built documentation in your build directory.
 Custom docs install location
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you have already installed the package, you can build the docs to any destination folder you want from the repository directory.
+If you have already installed the package, you can build the docs to any destination folder you want from the repository
+directory.
 Decide what directory you want to put the docs in and call
 ``sphinx-build`` to build ``html`` docs from the configuration in the
 ``docs`` directory of the gmxpy repository.

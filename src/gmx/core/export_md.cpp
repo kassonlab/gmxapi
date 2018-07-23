@@ -35,7 +35,10 @@ void export_md(py::module &m)
 
     // We don't have a reason to create objects of this type directly in Python.
     //gmxapi_mdmodule.def(py::init(), "");
-    py::class_< TestModule, std::shared_ptr<TestModule> >(m, "TestModule", gmxapi_mdmodule).def(py::init<>(), "Test module...");
+    py::class_< TestModule, std::shared_ptr<TestModule> >(m,
+                                                          "TestModule",
+                                                          gmxapi_mdmodule)
+            .def(py::init<>(), "Test module...");
 
     // Consider whether to bother exporting base class and whether/how to overload methods for testing.
     gmxapi_mdmodule.def(

@@ -24,7 +24,9 @@
  */
 
 
-/*! Make a new Python Capsule object allowing access to member data. Ensure that the owning object stays alive as long as the capsule.
+/*! Make a new Python Capsule object allowing access to member data.
+ *
+ * Ensure that the owning object stays alive as long as the capsule.
  *
  * The capsule holds a pointer to a pointer to an API object that is guaranteed to be valid
  * only during the function call in which the capsule was passed. In actuality, we can ensure

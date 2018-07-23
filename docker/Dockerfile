@@ -62,4 +62,5 @@ RUN (cd /home/jovyan/gmxpy/build && \
     mv docs /home/jovyan/)
 
 # Test with
-#    docker run --cpus 2 --rm -ti gmxapi/gmxapi bash -c "cd gmxpy && mpiexec -n 2 python -m mpi4py -m pytest  --log-cli-level=DEBUG --pyargs gmx -s --verbose"
+#    docker run --cpus 2 --rm -ti gmxapi/gmxapi bash -c \
+#        "cd gmxpy && mpiexec -n 2 python -m mpi4py -m pytest  --log-cli-level=DEBUG --pyargs gmx -s --verbose"

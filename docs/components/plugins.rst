@@ -34,7 +34,8 @@ instead of just an overall API level.
 Simulation plugins, call-backs, and API-facilitated introspection or manipulation
 require some additional facilities and revised data structures in the core library.
 
-* Hooks in the simulation loop for commonly extended behaviors to allow non-invasive extensibility through plugins
+* Hooks in the simulation loop for commonly extended behaviors to allow
+  non-invasive extensibility through plugins
 * Publicly derivable interface classes for extension code not (yet) included with Gromacs
 * run-time binding of plugins via API calls when Gromacs is used as a library
 * granular access to internal machinery for call-backs, rapid prototyping, etc.
@@ -44,13 +45,16 @@ Communicator
 If we want to be able to optimize non-local communication, access to the communicator
 should be mediated.
 
-* the ability to register an interest in particular data being available locally at the next (or other specified) iteration
+* the ability to register an interest in particular data being available locally
+  at the next (or other specified) iteration
 * Some amount of extensibility in adding data to the next outward communication
-* Iterators for requested input/output data to allow Gromacs to optimize its availability and access control
+* Iterators for requested input/output data to allow Gromacs to optimize its
+  availability and access control
 
 Step Scheduling
 ===============
-Various code has a need to manage what steps it is run on and deal with constraints associated with checkpointing and logging phase.
+Various code has a need to manage what steps it is run on and deal with constraints
+associated with checkpointing and logging phase.
 
 Notifications
 =============
