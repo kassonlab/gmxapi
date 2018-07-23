@@ -157,14 +157,15 @@ class SerialArrayContext(object):
         self.__context_array = list([DefaultContext(work_element) for work_element in work])
         self._session = None
 
+# Unused.
+# Reference https://github.com/kassonlab/gmxapi/issues/36
 # def shared_data_maker(element):
 #     """Make a shared data element for use by dependent nodes.
 #
-#     Note: outdated. This code is in limbo and should not be used.
-#
 #     This version uses mpi4py to share data and supports a single downstream node.
 #
-#     The element provides a serialized argument list for numpy.empty() as two elements, args, and kwargs. Each subscriber receives such
+#     The element provides a serialized argument list for numpy.empty() as two elements, args, and kwargs. Each
+#     subscriber receives such
 #     an array at launch along with a python function handle to call-back to at some interval (passed to
 #     the plugin C++ code).
 #     """
