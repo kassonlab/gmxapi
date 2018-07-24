@@ -409,3 +409,25 @@ installations, such as with ``pip install somepackage``) and ambiguities
 between python versions. The testing attempts to run under both Python 2
 and Python 3, so you may need to explicitly install packages for each
 Python installation.
+
+If you are working in the ``devel`` branch of the repository, note that
+the upstream branch may be reset to ``master`` after a new release is
+tagged. In general, but particularly on the ``devel`` branch, when you
+do a ``git pull``, you should use the ``--rebase`` flag.
+
+If you fetch this repository and then see a git status like this::
+
+    $ git status
+    On branch devel
+    Your branch and 'origin/devel' have diverged,
+    and have 31 and 29 different commits each, respectively.
+
+then ``gmxapi`` has probably entered a new development cycle. You can
+do ``git pull --rebase`` to update to the latest development branch.
+
+If you do a ``git pull`` while in ``devel`` and get a bunch of unexpected
+merge conflicts, do ``git merge --abort; git pull --rebase`` and you should
+be back on track.
+
+If you are developing code for gmxapi, this should be an indication to
+rebase your feature branches for the new development cycle.
