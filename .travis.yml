@@ -30,10 +30,10 @@ compiler: gcc
 env:
 #  - GMXAPI=0.0.6 SAMPLE_RESTRAINT=0.0.6
 # Python 2.7 and 3.6 are the only generations provided by pyenv on Travis-CI out-of-the-box
-  - GMXAPI=0.0.6 SAMPLE_RESTRAINT=devel CI_MPI=0 PY=2.7
-#  - GMXAPI=0.0.6 SAMPLE_RESTRAINT=devel CI_MPI=0 PY=3.4
+  - CI_MPI=0 PY=2.7
+  - CI_MPI=0 PY=3.4
 #  - GMXAPI=0.0.6 SAMPLE_RESTRAINT=devel CI_MPI=0 PY=3.5
-  - GMXAPI=0.0.6 SAMPLE_RESTRAINT=devel CI_MPI=0 PY=3.6
+  - CI_MPI=0 PY=3.6
 
 addons:
   apt:
@@ -53,6 +53,10 @@ addons:
 
 # Set up for all jobs
 before_install:
+  - PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 2.7.14
+  - PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 3.4.7
+  - PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 3.6.3
+  - pyenv rehash
   - pyenv versions
   # get exactly one Python version: the last listed patch version for the selected minor version
   - pyenv whence python${PY} && export PY_VER=`pyenv whence python${PY} | tail -1`
@@ -78,9 +82,15 @@ before_script:
 
 script:
   - source $HOME/install/gromacs_0_0_6/bin/GMXRC && ./ci_scripts/pygmx.sh
-#  - ./ci_scripts/sample_restraint.sh v0.0.6
-  - if [ "${TRAVIS_BRANCH}" != master ] ; then source $HOME/install/gromacs_devel/bin/GMXRC && ./ci_scripts/pygmx.sh ; fi
-  - if [ "${TRAVIS_BRANCH}" != master ] ; then ./ci_scripts/sample_restraint.sh devel ; fi
+  - ./ci_scripts/sample_restraint.sh v0.0.6
+  - |
+    if [ "${TRAVIS_BRANCH}" != master ] ; then
+      source $HOME/install/gromacs_devel/bin/GMXRC && ./ci_scripts/pygmx.sh
+    fi
+  - |
+    if [ "${TRAVIS_BRANCH}" != master ] ; then
+      ./ci_scripts/sample_restraint.sh devel
+    fi
 
 # At some point, we should test more types of interactions between components, such as both static and dynamically
 # linked builds, and components built with different compilers.

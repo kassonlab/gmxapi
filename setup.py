@@ -26,7 +26,7 @@ from setuptools.command.build_ext import build_ext
 from setuptools.command.test import test as TestCommand
 
 #import gmx.version
-__version__ = '0.0.6'
+__version__ = '0.0.7'
 
 extra_link_args=[]
 
