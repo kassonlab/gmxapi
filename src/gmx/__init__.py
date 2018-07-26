@@ -66,7 +66,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-__all__ = ['Status', 'System', 'get_context', 'run']
+__all__ = ['get_context', 'run']
 
 # Import system facilities
 import logging
@@ -78,20 +78,36 @@ logger.setLevel(logging.DEBUG)
 logger.info("Importing gmx.")
 
 # Import submodules.
-from . import exceptions
-from . exceptions import *
-__all__.extend(exceptions.__all__)
-
-from . import context
-from . import workflow
-from . status import Status
-from . import util
+from gmx import exceptions
+from gmx import workflow
+from gmx import version
 
 # Import top-level components
-from .version import __version__
-from .system import System
-from .workflow import run
-from .context import get_context
+__version__ = version.__version__
+from gmx.system import System
+from gmx.context import get_context
+
+def run(work=None):
+    """Run the provided work on available resources.
+
+    Args:
+        work (gmx.workflow.WorkSpec): either a WorkSpec or an object with a `workspec` attribute containing a WorkSpec object.
+
+    Returns:
+        gmx.status.Status: run status.
+
+    """
+    if isinstance(work, workflow.WorkSpec):
+        workspec = work
+    elif hasattr(work, "workspec") and isinstance(work.workspec, workflow.WorkSpec):
+        workspec = work.workspec
+    else:
+        raise exceptions.UsageError("Runnable work must be provided to run.")
+    # Find a Context that can run the work and hand it off.
+    with get_context(workspec) as session:
+        status = session.run()
+    return status
+
 
 # if __name__ == "__main__":
 #     import doctest

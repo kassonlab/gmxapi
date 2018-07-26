@@ -1,6 +1,7 @@
-import gmx
-import gmx.util
+from gmx import context
+from gmx import fileio
 from gmx import exceptions
+from gmx import util
 
 __all__ = ['System']
 
@@ -77,7 +78,7 @@ class System(object):
 
         """
         import gmx.core
-        if gmx.util._filetype(inputrecord) is gmx.fileio.TprFile:
+        if util._filetype(inputrecord) is fileio.TprFile:
             # we use the API to process TPR files. We create a MD module and
             # retrieve a system from its contents.
             newsystem = gmx.core.from_tpr(inputrecord)
@@ -113,7 +114,7 @@ class System(object):
             Gromacs status object.
 
         """
-        with gmx.context.DefaultContext(self.workflow) as session:
+        with context.DefaultContext(self.workflow) as session:
             if parameters is None:
                 return session.run()
             else:

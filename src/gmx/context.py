@@ -9,6 +9,7 @@ from __future__ import unicode_literals
 
 __all__ = ['Context', 'DefaultContext']
 
+import importlib
 import os
 import warnings
 import networkx as nx
@@ -16,9 +17,7 @@ from networkx import DiGraph as _Graph
 
 from gmx import exceptions
 from gmx import logging
-import gmx.core
-from . import workflow
-from .workflow import WorkSpec
+from gmx import status
 
 # Module-level logger
 logger = logging.getLogger(__name__)
@@ -77,10 +76,11 @@ class Context(object):
         Returns:
             True if workspec is processable in this Context, else False.
         """
+        from gmx.workflow import workspec_version, get_source_elements, WorkElement
         # initialize return value.
         is_valid = True
         # Check compatibility
-        if workspec.version != workflow.workspec_version:
+        if workspec.version != workspec_version:
             is_valid = False
             if raises:
                 raise exceptions.ApiError('Incompatible workspec version.')
@@ -95,7 +95,7 @@ class Context(object):
                     raise exceptions.ApiError('WorkSpec must contain uniquely named elements.')
         # Check that the specification is complete. There must be at least one source element and all
         # dependencies must be fulfilled.
-        sources = set([element.name for element in gmx.workflow.get_source_elements(workspec)])
+        sources = set([element.name for element in get_source_elements(workspec)])
         if len(sources) < 1:
             is_valid = False
             if raises:
@@ -332,7 +332,9 @@ class ParallelArrayContext(object):
         self._numpy = numpy
 
         # self.__context_array = list([Context(work_element) for work_element in work])
-        self.__work = workflow.WorkSpec()
+        from gmx.workflow import WorkSpec
+        import gmx.core
+        self.__work = WorkSpec()
         self.__workdir_list = workdir_list
 
         self._session = None
@@ -402,11 +404,10 @@ class ParallelArrayContext(object):
 
         For discussion on error handling, see https://github.com/kassonlab/gmxapi/issues/125
         """
+        from gmx.workflow import WorkSpec, WorkElement
         if work is None:
             warnings.warn("A Context without a valid WorkSpec is iffy...")
             return
-
-        import importlib
 
         if isinstance(work, WorkSpec):
             workspec = work
@@ -418,7 +419,7 @@ class ParallelArrayContext(object):
 
         # Make sure this context knows how to run the specified work.
         for e in workspec.elements:
-            element = gmx.workflow.WorkElement.deserialize(workspec.elements[e])
+            element = WorkElement.deserialize(workspec.elements[e])
 
             if element.namespace not in {'gmxapi', 'gromacs'} and element.namespace not in self.__operations:
                 # Non-built-in namespaces are treated as modules to import.
@@ -538,19 +539,21 @@ class ParallelArrayContext(object):
         The graph node created will have `launch` and `run` attributes with function references, and a `width`
         attribute declaring the workflow parallelism requirement.
         """
-
+        import gmx.core
         class Builder(object):
             """Translate md work element to a node in the session's DAG."""
             def __init__(self, element):
-                assert isinstance(element, workflow.WorkElement)
-                self.name = element.name
-                # Note that currently the calling code is in charge of subscribing this builder to its dependencies.
-                # A list of tpr files will be set when the calling code subscribes this builder to a tpr provider.
-                self.infile = None
-                # Other dependencies in the element may register potentials when subscribed to.
-                self.potential = []
-                self.input_nodes = []
-                self.runtime_params = element.params
+                try:
+                    self.name = element.name
+                    # Note that currently the calling code is in charge of subscribing this builder to its dependencies.
+                    # A list of tpr files will be set when the calling code subscribes this builder to a tpr provider.
+                    self.infile = None
+                    # Other dependencies in the element may register potentials when subscribed to.
+                    self.potential = []
+                    self.input_nodes = []
+                    self.runtime_params = element.params
+                except AttributeError:
+                    raise exceptions.ValueError("object provided does not seem to be a WorkElement.")
             def add_subscriber(self, builder):
                 """The md operation does not yet have any subscribeable facilities."""
                 pass
@@ -817,7 +820,7 @@ class ParallelArrayContext(object):
             class NullSession(object):
                 def run(self):
                     logger.info("Running null session on rank {}.".format(self.rank))
-                    return gmx.Status()
+                    return status.Status()
                 def close(self):
                     logger.info("Closing null session.")
                     return
@@ -862,7 +865,7 @@ def get_context(work=None):
     """Get a concrete Context object.
 
     Args:
-        work: runnable work as a valid gmx.workflow.WorkSpec object
+        work (gmx.workflow.WorkSpec): runnable work as a valid gmx.workflow.WorkSpec object
 
     Returns:
         An object implementing the gmx.context.Context interface, if possible.
@@ -884,7 +887,7 @@ def get_context(work=None):
       * anything else?
 
     """
-    from . import workflow
+    from gmx import workflow
     import gmx.core
 
     context = None
@@ -921,7 +924,6 @@ def get_context(work=None):
             raise exceptions.UsageError('Work specification does not provide any input for MD simulation.')
         if len(tpr_input) != 1:
             raise exceptions.UsageError('This Context does not support arrays of simulations.')
-
 
         # Use old-style constructor that takes gmx.core.MDSystem
         newsystem = gmx.core.from_tpr(tpr_input[0])
