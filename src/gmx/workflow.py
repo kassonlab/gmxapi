@@ -140,8 +140,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from . import exceptions
-import gmx
+from gmx import exceptions
 from gmx import logging
 from gmx.util import to_string
 from gmx.util import to_utf8
@@ -371,13 +370,13 @@ class WorkSpec(object):
     @classmethod
     def deserialize(serialized):
         import json
-        workspec = gmx.workflow.WorkSpec()
+        workspec = WorkSpec()
         dict_representation = json.loads(to_string(serialized))
         ver_in = dict_representation['version']
         ver_out = workspec.version
         if ver_in != ver_out:
             message = "Expected work spec version {}. Got work spec version {}.".format(ver_out, ver_in)
-            raise gmx.exceptions.CompatibilityError(message)
+            raise exceptions.CompatibilityError(message)
         for element in dict_representation['elements']:
             workspec.elements[element] = dict_representation['elements'][element]
         return workspec
@@ -587,7 +586,7 @@ def from_tpr(input=None, **kwargs):
 
     Where key word arguments correspond to ``gmx mdrun`` command line options, the corresponding flags are noted below.
 
-    Arguments:
+    Keyword Arguments:
         input (str): *Required* string or list of strings giving the filename(s) of simulation input
         grid (tuple): Domain decomposition grid divisions (nx, ny, nz). (-dd)
         pme_ranks (int): number of separate ranks to be used for PME electrostatics. (-npme)
@@ -701,23 +700,3 @@ def from_tpr(input=None, **kwargs):
     workspec.add_element(mdelement)
 
     return mdelement
-
-def run(work=None):
-    """Run the provided work on available resources.
-
-    Args:
-        work : either a WorkSpec or an object with a `workspec` attribute containing a WorkSpec object.
-
-    Returns:
-        run status.
-    """
-    if isinstance(work, WorkSpec):
-        workspec = work
-    elif hasattr(work, "workspec") and isinstance(work.workspec, WorkSpec):
-        workspec = work.workspec
-    else:
-        raise exceptions.UsageError("Runnable work must be provided to run.")
-    # Find a Context that can run the work and hand it off.
-    with gmx.get_context(workspec) as session:
-        status = session.run()
-    return status

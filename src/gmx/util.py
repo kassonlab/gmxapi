@@ -11,7 +11,6 @@ import os
 
 __all__ = []
 
-import gmx.fileio as fileio
 from gmx.exceptions import UsageError
 from gmx.exceptions import FileError
 
@@ -39,6 +38,7 @@ def _filetype(filename):
     Raises:
         FileError is filename is not a readable file.
     """
+    from gmx import fileio
     # Get an absolute filename.
     if not os.path.isabs(filename):
         filename = os.path.join(fileio._current_dir, filename)
