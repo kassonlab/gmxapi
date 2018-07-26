@@ -1,7 +1,5 @@
 #!/usr/bin/env/python
-"""
-Providing Python access to Gromacs
-==================================
+"""Providing Python access to Gromacs
 
 The gmx Python module provides an interface suitable for scripting GROMACS
 workflows, interactive use, or connectivity to external Python-based APIs. The
@@ -31,29 +29,24 @@ For more advanced use, the module provides means to access or manipulate GROMACS
 more granularly than the command-line tool. This allows rapid prototyping of new
 methods, debugging of unexpected simulation behavior, and adaptive workflows.
 
-Installation
-------------
+Installation:
+    The gmxapi library for GROMACS must be installed to build and install the gmx
+    Python module. Retrieve the GROMACS fork from
+    https://github.com/kassonlab/gromacs-gmxapi and do a normal CMake build and
+    install.
 
-The gmxapi library for GROMACS must be installed to build and install the gmx
-Python module. Retrieve the GROMACS fork from
-https://github.com/kassonlab/gromacs-gmxapi and do a normal CMake build and
-install.
+    Then, download the repository from https://github.com/kassonlab/gmxapi and refer
+    to `docs/install.rst <./install.html>`_ for details on installing this Python
+    module.
 
-Then, download the repository from https://github.com/kassonlab/gmxapi and refer
-to `docs/install.rst <./install.html>`_ for details on installing this Python
-module.
+Packaging:
+    This Python package is built with CMake, but attempts to flexibly handle the
+    user's choice of Python installation. Python virtual environments are recommended.
+    If you have trouble installing this software in a Python virtual environment and
+    find the accompanying documentation inadequate, please open an issue ticket at
+    https://github.com/kassonlab/gmxapi/issues
 
-Packaging
----------
-
-This Python package is built with CMake, but attempts to flexibly handle the
-user's choice of Python installation. Python virtual environments are recommended.
-If you have trouble installing this software in a Python virtual environment and
-find the accompanying documentation inadequate, please open an issue ticket at
-https://github.com/kassonlab/gmxapi/issues
-
-Citing
-------
+Citing:
 
 Irrgang, M. E., Hays, J. M., & Kasson, P. M.
 gmxapi: a high-level interface for advanced control and extension of molecular dynamics simulations.
