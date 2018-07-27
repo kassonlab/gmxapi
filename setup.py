@@ -54,11 +54,11 @@ def get_gromacs(url, cmake_args=(), build_args=()):
         warn("get_gromacs needs ssl support, but `import ssl` fails")
         raise
     try:
-        import urllib.request.urlopen as urlopen
-    except:
+        from urllib.request import urlopen
+    except ImportError:
         try:
-            import urllib2.urlopen as urlopen
-        except:
+            from urllib2 import urlopen
+        except ImportError:
             raise RuntimeError("Need urllib or urllib2 package to download GROMACS.")
     import tempfile
     # import tarfile
