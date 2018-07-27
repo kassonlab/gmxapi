@@ -5,6 +5,7 @@
  */
 
 #include "core.h"
+
 #include <memory>
 
 #include "gmxpy_api.h"
