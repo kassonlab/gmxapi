@@ -16,16 +16,19 @@ If not installing in a virtual environment, you may not be able to install
 necessary prerequisites.
 You will need a few packages installed that are hard for gmxpy to install automatically.
 
+.. contents::
+    :local:
+    :depth: 2
+
 Build System
 ============
 
-The gmxapi Python package can be installed with ``pip`` (deprecated) or with ``cmake``.
+The gmxapi Python package can be installed with ``setup.py``, ``pip`` or with ``cmake``.
 
-Either way there are some Python modules that you will want to have installed either on the system or in a virtual
+In any case there are some Python modules that you will want to have installed either on the system or in a virtual
 environment (see below). These are ``numpy``, ``networkx``, and ``mpi4py``. If you are on a system with multiple
-compilers or
-multiple MPI implementations, refer to the mpi4py documentation to make sure you install it with the same compiler you
-use for GROMACS and gmxapi. Namely, set the ``MPICC`` environment variable before running ``pip``.
+compilers or multiple MPI implementations, refer to the mpi4py documentation to make sure you install it with the
+same compiler you use for GROMACS and gmxapi. Namely, set the ``MPICC`` environment variable before running ``pip``.
 
 CMake
 ~~~~~
@@ -45,14 +48,18 @@ Explicitly setting PYTHON_EXECUTABLE helps to make sure your preferred interpret
 ``GMXAPI_USER_INSTALL=ON`` tells CMake to install the Python package in your home directory where Python knows to look
 for it since you might not have write access to the system Python installation.
 
-DO NOT set ``GMXAPI_USER_INSTALL=ON`` if you are in a virtual environment (see below) or the package will be installed in a place that
+DO NOT set ``GMXAPI_USER_INSTALL=ON`` if you are in a virtual environment (see below) or the package will be installed
+in a place that
 is visible to Python interpreters outside of the current virtual environment, including other virtual environments,
 which can lead to really confusing errors.
 
+You can leave off the ``gmxapi_DIR=/path/to/gromacs`` environment variable part if you have ``source``ed your ``GMXRC``
+already.
+
 See below for more detailed instructions.
 
-Pip
-~~~~
+Python setuptools
+~~~~~~~~~~~~~~~~~
 
 Before proceeding, install / upgrade the Python package for ``cmake``. Note that it is not
 sufficient just to have the command-line CMake tools installed.
@@ -61,7 +68,6 @@ sufficient just to have the command-line CMake tools installed.
     python -m pip install --upgrade pip
     pip install --upgrade setuptools
     pip install --upgrade scikit-build
-    pip install --upgrade cmake
 
 If not installing in a virtual environment and not installing as a privileged
 user, you will want to append ``--user`` to the ``pip`` commands.
@@ -83,7 +89,8 @@ you can have gmxapi download and build its own copy of GROMACS. This will simpli
 installation, but may miss optimizations and tweaks that could improve performance
 in HPC environments.
 
-Instead of setting ``gmxapi_DIR``, set ``BUILDGROMACS=TRUE`` at the beginning of the ``pip`` command line.
+Instead of setting ``gmxapi_DIR``, set ``BUILDGROMACS=TRUE`` at the beginning of the ``pip`` or ``setup.py`` command
+line, or set ``-DGMXAPI_BUILDGROMACS=ON`` to the cmake command line.
 
 Python virtual environments
 ===========================
@@ -146,18 +153,20 @@ Install the Python module.
     $ git clone https://github.com/kassonlab/gmxapi.git gmxapi
     $ cd gmxapi
 
+Follow the instructions for a Pip or CMake install.
 
-Pip
-----
+Python setuptools
+-----------------
 
-With pip you will need to install some additional dependencies. Also, note that ``pip`` version 10.0.0 did not work for a
-gmxapi installation. The issue appears to have been fixed in more recent versions, but be aware.
+With pip you will need to install some additional dependencies. Also, note that ``pip`` must be version 10.1 or higher.
 ::
 
     $ python -m pip install --upgrade pip
     $ pip install --upgrade setuptools
-    $ pip install --upgrade scikit-build cmake networkx
-    $ CC=`which gcc` CXX=`which g++` pip install .
+    $ pip install --upgrade scikit-build networkx
+    $ CC=`which gcc` CXX=`which g++` python setup.py install
+
+``python setup.py install`` could be replaced with ``pip install .`` if you prefer.
 
 CMake
 -----
@@ -165,10 +174,9 @@ CMake
     $ mkdir build
     $ cd build
     $ CC=`which gcc` CXX=`which g++` cmake ..
-    $
 
-Take note whether the correct python executable is found. You may need to specify ``-DPYTHON_EXECUTABLE=`which python```
-to cmake.
+Take note whether the correct python executable is found. You may need to specify
+``-DPYTHON_EXECUTABLE=`which python` `` to cmake.
 
 Note: we do not yet have a robust suggestion for setting up ``tox`` for running the test suite in a conda environment.
 If you come up with a recipe, please let us know. Otherwise, don't worry if you are able to install
@@ -228,9 +236,9 @@ If you will be running the testing suite, you also need ``virtualenv`` and ``tox
 Get a copy of this repository, if you haven't already. For a released version, you can just download a source package.
 ::
 
-    (myvenv)$ wget https://github.com/kassonlab/gmxapi/archive/v0.0.4.zip
-    (myvenv)$ unzip v0_0_4.zip
-    (myvenv)$ cd gmxapi-v0_0_4
+    (myvenv)$ wget https://github.com/kassonlab/gmxapi/archive/v0.0.6.zip
+    (myvenv)$ unzip v0_0_6.zip
+    (myvenv)$ cd gmxapi-v0_0_6
 
 For a development branch, you should probably clone the repository. You may not already have ``git`` installed on your
 system or you may need to load a module for it on an HPC system, which you will need to do before trying the following.
@@ -241,21 +249,22 @@ system or you may need to load a module for it on an HPC system, which you will 
 
 If installing with CMake, install as above.
 
-Pip
-----
+Python setuptools
+-----------------
 
 Update your environment and install some dependencies.
 ::
 
     (myvenv)$ pip install --upgrade setuptools
-    (myvenv)$ pip install --upgrade scikit-build cmake networkx
+    (myvenv)$ pip install --upgrade scikit-build packaging networkx
 
 For simplicity, let this package build and install a local GROMACS for you by setting the BUILDGROMACS environment
-variable. To be on the safe side, make sure to give hints to use the compilers you intend.
+variable.
+To be on the safe side, make sure to give hints to use the compilers you intend.
 For instance, if we loaded a gcc module, help make sure pip doesn't default to the system ``/bin/cc`` or some such.
 ::
 
-    (myenv)$ BUILDGROMACS=TRUE CC=`which gcc` CXX=`which g++` pip install .
+    (myenv)$ BUILDGROMACS=TRUE CC=`which gcc` CXX=`which g++` python setup.py install
 
 This will take a while because it has to download and install GROMACS as well. If you want more visual stimulation, you
 can add ``--verbose`` to the end of the pip command line.
@@ -313,7 +322,7 @@ Testing
 =======
 
 Unit tests are performed individually with ``pytest`` or as a full
-installation and test suite with ``tox``.
+installation and test suite with ``tox``. You will also need ``numpy``
 
 From the root of the repository::
 
@@ -323,7 +332,11 @@ For pytest, first install the package as above. Then,
 
 ::
 
-    $ pytest --pyargs gmx -s --verbose
+    $ pytest src/gmx/test/
+    $ # or
+    $ python -m pytest src/gmx/test/
+    $ # or, for more output
+    $ pytest src/gmx/test -s --verbose
 
 For a more thorough test that includes the parallel workflow features,
 make sure you have MPI set up and the ``mpi4py`` Python package.
@@ -332,11 +345,13 @@ make sure you have MPI set up and the ``mpi4py`` Python package.
 
     mpiexec -n 2 python -m mpi4py -m pytest --log-cli-level=DEBUG --pyargs gmx -s --verbose
 
-Note: ``tox`` may get confused when it tries to create virtual
-environments when run from within a virtual environment. If you get
-errors, try running the tests from the native Python environment or a
-different virtual environment manager (i.e. not conda). And let us know
-if you come up with any tips or tricks!
+.. note::
+
+    ``tox`` may get confused when it tries to create virtual
+    environments when run from within a virtual environment. If you get
+    errors, try running the tests from the native Python environment or a
+    different virtual environment manager (i.e. not conda). And let us know
+    if you come up with any tips or tricks!
 
 Troubleshooting
 ===============

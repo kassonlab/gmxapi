@@ -12,6 +12,7 @@ find_package(gmxapi 0.0.6 REQUIRED
              )
 
 # Build the C++ extension
+include_directories(${PYTHON_INCLUDE_DIRS})
 
 pybind11_add_module(pygmx_core
                     core.h
@@ -28,16 +29,6 @@ pybind11_add_module(pygmx_core
 
 # The target name is for clarity, but the installed module will be gmx.core
 set_target_properties(pygmx_core PROPERTIES OUTPUT_NAME core)
-
-
-#set(PYGMX_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
-#    CACHE PATH "Full path to the gmx module installation")
-
-# Set the output to the staging area
-# For installs that are part of a GROMACS install, we probably want to stage differently
-# set_target_properties(
-#    pygmx_core
-#    PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${PYGMX_DIRECTORY}")
 
 set_target_properties(pygmx_core PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/gmx)
 
