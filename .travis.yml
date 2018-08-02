@@ -20,8 +20,7 @@ cache:
     # Note: if a cache store forks due to a stage with parallel jobs that Travis identifies as part of the same flow,
     # we must make sure that the parallel jobs do not write to any of the same caches. Also note that all stages use the
     # same cache, so early stage jobs may see caches from later stages from previous builds in the same branch.
-    - $HOME/.ccache_gromacs
-    - $HOME/.ccache_py
+    - $HOME/.ccache_gmxapi
 # Allows us to build and install GROMACS in one CI stage, then use the installation in a subsequent stage
 #    - $HOME/install
 
@@ -53,33 +52,24 @@ addons:
 
 # Set up for all jobs
 before_install:
-  - PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 2.7.14
-  - PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 3.4.7
-  - PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -f 3.6.3
-  - pyenv rehash
-  - pyenv versions
-  # get exactly one Python version: the last listed patch version for the selected minor version
-  - pyenv whence python${PY} && export PY_VER=`pyenv whence python${PY} | tail -1`
-  - pyenv shell $PY_VER && pyenv shell
-#  - python-config --includes
-  - pyenv prefix ${PY_VER} && export PYTHON_PREFIX=`pyenv prefix ${PY_VER}`
-  - pyenv which python && export PYTHON=`pyenv which python`
   - source ./ci_scripts/set_compilers
+  - export CCACHE_DIR=$HOME/.ccache_gmxapi
+  - source ./ci_scripts/set_python
 
 install:
-  - export CCACHE_DIR=$HOME/.ccache_gromacs
+  - export CCACHE_DIR=$HOME/.ccache_gmxapi
   - ccache -s
   - ./ci_scripts/install_gromacs_0_0_6.sh
   - if [ "${TRAVIS_BRANCH}" != "master" ] ; then ./ci_scripts/install_gromacs_devel.sh ; fi
 
 before_script:
-  - export CCACHE_DIR=$HOME/.ccache_py
+  - export CCACHE_DIR=$HOME/.ccache_gmxapi
   - ccache -s
-  - pip install --upgrade pip setuptools
-  - pip install --upgrade packaging scikit-build
-  - pip install --no-cache-dir --upgrade --no-binary ":all:" --force-reinstall networkx mpi4py MarkupSafe
-  - pip install pytest numpy networkx sphinx sphinx_rtd_theme
-  - pip install -r requirements.txt
+  - $PYTHON -m pip install --upgrade pip setuptools -q
+  - $PYTHON -m pip install --upgrade packaging scikit-build -q
+  - $PYTHON -m pip install --no-cache-dir --upgrade --no-binary ":all:" --force-reinstall networkx mpi4py MarkupSafe -q
+  - $PYTHON -m pip install pytest numpy networkx sphinx sphinx_rtd_theme -q
+  - $PYTHON -m pip install -r requirements.txt -q
 
 script:
   - source $HOME/install/gromacs_0_0_6/bin/GMXRC && ./ci_scripts/pygmx.sh

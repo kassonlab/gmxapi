@@ -5,7 +5,7 @@ export GMX_DOUBLE=OFF
 export GMX_MPI=OFF
 export GMX_THREAD_MPI=ON
 
-export CCACHE_DIR=$HOME/.ccache_gromacs
+export CCACHE_DIR=$HOME/.ccache_gmxapi
 ccache -s
 
 pushd $HOME
