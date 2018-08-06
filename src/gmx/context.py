@@ -23,6 +23,122 @@ from gmx import status
 logger = logging.getLogger(__name__)
 logger.info('Importing gmx.context')
 
+
+def _load_tpr(self, element):
+    """Implement the gromacs.load_tpr operation.
+
+    Updates the minimum width of the workflow parallelism. Does not add any API object to the graph.
+
+    Arguments:
+        self: The Context in which this operation is being loaded.
+        element: WorkElement specifying the operation.
+
+    Returns:
+        A Director that the Context can use in launching the Session.
+    """
+    class Builder(object):
+        def __init__(self, tpr_list):
+            logger.debug("Loading tpr builder for tpr_list {}".format(tpr_list))
+            self.tpr_list = tpr_list
+            self.subscribers = []
+            self.width = len(tpr_list)
+
+        def add_subscriber(self, builder):
+            builder.infile = self.tpr_list
+            self.subscribers.append(builder)
+
+        def build(self, dag):
+            width = len(self.tpr_list)
+            for builder in self.subscribers:
+                builder.width = width
+            if 'width' in dag.graph:
+                width = max(width, dag.graph['width'])
+            dag.graph['width'] = width
+
+    return Builder(element.params['input'])
+
+def _md(context, element):
+    """Implement the gmxapi.md operation by returning a builder that can populate a data flow graph for the element.
+
+    Inspects dependencies to set up the simulation runner.
+
+    The graph node created will have `launch` and `run` attributes with function references, and a `width`
+    attribute declaring the workflow parallelism requirement.
+
+    Arguments:
+        context: The Context in which this operation is being loaded.
+        element: WorkElement specifying the operation.
+
+    Returns:
+        A Director that the Context can use in launching the Session.
+    """
+    import gmx.core
+    class Builder(object):
+        """Translate md work element to a node in the session's DAG."""
+        def __init__(self, element):
+            try:
+                self.name = element.name
+                # Note that currently the calling code is in charge of subscribing this builder to its dependencies.
+                # A list of tpr files will be set when the calling code subscribes this builder to a tpr provider.
+                self.infile = None
+                # Other dependencies in the element may register potentials when subscribed to.
+                self.potential = []
+                self.input_nodes = []
+                self.runtime_params = element.params
+            except AttributeError:
+                raise exceptions.ValueError("object provided does not seem to be a WorkElement.")
+        def add_subscriber(self, builder):
+            """The md operation does not yet have any subscribeable facilities."""
+            pass
+        def build(self, dag):
+            """Add a node to the graph that, when launched, will construct a simulation runner.
+
+            Complete the definition of appropriate graph edges for dependencies.
+
+            The launch() method of the added node creates the runner from the tpr file for the current rank and adds
+            modules from the incoming edges.
+            """
+            assert isinstance(dag, _Graph)
+            name = self.name
+            dag.add_node(name)
+            for neighbor in self.input_nodes:
+                dag.add_edge(neighbor, name)
+            infile = self.infile
+            assert not infile is None
+            potential_list = self.potential
+            assert dag.graph['width'] >= len(infile)
+
+            # Provide closure with which to execute tasks for this node.
+            def launch(rank=None):
+                assert not rank is None
+                tpr_file = infile[rank]
+                logger.info('Loading TPR file: {}'.format(tpr_file))
+                system = gmx.core.from_tpr(tpr_file)
+                dag.nodes[name]['system'] = system
+                for potential in potential_list:
+                    system.add_mdmodule(potential)
+                pycontext = element.workspec._context
+                pycontext.potentials = potential_list
+                mdargs = gmx.core.MDArgs()
+                mdargs.set(self.runtime_params)
+                context = pycontext._api_object
+                context.setMDArgs(mdargs)
+                dag.nodes[name]['session'] = system.launch(context)
+                dag.nodes[name]['close'] = dag.nodes[name]['session'].close
+                def runner():
+                    """Currently we only support a single call to run."""
+                    def done():
+                        raise StopIteration()
+                    # Replace the runner with a stop condition for subsequent passes.
+                    dag.nodes[name]['run'] = done
+                    return dag.nodes[name]['session'].run()
+                dag.nodes[name]['run'] = runner
+                return dag.nodes[name]['run']
+
+            dag.nodes[name]['launch'] = launch
+
+    return Builder(element)
+
 class Context(object):
     """ Proxy to API Context provides Python context manager.
 
@@ -357,13 +473,13 @@ class ParallelArrayContext(object):
         #   * build(dag) : Fulfill the builder responsibilities by adding an arbitrary number of nodes and edges to a Graph.
         #
         # The gmxapi namespace of operations should be consistent with a specified universal set of functionalities
-        self.__operations['gmxapi'] = {'md': lambda element : self.__md(element),
+        self.__operations['gmxapi'] = {'md': lambda element : _md(self, element),
                                        # 'global_data' : shared_data_maker,
                                       }
         # Even if TPR file loading were to become a common and stable enough operation to be specified in
         # and API, it is unlikely to be implemented by any code outside of GROMACS, so let's not clutter
         # a potentially more universal namespace.
-        self.__operations['gromacs'] = {'load_tpr': lambda element : self.__load_tpr(element),
+        self.__operations['gromacs'] = {'load_tpr': lambda element : _load_tpr(self, element),
                                        }
 
         # Right now we are treating workspec elements and work DAG nodes as equivalent, but they are
@@ -504,107 +620,6 @@ class ParallelArrayContext(object):
             raise exceptions.UsageError("Operation {}.{} already defined in this context.".format(namespace, operation))
         else:
             self.__operations[namespace][operation] = get_builder
-
-    def __load_tpr(self, element):
-        """Implement the gromacs.load_tpr operation.
-
-        Updates the minimum width of the workflow parallelism. Does not add any API object to the graph.
-        """
-        class Builder(object):
-            def __init__(self, tpr_list):
-                logger.info("Loading tpr builder for tpr_list {}".format(tpr_list))
-                self.tpr_list = tpr_list
-                self.subscribers = []
-                self.width = len(tpr_list)
-
-            def add_subscriber(self, builder):
-                builder.infile = self.tpr_list
-                self.subscribers.append(builder)
-
-            def build(self, dag):
-                width = len(self.tpr_list)
-                for builder in self.subscribers:
-                    builder.width = width
-                if 'width' in dag.graph:
-                    width = max(width, dag.graph['width'])
-                dag.graph['width'] = width
-
-        return Builder(element.params['input'])
-
-    def __md(self, element):
-        """Implement the gmxapi.md operation by returning a builder that can populate a data flow graph for the element.
-
-        Inspects dependencies to set up the simulation runner.
-
-        The graph node created will have `launch` and `run` attributes with function references, and a `width`
-        attribute declaring the workflow parallelism requirement.
-        """
-        import gmx.core
-        class Builder(object):
-            """Translate md work element to a node in the session's DAG."""
-            def __init__(self, element):
-                try:
-                    self.name = element.name
-                    # Note that currently the calling code is in charge of subscribing this builder to its dependencies.
-                    # A list of tpr files will be set when the calling code subscribes this builder to a tpr provider.
-                    self.infile = None
-                    # Other dependencies in the element may register potentials when subscribed to.
-                    self.potential = []
-                    self.input_nodes = []
-                    self.runtime_params = element.params
-                except AttributeError:
-                    raise exceptions.ValueError("object provided does not seem to be a WorkElement.")
-            def add_subscriber(self, builder):
-                """The md operation does not yet have any subscribeable facilities."""
-                pass
-            def build(self, dag):
-                """Add a node to the graph that, when launched, will construct a simulation runner.
-
-                Complete the definition of appropriate graph edges for dependencies.
-
-                The launch() method of the added node creates the runner from the tpr file for the current rank and adds
-                modules from the incoming edges.
-                """
-                assert isinstance(dag, _Graph)
-                name = self.name
-                dag.add_node(name)
-                for neighbor in self.input_nodes:
-                    dag.add_edge(neighbor, name)
-                infile = self.infile
-                assert not infile is None
-                potential_list = self.potential
-                assert dag.graph['width'] >= len(infile)
-
-                # Provide closure with which to execute tasks for this node.
-                def launch(rank=None):
-                    assert not rank is None
-                    tpr_file = infile[rank]
-                    logger.info('Loading TPR file: {}'.format(tpr_file))
-                    system = gmx.core.from_tpr(tpr_file)
-                    dag.nodes[name]['system'] = system
-                    for potential in potential_list:
-                        system.add_mdmodule(potential)
-                    mdargs = gmx.core.MDArgs()
-                    mdargs.set(self.runtime_params)
-                    pycontext = element.workspec._context
-                    pycontext.potentials = potential_list
-                    context = pycontext._api_object
-                    context.setMDArgs(mdargs)
-                    dag.nodes[name]['session'] = system.launch(context)
-                    dag.nodes[name]['close'] = dag.nodes[name]['session'].close
-                    def runner():
-                        """Currently we only support a single call to run."""
-                        def done():
-                            raise StopIteration()
-                        # Replace the runner with a stop condition for subsequent passes.
-                        dag.nodes[name]['run'] = done
-                        return dag.nodes[name]['session'].run()
-                    dag.nodes[name]['run'] = runner
-                    return dag.nodes[name]['run']
-
-                dag.nodes[name]['launch'] = launch
-
-        return Builder(element)
 
     # Set up a simple ensemble resource
     # This should be implemented for Session, not Context, and use an appropriate subcommunicator
