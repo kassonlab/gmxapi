@@ -458,9 +458,9 @@ class ParallelArrayContext(object):
         # Alternatively, maybe a trivial `property` that gets the rank from a bound session, if any.
         self.rank = None
 
-        # `size` notes the required width of an array of synchronous tasks to perform the specified work.
+        # `work_width` notes the required width of an array of synchronous tasks to perform the specified work.
         # As work elements are processed, self.size will be increased as appropriate.
-        self.size = None
+        self.work_width = None
 
         # initialize the operations map. May be extended during the lifetime of a Context.
         # Note that there may be a difference between built-in operations provided by this module and
@@ -546,7 +546,7 @@ class ParallelArrayContext(object):
                         'This context does not know how to invoke {} from {}. ImportError: {}'.format(
                             element.operation,
                             element.namespace,
-                            e.message))
+                            str(e)))
 
                 # Don't leave an empty nested dictionary if we couldn't map the operation.
                 if element.namespace in self.__operations:
@@ -631,7 +631,7 @@ class ParallelArrayContext(object):
             self.part[tag] = 0
         self._session_ensemble_communicator.Allreduce(send, recv)
         buffer = self._numpy.array(recv, copy=False)
-        buffer /= self.size
+        buffer /= self.work_width
         suffix = '_{}.npz'.format(tag)
         # These will end up in the working directory and each ensemble member will have one
         filename = str("rank{}part{:04d}{}".format(self.rank, int(self.part[tag]), suffix))
@@ -642,7 +642,7 @@ class ParallelArrayContext(object):
         """Implement Python context manager protocol, producing a Session for the specified work in this Context.
 
         Returns:
-            Session object the can be run and/or inspected.
+            Session object that can be run and/or inspected.
 
         Additional API operations are possible while the Session is active. When used as a Python context manager,
         the Context will close the Session at the end of the `with` block by calling `__exit__`.
@@ -674,13 +674,13 @@ class ParallelArrayContext(object):
         # Check the global MPI configuration
         # Since the Context doesn't have a destructor, if we use an MPI communicator at this scope then
         # it has to be owned and managed outside of Context.
-        context_communicator = MPI.COMM_WORLD
-        context_comm_size = context_communicator.Get_size()
-        context_rank = context_communicator.Get_rank()
+        self._session_communicator = MPI.COMM_WORLD
+        context_comm_size = self._session_communicator.Get_size()
+        context_rank = self._session_communicator.Get_rank()
         self.rank = context_rank
         # self._communicator = communicator
         logger.debug("Context rank {} in context {} of size {}".format(context_rank,
-                                                                       context_communicator,
+                                                                       self._session_communicator,
                                                                        context_comm_size))
 
         assert not self.rank is None
@@ -707,7 +707,7 @@ class ParallelArrayContext(object):
             except LookupError as e:
                 request = '.'.join([element.namespace, element.operation])
                 message = 'Could not find an implementation for the specified operation: {}. '.format(request)
-                message += e.message
+                message += str(e)
                 raise exceptions.ApiError(message)
             # Subscribing builders is the Context's responsibility because otherwise the builders
             # don't know about each other. Builders should not depend on the Context unless they
@@ -728,33 +728,33 @@ class ParallelArrayContext(object):
             logger.info("Building {}".format(builder))
             logger.debug("Has build attribute {}.".format(builder.build))
             builder.build(graph)
-        self.size = graph.graph['width']
+        self.work_width = graph.graph['width']
 
         # Prepare working directories. This should probably be moved to some aspect of the Session and either
         # removed from here or made more explicit to the user.
         workdir_list = self.__workdir_list
         if workdir_list is None:
-            workdir_list = [os.path.join('.', str(i)) for i in range(self.size)]
+            workdir_list = [os.path.join('.', str(i)) for i in range(self.work_width)]
         self.__workdir_list = list([os.path.abspath(dir) for dir in workdir_list])
 
         # Check the session "width" against the available parallelism
-        if (self.size > context_comm_size):
+        if (self.work_width > context_comm_size):
             msg = 'ParallelArrayContext requires a work array that fits in the MPI communicator: '
             msg += 'array width {} > size {}.'
-            msg = msg.format(self.size, context_comm_size)
+            msg = msg.format(self.work_width, context_comm_size)
             raise exceptions.UsageError(msg)
-        if (self.size < context_comm_size):
+        if (self.work_width < context_comm_size):
             msg = 'MPI context is wider than necessary to run this work:  array width {} vs. size {}.'
-            warnings.warn(msg.format(self.size, context_comm_size))
+            warnings.warn(msg.format(self.work_width, context_comm_size))
 
         # Create an appropriate sub-communicator for the present work. Extra ranks will be in a
         # subcommunicator with no work.
-        if context_rank < self.size:
+        if context_rank < self.work_width:
             color = 0
         else:
             color = MPI.UNDEFINED
 
-        self._session_ensemble_communicator = context_communicator.Split(color, context_rank)
+        self._session_ensemble_communicator = self._session_communicator.Split(color, context_rank)
         try:
             self._session_ensemble_size = self._session_ensemble_communicator.Get_size()
             self._session_ensemble_rank = self._session_ensemble_communicator.Get_rank()
@@ -768,7 +768,7 @@ class ParallelArrayContext(object):
             self._session_ensemble_size
         ))
         if self._session_ensemble_size > 0:
-            assert self._session_ensemble_size == self.size
+            assert self._session_ensemble_size == self.work_width
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
         # MDSystem objects are obtained from gmx.core.from_tpr(). They also provide add_potential().
@@ -787,7 +787,7 @@ class ParallelArrayContext(object):
 
             logger.info("Launching work on context rank {}, subcommunicator rank {}.".format(
                 self.rank,
-                self._session_ensemble_rank))
+                self._session_ensemble_communicator.Get_rank()))
 
             # Launch the work for this rank
             self.workdir = self.__workdir_list[self.rank]
