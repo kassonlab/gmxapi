@@ -4,6 +4,7 @@ import unittest
 import pytest
 
 import gmx
+import gmx.core
 
 class MDArgsTestCase(unittest.TestCase):
     """Test creation and setting of MDArgs for Context runtime."""

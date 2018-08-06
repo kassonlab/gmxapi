@@ -139,6 +139,66 @@ def _md(context, element):
 
     return Builder(element)
 
+def _get_ensemble_update(context):
+    """Set up a simple ensemble resource.
+
+    The context should call this function once per session to get an `ensemble_update`
+    function object.
+
+    This is a draft of a Context feature that may not be available in all
+    Context implementations. This factory function can be wrapped as a
+    ``ensemble_update`` "property" in a Context instance method to produce a Python function
+    with the signature ``update(context, send, recv, tag=None)``.
+
+    This feature requires that the Context is capabable of providing the
+    ensemble_communicator feature and the numpy feature.
+    If both are available, the function object provided by
+    ``ensemble_update`` provides
+    the ensemble reduce operation used by the restraint potential plugin in the
+    gmxapi sample_restraint repository. Otherwise, the provided function object
+    will log an error and then raise an exception.
+
+    gmxapi 0.0.5 and 0.0.6 MD plugin clients look for a member function named
+    ``ensemble_update`` in the Context that launched them. In the future,
+    clients will use session resources to access ensemble reduce operations.
+    In the mean time, a transitional implementation can involve defining a
+    ``ensemble_update`` property in the Context object that acts as a factory
+    function to produce the reducing operation, if possible with the given
+    resources.
+    """
+    try:
+        import numpy
+    except ImportError:
+        message = "ensemble_update requires numpy, but numpy is not available."
+        logger.error(message)
+        raise exceptions.FeatureNotAvailableError(message)
+
+    def _ensemble_update(active_context, send, recv, tag):
+        if not tag in active_context.part:
+            active_context.part[tag] = 0
+        logger.debug("Performing ensemble update.")
+        active_context._session_ensemble_communicator.Allreduce(send, recv)
+        buffer = numpy.array(recv, copy=False)
+        buffer /= active_context.work_width
+        suffix = '_{}.npz'.format(tag)
+        # These will end up in the working directory and each ensemble member will have one
+        filename = str("rank{}part{:04d}{}".format(active_context.rank, int(active_context.part[tag]), suffix))
+        numpy.savez(filename, recv=recv)
+        active_context.part[tag] += 1
+
+    def _no_ensemble_update(active_context, send, recv, tag):
+        message = "Attempt to call ensemble_update() in a Context that does not provide the operation."
+        # If we confirm effective exception handling, remove the extraneous log.
+        logger.error(message)
+        raise exceptions.FeatureNotAvailableError(message)
+
+    if context._session_ensemble_communicator is not None:
+        functor = _ensemble_update
+    else:
+        functor = _no_ensemble_update
+    context.part = {}
+    return functor
+
 class Context(object):
     """ Proxy to API Context provides Python context manager.
 
@@ -378,10 +438,10 @@ class ParallelArrayContext(object):
     Attributes:
         work :obj:`gmx.workflow.WorkSpec`: specification of work to be performed when a session is launched.
         rank : numerical index of the current worker in a running session (None if not running)
-        size : Minimum width needed for the parallelism required by the array of work being executed.
+        work_width : Minimum width needed for the parallelism required by the array of work being executed.
         elements : dictionary of references to elements of the workflow.
 
-    `rank`, `size`, and `elements` are empty or None until the work is processed, as during session launch.
+    `rank`, `work_width`, and `elements` are empty or None until the work is processed, as during session launch.
 
 
     Example: Use ``mpiexec -n 2 python -m mpi4py myscript.py`` to run two jobs at the same time.
@@ -459,7 +519,7 @@ class ParallelArrayContext(object):
         self.rank = None
 
         # `work_width` notes the required width of an array of synchronous tasks to perform the specified work.
-        # As work elements are processed, self.size will be increased as appropriate.
+        # As work elements are processed, self.work_width will be increased as appropriate.
         self.work_width = None
 
         # initialize the operations map. May be extended during the lifetime of a Context.
@@ -625,18 +685,16 @@ class ParallelArrayContext(object):
     # This should be implemented for Session, not Context, and use an appropriate subcommunicator
     # that is created and freed as the Session launches and exits.
     def ensemble_update(self, send, recv, tag=None):
-        assert not tag is None
-        assert str(tag) != ''
-        if not tag in self.part:
-            self.part[tag] = 0
-        self._session_ensemble_communicator.Allreduce(send, recv)
-        buffer = self._numpy.array(recv, copy=False)
-        buffer /= self.work_width
-        suffix = '_{}.npz'.format(tag)
-        # These will end up in the working directory and each ensemble member will have one
-        filename = str("rank{}part{:04d}{}".format(self.rank, int(self.part[tag]), suffix))
-        self._numpy.savez(filename, recv=recv)
-        self.part[tag] += 1
+        """Implement the ensemble_update member function that gmxapi through 0.0.6 expects.
+
+        """
+        # gmxapi through 0.0.6 expects to bind to this member function during "build".
+        # This behavior needs to be deprecated (bind during launch, instead), but this
+        # dispatching function should be an effective placeholder.
+        if tag is None or str(tag) == '':
+            raise exceptions.ApiError("ensemble_update must be called with a name tag.")
+        # __ensemble_update is an attribute, not an instance function, so we need to explicitly pass 'self'
+        return self.__ensemble_update(self, send, recv, tag)
 
     def __enter__(self):
         """Implement Python context manager protocol, producing a Session for the specified work in this Context.
@@ -769,6 +827,8 @@ class ParallelArrayContext(object):
         ))
         if self._session_ensemble_size > 0:
             assert self._session_ensemble_size == self.work_width
+        # For gmxapi 0.0.6, all ranks have a session_ensemble_communicator
+        self.__ensemble_update = _get_ensemble_update(self)
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
         # MDSystem objects are obtained from gmx.core.from_tpr(). They also provide add_potential().
@@ -864,6 +924,8 @@ class ParallelArrayContext(object):
                 logger.info("Freeing sub-communicator {} on rank {}".format(self._session_ensemble_communicator,
                                                                             self.rank))
                 self._session_ensemble_communicator.Free()
+            else:
+                logger.debug('"None" ensemble communicator does not need to be "Free"d.')
             del self._session_ensemble_communicator
         else:
             logger.debug("No ensemble subcommunicator on context rank {}.".format(self.rank))
