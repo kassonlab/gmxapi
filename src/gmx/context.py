@@ -139,6 +139,209 @@ def _md(context, element):
 
     return Builder(element)
 
+def _get_mpi_ensemble_communicator(session_communicator, ensemble_size):
+    """Get an ensemble communicator from an MPI communicator.
+
+    An ensemble communicator is an object that implements mpi4py.MPI.Comm methods
+    as described elsewhere in this documentation.
+
+    :param session_communicator: MPI communicator with the interface described by mpi4py.MPI.Comm
+    :param ensemble_size: number of ensemble members
+    :return: communicator of described size on participating ranks and null communicator on any others.
+
+    Must be called exactly once in every process in `communicator`. It is the
+    responsibility of the calling code to refrain from running ensemble operations
+    if not part of the ensemble. The calling code determines this by comparing its
+    session_communicator.Get_rank() to ensemble_size. This is not a good solution
+    because it assumes there is a single ensemble communicator and that ensemble
+    work is allocated to ranks serially from session_rank 0. Future work might
+    use process groups associated with specific operations in the work graph so
+    that processes can check for membership in a group to decide whether to use
+    their ensemble communicator. Another possibility would be to return None
+    rather than a null communicator in processes that aren't participating in
+    a given ensemble.
+    """
+    from mpi4py import MPI
+
+    session_size = session_communicator.Get_size()
+    session_rank = session_communicator.Get_rank()
+
+    # Check the ensemble "width" against the available parallelism
+    if ensemble_size > session_size:
+        msg = 'ParallelArrayContext requires a work array that fits in the MPI communicator: '
+        msg += 'array width {} > size {}.'
+        msg = msg.format(ensemble_size, session_size)
+        raise exceptions.UsageError(msg)
+    if ensemble_size < session_size:
+        msg = 'MPI context is wider than necessary to run this work:  array width {} vs. size {}.'
+        warnings.warn(msg.format(ensemble_size, session_size))
+
+    # Create an appropriate sub-communicator for the present work. Extra ranks will be in a
+    # sub-communicator with no work.
+    if session_rank < ensemble_size:
+        # The session launcher should maintain an inventory of the ensembles and
+        # provide an appropriate tag, but right now we just have a sort of
+        # Boolean: ensemble or not.
+        color = 0
+    else:
+        color = MPI.UNDEFINED
+
+    ensemble_communicator = session_communicator.Split(color, session_rank)
+    try:
+        ensemble_communicator_size = ensemble_communicator.Get_size()
+        ensemble_communicator_rank = ensemble_communicator.Get_rank()
+    except:
+        warnings.warn("Possible API programming error: ensemble_communicator does not provide required methods...")
+        ensemble_communicator_size = 0
+        ensemble_communicator_rank = None
+    logger.info("Session rank {} assigned to rank {} of subcommunicator {} of size {}".format(
+        session_rank,
+        ensemble_communicator_rank,
+        ensemble_communicator,
+        ensemble_communicator_size
+    ))
+
+    # There isn't a good reason to worry about special handling for a null communicator,
+    # which we have to explicitly avoid "free"ing, so let's just get rid of it.
+    # To do: don't even get the null communicator in the first place. Use a group and create instead of split.
+    if ensemble_communicator == MPI.COMM_NULL:
+        ensemble_communicator = None
+
+    return ensemble_communicator
+
+
+def _acquire_communicator(communicator=None):
+    """Get a workflow level communicator for the session.
+
+    This function is intended to be called by the __enter__ method that creates
+    a session get a communicator instance. The `Free` method of the returned
+    instance must be called exactly once. This should be performed by the
+    corresponding __exit__ method.
+
+    Arguments:
+        communicator : a communicator to duplicate (optional)
+
+    Returns:
+        A communicator that must be explicitly freed by the caller.
+
+    Currently only supports MPI multi-simulation parallelism dependent on
+    mpi4py. The mpi4py package should be installed and built with compilers
+    that are compatible with the gmxapi installation.
+
+    If provided, `communicator` must provide the mpi4py.MPI.Comm interface.
+    Returns either a duplicate of `communicator` or of MPI_COMM_WORLD if mpi4py
+    is available. Otherwise, returns a mock communicator that can only manage
+    sessions and ensembles of size 0 or 1.
+
+    gmx behavior is undefined if launched with mpiexec and without mpi4py
+    """
+
+    class MockSessionCommunicator(object):
+        def Dup(self):
+            return self
+
+        def Free(self):
+            return
+
+        def Get_size(self):
+            return 1
+
+        def Get_rank(self):
+            return 0
+
+        def __str__(self):
+            return 'Basic'
+
+        def __repr__(self):
+            return 'MockSessionCommunicator()'
+
+    if communicator is None:
+        try:
+            import mpi4py.MPI as MPI
+            communicator = MPI.COMM_WORLD
+        except ImportError:
+            logger.info("mpi4py is not available for default session communication.")
+            communicator = MockSessionCommunicator()
+    else:
+        communicator = communicator
+
+    try:
+        new_communicator = communicator.Dup()
+    except Exception as e:
+        message = "Exception when duplicating communicator: {}".format(e)
+        raise exceptions.ApiError(message)
+
+    return new_communicator
+
+
+def _get_ensemble_communicator(communicator, ensemble_size):
+    """Provide ensemble_communicator feature in active_context, if possible.
+
+    Must be called on all ranks in `communicator`. The communicator returned
+    must be freed by a call to its `Free()` instance method. This function is
+    best used in a context manager's `__enter__()` method so that the
+    corresponding `context.Free()` can be called in the `__exit__` method.
+
+    Arguments:
+        communicator : session communicator for the session with the ensemble.
+        ensemble_size : ensemble size of the requested ensemble communicator
+
+    The ensemble_communicator feature should be present if the Context can
+    provide communication between all ensemble members. The Context should
+    determine this at the launch of the session and set the
+    ``_session_ensemble_communicator`` attribute to provide an object that
+    implements the same interface as an mpi4py.MPI.Comm object. Actually, this is
+    a temporary shim, so the only methods that need to be available are `Get_size`,
+    `Get_rank` and something that can be called as
+    Allreduce(send, recv) where send and recv are objects providing the Python
+    buffer interface.
+
+    Currently, only one ensemble can be managed in a session.
+    """
+    ensemble_communicator = None
+
+    class TrivialEnsembleCommunicator(object):
+        def __init__(self):
+            import numpy
+            self._numpy = numpy
+
+        def Free(self):
+            return
+
+        def Allreduce(self, send, recv):
+            logger.debug("Faking an Allreduce for ensemble of size 1.")
+            send_buffer = self._numpy.array(send, copy=False)
+            recv_buffer = self._numpy.array(recv, copy=False)
+            recv_buffer[:] = send_buffer[:]
+
+        def Get_size(self):
+            return 1
+
+        def Get_rank(self):
+            return 0
+
+    # For trivial cases, don't bother trying to use MPI
+    # Note: all ranks in communicator must agree on the size of the work!
+    # Note: If running with a Mock session communicator in an MPI session (user error)
+    # every rank will think it is the only rank and will try to perform the
+    # same work.
+    if communicator.Get_size() <= 1 or ensemble_size <= 1:
+        message = "Getting TrivialEnsembleCommunicator for ensemble of size {}".format((ensemble_size))
+        message += " for session rank {} in session communicator of size {}".format(
+            communicator.Get_rank(),
+            communicator.Get_size())
+        logger.debug(message)
+        ensemble_communicator = TrivialEnsembleCommunicator()
+    else:
+        message = "Getting an MPI subcommunicator for ensemble of size {}".format(ensemble_size)
+        message += " for session rank {} in session communicator of size {}".format(
+            communicator.Get_rank(),
+            communicator.Get_size())
+        logger.debug(message)
+        ensemble_communicator = _get_mpi_ensemble_communicator(communicator, ensemble_size)
+
+    return ensemble_communicator
+
 def _get_ensemble_update(context):
     """Set up a simple ensemble resource.
 
@@ -499,17 +702,42 @@ class ParallelArrayContext(object):
     output (including just a completion message), blocking for acknowledgement before looking for the next set of subscribed inputs.
     """
 
-    def __init__(self, work=None, workdir_list=None):
-        """Initialize compute resources.
+    def __init__(self, work=None, workdir_list=None, communicator=None):
+        """Create manager for computing resources.
+
+        Does not initialize resources because Python objects by themselves do
+        not have a good way to deinitialize resources. Instead, resources are
+        initialized using the Python context manager protocol when sessions are
+        entered and exited.
 
         Appropriate computing resources need to be knowable when the Context is created.
+
+        Keyword Arguments:
+            work : work specification with which to initialize this context
+            workdir_list : deprecated
+            communicator : non-owning reference to a multiprocessing communicator
+
+        If provided, communicator must implement the mpi4py.MPI.Comm interface. The
+        Context will use this communicator as the parent for subcommunicators
+        used when launching sessions. If provided, communicator is owned by the
+        caller, and must be freed by the caller after any sessions are closed.
+        By default, the Context will get a reference to MPI_COMM_WORLD, which
+        will be freed when the Python process ends and cleans up its resources.
+        The communicator stored by the Context instance will not be used directly,
+        but will be duplicated when launching sessions using `with`.
         """
-        import numpy
-        self._numpy = numpy
 
         # self.__context_array = list([Context(work_element) for work_element in work])
         from gmx.workflow import WorkSpec
         import gmx.core
+
+        # Until better Session abstraction exists at the Python level, a
+        # _session_communicator attribute will be added to and removed from the
+        # context at session entry and exit. If necessary, a _session_ensemble_communicator
+        # will be split from _session_communicator for simulation ensembles
+        # present in the specified work.
+        self.__communicator = communicator
+
         self.__work = WorkSpec()
         self.__workdir_list = workdir_list
 
@@ -582,7 +810,6 @@ class ParallelArrayContext(object):
         """
         from gmx.workflow import WorkSpec, WorkElement
         if work is None:
-            warnings.warn("A Context without a valid WorkSpec is iffy...")
             return
 
         if isinstance(work, WorkSpec):
@@ -716,13 +943,6 @@ class ParallelArrayContext(object):
         self.__initial_cwd = os.getcwd()
         logger.debug("Launching session from {}".format(self.__initial_cwd))
 
-        import numpy
-        try:
-            from mpi4py import MPI
-        except:
-            raise exceptions.OptionalFeatureNotAvailableError(
-                "ParallelArrayContext requires Python package mpi4py to function.")
-
         if self._session is not None:
             raise exceptions.Error('Already running.')
         if self.work is None:
@@ -732,7 +952,7 @@ class ParallelArrayContext(object):
         # Check the global MPI configuration
         # Since the Context doesn't have a destructor, if we use an MPI communicator at this scope then
         # it has to be owned and managed outside of Context.
-        self._session_communicator = MPI.COMM_WORLD
+        self._session_communicator = _acquire_communicator(self.__communicator)
         context_comm_size = self._session_communicator.Get_size()
         context_rank = self._session_communicator.Get_rank()
         self.rank = context_rank
@@ -740,11 +960,6 @@ class ParallelArrayContext(object):
         logger.debug("Context rank {} in context {} of size {}".format(context_rank,
                                                                        self._session_communicator,
                                                                        context_comm_size))
-
-        assert not self.rank is None
-
-        # Set up a simple ensemble resource
-        self.part = {}
 
         ###
         # Process the work specification.
@@ -779,6 +994,7 @@ class ParallelArrayContext(object):
             builder_sequence.append(element.name)
 
         # Call the builders in dependency order
+        # Note: session_communicator is available, but ensemble_communicator has not been created yet.
         graph = _Graph(width=1)
         logger.info("Building sequence {}".format(builder_sequence))
         for name in builder_sequence:
@@ -795,39 +1011,8 @@ class ParallelArrayContext(object):
             workdir_list = [os.path.join('.', str(i)) for i in range(self.work_width)]
         self.__workdir_list = list([os.path.abspath(dir) for dir in workdir_list])
 
-        # Check the session "width" against the available parallelism
-        if (self.work_width > context_comm_size):
-            msg = 'ParallelArrayContext requires a work array that fits in the MPI communicator: '
-            msg += 'array width {} > size {}.'
-            msg = msg.format(self.work_width, context_comm_size)
-            raise exceptions.UsageError(msg)
-        if (self.work_width < context_comm_size):
-            msg = 'MPI context is wider than necessary to run this work:  array width {} vs. size {}.'
-            warnings.warn(msg.format(self.work_width, context_comm_size))
-
-        # Create an appropriate sub-communicator for the present work. Extra ranks will be in a
-        # subcommunicator with no work.
-        if context_rank < self.work_width:
-            color = 0
-        else:
-            color = MPI.UNDEFINED
-
-        self._session_ensemble_communicator = self._session_communicator.Split(color, context_rank)
-        try:
-            self._session_ensemble_size = self._session_ensemble_communicator.Get_size()
-            self._session_ensemble_rank = self._session_ensemble_communicator.Get_rank()
-        except:
-            self._session_ensemble_size = 0
-            self._session_ensemble_rank = None
-        logger.info("Context rank {} assigned to rank {} of subcommunicator {} of size {}".format(
-            self.rank,
-            self._session_ensemble_rank,
-            self._session_ensemble_communicator,
-            self._session_ensemble_size
-        ))
-        if self._session_ensemble_size > 0:
-            assert self._session_ensemble_size == self.work_width
         # For gmxapi 0.0.6, all ranks have a session_ensemble_communicator
+        self._session_ensemble_communicator = _get_ensemble_communicator(self._session_communicator, self.work_width)
         self.__ensemble_update = _get_ensemble_update(self)
 
         # launch() is currently a method of gmx.core.MDSystem and returns a gmxapi::Session.
@@ -839,7 +1024,10 @@ class ParallelArrayContext(object):
         # and then call a routine implemented by each object to run whatever protocol it needs, such
         # as `system = gmx.core.from_tpr(md._input_tpr); system.add_potential(md._plugins)
         # For future design plans, reference https://github.com/kassonlab/gmxapi/issues/65
-        if self._session_ensemble_size > 0:
+        #
+        # This `if` condition is currently the thing that ultimately determines whether the
+        # rank attempts to do work.
+        if context_rank < self.work_width:
             # print(graph)
             logger.debug(("Launching graph {}.".format(graph.graph)))
             logger.debug("Graph nodes: {}".format(str(list(graph.nodes))))
@@ -919,16 +1107,22 @@ class ParallelArrayContext(object):
             # Reference: https://github.com/kassonlab/gmxapi/issues/41
             logger.info("No _session known to context or session already closed.")
         if hasattr(self, '_session_ensemble_communicator'):
-            from mpi4py import MPI
-            if self._session_ensemble_communicator != MPI.COMM_NULL:
-                logger.info("Freeing sub-communicator {} on rank {}".format(self._session_ensemble_communicator,
-                                                                            self.rank))
+            if self._session_communicator is not None:
+                logger.info("Freeing sub-communicator {} on rank {}".format(
+                    self._session_ensemble_communicator,
+                    self.rank))
                 self._session_ensemble_communicator.Free()
             else:
                 logger.debug('"None" ensemble communicator does not need to be "Free"d.')
             del self._session_ensemble_communicator
         else:
             logger.debug("No ensemble subcommunicator on context rank {}.".format(self.rank))
+
+        logger.debug("Freeing session communicator.")
+        self._session_communicator.Free()
+        logger.debug("Deleting session communicator reference.")
+        del self._session_communicator
+
         os.chdir(self.__initial_cwd)
         logger.info("Session closed on context rank {}.".format(self.rank))
         # Note: Since sessions running in different processes can have different work, sessions have not necessarily
