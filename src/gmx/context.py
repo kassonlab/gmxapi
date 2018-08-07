@@ -428,8 +428,9 @@ def _get_ensemble_update(context):
     context.part = {}
     return functor
 
-class Context(object):
-    """ Proxy to API Context provides Python context manager.
+
+class _libgromacsContext(object):
+    """Low level API to libgromacs library context provides Python context manager.
 
     Binds to a workflow and manages computation resources.
 
@@ -437,7 +438,7 @@ class Context(object):
         workflow (:obj:`gmx.workflow.WorkSpec`): bound workflow to be executed.
 
     Example:
-        >>> with Context(my_workflow) as session: # doctest: +SKIP
+        >>> with _libgromacsContext(my_workflow) as session: # doctest: +SKIP
         ...    session.run()
 
     Things are still fluid, but what we might do is have all of the WorkSpec operations that are supported
@@ -539,31 +540,21 @@ class Context(object):
         self._session = None
         return False
 
-# In the next pass, Context can become more abstract and simplest-case behavior moved here.
-# class SimpleContext(Context):
-#     def __init__(self, options=None):
-#         pass
 
-class DefaultContext(Context):
-    """ Produce an appropriate context for the work and compute environment."""
+class DefaultContext(_libgromacsContext):
+    """ Produce an appropriate context for the work and compute environment.
+
+    Deprecated:
+        Use gmx.context.get_context() to find an appropriate high-level API
+        context. For lower-level access to the library that does not employ the
+        full API Context abstraction, but instead explicitly uses a local
+        libgromacs instance, a replacement still needs to be devised. It may
+        have this same interface, but the name and scoping of DefaultContext is
+        misleading.
+    """
     def __init__(self, work):
         # There is very little context abstraction at this point...
         super(DefaultContext, self).__init__(work)
-
-class SerialArrayContext(object):
-    """ Run a series of simulations in sequence.
-
-    Hierarchical Context manages simpler contexts for an array of work specifications.
-
-    This example illustrates that it may not be clear what to do with the Python code executed in a context. Should it
-    accumulate API operation objects and run them during __exit__()? It might be appropriate to move the usage down to
-    a lower level.
-    """
-    def __init__(self, work):
-        if not isinstance(work, list):
-            raise ValueError('work specification should be a Python list.')
-        self.__context_array = list([DefaultContext(work_element) for work_element in work])
-        self._session = None
 
 # Unused.
 # Reference https://github.com/kassonlab/gmxapi/issues/36
@@ -653,7 +644,8 @@ class SerialArrayContext(object):
 #     builder = Builder(element)
 #     return builder
 
-class ParallelArrayContext(object):
+
+class Context(object):
     """Manage an array of simulation work executing in parallel.
 
     This is the first implementation of a new style of Context class that has some extra abstraction
@@ -1158,6 +1150,12 @@ class ParallelArrayContext(object):
         # Python context managers return False when there were no exceptions to handle.
         return False
 
+
+# The interface and functionality of ParallelArrayContext is the new generic
+# Context behavior, but we need to keep the old name for compatibility for
+# the moment.
+ParallelArrayContext = Context
+
 def get_context(work=None):
     """Get a concrete Context object.
 
@@ -1168,7 +1166,7 @@ def get_context(work=None):
         An object implementing the gmx.context.Context interface, if possible.
 
     Raises:
-        gmx.exceptions.Error if an appropriate context for `work` could not be loaded.
+        gmx.exceptions.ValueError if an appropriate context for `work` could not be loaded.
 
     If work is provided, return a Context object capable of running the provided work or produce an error.
 
@@ -1184,47 +1182,23 @@ def get_context(work=None):
       * anything else?
 
     """
+    # We need to define an interface for WorkSpec objects so that we don't need
+    # to rely on typing and inter-module dependencies.
     from gmx import workflow
-    import gmx.core
-
-    context = None
-    if work is None:
-        # Create a new empty Context.
-        # TBD: should there be a global "current context" or default? We'll have to see how this gets used.
-        context = Context()
-    elif isinstance(work, workflow.WorkSpec):
-        # Assume simple simulation for now.
-
-        # Get MD simulation elements.
-        sims = [element for element in work if element.operation == 'md']
-        if len(sims) != 1:
-            raise exceptions.UsageError('gmx currently requires exactly one MD element in the work specification.')
-        sim = sims[0]
-
-        # Confirm the availability of dependencies.
-        # Note we are not performing a full recursive check here because we are just preparing the sim.
-        # A valid work specification requires dependencies to be defined.
-        for dependency in sim.depends:
-            assert dependency in work.elements
-
-        # If all is well, bind the work to a Context object and prepare the Context to be able to launch a session.
-        tpr_input = None
-        for dependency in sim.depends:
-            element = workflow.WorkElement.deserialize(work.elements[dependency])
-            if element.operation == 'load_tpr':
-                if tpr_input is None:
-                    tpr_input = list(element.params['input'])
-                else:
-                    raise exceptions.ApiError(
-                        'This Context can only handle work specifications with a single load_tpr operation.')
-        if tpr_input is None:
-            raise exceptions.UsageError('Work specification does not provide any input for MD simulation.')
-        if len(tpr_input) != 1:
-            raise exceptions.UsageError('This Context does not support arrays of simulations.')
-
-        # Use old-style constructor that takes gmx.core.MDSystem
-        newsystem = gmx.core.from_tpr(tpr_input[0])
-        context = Context(newsystem)
+    workspec = None
+    if work is not None:
+        if isinstance(work, workflow.WorkSpec):
+            workspec = work
+        elif hasattr(work, 'workspec') and isinstance(work.workspec,
+                                                      workflow.WorkSpec):
+            workspec = work.workspec
+        else:
+            raise exceptions.ValueError('work argument must provide a gmx.workflow.WorkSpec.')
+    if workspec is not None and \
+            hasattr(workspec, '_context') and \
+            workspec._context is not None:
+        context = workspec._context
     else:
-        raise exceptions.UsageError('Argument to get_context must be a runnable gmx.workflow.WorkSpec object.')
+        context = Context(work=workspec)
+
     return context
