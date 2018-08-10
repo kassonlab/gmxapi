@@ -10,6 +10,9 @@
 namespace gmxpy
 {
 
+class TprFile
+{};
+
 /*!
  * \brief Copy and possibly update TPR file by name.
  *
@@ -19,8 +22,6 @@ namespace gmxpy
  * \return true if successful, else false
  */
 bool copy_tprfile(std::string infile, std::string outfile, double end_time);
-
-
 
 }
 

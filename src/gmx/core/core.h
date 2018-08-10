@@ -41,6 +41,12 @@ void export_session(pybind11::module &m);
 
 void export_system(pybind11::module &m);
 
+void export_tprfile(pybind11::module &m);
+
+void export_mdcheckpoint(pybind11::module &m);
+
+void export_microstate(pybind11::module &m);
+
 } // end namespace gmxpy::detail
 
 }      // end namespace gmxpy

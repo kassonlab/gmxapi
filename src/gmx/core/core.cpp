@@ -76,8 +76,14 @@ PYBIND11_MODULE(core, m) {
 
 
     // Get bindings exported by the various components.
-    export_md(m);
+    // In the current implementation, sequence may be important. Exports that
+    // reference bindings from other exports should not be called before the
+    // dependencies are exported.
     export_context(m);
+    export_tprfile(m);
+    export_mdcheckpoint(m);
+    export_microstate(m);
+    export_md(m);
     export_system(m);
 
     m.def("copy_tprfile",

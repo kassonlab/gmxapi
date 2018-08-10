@@ -19,8 +19,13 @@ pybind11_add_module(pygmx_core
                     core.cpp
                     export_context.cpp
                     export_md.cpp
+                    export_mdcheckpoint.cpp
+                    export_microstate.cpp
                     export_system.cpp
+                    export_tprfile.cpp
                     gmxpy_api.h
+                    mdcheckpoint.cpp
+                    microstate.cpp
                     pymdmodule.h
                     pymdmodule.cpp
                     pysystem.h

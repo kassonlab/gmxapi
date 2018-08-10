@@ -47,8 +47,39 @@ class TprFile:
         if mode != 'r':
             raise UsageError("TPR files only support read-only access.")
         self.filename = filename
+
     def __repr__(self):
         return "gmx.fileio.TprFile('{}', '{}')".format(self.filename, self.mode)
+
+    def extract(self):
+        """Get an open file-like Python object.
+
+        Access the binary file contents. Allows external code to make a local
+        binary copy of the raw data.
+
+        Note:
+            The binary file format is not specified in gmxapi. If you think you
+            need this method, please share your use case with the gmxapi developers
+            so that a more general solution can be found.
+        """
+        # This version can only handle local files.
+        return open(self.filename, 'rb')
+
+    def getMDParameters(self):
+        import gmx.core
+        with gmx.core.TprFile(self.filename, mode='r') as tpr:
+            parameters = tpr.getMDParameters()
+        return parameters
+
+    def getCurrentStep(self, checkpoint_file=None):
+        import gmx.core
+        if checkpoint_file is None:
+            return self.getMDParameters()['nsteps']
+        else:
+            with gmx.core.TprFile(self.filename, mode='r') as tpr:
+                with gmx.core.MDCheckpoint(checkpoint_file) as checkpoint:
+                    microstate = gmx.core.get_microstate(tpr=tpr, checkpoint=checkpoint)
+                    return microstate.get_step()
 
 class TrajectoryFile:
     """Provides an interface to Gromacs supported trajectory file formats.
