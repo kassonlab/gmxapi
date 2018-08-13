@@ -13,6 +13,7 @@ import os
 import warnings
 import networkx as nx
 from networkx import DiGraph as _Graph
+import tempfile
 
 from gmx import exceptions
 from gmx import logging
@@ -575,7 +576,22 @@ class ParallelArrayContext(object):
                 # Provide closure with which to execute tasks for this node.
                 def launch(rank=None):
                     assert not rank is None
-                    tpr_file = infile[rank]
+
+                    # Copy and update, if required by `end_time` parameter.
+                    temp_filename = None
+                    if 'end_time' in self.runtime_params:
+                        # Note that mkstemp returns a file descriptor as the first part of the tuple.
+                        # We can make this cleaner in 0.0.7 with a separate node that manages the
+                        # altered input.
+                        _, temp_filename = tempfile.mkstemp(suffix='.tpr')
+                        logger.debug('Updating input. Using temp file {}'.format(temp_filename))
+                        gmx.core.copy_tprfile(source=infile[rank],
+                                              destination=temp_filename,
+                                              end_time=self.runtime_params['end_time'])
+                        tpr_file = temp_filename
+                    else:
+                        tpr_file = infile[rank]
+
                     logger.info('Loading TPR file: {}'.format(tpr_file))
                     system = gmx.core.from_tpr(tpr_file)
                     dag.nodes[name]['system'] = system
@@ -588,7 +604,16 @@ class ParallelArrayContext(object):
                     context = pycontext._api_object
                     context.setMDArgs(mdargs)
                     dag.nodes[name]['session'] = system.launch(context)
-                    dag.nodes[name]['close'] = dag.nodes[name]['session'].close
+
+                    if 'end_time' in self.runtime_params:
+                        def special_close():
+                            dag.nodes[name]['session'].close()
+                            logger.debug("Unlinking temporary TPR file {}.".format(temp_filename))
+                            os.unlink(temp_filename)
+                        dag.nodes[name]['close'] = special_close
+                    else:
+                        dag.nodes[name]['close'] = dag.nodes[name]['session'].close
+
                     def runner():
                         """Currently we only support a single call to run."""
                         def done():

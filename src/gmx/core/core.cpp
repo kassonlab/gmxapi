@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "gmxpy_api.h"
+#include "tprfile.h"
 #include "gmxapi/status.h"
 
 #include "pybind11/pybind11.h"
@@ -77,4 +78,11 @@ PYBIND11_MODULE(core, m) {
     export_md(m);
     export_context(m);
     export_system(m);
+
+    m.def("copy_tprfile",
+            &gmxpy::copy_tprfile,
+            py::arg("source"),
+            py::arg("destination"),
+            py::arg("end_time"),
+            "Copy a TPR file from `source` to `destination`, replacing `nsteps` with `end_time`.");
 }
