@@ -1,8 +1,9 @@
 """Test gmx.fileio submodule"""
-
-import unittest
 import os
+import tempfile
+import unittest
 
+import gmx.core
 from gmx.fileio import TprFile
 from gmx.exceptions import UsageError
 
@@ -15,6 +16,13 @@ class TprTestCase(unittest.TestCase):
         # TprFile does not yet check whether file exists and is readable...
         #self.assertRaises(UsageError, TprFile, 1, 'r')
         fh = TprFile(tpr_filename, 'r')
+
+    def test_tprcopy(self):
+        _, temp_filename = tempfile.mkstemp(suffix='.tpr')
+        # When we have some more inspection tools we can do more than just check for success.
+        assert gmx.core.copy_tprfile(source=tpr_filename, destination=temp_filename, end_time=1.0)
+        os.unlink(temp_filename)
+
 
 if __name__ == '__main__':
     unittest.main()
