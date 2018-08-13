@@ -24,6 +24,8 @@ pybind11_add_module(pygmx_core
                     pymdmodule.cpp
                     pysystem.h
                     pysystem.cpp
+                    tprfile.cpp
+                    tprfile.h
                     )
 
 # The target name is for clarity, but the installed module will be gmx.core
