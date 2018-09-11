@@ -12,7 +12,12 @@ if (POLICY CMP0048)
   cmake_policy(SET CMP0048 NEW)
 endif()
 
-project(pybind11)
+# CMake versions < 3.4.0 do not support try_compile/pthread checks without C as active language.
+if(CMAKE_VERSION VERSION_LESS 3.4.0)
+  project(pybind11)
+else()
+  project(pybind11 CXX)
+endif()
 
 # Check if pybind11 is being used directly or via add_subdirectory
 set(PYBIND11_MASTER_PROJECT OFF)
@@ -33,6 +38,8 @@ set(PYTHON_INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS} CACHE INTERNAL "")
 set(PYTHON_LIBRARIES ${PYTHON_LIBRARIES} CACHE INTERNAL "")
 set(PYTHON_MODULE_PREFIX ${PYTHON_MODULE_PREFIX} CACHE INTERNAL "")
 set(PYTHON_MODULE_EXTENSION ${PYTHON_MODULE_EXTENSION} CACHE INTERNAL "")
+set(PYTHON_VERSION_MAJOR ${PYTHON_VERSION_MAJOR} CACHE INTERNAL "")
+set(PYTHON_VERSION_MINOR ${PYTHON_VERSION_MINOR} CACHE INTERNAL "")
 
 # NB: when adding a header don't forget to also add it to setup.py
 set(PYBIND11_HEADERS
@@ -40,11 +47,13 @@ set(PYBIND11_HEADERS
   include/pybind11/detail/common.h
   include/pybind11/detail/descr.h
   include/pybind11/detail/init.h
+  include/pybind11/detail/internals.h
   include/pybind11/detail/typeid.h
   include/pybind11/attr.h
   include/pybind11/buffer_info.h
   include/pybind11/cast.h
   include/pybind11/chrono.h
+  include/pybind11/common.h
   include/pybind11/complex.h
   include/pybind11/options.h
   include/pybind11/eigen.h

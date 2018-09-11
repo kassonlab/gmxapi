@@ -81,6 +81,8 @@ set(GMXAPI_INSTALL_PATH ${GMXAPI_DEFAULT_SITE_PACKAGES}/gmx CACHE PATH
 
 message(STATUS "Python module will be installed to GMXAPI_INSTALL_PATH cache value ${GMXAPI_INSTALL_PATH}")
 
+# pybind11 is included as a subtree and updated just with squash merges.
+# Refer to https://www.atlassian.com/blog/git/alternatives-to-git-submodule-git-subtree
 add_subdirectory(pybind11)
 
 add_subdirectory(src)
