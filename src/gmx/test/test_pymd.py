@@ -111,6 +111,13 @@ def test_simpleSimulation(caplog):
     gmx.run(md)
 
 @pytest.mark.usefixtures("cleandir")
+def test_modifiedInput(caplog):
+    """Load a work specification with a single TPR file and updated params."""
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1, end_time='0.02')
+    with gmx.context.ParallelArrayContext(md) as session:
+        session.run()
+
+@pytest.mark.usefixtures("cleandir")
 @pytest.mark.usefixtures("caplog")
 @withmpi_only
 def test_array_context(caplog):

@@ -578,25 +578,35 @@ def from_tpr(input=None, **kwargs):
 
     If the MD operation discovers artifacts from a previous simulation that was launched from the same input,
     the simulation resumes from the last checkpointed step. If ``append_output`` is set ``False``, existing
-    artifacts are discarded, and new output begins from the last checkpointed step, if any.
+    artifacts are kept separate from new output with the standard file naming convention,
+    and new output begins from the last checkpointed step, if any.
+
+    Setting ``end_time`` redefines the end point of the simulation trajectory from what was provided in
+    ``input``. It is equivalent to changing the number of steps requested in the MDP (or TPR) input, but
+    it time is provided as picoseconds instead of a number of time steps.
 
     The stop condition for the MD operation may be overridden. If ``steps=N`` is provided and N is an integer
     greater than or equal to 1, the MD operation advances the trajectory by ``N`` steps, regardless of the number
-    of simulation steps specified in ``input``. For convenience, setting ``steps=None`` does not override ``input``.
+    of simulation steps specified in ``input`` or ``end_time``. For convenience, setting ``steps=None`` does not override
+    ``input``.
+    Note that when it is not ``None``, ``steps`` takes precedence over ``end_time`` and ``input``, but can still be
+    superceded by a signal, such as if an MD plugin or other code has a simulation completion condition that occurs
+    before ``N`` additional steps have run.
 
     Where key word arguments correspond to ``gmx mdrun`` command line options, the corresponding flags are noted below.
 
     Keyword Arguments:
         input (str): *Required* string or list of strings giving the filename(s) of simulation input
+        append_output (bool): Append output for continuous trajectories if True, truncate existing output data if False. (default True)
+        end_time (float): Specify the final time in the simulation trajectory, overriding input read from TPR.
         grid (tuple): Domain decomposition grid divisions (nx, ny, nz). (-dd)
+        max_hours (float): Terminate after 0.99 times this many hours if simulation is still running. (-maxh)
         pme_ranks (int): number of separate ranks to be used for PME electrostatics. (-npme)
-        threads (int): Total number of threads to start. (-nt)
-        tmpi (int): number of thread-MPI ranks to start. (-ntmpi)
-        threads_per_rank (int): number of OpenMP threads to start per MPI rank. (-ntomp)
         pme_threads_per_rank (int): Number of OpenMP threads per PME rank. (-ntomp_pme)
         steps (int): Override input files and run for this many steps. (-nsteps)
-        max_hours (float): Terminate after 0.99 times this many hours if simulation is still running. (-maxh)
-        append_output (bool): Append output for continuous trajectories if True, truncate existing output data if False. (default True)
+        threads (int): Total number of threads to start. (-nt)
+        threads_per_rank (int): number of OpenMP threads to start per MPI rank. (-ntomp)
+        tmpi (int): number of thread-MPI ranks to start. (-ntmpi)
 
     Returns:
         simulation member of a gmx.workflow.WorkSpec object
@@ -676,9 +686,10 @@ def from_tpr(input=None, **kwargs):
         elif arg_key == 'append_output':
             # Try not to encourage confusion with the `mdrun` `-noappend` flag, which would be a confusing double negative if represented as a bool.
             params['append_output'] = bool(kwargs[arg_key])
+        elif arg_key == 'end_time':
+            params[arg_key] = float(kwargs[arg_key])
         else:
             raise exceptions.UsageError("Invalid key word argument: {}. {}".format(arg_key, usage))
-
 
     # Create an empty WorkSpec
     workspec = WorkSpec()
