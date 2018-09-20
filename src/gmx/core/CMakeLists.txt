@@ -10,6 +10,18 @@
 find_package(gmxapi 0.0.6 REQUIRED
              HINTS "$ENV{GROMACS_DIR}"
              )
+if(gmxapi_FOUND)
+    set(_suffix "")
+    # GROMACS master branch and forked development branches may have divergent
+    # pre-release APIs. This check allows us to distinguish them and behave
+    # differently if needed. github.com/kassonlab/gromacs-gmxapi devel branch
+    # sets gmxapi_EXPERIMENTAL=TRUE. Upstream GROMACS master branch does not.
+    # Ref: https://github.com/kassonlab/gmxapi/issues/166
+    if(gmxapi_EXPERIMENTAL)
+        set(_suffix " (unofficial)")
+    endif()
+    message(STATUS "Found gmxapi version ${gmxapi_VERSION}${_suffix}")
+endif()
 
 # Build the C++ extension
 include_directories(${PYTHON_INCLUDE_DIRS})

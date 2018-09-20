@@ -10,11 +10,17 @@ Similarly, update the `gromacs_url` embedded in setup.py
 After merging the gmxapi development branch to master and before tagging the release, 
 update version.in so that it writes a version.py file with `release = True`.
 
-Once the release is tagged and any touch-up commits are merged (fast-forwarded) to the refreshed development branch,
-bump the version in the development branch in CMakeLists.txt _and_ in setup.py. If / when feature branches
-require new libgmxapi features, `find_package(gmxapi...` can be updated in `src/gmx/core/CMakeLists.txt`. As of
-gromacs-gmxapi 0.0.6, we are tracking compatibility more closely, and the gromacs-gmxapi 0.0.7 development branch will
-claim compatibility with 0.0.6 if possible. Note that version compatibility in find_package is handled by the installed
+Once the gmxapi gmxpy release is tagged and any touch-up commits are merged (fast-forwarded) to the refreshed
+development branch,
+bump the version in the development branch in CMakeLists.txt _and_ in setup.py.
+
+If / when feature branches require new libgmxapi features, `find_package(gmxapi...` can be updated in
+`src/gmx/core/CMakeLists.txt`.
+
+As of gromacs-gmxapi 0.0.6, we are tracking compatibility more closely, and the gromacs-gmxapi 0.0.7 development branch
+will claim compatibility with 0.0.6 while possible.
+
+Note that version compatibility in find_package is handled by the installed
 cmake version file of the targeted package, including handling of the `EXACT` key word, but the CMake macros used in
 gromacs-gmxapi should take care of this.
 
