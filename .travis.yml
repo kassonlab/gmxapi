@@ -78,9 +78,10 @@ before_script:
 
 script:
   - source $HOME/install/gromacs_0_0_6/bin/GMXRC && ./ci_scripts/pygmx.sh
-#  - ./ci_scripts/sample_restraint.sh v0.0.6
-  - if [ "${TRAVIS_BRANCH}" != master ] ; then source $HOME/install/gromacs_devel/bin/GMXRC && ./ci_scripts/pygmx.sh ; fi
-  - if [ "${TRAVIS_BRANCH}" != master ] ; then ./ci_scripts/sample_restraint.sh devel ; fi
+  - ./ci_scripts/sample_restraint.sh v0.0.6
+#  - if [ "${TRAVIS_BRANCH}" != master ] ; then source $HOME/install/gromacs_devel/bin/GMXRC && ./ci_scripts/pygmx.sh
+#  ; fi
+#  - if [ "${TRAVIS_BRANCH}" != master ] ; then ./ci_scripts/sample_restraint.sh devel ; fi
 
 # At some point, we should test more types of interactions between components, such as both static and dynamically
 # linked builds, and components built with different compilers.
