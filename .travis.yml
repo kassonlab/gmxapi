@@ -72,8 +72,8 @@ before_script:
   - $PYTHON -m pip install -r requirements.txt -q
 
 script:
-  - source $HOME/install/gromacs_0_0_6/bin/GMXRC && ./ci_scripts/pygmx.sh
-  - ./ci_scripts/sample_restraint.sh v0.0.6
+#  - source $HOME/install/gromacs_0_0_6/bin/GMXRC && ./ci_scripts/pygmx.sh
+#  - ./ci_scripts/sample_restraint.sh v0.0.6
   - |
     if [ "${TRAVIS_BRANCH}" != master ] ; then
       source $HOME/install/gromacs_devel/bin/GMXRC && ./ci_scripts/pygmx.sh
