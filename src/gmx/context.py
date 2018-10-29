@@ -165,6 +165,7 @@ def _md(context, element):
 
     return Builder(element)
 
+
 def _get_mpi_ensemble_communicator(session_communicator, ensemble_size):
     """Get an ensemble communicator from an MPI communicator.
 
@@ -402,7 +403,9 @@ def _get_ensemble_update(context):
         logger.error(message)
         raise exceptions.FeatureNotAvailableError(message)
 
-    def _ensemble_update(active_context, send, recv, tag):
+    def _ensemble_update(active_context, send, recv, tag=None):
+        assert not tag is None
+        assert str(tag) != ''
         if not tag in active_context.part:
             active_context.part[tag] = 0
         logger.debug("Performing ensemble update.")
@@ -415,7 +418,7 @@ def _get_ensemble_update(context):
         numpy.savez(filename, recv=recv)
         active_context.part[tag] += 1
 
-    def _no_ensemble_update(active_context, send, recv, tag):
+    def _no_ensemble_update(active_context, send, recv, tag=None):
         message = "Attempt to call ensemble_update() in a Context that does not provide the operation."
         # If we confirm effective exception handling, remove the extraneous log.
         logger.error(message)
