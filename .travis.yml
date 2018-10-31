@@ -15,7 +15,6 @@ sudo: false
 # https://docs.travis-ci.com/user/caching/#Caches-and-build-matrices
 cache:
   pip: true
-  apt: true
   directories:
     # Note: if a cache store forks due to a stage with parallel jobs that Travis identifies as part of the same flow,
     # we must make sure that the parallel jobs do not write to any of the same caches. Also note that all stages use the
@@ -59,7 +58,7 @@ before_install:
 install:
   - export CCACHE_DIR=$HOME/.ccache_gmxapi
   - ccache -s
-  - ./ci_scripts/install_gromacs_0_0_6.sh
+  - ./ci_scripts/install_gromacs_2019.sh
   - if [ "${TRAVIS_BRANCH}" != "master" ] ; then ./ci_scripts/install_gromacs_devel.sh ; fi
 
 before_script:
@@ -72,7 +71,7 @@ before_script:
   - $PYTHON -m pip install -r requirements.txt -q
 
 script:
-#  - source $HOME/install/gromacs_0_0_6/bin/GMXRC && ./ci_scripts/pygmx.sh
+  - source $HOME/install/gromacs_2019/bin/GMXRC && ./ci_scripts/pygmx.sh
 #  - ./ci_scripts/sample_restraint.sh v0.0.6
   - |
     if [ "${TRAVIS_BRANCH}" != master ] ; then
