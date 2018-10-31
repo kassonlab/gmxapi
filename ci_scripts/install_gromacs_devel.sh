@@ -6,8 +6,8 @@ export GMX_MPI=OFF
 export GMX_THREAD_MPI=ON
 
 pushd $HOME
- [ -d gromacs-gmxapi ] || git clone --depth=1 --no-single-branch https://github.com/eirrgang/gromacs-gmxapi.git gromacs-gmxapi
- pushd gromacs-gmxapi
+ [ -d gromacs-gmxapi ] || git clone --depth=1 --no-single-branch https://github.com/eirrgang/gromacs-gmxapi.git gromacs-kassonlab
+ pushd gromacs-kassonlab
   git branch -a
 # TODO: change back to devel after gromacs-gmxapi fork is updated.
   git checkout port_master

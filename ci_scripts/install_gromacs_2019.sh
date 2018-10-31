@@ -9,8 +9,8 @@ export CCACHE_DIR=$HOME/.ccache_gmxapi
 ccache -s
 
 pushd $HOME
- [ -d gromacs-gmxapi ] || git clone --depth=1 --no-single-branch https://github.com/gromacs/gromacs.git gromacs-gmxapi
- pushd gromacs-gmxapi
+ [ -d gromacs-gmxapi ] || git clone --depth=1 --no-single-branch https://github.com/gromacs/gromacs.git gromacs
+ pushd gromacs
   git branch -a
   git checkout release-2019
   pwd
