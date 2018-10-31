@@ -27,18 +27,14 @@ endif()
 include_directories(${PYTHON_INCLUDE_DIRS})
 
 pybind11_add_module(pygmx_core
-                    core.h
                     core.cpp
                     export_context.cpp
                     export_md.cpp
                     export_system.cpp
-                    gmxpy_api.h
-                    pymdmodule.h
+                    pycontext.cpp
                     pymdmodule.cpp
-                    pysystem.h
                     pysystem.cpp
                     tprfile.cpp
-                    tprfile.h
                     )
 
 # The target name is for clarity, but the installed module will be gmx.core
