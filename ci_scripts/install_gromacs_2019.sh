@@ -18,6 +18,7 @@ pushd $HOME
   mkdir build
   pushd build
    cmake -DCMAKE_CXX_COMPILER=$CXX \
+         -DGMX_ENABLE_CCACHE=ON \
          -DCMAKE_C_COMPILER=$CC \
          -DGMX_DOUBLE=$GMX_DOUBLE \
          -DGMX_MPI=$GMX_MPI \
