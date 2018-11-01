@@ -7,7 +7,7 @@
 # cmake was invoked with `-DCMAKE_PREFIX_PATH=...` pointing to the GROMACS
 # installation directory. We can also check now for a GROMACS_DIR environment
 # variable and provide it with the HINTS option.
-find_package(gmxapi 0.0.6 REQUIRED
+find_package(gmxapi 0.0.7 REQUIRED
              HINTS "$ENV{GROMACS_DIR}"
              )
 if(gmxapi_FOUND)
@@ -27,18 +27,14 @@ endif()
 include_directories(${PYTHON_INCLUDE_DIRS})
 
 pybind11_add_module(pygmx_core
-                    core.h
                     core.cpp
                     export_context.cpp
                     export_md.cpp
                     export_system.cpp
-                    gmxpy_api.h
-                    pymdmodule.h
+                    pycontext.cpp
                     pymdmodule.cpp
-                    pysystem.h
                     pysystem.cpp
                     tprfile.cpp
-                    tprfile.h
                     )
 
 # The target name is for clarity, but the installed module will be gmx.core

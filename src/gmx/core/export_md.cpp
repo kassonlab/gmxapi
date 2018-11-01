@@ -1,6 +1,8 @@
 #include "core.h"
+
 #include <iostream>
 
+#include "gmxapi/exceptions.h"
 #include "gmxapi/gmxapi.h"
 #include "gmxapi/md.h"
 #include "gmxapi/md/mdmodule.h"
@@ -32,9 +34,6 @@ void export_md(py::module &m)
     // used in function arguments for other more complete bindings. We do not need to
     // actually be able to instantiate it, but we do so for testing until we have
     // actually useful modules in the core package.
-
-    // We don't have a reason to create objects of this type directly in Python.
-    //gmxapi_mdmodule.def(py::init(), "");
     py::class_< TestModule, std::shared_ptr<TestModule> >(m,
                                                           "TestModule",
                                                           gmxapi_mdmodule)

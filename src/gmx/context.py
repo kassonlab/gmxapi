@@ -7,7 +7,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-__all__ = ['Context', 'DefaultContext']
+__all__ = ['Context']
 
 import importlib
 import os
@@ -131,14 +131,15 @@ def _md(context, element):
                 logger.info('Loading TPR file: {}'.format(tpr_file))
                 system = gmx.core.from_tpr(tpr_file)
                 dag.nodes[name]['system'] = system
-                for potential in potential_list:
-                    system.add_mdmodule(potential)
-                pycontext = element.workspec._context
-                pycontext.potentials = potential_list
                 mdargs = gmx.core.MDArgs()
                 mdargs.set(self.runtime_params)
+                # Workaround to give access to plugin potentials used in a context.
+                pycontext = element.workspec._context
+                pycontext.potentials = potential_list
                 context = pycontext._api_object
                 context.setMDArgs(mdargs)
+                for potential in potential_list:
+                    context.add_mdmodule(potential)
                 dag.nodes[name]['session'] = system.launch(context)
                 dag.nodes[name]['close'] = dag.nodes[name]['session'].close
 
