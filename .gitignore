@@ -4,6 +4,7 @@
 .tox/
 *build*/
 dist/
-*.egg-info
+gmx.egg-info
 *.pyc
 __pycache__
+.pytest_cache
