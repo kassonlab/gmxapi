@@ -6,16 +6,21 @@ export GMX_MPI=OFF
 export GMX_THREAD_MPI=ON
 
 pushd $HOME
- [ -d gromacs-gmxapi ] || git clone --depth=1 --no-single-branch https://github.com/eirrgang/gromacs-gmxapi.git gromacs-kassonlab
+ [ -d gromacs-gmxapi ] || \
+     git clone \
+         --depth=1 \
+         --no-single-branch \
+         https://github.com/kassonlab/gromacs-gmxapi.git \
+         gromacs-kassonlab
  pushd gromacs-kassonlab
   git branch -a
-# TODO: change back to devel after gromacs-gmxapi fork is updated.
-  git checkout port_master
+  git checkout devel
   pwd
   rm -rf build
   mkdir build
   pushd build
    cmake -DGMX_BUILD_HELP=OFF \
+         -DGMX_ENABLE_CCACHE=ON \
          -DCMAKE_CXX_COMPILER=$CXX \
          -DCMAKE_C_COMPILER=$CC \
          -DGMX_DOUBLE=$GMX_DOUBLE \
