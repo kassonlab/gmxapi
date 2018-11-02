@@ -65,9 +65,8 @@ before_script:
   - export CCACHE_DIR=$HOME/.ccache_gmxapi
   - ccache -s
   - $PYTHON -m pip install --upgrade pip setuptools -q
-  - $PYTHON -m pip install --upgrade packaging scikit-build -q
-  - $PYTHON -m pip install --no-cache-dir --upgrade --no-binary ":all:" --force-reinstall networkx mpi4py MarkupSafe -q
-  - $PYTHON -m pip install pytest numpy networkx sphinx sphinx_rtd_theme -q
+  # Make sure mpi4py is built with the intended compiler
+  - $PYTHON -m pip install --no-cache-dir --upgrade --no-binary ":all:" --force-reinstall mpi4py -q
   - $PYTHON -m pip install -r requirements.txt -q
 
 script:
