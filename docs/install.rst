@@ -176,7 +176,7 @@ CMake
     $ CC=`which gcc` CXX=`which g++` cmake ..
 
 Take note whether the correct python executable is found. You may need to specify
-``-DPYTHON_EXECUTABLE=`which python` `` to cmake.
+``-DPYTHON_EXECUTABLE=\`which python\``` to cmake.
 
 Note: we do not yet have a robust suggestion for setting up ``tox`` for running the test suite in a conda environment.
 If you come up with a recipe, please let us know. Otherwise, don't worry if you are able to install
