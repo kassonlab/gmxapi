@@ -15,7 +15,8 @@ __all__ = ['System']
 class System(object):
     """Gromacs simulation system objects. (Deprecated)
 
-    Instead, use gmx.workflow tools to set up a system for simulation.
+    .. deprecated:: 0.0.7
+        Instead, use :py:mod:`gmx.workflow` tools to set up a system for simulation.
 
     Version 0.0.6 and earlier:
 
@@ -47,7 +48,6 @@ class System(object):
         ...
         gmx.Status(True)
         Success
-        >>>
 
     """
 
