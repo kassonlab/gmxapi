@@ -6,9 +6,22 @@ Change Log
 
 Interface and feature updates
 
+- :py:class:`gmx.context.Context` is generic (ParallelArrayContext, DefaultContext deprecated)
+- :py:class:`gmx.system.System` deprecated (use :py:func:`gmx.workflow.from_tpr`)
+- Add ``end_time`` keyword argument to :py:func:`gmx.workflow.from_tpr()`
+
 Internal
 
+- substantial updates for compatibility with GROMACS 2019
+- various improvements to CI testing
+- Context functionality is now composed according to available resources.
+  (Resource tags, such as ``ensemble_update`` will be specified in
+  *workspec version 0.2* before the gmxapi 0.1 release.)
+
 Bug fixes
+
+- :py:func:`gmx.get_context()` and :py:func:`gmx.run()` did not behave as expected for all work types.
+- substantial documentation updates
 
 .. rubric:: 0.0.6
 
