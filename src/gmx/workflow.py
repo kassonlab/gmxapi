@@ -628,9 +628,6 @@ def from_tpr(input=None, **kwargs):
                 params: {'kw1': arg1, 'kw2': arg2, ...}
 
     Bugs: version 0.0.6
-        * If on-disk trajectory state is at a simulation step greater than that specified in ``input`` and
-          ``steps`` is not specified or is None, the MD operation will try to produce a trajectory of infinite
-          length. See https://github.com/kassonlab/gmxapi/issues/130
         * There is not a way to programatically check the current step number on disk.
           See https://github.com/kassonlab/gmxapi/issues/56 and https://github.com/kassonlab/gmxapi/issues/85
     """
