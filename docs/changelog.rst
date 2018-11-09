@@ -2,13 +2,13 @@
 Change Log
 ==========
 
-API and Python module versioning information.
+.. rubric:: 0.0.7
 
-List of features and available or target versions, organized by component.
-(See :doc:`components`). Link to documentation in :doc:`reference` section and
-appropriate content in :doc:`userguide` or :doc:`developerguide` if available.
-Should be accompanied by appropriate annotations elsewhere in the docs.
-I.e. See `Sphinx docs. <http://www.sphinx-doc.org/en/stable/markup/para.html>`_
+Interface and feature updates
+
+Internal
+
+Bug fixes
 
 .. rubric:: 0.0.6
 

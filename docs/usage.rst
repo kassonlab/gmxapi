@@ -1,6 +1,6 @@
-===============
-Getting started
-===============
+========================
+Using the Python package
+========================
 
 The primary user interface provided through ``gmxapi`` is a Python module
 called :mod:`gmx`. The interface is designed to be maximally portable to different
