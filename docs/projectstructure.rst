@@ -22,4 +22,4 @@ The Python package CMake configuration uses ``gmxapi_DIR`` or ``GROMACS_DIR`` to
 find the ``Gromacs::gmxapi`` CMake target provided by the GROMACS installation.
 
 The ``gmxapi`` library is provided in GROMACS 2019 and in a separate GROMACS fork at
-`bitbucket.org/kassonlab/gromacs <https://bitbucket.org/kassonlab/gromacs/>`_.
+https://github.org/kassonlab/gromacs-gmxapi/
