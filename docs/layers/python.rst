@@ -7,26 +7,21 @@ Notes on the Python level of the package.
 Other Python Gromacs interfaces
 ===============================
 
-`gmxscript <https://github.com/pslacerda/gmx>`__ : all-python CLI
-wrapper manages files, provides "checkpointed" re-runnable workflow with
-mdp rewriting and CLI replacement
-
-`GromacsWrapper <http://gromacswrapper.readthedocs.io/en/latest/>`__
-(Beckstein) : all-python CLI wrapper provides thorough scriptable
-interface with error handling
-
-`pmx <https://github.com/dseeliger/pmx>`__ (D. Seeliger) : Manipulate
-Gromacs files and data structures
-
-`grompy <https://github.com/GromPy>`__ (Rene Pool) : patches old Gromacs
-code to provide ctypes interface to Gromacs libraries
-
-`gmx\_wrapper <https://github.com/khuston/gmx_wrapper>`__ : very
-bare-bones CLI wrapper
-
-`GromacsPipeline <https://biod.pnpi.spb.ru/gitweb/?p=alexxy/gromacs.git;a=commit;h=1241cd15da38bf7afd65a924100730b04e430475>`__
-(Redmine 1625) adds SIP bindings to run Gromacs analysis modules in a
-single pass on a trajectory
+- `gmxscript <https://github.com/pslacerda/gmx>`__ : all-python CLI
+   wrapper manages files, provides "checkpointed" re-runnable workflow with
+   mdp rewriting and CLI replacement
+- `GromacsWrapper <http://gromacswrapper.readthedocs.io/en/latest/>`__
+   (Beckstein) : all-python CLI wrapper provides thorough scriptable
+   interface with error handling
+- `pmx <https://github.com/dseeliger/pmx>`__ (D. Seeliger) : Manipulate
+   Gromacs files and data structures
+- `grompy <https://github.com/GromPy>`__ (Rene Pool) : patches old Gromacs
+   code to provide ctypes interface to Gromacs libraries
+- `gmx\_wrapper <https://github.com/khuston/gmx_wrapper>`__ : very
+   bare-bones CLI wrapper
+- `GromacsPipeline <https://biod.pnpi.spb.ru/gitweb/?p=alexxy/gromacs.git;a=commit;h=1241cd15da38bf7afd65a924100730b04e430475>`__
+   (Redmine 1625) adds SIP bindings to run Gromacs analysis modules in a
+   single pass on a trajectory
 
 Existing Python tools to leverage
 =================================
@@ -109,17 +104,17 @@ Python 3.3 has a lot of improvements and changes, including better 2.7 compatibi
 
 Python 3.4
 
-* built-in pip
-* enum types
-* new pickle protocol
+- built-in pip
+- enum types
+- new pickle protocol
 
 Python 3.5
 
-* typing and coroutines
-* RecursionError exception
-* Generators have gi_yieldfrom
-* memoryview tuple indexing
-* hexadecimal methods
+- typing and coroutines
+- RecursionError exception
+- Generators have gi_yieldfrom
+- memoryview tuple indexing
+- hexadecimal methods
 
 Linux distributions released after June 2013 and supported at least to June 2019.
 
