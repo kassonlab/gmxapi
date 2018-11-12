@@ -1,3 +1,10 @@
+/*! \file
+ * \brief Bindings for System and session launch.
+ *
+ * \ingroup module_python
+ * \author M. Eric Irrgang <ericirrgang@gmail.com>
+ */
+
 #include "core.h"
 
 #include <iostream>

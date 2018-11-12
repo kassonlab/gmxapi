@@ -1,3 +1,10 @@
+/*! \file
+ * \brief Implement System helper code.
+ *
+ * \ingroup module_python
+ * \author M. Eric Irrgang <ericirrgang@gmail.com>
+ */
+
 #include "pysystem.h"
 
 #include <memory>

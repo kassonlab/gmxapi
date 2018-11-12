@@ -1,6 +1,9 @@
-//
-// Created by Eric Irrgang on 8/14/18.
-//
+/*! \file
+ * \brief Helper code for TPR file access.
+ *
+ * \ingroup module_python
+ * \author M. Eric Irrgang <ericirrgang@gmail.com>
+ */
 
 #include "tprfile.h"
 

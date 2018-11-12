@@ -1,7 +1,9 @@
-//
-// Created by Eric Irrgang on 10/26/18.
-//
-
+/*! \file
+ * \brief Wrapper code for gmxapi::Context.
+ *
+ * \ingroup module_python
+ * \author M. Eric Irrgang <ericirrgang@gmail.com>
+ */
 #include "pycontext.h"
 
 #include "gmxapi/gmxapi.h"

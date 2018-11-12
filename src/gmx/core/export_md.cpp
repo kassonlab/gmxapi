@@ -1,3 +1,9 @@
+/*! \file
+ * \brief Bindings for external GROMACS MD modules.
+ *
+ * \ingroup module_python
+ * \author M. Eric Irrgang <ericirrgang@gmail.com>
+ */
 #include "core.h"
 
 #include <iostream>

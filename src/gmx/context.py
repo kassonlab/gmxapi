@@ -1080,7 +1080,7 @@ def get_context(work=None):
         An object implementing the :py:class:`gmx.context.Context` interface, if possible.
 
     Raises:
-        gmx.exceptions.ValueError if an appropriate context for :param:`work` could not be loaded.
+        gmx.exceptions.ValueError if an appropriate context for ``work`` could not be loaded.
 
     If work is provided, return a Context object capable of running the provided work or produce an error.
 

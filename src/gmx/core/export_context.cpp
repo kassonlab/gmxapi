@@ -1,7 +1,9 @@
-//
-// Created by Eric Irrgang on 3/18/18.
-//
-
+/*! \file
+ * \brief Bindings for Context class.
+ *
+ * \ingroup module_python
+ * \author M. Eric Irrgang <ericirrgang@gmail.com>
+ */
 #include "core.h"
 
 #include "gmxapi/context.h"
