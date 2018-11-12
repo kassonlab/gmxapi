@@ -1,6 +1,9 @@
-//
-// Created by Eric Irrgang on 10/26/18.
-//
+/*! \file
+ * \brief Declarations for Context wrappers.
+ *
+ * \ingroup module_python
+ * \author M. Eric Irrgang <ericirrgang@gmail.com>
+ */
 
 #ifndef GMXPY_PYCONTEXT_H
 #define GMXPY_PYCONTEXT_H

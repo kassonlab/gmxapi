@@ -1,10 +1,9 @@
 /*! \defgroup module_python Python module for accessing Gromacs library
- *  \internal
  * The Python module ``gmx`` consists of a high-level interface implemented in
  * pure Python and a low-level interface implemented as a C++ extension in the
  * submodule, gmx.core.
  */
-/*! \internal \file
+/*! \file
  * \brief Declares symbols to be exported to gmx.core Python module.
  *
  * Declares namespace gmxpy.
@@ -22,7 +21,6 @@
  * Python API in the C++ Python extension it produces, and it uses the public
  * C++ Gromacs API, but is itself an API *client* and its C++ interfaces are not
  * intended to be used in external code.
- * \internal
  * \ingroup module_python
  */
 namespace gmxpy
