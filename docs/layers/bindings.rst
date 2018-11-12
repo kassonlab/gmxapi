@@ -34,7 +34,6 @@ The API defers not only computation and data transfer, but also control flow
 related to execution context. This allows task scheduling and parallelism to
 be managed separately, either at a low level by the library or at a higher level
 through the middleware layer.
-.. seealso:: middleware
 Though agnostic to the execution context, the API provides client-side tools
 with which to interact with the execution context where necessary, such as to
 support data locality optimizations in client code.

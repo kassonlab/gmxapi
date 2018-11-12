@@ -560,95 +560,6 @@ class DefaultContext(_libgromacsContext):
         # There is very little context abstraction at this point...
         super(DefaultContext, self).__init__(work)
 
-# Unused.
-# Reference https://github.com/kassonlab/gmxapi/issues/36
-# def shared_data_maker(element):
-#     """Make a shared data element for use by dependent nodes.
-#
-#     This version uses mpi4py to share data and supports a single downstream node.
-#
-#     The element provides a serialized argument list for numpy.empty() as two elements, args, and kwargs. Each
-#     subscriber receives such
-#     an array at launch along with a python function handle to call-back to at some interval (passed to
-#     the plugin C++ code).
-#     """
-#
-#     # New idea: Instead of being dependent on a shared data node, let participants add a downstream node
-#     # that performs the reduce operation. A context can determine unsuitability for this parallelism with
-#     # lack of support for a reduce with a period less than the length of the specified trajectories.
-#     # To support reduce operations for ensembles wider than the Context, the Context could provide an
-#     # additional tier in the reduction for batches of co-scheduled tasks.
-#
-#     import json
-#
-#     class Builder(object):
-#         def __init__(self, element):
-#             logger.debug("Processing element {}".format(element.serialize()))
-#             self.context = element.workspec._context
-#             self.rank = self.context.rank
-#             self.subscriber = None
-#             self.name = element.name
-#             params = element.params
-#             # Params contains a dictionary of kwargs
-#             logger.debug("Processing parameters {}".format(params))
-#             assert isinstance(params, dict)
-#             kwargs = {name: params[name] for name in params}
-#             self.args = kwargs['args']
-#             self.kwargs = kwargs['kwargs']
-#
-#             # The builder can hold an updater to be provided to the subscriber at launch. The updater is
-#             # a function reference that the user provides to perform a desired periodic action. Not sure
-#             # how this will work in the future. Allowing arbitrary Python code to be provided during job
-#             # configuration would be the hardest thing. The updater could be another user-provided operation.
-#             # Hopefully we can provided some canned behaviors that can be selected with element parameters.
-#             # Maybe both.
-#             #self.updater = None
-#
-#         def add_subscriber(self, builder):
-#             # At this point, we could find out how this data will be used (e.g. subscribing ranks)
-#             if self.subscriber is None:
-#                 self.subscriber = builder
-#             else:
-#                 raise exceptions.ApiError("This element does not support multiple consumers")
-#
-#         def build(self, dag):
-#             # Either the builder needs to get the key for the subscribed node(s) so that we can
-#             # create the edge now, or this builder needs to provide subscribers with the key of this
-#             # DAG node so that the subscriber can create the edge. I think I prefer the latter, so that
-#             # edge creation is tied to the binding process of a new node with its upstream nodes.
-#             nodename = self.name
-#             dag.add_node(nodename)
-#             self.node = dag.nodes[nodename]
-#
-#             self.node['launch'] = self.__launch
-#             # To avoid ambiguity, let's assert that only nodes that are active at launch will have data.
-#             self.node['data'] = None
-#             self.subscriber.input_nodes.append(nodename)
-#             self.node['launch'] = self.__launch
-#
-#         def __launch(self, rank=None):
-#             """Create the shared data resource for subscribed builders.
-#
-#             This is the place to provide subscribers with API references for interacting with
-#             the shared data facility.
-#             """
-#             import numpy
-#             data = numpy.empty(*self.args, **self.kwargs)
-#             self.node['data'] = data
-#             self.comm = self.context._communicator
-#             self.node['comm'] = self.context._session_ensemble_communicator
-#             # self.subscriber.shared_data_updater = self.updater
-#             self.subscribinging_ranks = list(range(self.subscriber.width))
-#
-#             # Later, we can offload consumer responsibilities and the updater function to this runner,
-#             # but we aren't there yet.
-#             runner = None
-#             return runner
-#
-#     builder = Builder(element)
-#     return builder
-
-
 class Context(object):
     """Manage an array of simulation work executing in parallel.
 
@@ -668,9 +579,9 @@ class Context(object):
 
     `rank`, `work_width`, and `elements` are empty or None until the work is processed, as during session launch.
 
-
-    Example: Use ``mpiexec -n 2 python -m mpi4py myscript.py`` to run two jobs at the same time.
-    In this example the jobs are identical. In myscript.py:
+    Example:
+        Use ``mpiexec -n 2 python -m mpi4py myscript.py`` to run two jobs at the same time.
+        In this example the jobs are identical. In myscript.py:
 
         >>> import gmx
         >>> import gmx.core
@@ -684,7 +595,7 @@ class Context(object):
         >>> import gmx.core
         >>> from gmx.data import tpr_filename # Get a test tpr filename
         >>> work = gmx.workflow.from_tpr([tpr_filename, tpr_filename])
-        >>> context = gmx.context.ParallelArrayContext(work)
+        >>> context = gmx.context.get_context(work)
         >>> with context as session:
         ...    session.run()
         ...    # The session is one abstraction too low to know what rank it is. It lets the spawning context manage
@@ -695,7 +606,6 @@ class Context(object):
         ...    output_path = os.path.join(context.workdir_list[rank], 'traj.trr')
         ...    assert(os.path.exists(output_path))
         ...    print('Worker {} produced {}'.format(rank, output_path))
-        ...
 
     Implementation notes:
 
@@ -746,7 +656,7 @@ class Context(object):
         By default, the Context will get a reference to MPI_COMM_WORLD, which
         will be freed when the Python process ends and cleans up its resources.
         The communicator stored by the Context instance will not be used directly,
-        but will be duplicated when launching sessions using `with`.
+        but will be duplicated when launching sessions using ``with``.
         """
 
         # self.__context_array = list([Context(work_element) for work_element in work])
@@ -1167,10 +1077,10 @@ def get_context(work=None):
         work (gmx.workflow.WorkSpec): runnable work as a valid gmx.workflow.WorkSpec object
 
     Returns:
-        An object implementing the gmx.context.Context interface, if possible.
+        An object implementing the :py:class:`gmx.context.Context` interface, if possible.
 
     Raises:
-        gmx.exceptions.ValueError if an appropriate context for `work` could not be loaded.
+        gmx.exceptions.ValueError if an appropriate context for :param:`work` could not be loaded.
 
     If work is provided, return a Context object capable of running the provided work or produce an error.
 
@@ -1183,7 +1093,6 @@ def get_context(work=None):
       * the Context supports DAG topologies implied by the network of dependencies
       * the Context supports features required by the elements with the specified parameters,
         such as synchronous array jobs.
-      * anything else?
 
     """
     # We need to define an interface for WorkSpec objects so that we don't need

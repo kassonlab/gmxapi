@@ -64,10 +64,7 @@ install:
 before_script:
   - export CCACHE_DIR=$HOME/.ccache_gmxapi
   - ccache -s
-  - $PYTHON -m pip install --upgrade pip setuptools -q
-  # Make sure mpi4py is built with the intended compiler
-  - $PYTHON -m pip install --no-cache-dir --upgrade --no-binary ":all:" --force-reinstall mpi4py -q
-  - $PYTHON -m pip install -r requirements.txt -q
+  - eval $(./ci_scripts/prepare_python.sh)
 
 script:
   - source $HOME/install/gromacs_2019/bin/GMXRC && ./ci_scripts/pygmx.sh

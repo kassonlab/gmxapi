@@ -5,8 +5,14 @@ export GMX_DOUBLE=OFF
 export GMX_MPI=OFF
 export GMX_THREAD_MPI=ON
 
-export CCACHE_DIR=$HOME/.ccache_gmxapi
-ccache -s
+CCACHE=`which ccache`
+if [ "${CCACHE}" ] ; then
+    export CCACHE_DIR=$HOME/.ccache_gmxapi
+    ccache -s
+    export ENABLE_CCACHE=ON
+else
+    export ENABLE_CCACHE=OFF
+fi
 
 pushd $HOME
  [ -d gromacs-gmxapi ] || git clone --depth=1 --no-single-branch https://github.com/gromacs/gromacs.git gromacs
@@ -17,8 +23,9 @@ pushd $HOME
   rm -rf build
   mkdir build
   pushd build
-   cmake -DCMAKE_CXX_COMPILER=$CXX \
-         -DGMX_ENABLE_CCACHE=ON \
+   cmake -DGMX_BUILD_HELP=OFF \
+         -DGMX_ENABLE_CCACHE=$ENABLE_CCACHE \
+         -DCMAKE_CXX_COMPILER=$CXX \
          -DCMAKE_C_COMPILER=$CC \
          -DGMX_DOUBLE=$GMX_DOUBLE \
          -DGMX_MPI=$GMX_MPI \
@@ -29,4 +36,4 @@ pushd $HOME
   popd
  popd
 popd
-ccache -s
+[ "$ENABLE_CCACHE" ] && ccache -s
