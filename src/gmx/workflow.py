@@ -30,6 +30,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import warnings
+
 from gmx import exceptions
 from gmx import logging
 from gmx.util import to_string
@@ -479,13 +481,14 @@ def from_tpr(input=None, **kwargs):
     ``input``. It is equivalent to changing the number of steps requested in the MDP (or TPR) input, but
     it time is provided as picoseconds instead of a number of time steps.
 
-    The stop condition for the MD operation may be overridden. If ``steps=N`` is provided and N is an integer
-    greater than or equal to 1, the MD operation advances the trajectory by ``N`` steps, regardless of the number
-    of simulation steps specified in ``input`` or ``end_time``. For convenience, setting ``steps=None`` does not override
-    ``input``.
-    Note that when it is not ``None``, ``steps`` takes precedence over ``end_time`` and ``input``, but can still be
-    superceded by a signal, such as if an MD plugin or other code has a simulation completion condition that occurs
-    before ``N`` additional steps have run.
+    .. deprecated:: 0.0.7
+        If ``steps=N`` is provided and N is an integer
+        greater than or equal to 1, the MD operation advances the trajectory by ``N`` steps, regardless of the number
+        of simulation steps specified in ``input`` or ``end_time``. For convenience, setting ``steps=None`` does not override
+        ``input``.
+        Note that when it is not ``None``, ``steps`` takes precedence over ``end_time`` and ``input``, but can still be
+        superceded by a signal, such as if an MD plugin or other code has a simulation completion condition that occurs
+        before ``N`` additional steps have run.
 
     Where key word arguments correspond to ``gmx mdrun`` command line options, the corresponding flags are noted below.
 
@@ -497,7 +500,7 @@ def from_tpr(input=None, **kwargs):
         max_hours (float): Terminate after 0.99 times this many hours if simulation is still running. (-maxh)
         pme_ranks (int): number of separate ranks to be used for PME electrostatics. (-npme)
         pme_threads_per_rank (int): Number of OpenMP threads per PME rank. (-ntomp_pme)
-        steps (int): Override input files and run for this many steps. (-nsteps)
+        steps (int): Override input files and run for this many steps. (-nsteps; deprecated)
         threads (int): Total number of threads to start. (-nt)
         threads_per_rank (int): number of OpenMP threads to start per MPI rank. (-ntomp)
         tmpi (int): number of thread-MPI ranks to start. (-ntmpi)
@@ -560,7 +563,7 @@ def from_tpr(input=None, **kwargs):
             params['pme_threads_per_rank'] = int(kwargs[arg_key])
         elif arg_key == 'steps' or arg_key == 'nsteps':
             if kwargs[arg_key] is None:
-                # None means "don't override the input" which is indicated by a parameter value of -2 in gmxapi 0.0.6
+                # None means "don't override the input" which is indicated by a parameter value of -2 in GROMACS 2019
                 steps = -2
             else:
                 # Otherwise we require steps to be a positive integer
@@ -571,6 +574,10 @@ def from_tpr(input=None, **kwargs):
                 except (TypeError, ValueError) as e:
                     # steps is not an integer.
                     raise exceptions.TypeError('"steps" could not be interpreted as an integer.')
+                # The "nsteps" command line flag will be removed in GROMACS 2020
+                # and so "steps" is deprecated in gmxapi 0.0.7
+                warnings.warn("`steps` keyword argument is deprecated. Consider `end_time` instead.",
+                              DeprecationWarning)
             params['steps'] = steps
         elif arg_key == 'max_hours' or arg_key == 'maxh':
             params['max_hours'] = float(kwargs[arg_key])
