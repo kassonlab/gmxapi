@@ -10,6 +10,11 @@ Interface and feature updates
 - :py:class:`gmx.system.System` deprecated (use :py:func:`gmx.workflow.from_tpr`)
 - Add ``end_time`` keyword argument to :py:func:`gmx.workflow.from_tpr()`
 
+Deprecation
+
+- ``steps`` keyword argument to :py:func:`gmx.workflow.from_tpr()` is deprecated
+  in accordance with changes planned for GROMACS 2020.
+
 Internal
 
 - substantial updates for compatibility with GROMACS 2019
