@@ -12,8 +12,6 @@ __all__ = ['Context']
 import importlib
 import os
 import warnings
-import networkx as nx
-from networkx import DiGraph as _Graph
 import tempfile
 
 from gmx import exceptions
@@ -99,7 +97,11 @@ def _md(context, element):
             The launch() method of the added node creates the runner from the tpr file for the current rank and adds
             modules from the incoming edges.
             """
-            assert isinstance(dag, _Graph)
+            if not (hasattr(dag, 'add_node')
+                    and hasattr(dag, 'add_edge')
+                    and hasattr(dag, 'graph')
+                    and hasattr(dag, 'nodes')):
+                raise gmx.exceptions.TypeError("dag argument does not have a DiGraph interface.")
             name = self.name
             dag.add_node(name)
             for neighbor in self.input_nodes:
@@ -870,6 +872,12 @@ class Context(object):
         instantiate objects to perform the work. In the first implementation, we kind of muddle things into
         a single pass.
         """
+        try:
+            import networkx as nx
+            from networkx import DiGraph as _Graph
+        except ImportError:
+            raise exceptions.FeatureNotAvailableError("gmx requires the networkx package to execute work graphs.")
+
         # Cache the working directory from which we were launched so that __exit__() can give us proper context
         # management behavior.
         self.__initial_cwd = os.getcwd()
