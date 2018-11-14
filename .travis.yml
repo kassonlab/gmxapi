@@ -68,7 +68,7 @@ before_script:
 
 script:
   - source $HOME/install/gromacs_2019/bin/GMXRC && ./ci_scripts/pygmx.sh
-#  - ./ci_scripts/sample_restraint.sh release-0_0_7
+  - ./ci_scripts/sample_restraint.sh release-0_0_7
   - |
     if [ "${TRAVIS_BRANCH}" != master ] ; then
       source $HOME/install/gromacs_devel/bin/GMXRC && ./ci_scripts/pygmx.sh
