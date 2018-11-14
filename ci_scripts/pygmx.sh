@@ -16,26 +16,6 @@
 set -ev
 
 #
-# Test install with pip
-#
-$PYTHON -m pip uninstall -y gmx
-# Clean up some of the dirty built-in-source directories that could cause
-# inappropriate caching.
-rm -rf _skbuild dist gmx* build
-$PYTHON -m pip install .
-
-$PYTHON -m pytest src/gmx/test
-
-#
-# Test install with setup.py
-#
-$PYTHON -m pip uninstall -y gmx
-rm -rf _skbuild dist gmx* build
-$PYTHON setup.py install
-
-$PYTHON -m pytest src/gmx/test
-
-#
 # Test CMake-driven install
 #
 pip uninstall -y gmx

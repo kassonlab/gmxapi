@@ -26,11 +26,9 @@ cache:
 compiler: gcc
 
 env:
-#  - GMXAPI=0.0.6 SAMPLE_RESTRAINT=0.0.6
 # Python 2.7 and 3.6 are the only generations provided by pyenv on Travis-CI out-of-the-box
   - CI_MPI=0 PY=2.7
   - CI_MPI=0 PY=3.4
-#  - GMXAPI=0.0.6 SAMPLE_RESTRAINT=devel CI_MPI=0 PY=3.5
   - CI_MPI=0 PY=3.6
 
 addons:
@@ -67,6 +65,7 @@ before_script:
   - eval $(./ci_scripts/prepare_python.sh)
 
 script:
+  - source $HOME/install/gromacs_2019/bin/GMXRC && ./ci_scripts/test_installers.sh
   - source $HOME/install/gromacs_2019/bin/GMXRC && ./ci_scripts/pygmx.sh
   - ./ci_scripts/sample_restraint.sh release-0_0_7
   - |
