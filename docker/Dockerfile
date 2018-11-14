@@ -28,7 +28,7 @@
 # container naming, committing snapshots, and managing containers and disk space.
 #
 
-FROM gmxapi/gromacs-gmxapi:0.0.6
+FROM gmxapi/gromacs-gmxapi:0.0.7
 
 # Allow build for an arbitrary branch or tag, but default to the tip of `master`
 ARG BRANCH=master
