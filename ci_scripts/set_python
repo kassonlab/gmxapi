@@ -1,0 +1,14 @@
+# Use PY environment variable to export an appropriate PYTHON environment variable.
+# Build and install Python version, if necessary.
+
+[ "$PY" = "2.7" ] && PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -s 2.7.14
+[ "$PY" = "3.4" ] && PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -s 3.4.7
+[ "$PY" = "3.6" ] && PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -s 3.6.3
+pyenv rehash
+pyenv versions
+# get exactly one Python version: the last listed patch version for the selected minor version
+pyenv whence python${PY} && export PY_VER=`pyenv whence python${PY} | tail -1`
+pyenv shell $PY_VER && pyenv shell
+pyenv prefix ${PY_VER} && export PYTHON_PREFIX=`pyenv prefix ${PY_VER}`
+pyenv which python && export PYTHON=`pyenv which python`
+pyenv versions

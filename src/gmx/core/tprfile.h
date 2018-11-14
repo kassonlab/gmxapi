@@ -1,6 +1,9 @@
-//
-// Created by Eric Irrgang on 8/13/18.
-//
+/*! \file
+ * \brief Declare TPR file helpers.
+ *
+ * \ingroup module_python
+ * \author M. Eric Irrgang <ericirrgang@gmail.com>
+ */
 
 #ifndef GMXPY_TPRFILE_H
 #define GMXPY_TPRFILE_H

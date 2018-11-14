@@ -2,13 +2,26 @@
 Change Log
 ==========
 
-API and Python module versioning information.
+.. rubric:: 0.0.7
 
-List of features and available or target versions, organized by component.
-(See :doc:`components`). Link to documentation in :doc:`reference` section and
-appropriate content in :doc:`userguide` or :doc:`developerguide` if available.
-Should be accompanied by appropriate annotations elsewhere in the docs.
-I.e. See `Sphinx docs. <http://www.sphinx-doc.org/en/stable/markup/para.html>`_
+Interface and feature updates
+
+- :py:class:`gmx.context.Context` is generic (ParallelArrayContext, DefaultContext deprecated)
+- :py:class:`gmx.system.System` deprecated (use :py:func:`gmx.workflow.from_tpr`)
+- Add ``end_time`` keyword argument to :py:func:`gmx.workflow.from_tpr()`
+
+Internal
+
+- substantial updates for compatibility with GROMACS 2019
+- various improvements to CI testing
+- Context functionality is now composed according to available resources.
+  (Resource tags, such as ``ensemble_update`` will be specified in
+  *workspec version 0.2* before the gmxapi 0.1 release.)
+
+Bug fixes
+
+- :py:func:`gmx.get_context()` and :py:func:`gmx.run()` did not behave as expected for all work types.
+- substantial documentation updates
 
 .. rubric:: 0.0.6
 

@@ -1,11 +1,24 @@
-import gmx
-import gmx.util
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import warnings
+
+from gmx import context
+from gmx import fileio
 from gmx import exceptions
+from gmx import util
 
 __all__ = ['System']
 
 class System(object):
-    """Gromacs simulation system objects.
+    """Gromacs simulation system objects. (Deprecated)
+
+    .. deprecated:: 0.0.7
+        Instead, use :py:mod:`gmx.workflow` tools to set up a system for simulation.
+
+    Version 0.0.6 and earlier:
 
     A System object connects all of the objects necessary to describe a molecular
     system to be simulated.
@@ -35,11 +48,12 @@ class System(object):
         ...
         gmx.Status(True)
         Success
-        >>>
 
     """
 
     def __init__(self):
+        warnings.warn("gmx.System handles are not meaningful in GROMACS versions >= 2019. See gmx.workflow",
+                      DeprecationWarning)
         self.__workflow = None
 
     @property
@@ -52,7 +66,7 @@ class System(object):
 
     @staticmethod
     def _from_file(inputrecord):
-        """Process a file to create a System object.
+        """Process a file to create a System object. (Deprecated)
 
         Calls an appropriate helper function to parse a file in the current
         context and create a System object. If no Context is currently bound, a
@@ -76,11 +90,11 @@ class System(object):
             status = simulation.run()
 
         """
-        import gmx.core
-        if gmx.util._filetype(inputrecord) is gmx.fileio.TprFile:
+        import gmx.workflow
+        if util._filetype(inputrecord) is fileio.TprFile:
             # we use the API to process TPR files. We create a MD module and
             # retrieve a system from its contents.
-            newsystem = gmx.core.from_tpr(inputrecord)
+            newsystem = gmx.workflow.from_tpr(inputrecord)
             if newsystem is None:
                 raise gmx.Error("Got empty system when reading TPR file.")
         else:
@@ -90,12 +104,6 @@ class System(object):
         system.workflow = newsystem
 
         return system
-
-    def add_mdmodule(self, potential):
-        if (hasattr(potential, "bind")):
-            self.workflow.add_mdmodule(potential)
-        else:
-            raise exceptions.UsageError("Cannot add a potential that does not have a 'bind' method.")
 
     def run(self, parameters=None):
         """Launch execution.
@@ -113,7 +121,7 @@ class System(object):
             Gromacs status object.
 
         """
-        with gmx.context.DefaultContext(self.workflow) as session:
+        with context.get_context(self.workflow) as session:
             if parameters is None:
                 return session.run()
             else:

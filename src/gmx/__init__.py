@@ -1,7 +1,5 @@
 #!/usr/bin/env/python
-"""
-Providing Python access to Gromacs
-==================================
+"""Providing Python access to Gromacs
 
 The gmx Python module provides an interface suitable for scripting GROMACS
 workflows, interactive use, or connectivity to external Python-based APIs. The
@@ -31,29 +29,24 @@ For more advanced use, the module provides means to access or manipulate GROMACS
 more granularly than the command-line tool. This allows rapid prototyping of new
 methods, debugging of unexpected simulation behavior, and adaptive workflows.
 
-Installation
-------------
+Installation:
+    The gmxapi library for GROMACS must be installed to build and install the gmx
+    Python module. Retrieve the GROMACS fork from
+    https://github.com/kassonlab/gromacs-gmxapi and do a normal CMake build and
+    install.
 
-The gmxapi library for GROMACS must be installed to build and install the gmx
-Python module. Retrieve the GROMACS fork from
-https://github.com/kassonlab/gromacs-gmxapi and do a normal CMake build and
-install.
+    Then, download the repository from https://github.com/kassonlab/gmxapi and refer
+    to `docs/install.rst <./install.html>`_ for details on installing this Python
+    module.
 
-Then, download the repository from https://github.com/kassonlab/gmxapi and refer
-to `docs/install.rst <./install.html>`_ for details on installing this Python
-module.
+Packaging:
+    This Python package is built with CMake, but attempts to flexibly handle the
+    user's choice of Python installation. Python virtual environments are recommended.
+    If you have trouble installing this software in a Python virtual environment and
+    find the accompanying documentation inadequate, please open an issue ticket at
+    https://github.com/kassonlab/gmxapi/issues
 
-Packaging
----------
-
-This Python package is built with CMake, but attempts to flexibly handle the
-user's choice of Python installation. Python virtual environments are recommended.
-If you have trouble installing this software in a Python virtual environment and
-find the accompanying documentation inadequate, please open an issue ticket at
-https://github.com/kassonlab/gmxapi/issues
-
-Citing
-------
+Citing:
 
 Irrgang, M. E., Hays, J. M., & Kasson, P. M.
 gmxapi: a high-level interface for advanced control and extension of molecular dynamics simulations.
@@ -66,7 +59,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-__all__ = ['Status', 'System', 'get_context', 'run']
+__all__ = ['get_context', 'run']
 
 # Import system facilities
 import logging
@@ -78,20 +71,37 @@ logger.setLevel(logging.DEBUG)
 logger.info("Importing gmx.")
 
 # Import submodules.
-from . import exceptions
-from . exceptions import *
-__all__.extend(exceptions.__all__)
-
-from . import context
-from . import workflow
-from . status import Status
-from . import util
+from gmx import exceptions
+from gmx import workflow
+from gmx import version
 
 # Import top-level components
-from .version import __version__
-from .system import System
-from .workflow import run
-from .context import get_context
+__version__ = version.__version__
+from gmx.system import System
+from gmx.context import get_context
+
+
+def run(work=None):
+    """Run the provided work on available resources.
+
+    Args:
+        work (gmx.workflow.WorkSpec): either a WorkSpec or an object with a `workspec` attribute containing a WorkSpec object.
+
+    Returns:
+        gmx.status.Status: run status.
+
+    """
+    if isinstance(work, workflow.WorkSpec):
+        workspec = work
+    elif hasattr(work, "workspec") and isinstance(work.workspec, workflow.WorkSpec):
+        workspec = work.workspec
+    else:
+        raise exceptions.UsageError("Runnable work must be provided to run.")
+    # Find a Context that can run the work and hand it off.
+    with get_context(workspec) as session:
+        status = session.run()
+    return status
+
 
 # if __name__ == "__main__":
 #     import doctest

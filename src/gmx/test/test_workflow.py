@@ -6,6 +6,7 @@ import pytest
 import gmx
 import json
 import os
+import gmx.util
 from gmx.util import to_string
 from gmx.util import to_utf8
 

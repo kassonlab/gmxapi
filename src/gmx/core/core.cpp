@@ -5,9 +5,9 @@
  */
 
 #include "core.h"
+
 #include <memory>
 
-#include "gmxpy_api.h"
 #include "tprfile.h"
 #include "gmxapi/status.h"
 
@@ -67,8 +67,6 @@ PYBIND11_MODULE(core, m) {
     using namespace gmxpy::detail;
 
     m.doc() = docstring;
-
-    export_gmxapi(m);
 
     // Export core bindings
     py::class_< ::gmxapi::Status > gmx_status(m, "Status", "Holds status for API operations.");

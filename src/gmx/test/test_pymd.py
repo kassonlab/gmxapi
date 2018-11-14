@@ -33,6 +33,7 @@ try:
 except ImportError:
     withmpi_only = pytest.mark.skip(reason="Test requires at least 2 MPI ranks, but mpi4py is not available.")
 
+
 # Set up an API-conformant plugin.
 # Usually, the Context must be able to import a module and call a function that accepts the gmx.workflow.WorkElement
 # to return a builder.

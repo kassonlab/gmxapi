@@ -7,39 +7,38 @@
 # cmake was invoked with `-DCMAKE_PREFIX_PATH=...` pointing to the GROMACS
 # installation directory. We can also check now for a GROMACS_DIR environment
 # variable and provide it with the HINTS option.
-find_package(gmxapi 0.0.6 REQUIRED
+find_package(gmxapi 0.0.7 REQUIRED
              HINTS "$ENV{GROMACS_DIR}"
              )
+if(gmxapi_FOUND)
+    set(_suffix "")
+    # GROMACS master branch and forked development branches may have divergent
+    # pre-release APIs. This check allows us to distinguish them and behave
+    # differently if needed. github.com/kassonlab/gromacs-gmxapi devel branch
+    # sets gmxapi_EXPERIMENTAL=TRUE. Upstream GROMACS master branch does not.
+    # Ref: https://github.com/kassonlab/gmxapi/issues/166
+    if(gmxapi_EXPERIMENTAL)
+        set(_suffix " (unofficial)")
+    endif()
+    message(STATUS "Found gmxapi version ${gmxapi_VERSION}${_suffix}")
+endif()
 
 # Build the C++ extension
+include_directories(${PYTHON_INCLUDE_DIRS})
 
 pybind11_add_module(pygmx_core
-                    core.h
                     core.cpp
                     export_context.cpp
                     export_md.cpp
                     export_system.cpp
-                    gmxpy_api.h
-                    pymdmodule.h
+                    pycontext.cpp
                     pymdmodule.cpp
-                    pysystem.h
                     pysystem.cpp
                     tprfile.cpp
-                    tprfile.h
                     )
 
 # The target name is for clarity, but the installed module will be gmx.core
 set_target_properties(pygmx_core PROPERTIES OUTPUT_NAME core)
-
-
-#set(PYGMX_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
-#    CACHE PATH "Full path to the gmx module installation")
-
-# Set the output to the staging area
-# For installs that are part of a GROMACS install, we probably want to stage differently
-# set_target_properties(
-#    pygmx_core
-#    PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${PYGMX_DIRECTORY}")
 
 set_target_properties(pygmx_core PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/gmx)
 

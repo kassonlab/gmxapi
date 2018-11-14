@@ -13,126 +13,16 @@ Single-sim example:
     >>> md = gmx.workflow.from_tpr(filename)
     >>> with gmx.get_context(md.workspec) as session:
     ...    session.run()
-    ...
-    >>> # Which is, in turn, shorthand for
-    >>> md = gmx.workflow.from_tpr(filename)
-    >>> with gmx.context.Context(md.workspec) as session:
-    ...    session.run()
 
 Array sim example:
 
 .. code-block:: python
 
-    >>> work = gmx.workflow.from_tpr([filename1, filename2])
-    >>> gmx.run(work)
-    >>>
-    >>> # The above is shorthand for
-    >>> work = gmx.workflow.from_tpr([filename1, filename2])
-    >>> with gmx.get_context(work) as session:
-    ...    session.run()
-    ...
-    >>> # Which is, in turn, shorthand for
-    >>> work = gmx.workflow.from_tpr([filename1, filename2])
-    >>> global_context = gmx.context.ParallelArrayContext(work)
-    >>> my_id = global_context.local_id
-    >>> my_work = global_context.work_array[my_id]
-    >>> with gmx.context.Context(my_work) as session:
-    ...    session.run()
-
-Single-sim with plugin:
-
-.. code-block:: python
-
-    >>> work = gmx.workflow.from_tpr(filename)
-    >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
-    >>> work.add_dependency(potential)
-    >>> gmx.run(work)
-    >>>
-    >>> # The above is shorthand for
-    >>> work = gmx.workflow.from_tpr(filename)
-    >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
-    >>> work['md'].add_mdmodule(potential)
-    >>> with gmx.context.Context(work) as session:
-    ...    session.run()
-
-Array sim with plugin:
-
-.. code-block:: python
-
     >>> md = gmx.workflow.from_tpr([filename1, filename2])
-    >>> potential = myplugin.EnsembleRestraint(sites=[1,4], R0=2.0, k=10000.0)
-    >>> gmx.add_potential(md, potential)
-    >>> gmx.run(work)
-
-The above is shorthand for:
-
-.. code-block:: python
-
-    >>> work = gmx.workflow.from_tpr(filename)
-    >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0)
-    >>> work['md'].add_mdmodule(potential)
-    >>> global_context = gmx.context.ParallelArrayContext(work)
-    >>> my_id = global_context.local_id
-    >>> my_work = global_context.work_array[my_id]
-    >>> with gmx.context.Context(my_work) as session:
-    ...    session.run()
-
-Array sim with plugin using global resources:
-
-.. code-block:: python
-
-    >>> md = gmx.workflow.from_tpr([filename1, filename2])
-    >>> workdata = gmx.workflow.SharedDataElement()
-    >>> numsteps = int(1e-9 / 5e-15) # every nanosecond or so...
-    >>> potential = myplugin.EnsembleRestraint([1,4], R0=2.0, k=10000.0, workdata=workdata, data_update_period=numsteps)
-    >>> md.add_dependency(potential)
     >>> gmx.run(md)
 
-The above is shorthand for:
-
-.. code-block:: python
-
-    >>> # Create work spec and get handle to MD work unit
-    >>> md = gmx.workflow.from_tpr([filename1, filename2])
-    >>> workdata = gmx.workflow.SharedDataElement()
-    >>> potential = myplugin.HarmonicRestraint(sites=[1,4], R0=2.0, k=10000.0, workdata=workdata)
-    >>> # EnsembleRestraint is dependent on workdata, so `workdata` must be added to
-    >>> # `work` before `potential` can be added to `work`. Combine specs.
-    >>> md.workflow.add(workdata)
-    >>> md.add_dependency(potential)
-    >>> # Initialize resources for work or throw appropriate error
-    >>> global_context = gmx.get_context(md.workflow)
-    >>> # Global resources like SharedDataFile are now available.
-    >>> my_id = global_context.local_id
-    >>> with global_context as session:
-    ...    # plugin and simulation are now initialized.
-    ...    session.run()
-
-Note that object representing work specification contains a recipe, not references to actual objects representing the
-workflow elements. Distinctly, objects can be created as handles to representations of workflow elements, and these
-objects can hold strong references to objects representing work specification. In other words, the work specification
-is a serialized data structure containing the serialized representations of workflow elements.
-
-Implementation details: When the plugin potential is instantiated, it has a WorkElement interface and can
-provide enough information for the Context to call the same constructor, but we want a portal back to the
-original object handle, too. If data only needs to be pulled by the handle, then it can chase references.
-When it is added as a dependency to the md operation, it gains a reference to the workspec. When the
-work is launched, that workspec gains a reference to the Context. We need some sort of signal that can
-propagate back to the handles to the work elements.
-
-TBD:
-
-1.  We may decide that there is always a single active Context that can be picked up from a singleton, such that a
-    workspec can always have at least a generic Context. This would imply that a workspec could exist in a Context that
-    couldn't run it, which might be antithetical.
-2.  We may decide that WorkElements are always in some sort of workspec, and that there may be a lot of merging of
-    work specs. This would resolve the ambiguity that a WorkElement may or may not be associated with a work spec, but
-    it cannot happen right now for several reasons.
-
-    * there is not a clear way to move elements with dependents from one work spec to another without some ugly transient states.
-    * When an element is serialized and deserialized, there is not a good way of finding the original workspec object ref.
-    * We make a lot of use of temporary WorkElement objects for which we don't care about the workspec.
-
+The representation of work and the way it is dispatched are areas of active
+development. See also https://github.com/kassonlab/gmxapi/milestone/3
 """
 
 from __future__ import absolute_import
@@ -140,8 +30,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from . import exceptions
-import gmx
+from gmx import exceptions
 from gmx import logging
 from gmx.util import to_string
 from gmx.util import to_utf8
@@ -162,31 +51,26 @@ logger.info("Using schema version {}.".format(workspec_version))
 class WorkSpec(object):
     """
     Container of workflow elements with data dependency
-    information and requirements for execution. E.g. once Array elements are added,
-    the WorkSpec can only be launched in a context that supports parallel Array
-    elements. These attributes can be refined and requirements minimized in the future.
+    information and requirements for execution.
 
-    Future functionality may allow
-    WorkSpec instances can be merged with `WorkSpec.add()`.
-    Reference to elements remain valid after the
-    merge, but may have modified properties (such as unique identifiers or hashes
-    associated with their relationship to the rest of the workflow).
+    An element cannot be added to a WorkSpec if it has dependencies that are not
+    in the WorkSpec.
 
-    An element cannot
-    be added to a WorkSpec if it has dependencies that are not in the WorkSpec.
-
-    Work is added to the specification by passing a WorkElement object to WorkSpec.add_element().
+    Work is added to the specification by passing a WorkElement object to
+    :py:func:`WorkSpec.add_element()`.
     Any dependencies in the WorkElement must already be specified in the target WorkSpec.
 
-    When iterated over, a WorkSpec object yields WorkElement objects in a valid order to
-    keep dependencies satisfied, but not necessarily the same order in which add_element()
-    calls were originally made.
-
     When iterated over, a WorkSpec object returns WorkElement objects.
+    WorkElement objects are yielded in a valid order to keep dependencies
+    satisfied, but not necessarily the same order in which add_element()
+    calls were originally made. In other words, the WorkSpec is a directed
+    acyclic dependency graph, and its iterator returns nodes in an arbitrary
+    but topologically correct order.
 
     The string representation of a WorkSpec object is a valid JSON serialized data object.
 
-    The schema for version 0.1 of the specification has the following layout.
+    The schema for version 0.1 of the specification allows data structures like
+    the following.
     ::
 
         {
@@ -209,8 +93,8 @@ class WorkSpec(object):
                 {
                     'namespace': 'myplugin',
                     'operation': 'create_mdmodule',
-                    params: {...},
-                    depends: [mydata]
+                    'params': {...},
+                    'depends': ['mydata']
                 },
                 'mysim':
                 {
@@ -221,13 +105,19 @@ class WorkSpec(object):
             }
         }
 
-    The first mapping (``version``) is required as shown. The ``elements`` map contains uniquely named elements specifying
-    an operation, the operation's namespace, and parameters and dependencies of the operation for this element. ``depends``
-    is a sequence of string names of elements that are also in the work spec. ``params`` is a key-value map with string
-    keys and values that are valid JSON data. Namespace and operation are strings that the Context can map to directors
-    it can use to construct the session. Namespace ``gmxapi`` is reserved for operations specified by the API. Namespace
-    ``gromacs`` is reserved for operations implemented as GROMACS adapters (versioned separately from gmxapi). The period
-    character (".") has special meaning and should not be used in naming elements, namespaces, or operations.
+    The first mapping (``version``) is required as shown. The ``elements`` map
+    contains uniquely named elements specifying an operation, the operation's
+    namespace, and parameters and dependencies of the operation for this element.
+    ``depends`` is a sequence of string names of elements that are also in the
+    work spec. ``params`` is a key-value map with string keys and values that
+    are valid JSON data. ``namespace`` and ``operation`` are strings that the
+    :py:class:`Context <gmx.context.Context>` can map to directors it uses to
+    construct the session. Namespace ``gmxapi`` is reserved for operations
+    specified by the API. Namespace ``gromacs`` is reserved for operations
+    implemented as GROMACS adapters (versioned separately from gmxapi). The
+    period character (".") has special meaning and should not be used in naming
+    elements, namespaces, or operations.
+
     """
     def __init__(self):
         self.version = workspec_version
@@ -348,7 +238,7 @@ class WorkSpec(object):
         3. Output is a byte sequence of the utf-8 encoded densely formatted JSON document.
 
         Returns:
-            py:unicode object in Python 2, py:bytes object in Python 3
+            ``unicode`` object in Python 2, ``bytes`` object in Python 3
 
         Output of serialize() should be explicitly converted to a string before passing to a JSON deserializer.
 
@@ -371,13 +261,13 @@ class WorkSpec(object):
     @classmethod
     def deserialize(serialized):
         import json
-        workspec = gmx.workflow.WorkSpec()
+        workspec = WorkSpec()
         dict_representation = json.loads(to_string(serialized))
         ver_in = dict_representation['version']
         ver_out = workspec.version
         if ver_in != ver_out:
             message = "Expected work spec version {}. Got work spec version {}.".format(ver_out, ver_in)
-            raise gmx.exceptions.CompatibilityError(message)
+            raise exceptions.CompatibilityError(message)
         for element in dict_representation['elements']:
             workspec.elements[element] = dict_representation['elements'][element]
         return workspec
@@ -385,9 +275,12 @@ class WorkSpec(object):
     def uid(self):
         """Get a unique identifier for this work specification.
 
+        Returns:
+            hash value
+
         Generate a cryptographic hash of this work specification that is guaranteed to match that of another equivalent
         work specification. The returned string is a 64-character hexadecimal encoded SHA-256 hash digest of the
-        serialized workspec.
+        serialized WorkSpec.
 
         The definition of equivalence is likely to evolve, but currently means a work spec of the
         same version with the same named elements containing the same operations, dependencies, and parameters, as
@@ -472,7 +365,7 @@ class WorkElement(object):
         """Add another element as a dependency.
 
         First move the provided element to the same WorkSpec, if not already here.
-        Then, add to depends and update the WorkSpec.
+        Then, add to ``depends`` and update the WorkSpec.
         """
         if element.workspec is None:
             self.workspec.add_element(element)
@@ -596,7 +489,7 @@ def from_tpr(input=None, **kwargs):
 
     Where key word arguments correspond to ``gmx mdrun`` command line options, the corresponding flags are noted below.
 
-    Arguments:
+    Keyword Arguments:
         input (str): *Required* string or list of strings giving the filename(s) of simulation input
         append_output (bool): Append output for continuous trajectories if True, truncate existing output data if False. (default True)
         end_time (float): Specify the final time in the simulation trajectory, overriding input read from TPR.
@@ -627,9 +520,6 @@ def from_tpr(input=None, **kwargs):
                 params: {'kw1': arg1, 'kw2': arg2, ...}
 
     Bugs: version 0.0.6
-        * If on-disk trajectory state is at a simulation step greater than that specified in ``input`` and
-          ``steps`` is not specified or is None, the MD operation will try to produce a trajectory of infinite
-          length. See https://github.com/kassonlab/gmxapi/issues/130
         * There is not a way to programatically check the current step number on disk.
           See https://github.com/kassonlab/gmxapi/issues/56 and https://github.com/kassonlab/gmxapi/issues/85
     """
@@ -712,23 +602,3 @@ def from_tpr(input=None, **kwargs):
     workspec.add_element(mdelement)
 
     return mdelement
-
-def run(work=None):
-    """Run the provided work on available resources.
-
-    Args:
-        work : either a WorkSpec or an object with a `workspec` attribute containing a WorkSpec object.
-
-    Returns:
-        run status.
-    """
-    if isinstance(work, WorkSpec):
-        workspec = work
-    elif hasattr(work, "workspec") and isinstance(work.workspec, WorkSpec):
-        workspec = work.workspec
-    else:
-        raise exceptions.UsageError("Runnable work must be provided to run.")
-    # Find a Context that can run the work and hand it off.
-    with gmx.get_context(workspec) as session:
-        status = session.run()
-    return status
