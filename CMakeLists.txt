@@ -8,7 +8,7 @@ cmake_minimum_required(VERSION 3.4.3)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9 CACHE STRING "OS X deployment target below 10.9 does not use C++11 standard library" FORCE)
 
 # Sets the PROJECT_VERSION variable, as well...
-project(gmxpy VERSION 0.0.7)
+project(gmxpy VERSION 0.0.8)
 
 # Only interpret if() arguments as variables or keywords when unquoted.
 cmake_policy(SET CMP0054 NEW)
