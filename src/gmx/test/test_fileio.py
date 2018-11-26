@@ -15,7 +15,9 @@ class TprTestCase(unittest.TestCase):
         self.assertRaises(UsageError, TprFile, tpr_filename, 'x')
         # TprFile does not yet check whether file exists and is readable...
         #self.assertRaises(UsageError, TprFile, 1, 'r')
-        fh = TprFile(tpr_filename, 'r')
+        tprfile = TprFile(tpr_filename, 'r')
+        with tprfile as fh:
+            pass
 
     def test_tprcopy(self):
         _, temp_filename = tempfile.mkstemp(suffix='.tpr')

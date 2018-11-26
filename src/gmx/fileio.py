@@ -47,8 +47,22 @@ class TprFile:
         if mode != 'r':
             raise UsageError("TPR files only support read-only access.")
         self.filename = filename
+        self._tprFileHandle = None
+
+    def close(self):
+        # self._tprFileHandle.close()
+        self._tprFileHandle = None
+
     def __repr__(self):
         return "gmx.fileio.TprFile('{}', '{}')".format(self.filename, self.mode)
+
+    def __enter__(self):
+        # self._tprFileHandle = gmx.core.TprFile()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return
 
 class TrajectoryFile:
     """Provides an interface to Gromacs supported trajectory file formats.
