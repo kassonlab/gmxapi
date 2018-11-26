@@ -35,6 +35,8 @@ void export_context(pybind11::module &m);
 
 void export_system(pybind11::module &m);
 
+void export_tprfile(pybind11::module &m);
+
 } // end namespace gmxpy::detail
 
 }      // end namespace gmxpy
