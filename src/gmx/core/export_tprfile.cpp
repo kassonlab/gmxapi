@@ -18,7 +18,21 @@ void detail::export_tprfile(pybind11::module &m)
     tprfile.def("params",
             [](const TprFileHandle& self)
             {
-                return gmxapicompat::keys(gmxapicompat::getMdParams(self));
+                py::dict dictionary;
+                auto params = gmxapicompat::getMdParams(self);
+                for (const auto& key : gmxapicompat::keys(params))
+                {
+                    const auto& paramType = gmxapicompat::mdParamToType(key);
+                    if (gmxapicompat::isFloat(paramType))
+                    {
+                        dictionary[key.c_str()] = extractParam(params, key, double());
+                    }
+                    else if (gmxapicompat::isInt(paramType))
+                    {
+                        dictionary[key.c_str()] = extractParam(params, key, int64_t());
+                    }
+                }
+                return dictionary;
             });
 
     m.def("read_tprfile",

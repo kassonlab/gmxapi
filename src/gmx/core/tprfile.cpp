@@ -397,8 +397,62 @@ double GmxMdParamsImpl::extract<double>(const std::string& key) const {
 }
 
 
+int extractParam(const GmxMdParams &params, const std::string &name, int) {
+    assert(params.params_);
+    return params.params_->extract<int>(name);
+}
 
-std::vector<std::string> keys(const gmxapicompat::GmxMdParams &params) {
+int64_t extractParam(const GmxMdParams &params, const std::string &name, int64_t) {
+    assert(params.params_);
+    int64_t value{};
+    // Allow fetching both known integer types.
+    try {
+        value = params.params_->extract<int>(name);
+    }
+    catch (const KeyError& error)
+    {
+        // If not found as a regular int, check for int64.
+        try {
+            value = params.params_->extract<int64_t >(name);
+        }
+        catch (const KeyError& error64)
+        {
+            throw KeyError("Parameter of the requested name not set.");
+        }
+    }
+    // Any other exceptions propagate out.
+    return value;
+}
+
+float extractParam(const GmxMdParams &params, const std::string &name, float) {
+    assert(params.params_);
+    return params.params_->extract<float>(name);
+}
+
+double extractParam(const GmxMdParams &params, const std::string &name, double) {
+    assert(params.params_);
+    double value{};
+    // Allow fetching both single and double precision.
+    try {
+        value = params.params_->extract<double>(name);
+    }
+    catch (const KeyError& errorDouble)
+    {
+        // If not found as a double precision value, check for single-precision.
+        try {
+            value = params.params_->extract<float>(name);
+        }
+        catch (const KeyError& errorFloat)
+        {
+            throw KeyError("Parameter of the requested name not set.");
+        }
+    }
+    // Any other exceptions propagate out.
+    return value;
+}
+
+
+std::vector<std::string> keys(const GmxMdParams &params) {
     return params.params_->keys();
 }
 
@@ -494,6 +548,10 @@ GmxMdParams::~GmxMdParams() = default;
 GmxMdParams::GmxMdParams() :
     params_{std::make_unique<GmxMdParamsImpl>()}
 {}
+
+GmxMdParams::GmxMdParams(GmxMdParams &&) noexcept = default;
+
+GmxMdParams &GmxMdParams::operator=(GmxMdParams &&) noexcept = default;
 
 } // end namespace gmxapicompat
 
