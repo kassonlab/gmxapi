@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/topology/topology.h"
