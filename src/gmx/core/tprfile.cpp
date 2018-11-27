@@ -23,6 +23,7 @@
 
 #include "exceptions.h"
 #include "mdparams.h"
+#include "typetemplates.h"
 
 namespace gmxapicompat
 {
@@ -231,7 +232,51 @@ public:
         throw TypeError("unhandled type");
     }
 
+    void set(const std::string& key, const int64_t& value)
+    {
+        if (int64Params_.find(key) != int64Params_.end())
+        {
+            int64Params_.at(key) = std::make_pair(value, true);
+        }
+        else if (intParams_.find(key) != intParams_.end())
+        {
+            // TODO: check whether value is too large?
+            intParams_.at(key) = std::make_pair(static_cast<int>(value), true);
+        }
+        else
+        {
+            throw KeyError("Named parameter is incompatible with integer type value.");
+        }
+    };
+
+    void set(const std::string& key, const double& value)
+    {
+        if (float64Params_.find(key) != float64Params_.end())
+        {
+            float64Params_.at(key) = std::make_pair(value, true);
+        }
+        else if (floatParams_.find(key) != floatParams_.end())
+        {
+            // TODO: check whether value is too large?
+            floatParams_.at(key) = std::make_pair(static_cast<float>(value), true);
+        }
+        else
+        {
+            throw KeyError("Named parameter is incompatible with floating point type value.");
+        }
+    };
+//
+//    // Uses expression SFINAE of the return type to be sure of the right overload
+//    // at template instantiation. Causes compile error if a setter is not available
+//    // for the parameter type T.
+//    template<typename T> auto set(const std::string& key, const T& value) -> decltype(setParam(key, value), void())
+//    {
+//        this->set(key, value);
+//    }
+
 private:
+
+
     // TODO: update to gmxapi named types?
 //    std::map<std::string, int64_t t_inputrec::*> int64Params_;
 //    std::map<std::string, int t_inputrec::*> intParams_;
@@ -242,6 +287,20 @@ private:
     std::map<std::string, std::pair<float, bool>> floatParams_;
     std::map<std::string, std::pair<double, bool>> float64Params_;
 };
+
+void setParam(gmxapicompat::GmxMdParams *params, const std::string &name, double value)
+{
+    assert(params != nullptr);
+    assert(params->params_ != nullptr);
+    params->params_->set(name, value);
+}
+
+void setParam(gmxapicompat::GmxMdParams *params, const std::string &name, int64_t value)
+{
+    assert(params != nullptr);
+    assert(params->params_ != nullptr);
+    params->params_->set(name, value);
+}
 
 GmxMdParamsImpl::GmxMdParamsImpl()
 {
@@ -360,9 +419,37 @@ public:
 
     GmxMdParams mdParams()
     {
+        assert(irInstance != nullptr);
         auto params = GmxMdParams();
-        params.params_ = std::make_unique<GmxMdParamsImpl>();
-        return params;
+        for (const auto& definition : int64Params())
+        {
+            const auto& key = definition.first;
+            auto memberPointer = definition.second;
+            auto fileValue = (*irInstance).*memberPointer;
+            setParam(&params, key, fileValue);
+        }
+        for (const auto& definition : int32Params())
+        {
+            const auto& key = definition.first;
+            auto memberPointer = definition.second;
+            auto fileValue = (*irInstance).*memberPointer;
+            setParam(&params, key, static_cast<int64_t>(fileValue));
+        }
+        for (const auto& definition : float32Params())
+        {
+            const auto& key = definition.first;
+            auto memberPointer = definition.second;
+            auto fileValue = (*irInstance).*memberPointer;
+            setParam(&params, key, fileValue);
+        }
+        for (const auto& definition : float64Params())
+        {
+            const auto& key = definition.first;
+            auto memberPointer = definition.second;
+            auto fileValue = (*irInstance).*memberPointer;
+            setParam(&params, key, fileValue);
+        }
+        return {std::move(params)};
     };
 private:
     // These types are not moveable in GROMACS 2019, so we use unique_ptr as a
@@ -381,6 +468,7 @@ TprFileHandle readTprFile(const std::string& filename) {
 
 GmxMdParams getMdParams(const TprFileHandle &fileHandle) {
     auto tprfile = fileHandle.get();
+    assert(tprfile);
     return std::move(tprfile->mdParams());
 }
 
@@ -402,6 +490,10 @@ std::shared_ptr<TprFile> TprFileHandle::get() const {
 TprFileHandle::~TprFileHandle() = default;
 
 GmxMdParams::~GmxMdParams() = default;
+
+GmxMdParams::GmxMdParams() :
+    params_{std::make_unique<GmxMdParamsImpl>()}
+{}
 
 } // end namespace gmxapicompat
 

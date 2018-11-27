@@ -13,7 +13,10 @@
  */
 
 #include <map>
+#include <memory>
 #include <string>
+
+#include "exceptions.h"
 
 struct t_inputrec;
 
@@ -96,7 +99,7 @@ class GmxMdParamsImpl;
 class GmxMdParams
 {
 public:
-    GmxMdParams() = default;
+    GmxMdParams();
     ~GmxMdParams();
     GmxMdParams(const GmxMdParams&) = delete;
     GmxMdParams& operator=(const GmxMdParams&) = delete;
@@ -120,6 +123,9 @@ int extractParam(const gmxapicompat::GmxMdParams& params, const std::string& nam
 int64_t extractParam(const gmxapicompat::GmxMdParams& params, const std::string& name, int64_t);
 float extractParam(const gmxapicompat::GmxMdParams& params, const std::string& name, float);
 double extractParam(const gmxapicompat::GmxMdParams& params, const std::string& name, double);
+
+void setParam(gmxapicompat::GmxMdParams* params, const std::string& name, double value);
+void setParam(gmxapicompat::GmxMdParams* params, const std::string& name, int64_t value);
 
 } // end namespace gmxapicompat
 
