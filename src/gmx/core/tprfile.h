@@ -99,31 +99,6 @@ GmxMdParams getMdParams(const TprFileHandle& fileHandle);
 
 std::vector<std::string> keys(const GmxMdParams& params);
 
-// Anonymous namespace for a template that we want to define at file scope.
-namespace {
-/*!
- * \brief Procedural interface for setting named parameters.
- *
- * \throws TypeError if parameter and value are of incompatible type.
- * \throws KeyError if parameter is unknown.
- *
- * \note The logic of errors is potentially confusing.
- */
-template<typename T>
-gmxapicompat::GmxMdParams &setParam(gmxapicompat::GmxMdParams *params,
-                                    std::string keyname,
-                                    T value) {
-    const auto paramType = gmxapicompat::mdParamToType(keyname);
-    if (paramType == gmxapicompat::GmxapiType::gmxInt64) {
-
-    } else {
-        // If parameter type is registered and we don't have handler code, this is a bug.
-        assert(paramType == gmxapicompat::GmxapiType::gmxNull);
-        throw gmxapicompat::KeyError(std::string("Unknown parameter name: ") + keyname);
-    }
-    return *params;
-}
-} // end anonymous namespace
 
 ///*!
 // * \brief Extract a parameter to the requested type.
