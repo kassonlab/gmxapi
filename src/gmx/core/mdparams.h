@@ -74,6 +74,9 @@ const std::map<std::string, int64_t t_inputrec::*> int64Params();
  */
 GmxapiType mdParamToType(const std::string& name);
 
+// Forward declaration for private implementation class for GmxMdParams
+class GmxMdParamsImpl;
+
 /*!
  * \brief Handle / manager for GROMACS MM computation input parameters.
  *
@@ -90,7 +93,18 @@ GmxapiType mdParamToType(const std::string& name);
  * more generic output, but our efforts may be better spent in updating the
  * infrastructure for the key-value tree input system.
  */
-class GmxMdParams;
+class GmxMdParams
+{
+public:
+    GmxMdParams() = default;
+    ~GmxMdParams();
+    GmxMdParams(const GmxMdParams&) = delete;
+    GmxMdParams& operator=(const GmxMdParams&) = delete;
+    GmxMdParams(GmxMdParams&&) = default;
+    GmxMdParams& operator=(GmxMdParams&&) = default;
+
+    std::unique_ptr<GmxMdParamsImpl> params_;
+};
 
 /*!
  * \brief A set of overloaded functions to fetch parameters of the indicated type, if possible.

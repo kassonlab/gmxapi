@@ -13,6 +13,7 @@ import os
 
 __all__ = ['TprFile']
 
+import gmx.core
 from gmx.exceptions import UsageError
 
 _current_dir = os.getcwd()
@@ -57,7 +58,7 @@ class TprFile:
         return "gmx.fileio.TprFile('{}', '{}')".format(self.filename, self.mode)
 
     def __enter__(self):
-        # self._tprFileHandle = gmx.core.TprFile()
+        self._tprFileHandle = gmx.core.read_tprfile(self.filename)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

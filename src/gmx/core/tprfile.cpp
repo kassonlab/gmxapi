@@ -182,7 +182,7 @@ GmxapiType mdParamToType(const std::string& name)
  * more generic output, but our efforts may be better spent in updating the
  * infrastructure for the key-value tree input system.
  */
-class GmxMdParams final
+class GmxMdParamsImpl final
 {
 public:
     /*!
@@ -195,7 +195,7 @@ public:
      *
      * To load values from a TPR file, see getMdParams().
      */
-//    GmxMdParams();
+    GmxMdParamsImpl();
 
     /*!
      * \brief Get the current list of keys.
@@ -209,7 +209,15 @@ public:
         {
             keyList.emplace_back(entry.first);
         }
+        for (auto&& entry : intParams_)
+        {
+            keyList.emplace_back(entry.first);
+        }
         for (auto&& entry : floatParams_)
+        {
+            keyList.emplace_back(entry.first);
+        }
+        for (auto&& entry : float64Params_)
         {
             keyList.emplace_back(entry.first);
         }
@@ -225,69 +233,114 @@ public:
 
 private:
     // TODO: update to gmxapi named types?
-    std::map<std::string, int64_t t_inputrec::*> int64Params_;
-    std::map<std::string, int t_inputrec::*> intParams_;
-    std::map<std::string, float t_inputrec::*> floatParams_;
-    std::map<std::string, double t_inputrec::*> float64Params_;
-    // t_inputrec requires libgromacs to construct or destroy.
-    t_inputrec inputRecord_;
+//    std::map<std::string, int64_t t_inputrec::*> int64Params_;
+//    std::map<std::string, int t_inputrec::*> intParams_;
+//    std::map<std::string, float t_inputrec::*> floatParams_;
+//    std::map<std::string, double t_inputrec::*> float64Params_;
+    std::map<std::string, std::pair<int64_t, bool>> int64Params_;
+    std::map<std::string, std::pair<int, bool>> intParams_;
+    std::map<std::string, std::pair<float, bool>> floatParams_;
+    std::map<std::string, std::pair<double, bool>> float64Params_;
 };
 
+GmxMdParamsImpl::GmxMdParamsImpl()
+{
+    for (const auto& definition : int64Params())
+    {
+        int64Params_[definition.first].second = {};
+    }
+    for (const auto& definition : int32Params())
+    {
+        intParams_[definition.first].second = {};
+    }
+    for (const auto& definition : float32Params())
+    {
+        floatParams_[definition.first].second = {};
+    }
+    for (const auto& definition : float64Params())
+    {
+        float64Params_[definition.first].second = {};
+    }
+}
+
 template<>
-int GmxMdParams::extract<int>(const std::string& key) const {
+int GmxMdParamsImpl::extract<int>(const std::string& key) const {
     const auto& params = intParams_;
     const auto& entry = params.find(key);
     if (entry == params.cend())
     {
-        throw KeyError("Parameter of the requested name and type not available.");
+        throw KeyError("Parameter of the requested name and type not defined.");
+    }
+    else if (! entry->second.second)
+    {
+        // TODO: handle invalid and unset parameters differently.
+        throw KeyError("Parameter of the requested name not set.");
     }
     else
     {
-        const auto& dataMemberPointer = entry->second;
-        return inputRecord_.*dataMemberPointer;
+        return entry->second.first;
     }
 }
+
 template<>
-int64_t GmxMdParams::extract<int64_t>(const std::string& key) const {
+int64_t GmxMdParamsImpl::extract<int64_t>(const std::string& key) const {
     const auto& params = int64Params_;
     const auto& entry = params.find(key);
     if (entry == params.cend())
     {
-        throw KeyError("Parameter of the requested name and type not available.");
+        throw KeyError("Parameter of the requested name and type not defined.");
+    }
+    else if (! entry->second.second)
+    {
+        // TODO: handle invalid and unset parameters differently.
+        throw KeyError("Parameter of the requested name not set.");
     }
     else
     {
-        const auto& dataMemberPointer = entry->second;
-        return inputRecord_.*dataMemberPointer;
+        return entry->second.first;
     }
 }
 template<>
-float GmxMdParams::extract<float>(const std::string& key) const {
+float GmxMdParamsImpl::extract<float>(const std::string& key) const {
     const auto& params = floatParams_;
     const auto& entry = params.find(key);
     if (entry == params.cend())
     {
-        throw KeyError("Parameter of the requested name and type not available.");
+        throw KeyError("Parameter of the requested name and type not defined.");
+    }
+    else if (! entry->second.second)
+    {
+        // TODO: handle invalid and unset parameters differently.
+        throw KeyError("Parameter of the requested name not set.");
     }
     else
     {
-        const auto& dataMemberPointer = entry->second;
-        return inputRecord_.*dataMemberPointer;
+        return entry->second.first;
     }
 }
 template<>
-double GmxMdParams::extract<double>(const std::string& key) const {
+double GmxMdParamsImpl::extract<double>(const std::string& key) const {
     const auto& params = float64Params_;
     const auto& entry = params.find(key);
     if (entry == params.cend())
     {
-        throw KeyError("Parameter of the requested name and type not available.");
+        throw KeyError("Parameter of the requested name and type not defined.");
+    }
+    else if (! entry->second.second)
+    {
+        // TODO: handle invalid and unset parameters differently.
+        throw KeyError("Parameter of the requested name not set.");
     }
     else
     {
-        const auto& dataMemberPointer = entry->second;
-        return inputRecord_.*dataMemberPointer;
+        return entry->second.first;
     }
+}
+
+
+
+std::vector<std::string> keys(const gmxapicompat::GmxMdParams &params) {
+    return params.params_->keys();
 }
 
 class TprFile
@@ -305,6 +358,12 @@ public:
     TprFile(TprFile&& source) noexcept = default;
     TprFile& operator=(TprFile&&) noexcept = default;
 
+    GmxMdParams mdParams()
+    {
+        auto params = GmxMdParams();
+        params.params_ = std::make_unique<GmxMdParamsImpl>();
+        return params;
+    };
 private:
     // These types are not moveable in GROMACS 2019, so we use unique_ptr as a
     // moveable wrapper to let TprFile be moveable.
@@ -320,6 +379,11 @@ TprFileHandle readTprFile(const std::string& filename) {
     return handle;
 }
 
+GmxMdParams getMdParams(const TprFileHandle &fileHandle) {
+    auto tprfile = fileHandle.get();
+    return std::move(tprfile->mdParams());
+}
+
 TprFileHandle::TprFileHandle(std::shared_ptr<TprFile> tprFile) :
     tprFile_{std::move(tprFile)}
 {
@@ -330,8 +394,14 @@ TprFileHandle::TprFileHandle(TprFile &&tprFile) :
 {
 }
 
+std::shared_ptr<TprFile> TprFileHandle::get() const {
+    return tprFile_;
+}
+
 // defaulted here to delay definition until after member types are defined.
 TprFileHandle::~TprFileHandle() = default;
+
+GmxMdParams::~GmxMdParams() = default;
 
 } // end namespace gmxapicompat
 

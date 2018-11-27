@@ -17,7 +17,11 @@ class TprTestCase(unittest.TestCase):
         #self.assertRaises(UsageError, TprFile, 1, 'r')
         tprfile = TprFile(tpr_filename, 'r')
         with tprfile as fh:
-            pass
+            cpp_object = fh._tprFileHandle
+            assert not cpp_object is None
+            params = cpp_object.params()
+            assert "nsteps" in params
+            assert not "foo" in params
 
     def test_tprcopy(self):
         _, temp_filename = tempfile.mkstemp(suffix='.tpr')
