@@ -9,6 +9,7 @@
 #define GMXPY_TPRFILE_H
 
 #include <string>
+#include <vector>
 
 #include "exceptions.h"
 #include "mdparams.h"

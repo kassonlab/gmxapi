@@ -103,8 +103,8 @@ public:
     ~GmxMdParams();
     GmxMdParams(const GmxMdParams&) = delete;
     GmxMdParams& operator=(const GmxMdParams&) = delete;
-    GmxMdParams(GmxMdParams&&) = default;
-    GmxMdParams& operator=(GmxMdParams&&) = default;
+    GmxMdParams(GmxMdParams&&) noexcept;
+    GmxMdParams& operator=(GmxMdParams&&) noexcept;
 
     std::unique_ptr<GmxMdParamsImpl> params_;
 };
@@ -126,6 +126,22 @@ double extractParam(const gmxapicompat::GmxMdParams& params, const std::string& 
 
 void setParam(gmxapicompat::GmxMdParams* params, const std::string& name, double value);
 void setParam(gmxapicompat::GmxMdParams* params, const std::string& name, int64_t value);
+
+// Anonymous namespace to confine helper function definitions to file scope.
+namespace
+{
+
+bool isFloat(GmxapiType dataType)
+{
+    return (dataType == GmxapiType::gmxFloat64) || (dataType == GmxapiType::gmxFloat32);
+}
+
+bool isInt(GmxapiType dataType)
+{
+    return (dataType == GmxapiType::gmxInt64) || (dataType == GmxapiType::gmxInt32);
+}
+
+} // end anonymous namespace
 
 } // end namespace gmxapicompat
 
