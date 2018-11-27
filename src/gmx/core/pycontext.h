@@ -16,8 +16,11 @@
 namespace gmxpy
 {
 
-using MDArgs = std::vector<std::string>;
-
+class MDArgs
+{
+public:
+    std::vector<std::string> value;
+};
 
 /*!
  * \brief Wrapper for gmxapi::Context
