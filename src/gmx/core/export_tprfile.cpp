@@ -7,18 +7,18 @@
 
 namespace gmxpy {
 
-class PyTprFileHandle
-{
-    // C++ may need to extend the life of a TprFile object provided by the Python
-    // interpreter, so we use a reference-counted holder.
-    std::shared_ptr<TprFileHandle> filehandle_;
-};
-
 void detail::export_tprfile(pybind11::module &m)
 {
     namespace py = pybind11;
+    using gmxapicompat::TprFileHandle;
+    using gmxapicompat::readTprFile;
 
-    py::class_<PyTprFileHandle> tprfile(m, "TprFile");
+    py::class_<TprFileHandle> tprfile(m, "TprFile");
+
+    m.def("read_tprfile",
+            &readTprFile,
+            py::arg("filename"),
+            "Get a handle to a TPR file resource for a given file name.");
 
     m.def("copy_tprfile",
           &gmxpy::copy_tprfile,
