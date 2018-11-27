@@ -61,6 +61,8 @@ public:
     explicit TprFileHandle(std::shared_ptr<TprFile> tprFile);
     explicit TprFileHandle(TprFile&& tprFile);
     ~TprFileHandle();
+
+    std::shared_ptr<TprFile> get() const ;
 private:
     std::shared_ptr<TprFile> tprFile_;
 };
@@ -93,7 +95,9 @@ StructureSource getStructureSource(const TprFileHandle& filehandle);
  * \param fileHandle
  * \return
  */
-gmxapicompat::GmxMdParams getMdParams(const TprFileHandle& fileHandle);
+GmxMdParams getMdParams(const TprFileHandle& fileHandle);
+
+std::vector<std::string> keys(const GmxMdParams& params);
 
 // Anonymous namespace for a template that we want to define at file scope.
 namespace {

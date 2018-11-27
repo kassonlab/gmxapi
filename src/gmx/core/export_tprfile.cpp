@@ -4,6 +4,7 @@
 
 #include "core.h"
 #include "tprfile.h"
+#include <pybind11/stl.h>
 
 namespace gmxpy {
 
@@ -14,6 +15,11 @@ void detail::export_tprfile(pybind11::module &m)
     using gmxapicompat::readTprFile;
 
     py::class_<TprFileHandle> tprfile(m, "TprFile");
+    tprfile.def("params",
+            [](const TprFileHandle& self)
+            {
+                return gmxapicompat::keys(gmxapicompat::getMdParams(self));
+            });
 
     m.def("read_tprfile",
             &readTprFile,
