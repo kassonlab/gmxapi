@@ -7,6 +7,8 @@
 
 #include "tprfile.h"
 
+#include <cassert>
+
 #include <map>
 #include <memory>
 #include <string>

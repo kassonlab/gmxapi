@@ -6,6 +6,8 @@
  */
 #include "pycontext.h"
 
+#include <cassert>
+
 #include "gmxapi/gmxapi.h"
 #include "gmxapi/md.h"
 
