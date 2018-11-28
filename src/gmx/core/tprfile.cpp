@@ -201,6 +201,8 @@ public:
      */
     GmxMdParamsImpl();
 
+    explicit GmxMdParamsImpl(std::shared_ptr<TprFile> tprfile);
+
     /*!
      * \brief Get the current list of keys.
      *
@@ -239,12 +241,12 @@ public:
     {
         if (int64Params_.find(key) != int64Params_.end())
         {
-            int64Params_.at(key) = std::make_pair(value, true);
+            int64Params_[key] = std::make_pair(value, true);
         }
         else if (intParams_.find(key) != intParams_.end())
         {
             // TODO: check whether value is too large?
-            intParams_.at(key) = std::make_pair(static_cast<int>(value), true);
+            intParams_[key] = std::make_pair(static_cast<int>(value), true);
         }
         else
         {
@@ -256,12 +258,12 @@ public:
     {
         if (float64Params_.find(key) != float64Params_.end())
         {
-            float64Params_.at(key) = std::make_pair(value, true);
+            float64Params_[key] = std::make_pair(value, true);
         }
         else if (floatParams_.find(key) != floatParams_.end())
         {
             // TODO: check whether value is too large?
-            floatParams_.at(key) = std::make_pair(static_cast<float>(value), true);
+            floatParams_[key] = std::make_pair(static_cast<float>(value), true);
         }
         else
         {
@@ -277,18 +279,22 @@ public:
 //        this->set(key, value);
 //    }
 
+    TprFileHandle getSource() const
+    {
+        // Note: might return a null handle. Need to decide what that means and how to address it.
+        return TprFileHandle(source_);
+    }
+
 private:
 
-
+    // Hold the settable parameters and whether or not they have been set.
     // TODO: update to gmxapi named types?
-//    std::map<std::string, int64_t t_inputrec::*> int64Params_;
-//    std::map<std::string, int t_inputrec::*> intParams_;
-//    std::map<std::string, float t_inputrec::*> floatParams_;
-//    std::map<std::string, double t_inputrec::*> float64Params_;
     std::map<std::string, std::pair<int64_t, bool>> int64Params_;
     std::map<std::string, std::pair<int, bool>> intParams_;
     std::map<std::string, std::pair<float, bool>> floatParams_;
     std::map<std::string, std::pair<double, bool>> float64Params_;
+
+    std::shared_ptr<TprFile> source_;
 };
 
 void setParam(gmxapicompat::GmxMdParams *params, const std::string &name, double value)
@@ -305,25 +311,129 @@ void setParam(gmxapicompat::GmxMdParams *params, const std::string &name, int64_
     params->params_->set(name, value);
 }
 
-GmxMdParamsImpl::GmxMdParamsImpl()
+class TprFile
+{
+public:
+    explicit TprFile(const std::string& infile) :
+        irInstance_{std::make_unique<t_inputrec>()},
+        mtop_{std::make_unique<gmx_mtop_t>()},
+        state_{std::make_unique<t_state>()}
+    {
+        t_inputrec *ir = irInstance_.get();
+        read_tpx_state(infile.c_str(), ir, state_.get(), mtop_.get());
+    }
+    ~TprFile() = default;
+    TprFile(TprFile&& source) noexcept = default;
+    TprFile& operator=(TprFile&&) noexcept = default;
+
+    t_inputrec& inputRecord() const
+    {
+        assert(irInstance_);
+        return *irInstance_;
+    }
+
+    gmx_mtop_t& molecularTopology() const
+    {
+        assert(mtop_);
+        return *mtop_;
+    }
+
+    t_state& state() const
+    {
+        assert(state_);
+        return *state_;
+    }
+private:
+    // These types are not moveable in GROMACS 2019, so we use unique_ptr as a
+    // moveable wrapper to let TprFile be moveable.
+    std::unique_ptr<t_inputrec>  irInstance_;
+    std::unique_ptr<gmx_mtop_t>        mtop_;
+    std::unique_ptr<t_state>           state_;
+
+};
+
+/*!
+ * \brief A GmxMdParams implementation that depends on TPR files.
+ *
+ * \param tprfile
+ */
+GmxMdParamsImpl::GmxMdParamsImpl(std::shared_ptr<gmxapicompat::TprFile> tprfile) :
+        source_{std::move(tprfile)}
 {
     for (const auto& definition : int64Params())
     {
-        int64Params_[definition.first].second = {};
+        auto& params = int64Params_;
+
+        // the rest of this loop is copy->paste-able
+        const auto& key = definition.first;
+        auto memberPointer = definition.second;
+        if (source_)
+        {
+            auto& irInstance = source_->inputRecord();
+            auto fileValue = irInstance.*memberPointer;
+            params[key] = std::make_pair(fileValue, true);
+        } else
+        {
+            params[key] = {};
+        }
     }
     for (const auto& definition : int32Params())
     {
-        intParams_[definition.first].second = {};
+        auto& params = intParams_;
+
+        // the rest of this loop is copy->paste-able
+        const auto& key = definition.first;
+        auto memberPointer = definition.second;
+        if (source_)
+        {
+            auto& irInstance = source_->inputRecord();
+            auto fileValue = irInstance.*memberPointer;
+            params[key] = std::make_pair(fileValue, true);
+        } else
+        {
+            params[key] = {};
+        }
     }
     for (const auto& definition : float32Params())
     {
-        floatParams_[definition.first].second = {};
+        auto& params = floatParams_;
+
+        // the rest of this loop is copy->paste-able
+        const auto& key = definition.first;
+        auto memberPointer = definition.second;
+        if (source_)
+        {
+            auto& irInstance = source_->inputRecord();
+            auto fileValue = irInstance.*memberPointer;
+            params[key] = std::make_pair(fileValue, true);
+        } else
+        {
+            params[key] = {};
+        }
     }
     for (const auto& definition : float64Params())
     {
-        float64Params_[definition.first].second = {};
+        auto& params = float64Params_;
+
+        // the rest of this loop is copy->paste-able
+        const auto& key = definition.first;
+        auto memberPointer = definition.second;
+        if (source_)
+        {
+            auto& irInstance = source_->inputRecord();
+            auto fileValue = irInstance.*memberPointer;
+            params[key] = std::make_pair(fileValue, true);
+        } else
+        {
+            params[key] = {};
+        }
     }
+
 }
+
+GmxMdParamsImpl::GmxMdParamsImpl() :
+        GmxMdParamsImpl(nullptr)
+{}
 
 template<>
 int GmxMdParamsImpl::extract<int>(const std::string& key) const {
@@ -459,63 +569,6 @@ std::vector<std::string> keys(const GmxMdParams &params) {
     return params.params_->keys();
 }
 
-class TprFile
-{
-public:
-    explicit TprFile(const std::string& infile) :
-        irInstance{std::make_unique<t_inputrec>()},
-        mtop{std::make_unique<gmx_mtop_t>()},
-        state{std::make_unique<t_state>()}
-    {
-        t_inputrec *ir = irInstance.get();
-        read_tpx_state(infile.c_str(), ir, state.get(), mtop.get());
-    }
-    ~TprFile() = default;
-    TprFile(TprFile&& source) noexcept = default;
-    TprFile& operator=(TprFile&&) noexcept = default;
-
-    GmxMdParams mdParams()
-    {
-        assert(irInstance != nullptr);
-        auto params = GmxMdParams();
-        for (const auto& definition : int64Params())
-        {
-            const auto& key = definition.first;
-            auto memberPointer = definition.second;
-            auto fileValue = (*irInstance).*memberPointer;
-            setParam(&params, key, fileValue);
-        }
-        for (const auto& definition : int32Params())
-        {
-            const auto& key = definition.first;
-            auto memberPointer = definition.second;
-            auto fileValue = (*irInstance).*memberPointer;
-            setParam(&params, key, static_cast<int64_t>(fileValue));
-        }
-        for (const auto& definition : float32Params())
-        {
-            const auto& key = definition.first;
-            auto memberPointer = definition.second;
-            auto fileValue = (*irInstance).*memberPointer;
-            setParam(&params, key, fileValue);
-        }
-        for (const auto& definition : float64Params())
-        {
-            const auto& key = definition.first;
-            auto memberPointer = definition.second;
-            auto fileValue = (*irInstance).*memberPointer;
-            setParam(&params, key, fileValue);
-        }
-        return {std::move(params)};
-    };
-private:
-    // These types are not moveable in GROMACS 2019, so we use unique_ptr as a
-    // moveable wrapper to let TprFile be moveable.
-    std::unique_ptr<t_inputrec>  irInstance;
-    std::unique_ptr<gmx_mtop_t>        mtop;
-    std::unique_ptr<t_state>           state;
-
-};
 
 TprFileHandle readTprFile(const std::string& filename) {
     auto tprfile = gmxapicompat::TprFile(filename);
@@ -525,8 +578,11 @@ TprFileHandle readTprFile(const std::string& filename) {
 
 GmxMdParams getMdParams(const TprFileHandle &fileHandle) {
     auto tprfile = fileHandle.get();
+    // TODO: convert to exception / decide whether null handles are allowed.
     assert(tprfile);
-    return std::move(tprfile->mdParams());
+    GmxMdParams params;
+    params.params_ = std::make_unique<GmxMdParamsImpl>(tprfile);
+    return params;
 }
 
 TprFileHandle::TprFileHandle(std::shared_ptr<TprFile> tprFile) :
