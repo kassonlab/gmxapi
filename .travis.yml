@@ -39,6 +39,7 @@ addons:
     - cmake
     - cmake-data
     - doxygen
+    - g++-6
     - libblas-dev
     - libcr-dev
     - libfftw3-dev
