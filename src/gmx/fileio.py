@@ -147,6 +147,20 @@ def read_tpr(tprfile=None):
 
     return _SimulationInput(tprfile)
 
+# In initial implementation, we extract the entire TPR file contents through the
+# TPR-backed GmxMdParams implementation.
+def writeTprFile(output, params=None, structure=None, topology=None, state=None):
+    if topology is not None:
+        raise gmx.exceptions.FeatureNotAvailableError("Can't rewrite topology yet.")
+    if structure is not None:
+        raise gmx.exceptions.FeatureNotAvailableError("Can't rewrite structure yet.")
+    if state is not None:
+        raise gmx.exceptions.FeatureNotAvailableError("Can't rewrite state yet.")
+    if not isinstance(params, gmx.core.SimulationParameters):
+        raise gmx.exceptions.TypeError("You must provide a gmx.core.SimulationParameters object to `params` as input.")
+    gmx.core.writeTpr(output,  params)
+
+
 class TrajectoryFile:
     """Provides an interface to Gromacs supported trajectory file formats.
 

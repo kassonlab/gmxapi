@@ -56,19 +56,49 @@ class TprFile;
  *
  * Can provide StructureSource, TopologySource, GmxMdParams, and SimulationState
  */
-class TprFileHandle
+class TprReadHandle
 {
 public:
-    explicit TprFileHandle(std::shared_ptr<TprFile> tprFile);
-    explicit TprFileHandle(TprFile&& tprFile);
-    ~TprFileHandle();
+    explicit TprReadHandle(std::shared_ptr<TprFile> tprFile);
+    explicit TprReadHandle(TprFile&& tprFile);
+    ~TprReadHandle();
 
     std::shared_ptr<TprFile> get() const ;
 private:
     std::shared_ptr<TprFile> tprFile_;
 };
 
-TprFileHandle readTprFile(const std::string& filename);
+/*!
+ * \brief Open a TPR file and retrieve a handle.
+ *
+ * \param filename Path of file to read.
+ * \return handle that may share ownership of TPR file resource.
+ */
+TprReadHandle readTprFile(const std::string& filename);
+
+/*!
+ * \brief Write a new TPR file to the filesystem with the provided contents.
+ *
+ * \param filename output file path
+ * \param params simulation parameters
+ * \param structure system structure (atomic configuration)
+ * \param state simulation state
+ * \param topology molecular topology
+ */
+void writeTprFile(const std::string &filename,
+                  const GmxMdParams &params,
+                  const StructureSource &structure,
+                  const SimulationState &state,
+                  const TopologySource &topology);
+
+/*!
+ * \brief Helper function for early implementation.
+ *
+ * Allows extraction of TPR file information from special params objects.
+ *
+ * \todo This is a very temporary shim!
+ */
+TprReadHandle getSourceFileHandle(const GmxMdParams &params);
 
 /*!
  * \brief
@@ -78,7 +108,7 @@ TprFileHandle readTprFile(const std::string& filename);
  * \todo replace with a helper template on T::topologySource() member function existence.
  */
 
-TopologySource getTopologySource(const TprFileHandle& filehandle);
+TopologySource getTopologySource(const TprReadHandle& filehandle);
 
 /*!
  * \brief
@@ -87,96 +117,50 @@ TopologySource getTopologySource(const TprFileHandle& filehandle);
  *
  * \todo template on T::simulationState() member function existence.
  */
-SimulationState getSimulationState(const TprFileHandle& filehandle);
+SimulationState getSimulationState(const TprReadHandle& filehandle);
 
-StructureSource getStructureSource(const TprFileHandle& filehandle);
+StructureSource getStructureSource(const TprReadHandle& filehandle);
 
 /*!
  * \brief Get an initialized parameters structure.
  * \param fileHandle
  * \return
  */
-GmxMdParams getMdParams(const TprFileHandle& fileHandle);
+GmxMdParams getMdParams(const TprReadHandle& fileHandle);
 
 std::vector<std::string> keys(const GmxMdParams& params);
 
+class StructureSource
+{
+public:
+    std::shared_ptr<TprFile> tprFile_;
+};
 
-///*!
-// * \brief Extract a parameter to the requested type.
-// *
-// * \tparam T
-// * \param params
-// * \param name
-// * \return
-// *
-// * \throws KeyError if parameter cannot be mapped.
-// * \throws TypeError if parameter type cannot be converted to T.
-// */
-//template<typename T>
-//T extractParam(const gmxapi_compat::GmxMdParams& params, const std::string& name)
-//{
-//    gmxapi_compat::GmxapiType paramType;
-//    try
-//    {
-//        paramType = gmxapi_compat::mdParamToType(name);
-//    }
-//    catch(const gmxapi_compat::ValueError& e)
-//    {
-//        throw gmxapi_compat::KeyError("No parameter entry for this name and type.");
-//    }
-//
-//    // If
-//    if (paramType)
-//    {}
-//    else
-//    {}
-//
-//    return {};
-//}
+class TopologySource
+{
+public:
+    std::shared_ptr<TprFile> tprFile_;
+};
+
+class SimulationState
+{
+public:
+    std::shared_ptr<TprFile> tprFile_;
+};
 
 } // end namespace gmxapicompat
 
 namespace gmxpy
 {
-/*!
- * \brief Get a dictionary of MDP key-value pairs from a TPR file.
- *
- * \param filename TPR file name
- *
- * \return key-value pairs from filename
- *
- * \todo Move this to gmxapicompat to provide abstraction for different versions.
- * * handle GROMACS 2019, GROMACS master with and without feature
- * * handle TPR versions from GROMACS 2018 and later
- */
-//pybind11::dict read_mdparams(const std::string &filename) {
-//    using namespace pybind11::literals; // to bring in the `_a` literal
-//
-//    const char *topology_filename = filename.c_str();
-//    t_inputrec irInstance;
-//    t_inputrec *ir = &irInstance;
-//    gmx_mtop_t mtop;
-//    t_state state;
-//    read_tpx_state(topology_filename, ir, &state, &mtop);
-//
-//    return pybind11::dict("nsteps"_a = ir->nsteps);
-//}
 
 /*!
- * \brief Write a TPR file using the provided input.
+ * \brief Copy TPR file.
  *
- * \param filename output file name.
- * \param parameters GROMACS input parameters
- * \param structure atomic configuration
- * \param topology molecular topology information
+ * \param input TPR source to copy from
+ * \param outfile output TPR file name
+ * \return true if successful. else false.
  */
-//void write_tpr(const std::string &filename,
-//               pybind11::dict parameters,
-//               const StructureSource &structureSource,
-//               const TopologySource &topology) {
-//
-//    write_tpx_state(filename.c_str(), ir, &state, &mtop);
-//}
+bool copy_tprfile(const gmxapicompat::TprReadHandle& input, std::string outfile);
 
 /*!
  * \brief Copy and possibly update TPR file by name.
