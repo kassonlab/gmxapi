@@ -126,6 +126,8 @@ double extractParam(const gmxapicompat::GmxMdParams& params, const std::string& 
 
 void setParam(gmxapicompat::GmxMdParams* params, const std::string& name, double value);
 void setParam(gmxapicompat::GmxMdParams* params, const std::string& name, int64_t value);
+// TODO: unsetParam
+
 
 // Anonymous namespace to confine helper function definitions to file scope.
 namespace
