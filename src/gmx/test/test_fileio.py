@@ -19,7 +19,7 @@ class TprTestCase(unittest.TestCase):
         with tprfile as fh:
             cpp_object = fh._tprFileHandle
             assert not cpp_object is None
-            params = cpp_object.params()
+            params = cpp_object.params().extract()
             assert "nsteps" in params
             assert not "foo" in params
 
