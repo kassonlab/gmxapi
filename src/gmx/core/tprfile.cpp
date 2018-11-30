@@ -22,7 +22,6 @@ bool gmxpy::copy_tprfile(std::string infile, std::string outfile, double until_t
     bool success = false;
 
     const char * top_fn = infile.c_str();
-    fprintf(stderr, "Reading toplogy and stuff from %s\n", top_fn);
 
     t_inputrec  irInstance;
     t_inputrec *ir = &irInstance;
@@ -47,17 +46,7 @@ bool gmxpy::copy_tprfile(std::string infile, std::string outfile, double until_t
     int64_t run_step = ir->init_step;
     double run_t    = ir->init_step*ir->delta_t + ir->init_t;
 
-    // \todo log
-    printf("nsteps = %s, run_step = %s, current_t = %g, until = %g\n",
-           gmx_step_str(ir->nsteps, buf),
-           gmx_step_str(run_step, buf2),
-           run_t, until_t);
-
     ir->nsteps = static_cast<int64_t>((until_t - run_t)/ir->delta_t + 0.5);
-
-    // \todo log
-    printf("Extending remaining runtime until %g ps (now %s steps)\n",
-           until_t, gmx_step_str(ir->nsteps, buf));
 
     ir->init_step = run_step;
 

@@ -23,8 +23,6 @@ namespace gmxpy
  */
 bool copy_tprfile(std::string infile, std::string outfile, double end_time);
 
-
-
-}
+} // end namespace gmxpy
 
 #endif //GMXPY_TPRFILE_H
