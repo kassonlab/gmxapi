@@ -117,10 +117,11 @@ void setMDArgs(std::vector<std::string>* mdargs, py::dict params)
 void export_context(py::module &m)
 {
     // Add argument type before it is used for more sensible automatic bindings behavior.
-    using gmxpy::MDArgs;
     py::class_<MDArgs, std::unique_ptr<MDArgs>> mdargs(m, "MDArgs");
     mdargs.def(py::init(), "Create an empty MDArgs object.");
-    mdargs.def("set", &setMDArgs, "Assign parameters in MDArgs from Python dict.");
+    mdargs.def("set",
+            [](MDArgs* self, py::dict params){ setMDArgs(&self->value, params); },
+            "Assign parameters in MDArgs from Python dict.");
 
     // Export execution context class
     py::class_<PyContext, std::shared_ptr<PyContext>> context(m, "Context");

@@ -17,7 +17,7 @@ namespace gmxpy
 
 void PyContext::setMDArgs(const MDArgs &mdArgs) {
     assert(context_);
-    context_->setMDArgs(mdArgs);
+    context_->setMDArgs(mdArgs.value);
 }
 
 std::shared_ptr<gmxapi::Session> PyContext::launch(const gmxapi::Workflow &work) {
