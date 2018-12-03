@@ -560,6 +560,7 @@ class DefaultContext(_libgromacsContext):
     """
     def __init__(self, work):
         # There is very little context abstraction at this point...
+        warnings.warn("Behavior of DefaultContext is unspecified starting in gmxapi 0.0.8.", DeprecationWarning)
         super(DefaultContext, self).__init__(work)
 
 class Context(object):
