@@ -38,6 +38,7 @@ Procedural interface
 .. alphabetize the functions except for gmx.run (put first)
 
 - :func:`gmx.run`
+- :func:`gmx.commandline_operation`
 - :func:`gmx.get_context`
 - :func:`gmx.workflow.from_tpr`
 - :func:`gmx.workflow.get_source_elements`
@@ -50,6 +51,8 @@ Procedural interface
    `__all__`. But it would be nice if we could generate side-bar contents entries...
 
 .. autofunction:: gmx.run
+
+.. autofunction:: gmx.commandline_operation
 
 .. autofunction:: gmx.get_context
 

@@ -103,6 +103,137 @@ def run(work=None):
     return status
 
 
+def commandline_operation(executable=None, shell=False, arguments=None, keyword_arguments=None):
+    """Execute in a subprocess.
+
+    Configure an executable in a subprocess. Executes when run in an execution
+    Context, as part of a work graph or via gmx.run(). Runs in the current
+    working directory.
+
+    Shell processing is not enabled, but can be considered for a future version.
+    This means that shell expansions such as environment variables, globbing (`*`),
+    and other special symbols (like `~` for home directory) are not available.
+    This allows a simpler and more robust implementation, as well as a better
+    ability to uniquely identify the effects of a command line operation. If you
+    think this disallows important use cases, please let us know.
+
+    Arguments:
+         arguments : a single tuple (or list)
+         keyword_arguments : a dictionary of keyword arguments
+
+    Arguments are iteratively added to the command line with standard Python
+    iteration, so you should use a tuple or list even if you have only one parameter.
+    I.e. If you provide a string with `arguments="asdf"` then it will be passed as
+    `... "a" "s" "d" "f"`. To pass a single string argument, `arguments=("asdf")`
+    or `arguments=["asdf"]`.
+
+    `keyword_arguments` should be a dictionary with string keys, where the keys
+    name command line "flags" or options. For example, to execute a command that
+    takes a file name as an option (stored in a local Python variable `my_filename`)
+    and a `origin` flag that uses the next three arguments to define a vector:
+
+        keyword_arguments = {'-f': my_filename, '--origin': [1.0, 2.0, 3.0]}
+
+    Returns:
+        An Operation to invoke local subprocess(es)
+
+    Note:
+        STDOUT is available if a consuming operation is bound to `output.stdout`.
+        STDERR is available if a consuming operation is bound to `output.stderr`.
+        Otherwise, STDOUT and/or STDERR is(are) closed when command is called.
+
+    Warning:
+        Commands using STDIN cannot be used and is closed when command is called.
+
+    """
+    import subprocess
+    import os
+    if shell != False:
+        raise exceptions.UsageError("Operation does not support shell processing.")
+    command = ""
+    try:
+        fpath = os.path.abspath(executable)
+        if os.access(fpath, os.X_OK):
+            command = str(fpath)
+    except:
+        # We could handle specific errors, but right now we only care
+        # whether we have something we can run.
+        pass
+    args = []
+    if command != "":
+        args = [command]
+        # To do: better handling of iterables
+        if arguments is not None:
+            for arg in arguments:
+                args.append(str(arg))
+        if keyword_arguments is not None:
+            for kwarg in keyword_arguments:
+                args.append(str(kwarg))
+                for arg in keyword_arguments[kwarg]:
+                    args.append(str(arg))
+
+    class CommandlineOperation(object):
+        def __init__(self, command):
+            self.command = command
+
+            self.__input = {}
+            self.__output = {}
+
+        @property
+        def input(self):
+            """Operation graph input(s) not implemented."""
+            # value = object()
+            # value.stdin = self.__input['stdin']
+            # return value
+            raise exceptions.FeatureNotAvailableError("command_line operation input ports not implemented (yet).")
+
+        # Provide an `output` attribute that is an object with properties for
+        # each output port.
+        @property
+        def output(self):
+            """Graph output(s) for the operation, if bound to subscribers.
+
+            The subprocess is executed with STDOUT and STDERR closed, by default.
+            But if a consuming operation is bound to one of the output ports,
+            output.stdout or output.stderr, then the output of the command is
+            captured and stored.
+
+            To do: we should take precautions to handle buffering and memory
+            tidiness. The session manager could make sure that the output buffers
+            for the subprocess are read frequently and published to subscribers,
+            but it might make sense to require that stdout and stderr are at
+            least intermediately sent directly to files until the operation is
+            completed and the output filehandles closed, such that a command
+            line operation produces a single clear data event when it completes.
+            """
+            # This will need to be a class instance with more sophisticated
+            # property attributes in the future...
+            _output = {}
+            if 'stdout' in self.__output:
+                _output['stdout'] = self.__output['stdout']
+            if 'stderr' in self.__output:
+                _output['stderr'] = self.__output['stderr']
+            if 'returncode' in self.__output:
+                _output['returncode'] = self.__output['returncode']
+
+            return _output
+
+        def __call__(self):
+            # try:
+            #     subprocess.check_call()
+            # except:
+            #     pass
+
+            # To do: do not inherit file descriptors 0, 1, and 2 from parent
+            self.__output['returncode'] = subprocess.call(self.command, shell=shell)
+            # return self.output.returncode == 0
+            return self.output['returncode'] == 0
+
+    operation = None
+    if len(args) > 0:
+        operation = CommandlineOperation(args)
+    return operation
+
 # if __name__ == "__main__":
 #     import doctest
 #     import gmx
