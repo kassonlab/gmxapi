@@ -73,37 +73,10 @@ class BindingsTestCase(unittest.TestCase):
         session = apisystem.launch(context)
         assert hasattr(session, 'run')
         session.run()
-        # Test rerunability
-        # system = gmx.System()
-        # runner = gmx.runner.SimpleRunner()
-        # runner._runner = apirunner
-        # system.runner = runner
-        # assert isinstance(system, gmx.System)
-        # assert isinstance(system.runner, gmx.runner.Runner)
-        # assert isinstance(system.runner._runner, gmx.core.SimpleRunner)
-        # with gmx.context.DefaultContext(system.runner) as session:
-        #     session.run()
-    def test_SystemFromTpr(self):
-        system = gmx.System._from_file(tpr_filename)
-        system.run()
-    # def test_Extension(self):
-    #     import pytest
-    #     # Test attachment of external code
-    #     system = gmx.System._from_file(tpr_filename)
-    #     potential = gmx.core.TestModule()
-    #     assert isinstance(potential, gmx.core.MDModule)
-    #     system.add_potential(potential)
-    #
-    #     assert hasattr(potential, "bind")
-    #     generic_object = object()
-    #     with pytest.raises(Exception) as exc_info:
-    #         potential.bind(generic_object)
-    #     assert str(exc_info).endswith("MDModule bind method requires properly named PyCapsule input.")
-    #
-    #     with gmx.context.DefaultContext(system.workflow) as session:
-    #         session.run()
 
+# Ignore deprecation warning from networkx...
 @pytest.mark.usefixtures("cleandir")
+@pytest.mark.filterwarnings("ignore:Using or importing the ABCs from 'collections'")
 @pytest.mark.usefixtures("caplog")
 def test_simpleSimulation(caplog):
     """Load a work specification with a single TPR file and run."""
