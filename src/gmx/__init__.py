@@ -152,15 +152,42 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
         raise exceptions.UsageError("Operation does not support shell processing.")
     command = ""
     try:
-        fpath = os.path.abspath(executable)
-        if os.access(fpath, os.X_OK):
-            command = str(fpath)
+        if os.path.exists(executable):
+            fpath = os.path.abspath(executable)
+            if os.access(fpath, os.X_OK):
+                command = str(fpath)
+        else:
+            # Try to find the executable on the default PATH
+            try:
+                from shutil import which
+            except:
+                # Python 2 compatibility, from
+                #  https://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
+                def which(program):
+                    import os
+                    def is_exe(fpath):
+                        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+                    fpath, fname = os.path.split(program)
+                    if fpath:
+                        if is_exe(program):
+                            return program
+                    else:
+                        for path in os.environ["PATH"].split(os.pathsep):
+                            exe_file = os.path.join(path, program)
+                            if is_exe(exe_file):
+                                return exe_file
+
+                    return None
+            command = which(executable)
     except:
         # We could handle specific errors, but right now we only care
         # whether we have something we can run.
         pass
     args = []
-    if command != "":
+    if command is None or command == "":
+        raise exceptions.UsageError("Need an executable command.")
+    else:
         args = [command]
         # To do: better handling of iterables
         if arguments is not None:
@@ -215,7 +242,6 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
                 _output['stderr'] = self.__output['stderr']
             if 'returncode' in self.__output:
                 _output['returncode'] = self.__output['returncode']
-
             return _output
 
         def __call__(self):
@@ -225,13 +251,22 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
             #     pass
 
             # To do: do not inherit file descriptors 0, 1, and 2 from parent
-            self.__output['returncode'] = subprocess.call(self.command, shell=shell)
+            try:
+                returncode = subprocess.check_call(self.command, shell=shell)
+            except subprocess.CalledProcessError as e:
+                returncode = e.returncode
+                # What should we do with error (non-zero) exit codes?
+                logger.info("commandline operation had non-zero return status when calling {}".format(e.cmd))
+                self.__output['erroroutput'] = e.output
+            self.__output['returncode'] = returncode
             # return self.output.returncode == 0
             return self.output['returncode'] == 0
 
     operation = None
     if len(args) > 0:
         operation = CommandlineOperation(args)
+    else:
+        raise exceptions.UsageError("No command line could be constructed.")
     return operation
 
 # if __name__ == "__main__":

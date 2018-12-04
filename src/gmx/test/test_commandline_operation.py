@@ -8,7 +8,7 @@ import gmx
 class CommandLineOperationTestCase(unittest.TestCase):
     """Test creation and execution of command line wrapper."""
     def test_true(self):
-        operation = gmx.commandline_operation(executable='/usr/bin/true')
+        operation = gmx.commandline_operation(executable='true')
         assert not 'stdout' in operation.output
         assert not 'stderr' in operation.output
         assert not 'returncode' in operation.output
@@ -25,7 +25,7 @@ class CommandLineOperationTestCase(unittest.TestCase):
         assert operation.output['returncode'] == 0
 
     def test_false(self):
-        operation = gmx.commandline_operation(executable='/usr/bin/false')
+        operation = gmx.commandline_operation(executable='false')
         assert not 'stdout' in operation.output
         assert not 'stderr' in operation.output
         assert not 'returncode' in operation.output
@@ -42,7 +42,7 @@ class CommandLineOperationTestCase(unittest.TestCase):
         assert operation.output['returncode'] == 1
 
     def test_echo(self):
-        operation = gmx.commandline_operation(executable='/bin/echo', arguments=['hi there'])
+        operation = gmx.commandline_operation(executable='echo', arguments=['hi there'])
         success = operation()
         assert success
         assert not 'stdout' in operation.output
