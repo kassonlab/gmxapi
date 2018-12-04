@@ -148,6 +148,12 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
     """
     import subprocess
     import os
+    if hasattr(os, 'devnull'):
+        devnull = os.devnull
+    elif os.path.exists('/dev/null'):
+        devnull = '/dev/null'
+    else:
+        devnull = None
     if shell != False:
         raise exceptions.UsageError("Operation does not support shell processing.")
     command = ""
@@ -245,14 +251,19 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
             return _output
 
         def __call__(self):
-            # try:
-            #     subprocess.check_call()
-            # except:
-            #     pass
-
-            # To do: do not inherit file descriptors 0, 1, and 2 from parent
+            # File descriptors 0, 1, and 2 are inherited from parent and we don't
+            # want to close them for the parent, so we need to redirect or close
+            # them in the subprocess. Setting to the null device is probably
+            # sufficient, but it might not be easy to find on all systems.
+            # Python 3.3+ has better support.
+            # To do: Handle input and output flow.
+            null_filehandle = open(devnull, 'w')
             try:
-                returncode = subprocess.check_call(self.command, shell=shell)
+                returncode = subprocess.check_call(self.command,
+                                                   shell=shell,
+                                                   stdin=null_filehandle,
+                                                   stdout=null_filehandle,
+                                                   stderr=null_filehandle)
             except subprocess.CalledProcessError as e:
                 returncode = e.returncode
                 # What should we do with error (non-zero) exit codes?
