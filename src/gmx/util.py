@@ -12,7 +12,7 @@ import os
 __all__ = []
 
 from gmx.exceptions import UsageError
-from gmx.exceptions import FileError
+from gmx.exceptions import ValueError
 
 def _filetype(filename):
     """Use Gromacs file I/O module to identify known file types.
@@ -112,9 +112,51 @@ def to_string(input):
             value = string.decode('utf-8')
     return value
 
+def which(command):
+    """
+    Get the full path of an executable that can be resolved by the shell.
+
+    :param command: executable in the user's PATH
+    :return: Absolute path of executable.
+
+    Ref: https://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
+    """
+    try:
+        command_path = to_utf8(command)
+    except:
+        raise ValueError("Argument must be representable on the command line.")
+    if os.path.exists(command_path):
+        command_path = os.path.abspath(command_path)
+        if os.access(command_path, os.X_OK):
+            return command_path
+    else:
+        # Try to find the executable on the default PATH
+        try:
+            # available in Python 3
+            from shutil import which
+        except:
+            # Python 2 compatibility, from
+            # https://stackoverflow.com/a/377028/5351807
+            def which(program):
+                import os
+                is_exe = lambda fpath: os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+                fpath, fname = os.path.split(program)
+                if fpath:
+                    if is_exe(program):
+                        return program
+                else:
+                    for path in os.environ["PATH"].split(os.pathsep):
+                        exe_file = os.path.join(path, program)
+                        if is_exe(exe_file):
+                            return exe_file
+                return None
+
+        return which(command)
+
 def _test():
-        import doctest
-        doctest.testmod()
+    import doctest
+    doctest.testmod()
 
 if __name__ == "__main__":
     _test()
