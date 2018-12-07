@@ -171,34 +171,7 @@ def commandline_operation(executable=None, shell=False, arguments=None, input=No
         raise exceptions.UsageError("Operation does not support shell processing.")
     command = ""
     try:
-        if os.path.exists(executable):
-            fpath = os.path.abspath(executable)
-            if os.access(fpath, os.X_OK):
-                command = str(fpath)
-        else:
-            # Try to find the executable on the default PATH
-            try:
-                from shutil import which
-            except:
-                # Python 2 compatibility, from
-                #  https://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
-                def which(program):
-                    import os
-                    def is_exe(fpath):
-                        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
-
-                    fpath, fname = os.path.split(program)
-                    if fpath:
-                        if is_exe(program):
-                            return program
-                    else:
-                        for path in os.environ["PATH"].split(os.pathsep):
-                            exe_file = os.path.join(path, program)
-                            if is_exe(exe_file):
-                                return exe_file
-
-                    return None
-            command = which(executable)
+        command = util.which(executable)
     except:
         # We could handle specific errors, but right now we only care
         # whether we have something we can run.
