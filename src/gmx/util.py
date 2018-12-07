@@ -9,8 +9,6 @@ from __future__ import unicode_literals
 import sys
 import os
 
-__all__ = []
-
 from gmx.exceptions import UsageError
 from gmx.exceptions import ValueError
 
