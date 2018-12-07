@@ -103,7 +103,7 @@ def run(work=None):
     return status
 
 
-def commandline_operation(executable=None, shell=False, arguments=None, keyword_arguments=None):
+def commandline_operation(executable=None, shell=False, arguments=None, input=None, output=None):
     """Execute in a subprocess.
 
     Configure an executable in a subprocess. Executes when run in an execution
@@ -118,8 +118,9 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
     think this disallows important use cases, please let us know.
 
     Arguments:
-         arguments : a single tuple (or list)
-         keyword_arguments : a dictionary of keyword arguments
+         arguments : a single tuple (or list) to be the first arguments to `executable`
+         input : mapping of command line flags to input filename arguments
+         output : mapping of command line flags to output filename arguments
 
     Arguments are iteratively added to the command line with standard Python
     iteration, so you should use a tuple or list even if you have only one parameter.
@@ -127,12 +128,19 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
     `... "a" "s" "d" "f"`. To pass a single string argument, `arguments=("asdf")`
     or `arguments=["asdf"]`.
 
-    `keyword_arguments` should be a dictionary with string keys, where the keys
-    name command line "flags" or options. For example, to execute a command that
-    takes a file name as an option (stored in a local Python variable `my_filename`)
-    and a `origin` flag that uses the next three arguments to define a vector:
+    `input` and `output` should be a dictionary with string keys, where the keys
+    name command line "flags" or options.
 
-        keyword_arguments = {'-f': my_filename, '--origin': [1.0, 2.0, 3.0]}
+    Example:
+        Execute a command named `exe` that takes a flagged option for file name
+        (stored in a local Python variable `my_filename`) and an `origin` flag
+        that uses the next three arguments to define a vector.
+
+            >>> import gmx
+            >>> from gmx import commandline_operation as cli
+            >>> my_filename = "somefilename"
+            >>> my_op = cli('exe', arguments=['--origin', 1.0, 2.0, 3.0], input={'-f': my_filename})
+            >>> gmx.run(my_op)
 
     Returns:
         An Operation to invoke local subprocess(es)
@@ -145,9 +153,14 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
     Warning:
         Commands using STDIN cannot be used and is closed when command is called.
 
+    Todo:
+        We can be more helpful about managing the work graph for operations, but
+        we need to resolve issue #90 and others first.
+
     """
     import subprocess
     import os
+    from gmx import util
     if hasattr(os, 'devnull'):
         devnull = os.devnull
     elif os.path.exists('/dev/null'):
@@ -190,20 +203,42 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
         # We could handle specific errors, but right now we only care
         # whether we have something we can run.
         pass
-    args = []
+    command_args = []
     if command is None or command == "":
         raise exceptions.UsageError("Need an executable command.")
     else:
-        args = [command]
-        # To do: better handling of iterables
+        command_args = [util.to_utf8(command)]
+        # If we can confirm that we are handling iterables well, we can update
+        # the documentation, revising the warning about single string arguments
+        # and noting the automatic conversion of single scalars.
+        #
+        # Strings are iterable, but we want to treat them as scalars.
+        if isinstance(arguments, (str, bytes)):
+            arguments = [arguments]
+        # Python 2 compatibility:
+        try:
+            if isinstance(arguments, unicode):
+                arguments = [arguments]
+        except NameError as e:
+            # Python 3 does not have unicode type
+            pass
         if arguments is not None:
             for arg in arguments:
-                args.append(str(arg))
-        if keyword_arguments is not None:
-            for kwarg in keyword_arguments:
-                args.append(str(kwarg))
-                for arg in keyword_arguments[kwarg]:
-                    args.append(str(arg))
+                command_args.append(util.to_utf8(arg))
+
+        if input is not None:
+            for kwarg in input:
+                # the flag
+                command_args.append(util.to_utf8(kwarg))
+                # the filename argument
+                command_args.append(util.to_utf8(input[kwarg]))
+
+        if output is not None:
+            for kwarg in input:
+                # the flag
+                command_args.append(util.to_utf8(kwarg))
+                # the filename argument
+                command_args.append(util.to_utf8(input[kwarg]))
 
     class CommandlineOperation(object):
         def __init__(self, command):
@@ -214,7 +249,10 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
 
         @property
         def input(self):
-            """Operation graph input(s) not implemented."""
+            """Operation graph input(s) not implemented.
+
+            See issue #203
+            """
             # value = object()
             # value.stdin = self.__input['stdin']
             # return value
@@ -274,8 +312,8 @@ def commandline_operation(executable=None, shell=False, arguments=None, keyword_
             return self.output['returncode'] == 0
 
     operation = None
-    if len(args) > 0:
-        operation = CommandlineOperation(args)
+    if len(command_args) > 0:
+        operation = CommandlineOperation(command_args)
     else:
         raise exceptions.UsageError("No command line could be constructed.")
     return operation
