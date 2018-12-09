@@ -14,7 +14,7 @@ import unittest
 import gmx
 from gmx.exceptions import Error
 from gmx.exceptions import UsageError
-from gmx.exceptions import OptionalFeatureNotAvailableError
+from gmx.exceptions import FeatureNotAvailableError
 
 # Note: should note API level...
 
@@ -28,10 +28,10 @@ class ExceptionTestCase(unittest.TestCase):
         self.assertTrue(isinstance(exception, UsageError))
         self.assertTrue(isinstance(exception, Error))
         try:
-            raise OptionalFeatureNotAvailableError("description of feature requirement")
-        except gmx.exceptions.OptionalFeatureNotAvailableError as e:
+            raise FeatureNotAvailableError("description of feature requirement")
+        except gmx.exceptions.FeatureNotAvailableError as e:
             exception = e
-        self.assertTrue(isinstance(exception, OptionalFeatureNotAvailableError))
+        self.assertTrue(isinstance(exception, FeatureNotAvailableError))
         self.assertTrue(isinstance(exception, Error))
 
 if __name__ == '__main__':
