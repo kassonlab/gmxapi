@@ -149,16 +149,59 @@ def read_tpr(tprfile=None):
 
 # In initial implementation, we extract the entire TPR file contents through the
 # TPR-backed GmxMdParams implementation.
-def writeTprFile(output, params=None, structure=None, topology=None, state=None):
-    if topology is not None:
-        raise gmx.exceptions.FeatureNotAvailableError("Can't rewrite topology yet.")
-    if structure is not None:
-        raise gmx.exceptions.FeatureNotAvailableError("Can't rewrite structure yet.")
-    if state is not None:
-        raise gmx.exceptions.FeatureNotAvailableError("Can't rewrite state yet.")
-    if not isinstance(params, gmx.core.SimulationParameters):
-        raise gmx.exceptions.TypeError("You must provide a gmx.core.SimulationParameters object to `params` as input.")
-    gmx.core.writeTpr(output,  params)
+def writeTprFile(output, input=None):
+    """
+    Create a new TPR file, combining user-provided input.
+
+    .. versionadded:: 0.0.8
+        Initial version of this tool does not know how to generate a valid simulation
+        run input file from scratch, so it requires input derived from an already valid
+        TPR file.
+
+    The simulation input object should provide the gmx simulation_input interface,
+    with output ports for `parameters`, `structure`, `topology`, and `state`, such
+    as a TprFileHandle
+
+    Arguments
+        output: TPR file name to write.
+        input: simulation input data from which to write a simulation run input file.
+
+    Use this function to write a new TPR file with data updated from an
+    existing TPR file. Keyword arguments are objects that can provide gmxapi
+    compatible access to the necessary simulation input data.
+
+    In the initial version, data must originate from an existing TPR file, and
+    only simulation parameters may be rewritten. See
+
+    Warning:
+        The interface is in flux.
+
+    \todo Be consistent about terminology for "simulation state".
+    We are currently using "simulation state" to refer both to the aggregate of
+    data (superset) necessary to launch or continue a simulation _and_ to the
+    extra data (subset) necessary to capture full program state, beyond the
+    model/method input parameters and current phase space coordinates. Maybe we
+    shouldn't expose that as a separate user-accessible object and should instead
+    make it an implementation detail of a wrapper object that has standard
+    interfaces for the non-implementation-dependent encapsulated data.
+
+    :return: TBD
+    """
+
+    if not hasattr(input, 'parameters'):
+        if hasattr(input, 'output'):
+            if hasattr(input.output, 'parameters'):
+                parameters = input.output.parameters
+            else:
+                raise ValueError("Need output.parameters")
+        else:
+            raise ValueError("Need output.parameters")
+    else:
+        parameters = input.parameters
+
+    if not isinstance(parameters, gmx.core.SimulationParameters):
+        raise gmx.exceptions.TypeError("You must provide a gmx.core.SimulationParameters object to `parameters` as input.")
+    gmx.core.writeTpr(output, parameters)
 
 
 class TrajectoryFile:

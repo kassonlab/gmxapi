@@ -30,7 +30,7 @@ class TprTestCase(unittest.TestCase):
         Transitively test gmx.fileio.read_tpr()
         """
         sim_input = read_tpr(tpr_filename)
-        params = sim_input.output.parameters
+        params = sim_input.output.parameters.extract()
         dt = params['dt']
         nsteps = params['nsteps']
         init_step = params['init-step']
@@ -41,7 +41,7 @@ class TprTestCase(unittest.TestCase):
         assert gmx.core.copy_tprfile(source=tpr_filename, destination=temp_filename, end_time=new_endtime)
         tprfile = TprFile(temp_filename, 'r')
         with tprfile as fh:
-            params = read_tpr(fh).output.parameters
+            params = read_tpr(fh).output.parameters.extract()
             dt = params['dt']
             nsteps = params['nsteps']
             init_step = params['init-step']
