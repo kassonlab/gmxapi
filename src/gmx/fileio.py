@@ -11,17 +11,16 @@ from __future__ import unicode_literals
 
 import os
 
-__all__ = ['TprFile']
+__all__ = ['TprFile', 'read_tpr']
 
 import gmx.core
+import gmx.util
 from gmx.exceptions import UsageError
 
 _current_dir = os.getcwd()
 
 class TprFile:
     """Handle to a Gromacs simulation run input file.
-
-    See :doc:`filetypes`
     """
     def __init__(self, filename=None, mode=None):
         """Open a TPR file.
@@ -64,6 +63,89 @@ class TprFile:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
         return
+
+class _NodeOutput(object):
+    """Implement the `output` attribute of a simulation input node.
+
+        Attributes:
+            parameters: Simulation parameters for (re)written TPR file.
+            structure: Atomic details (not yet implemented)
+            topology: Molecular force field details (not yet implemented)
+            state: Simulation state information (not yet implemented)
+
+
+    """
+    def __init__(self, parameters=None, structure=None, topology=None, state=None):
+        """Initialize getters for output ports."""
+        self.__tprfile = parameters
+
+    @property
+    def parameters(self):
+        with self.__tprfile as fh:
+            params = fh._tprFileHandle.params()
+        return params
+
+    @property
+    def structure(self):
+        raise gmx.exceptions.FeatureNotAvailableError("property not implemented.")
+
+    @property
+    def topology(self):
+        raise gmx.exceptions.FeatureNotAvailableError("property not implemented.")
+
+    @property
+    def state(self):
+        raise gmx.exceptions.FeatureNotAvailableError("property not implemented.")
+
+
+class _SimulationInput(object):
+    """
+    Simulation input interface for a TPR file read by gmx.fileio.read_tpr()
+
+    Attributes:
+        output : provides the `parameters` output port
+
+    """
+    def __init__(self, tprfile):
+        if not isinstance(tprfile, TprFile):
+            # This class is an implementation detail of TPR file I/O...
+            raise gmx.exceptions.ApiError("Must be initialized from a gmx.fileio.TprFile object.")
+        self.__tprfile = tprfile
+
+    @property
+    def output(self):
+        """Access the output ports of SimulationInput."""
+        return _NodeOutput(parameters=self.__tprfile)
+
+
+def read_tpr(tprfile=None):
+    """
+    Get a simulation input object from a TPR run input file.
+
+    :param tprfile: TPR input object or filename
+    :return: simulation input object
+
+    The returned object may be inspected by the user. Simulation input parameters
+    may be extracted from the object's `output` through the nested attribute
+    `output.parameters`.
+
+    Example:
+        >>> sim_input = gmx.fileio.read_tpr(tprfile=tprfilename)
+        >>> params = sim_input.output.parameters.extract()
+        >>> print(params['init-step'])
+        0
+
+    Supports the `read_tpr` gmxapi work graph operation. (not yet implemented)
+    """
+    if not isinstance(tprfile, TprFile):
+        try:
+            tprfile = TprFile(gmx.util.to_utf8(tprfile), mode='r')
+        except:
+            tprfile = None
+    if tprfile is None:
+        raise UsageError("TPR object or file name is required.")
+
+    return _SimulationInput(tprfile)
 
 class TrajectoryFile:
     """Provides an interface to Gromacs supported trajectory file formats.
