@@ -5,6 +5,7 @@
 *build*/
 dist/
 gmx.egg-info
+html/
 *.pyc
 __pycache__
 .pytest_cache
