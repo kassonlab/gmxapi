@@ -76,6 +76,12 @@ produces a :class:`Session` object. See examples below.
 
     :class:`Session` is not well specified in gmxapi 0.0.6.
 
+gmx.fileio module
+-----------------
+
+..  automodule:: gmx.fileio
+    :members:
+
 gmx.system module
 -----------------
 
