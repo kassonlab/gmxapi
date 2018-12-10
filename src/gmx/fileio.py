@@ -210,7 +210,8 @@ def write_tpr_file(output, input=None):
         make it an implementation detail of a wrapper object that has standard
         interfaces for the non-implementation-dependent encapsulated data.
 
-    :return: TBD
+    Returns:
+        TBD : possibly a completion condition of some sort and/or handle to the new File
     """
 
     if not hasattr(input, 'parameters'):
@@ -229,6 +230,7 @@ def write_tpr_file(output, input=None):
     gmx.core.write_tprfile(output, parameters)
 
 
+# Note: this has been dead since at least 0.0.3, but we should revive it...
 class TrajectoryFile:
     """Provides an interface to Gromacs supported trajectory file formats.
 
