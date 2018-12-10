@@ -73,6 +73,7 @@ class BindingsTestCase(unittest.TestCase):
         session = apisystem.launch(context)
         assert hasattr(session, 'run')
         session.run()
+        session.close()
 
 # Ignore deprecation warning from networkx...
 @pytest.mark.usefixtures("cleandir")
@@ -82,7 +83,8 @@ def test_simpleSimulation(caplog):
     """Load a work specification with a single TPR file and run."""
     # use case 1: simple high-level
     md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
-    gmx.run(md)
+    with gmx.context.ParallelArrayContext(md) as session:
+        session.run()
 
 @pytest.mark.usefixtures("cleandir")
 def test_modifiedInput(caplog):

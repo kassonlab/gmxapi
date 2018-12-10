@@ -80,7 +80,6 @@ __version__ = version.__version__
 from gmx.system import System
 from gmx.context import get_context
 
-
 def run(work=None):
     """Run the provided work on available resources.
 
