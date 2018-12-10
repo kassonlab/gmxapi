@@ -62,7 +62,7 @@ Python Classes
 - :class:`gmx.workflow.WorkSpec`
 - :class:`gmx.workflow.WorkElement`
 - :class:`gmx.context.Context`
-- :class:`gmx.context.ParallelArrayContext`
+- :class:`gmx.fileio.TprFile`
 - :class:`gmx.status.Status`
 
 Python context managers

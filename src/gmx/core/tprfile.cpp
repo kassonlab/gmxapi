@@ -31,6 +31,63 @@
 namespace gmxapicompat
 {
 
+class TprFile
+{
+public:
+    explicit TprFile(const std::string& infile) :
+            irInstance_{std::make_unique<t_inputrec>()},
+            mtop_{std::make_unique<gmx_mtop_t>()},
+            state_{std::make_unique<t_state>()}
+    {
+        t_inputrec *ir = irInstance_.get();
+        read_tpx_state(infile.c_str(), ir, state_.get(), mtop_.get());
+    }
+    ~TprFile() = default;
+    TprFile(TprFile&& source) noexcept = default;
+    TprFile& operator=(TprFile&&) noexcept = default;
+
+    /*!
+     * \brief Get a reference to the input record in the TPR file.
+     *
+     * Note that this implementation allows different objects to share ownership
+     * of the TprFile and does not provide access restrictions to prevent multiple
+     * code blocks writing to the input record. This should be resolved with a
+     * combination of managed access controlled handles and through better
+     * management of the data structures in the TPR file. I.e. the t_inputrec is
+     * not copyable, moveable, nor default constructable (at least, to produce a
+     * valid record), and it does not necessarily make sense to map the library
+     * data structure to the file data structure (except that we don't have another
+     * way of constructing a complete and valid input record).
+     *
+     * \todo We can't play fast and loose with the irInstance for long...
+     *
+     * \return
+     */
+    t_inputrec& inputRecord() const
+    {
+        assert(irInstance_);
+        return *irInstance_;
+    }
+
+    gmx_mtop_t& molecularTopology() const
+    {
+        assert(mtop_);
+        return *mtop_;
+    }
+
+    t_state& state() const
+    {
+        assert(state_);
+        return *state_;
+    }
+private:
+    // These types are not moveable in GROMACS 2019, so we use unique_ptr as a
+    // moveable wrapper to let TprFile be moveable.
+    std::unique_ptr<t_inputrec>  irInstance_;
+    std::unique_ptr<gmx_mtop_t>        mtop_;
+    std::unique_ptr<t_state>           state_;
+
+};
 
 /*!
  * \brief Static map of GROMACS 2019 mdp file entries to normalized "type".
@@ -242,11 +299,24 @@ public:
         if (int64Params_.find(key) != int64Params_.end())
         {
             int64Params_[key] = std::make_pair(value, true);
+
+            if (source_)
+            {
+                auto memberPointer = int64Params().at(key);
+                source_->inputRecord().*memberPointer = value;
+            }
         }
         else if (intParams_.find(key) != intParams_.end())
         {
             // TODO: check whether value is too large?
             intParams_[key] = std::make_pair(static_cast<int>(value), true);
+
+            if (source_)
+            {
+                auto memberPointer = int32Params().at(key);
+                source_->inputRecord().*memberPointer = value;
+            }
+
         }
         else
         {
@@ -259,11 +329,25 @@ public:
         if (float64Params_.find(key) != float64Params_.end())
         {
             float64Params_[key] = std::make_pair(value, true);
+
+            if (source_)
+            {
+                auto memberPointer = float64Params().at(key);
+                source_->inputRecord().*memberPointer = value;
+            }
+
         }
         else if (floatParams_.find(key) != floatParams_.end())
         {
             // TODO: check whether value is too large?
             floatParams_[key] = std::make_pair(static_cast<float>(value), true);
+
+            if (source_)
+            {
+                auto memberPointer = float32Params().at(key);
+                source_->inputRecord().*memberPointer = value;
+            }
+
         }
         else
         {
@@ -279,10 +363,10 @@ public:
 //        this->set(key, value);
 //    }
 
-    TprFileHandle getSource() const
+    TprReadHandle getSource() const
     {
         // Note: might return a null handle. Need to decide what that means and how to address it.
-        return TprFileHandle(source_);
+        return TprReadHandle(source_);
     }
 
 private:
@@ -310,47 +394,6 @@ void setParam(gmxapicompat::GmxMdParams *params, const std::string &name, int64_
     assert(params->params_ != nullptr);
     params->params_->set(name, value);
 }
-
-class TprFile
-{
-public:
-    explicit TprFile(const std::string& infile) :
-        irInstance_{std::make_unique<t_inputrec>()},
-        mtop_{std::make_unique<gmx_mtop_t>()},
-        state_{std::make_unique<t_state>()}
-    {
-        t_inputrec *ir = irInstance_.get();
-        read_tpx_state(infile.c_str(), ir, state_.get(), mtop_.get());
-    }
-    ~TprFile() = default;
-    TprFile(TprFile&& source) noexcept = default;
-    TprFile& operator=(TprFile&&) noexcept = default;
-
-    t_inputrec& inputRecord() const
-    {
-        assert(irInstance_);
-        return *irInstance_;
-    }
-
-    gmx_mtop_t& molecularTopology() const
-    {
-        assert(mtop_);
-        return *mtop_;
-    }
-
-    t_state& state() const
-    {
-        assert(state_);
-        return *state_;
-    }
-private:
-    // These types are not moveable in GROMACS 2019, so we use unique_ptr as a
-    // moveable wrapper to let TprFile be moveable.
-    std::unique_ptr<t_inputrec>  irInstance_;
-    std::unique_ptr<gmx_mtop_t>        mtop_;
-    std::unique_ptr<t_state>           state_;
-
-};
 
 /*!
  * \brief A GmxMdParams implementation that depends on TPR files.
@@ -564,19 +607,18 @@ double extractParam(const GmxMdParams &params, const std::string &name, double) 
     return value;
 }
 
-
 std::vector<std::string> keys(const GmxMdParams &params) {
     return params.params_->keys();
 }
 
 
-TprFileHandle readTprFile(const std::string& filename) {
+TprReadHandle readTprFile(const std::string& filename) {
     auto tprfile = gmxapicompat::TprFile(filename);
-    auto handle = gmxapicompat::TprFileHandle(std::move(tprfile));
+    auto handle = gmxapicompat::TprReadHandle(std::move(tprfile));
     return handle;
 }
 
-GmxMdParams getMdParams(const TprFileHandle &fileHandle) {
+GmxMdParams getMdParams(const TprReadHandle &fileHandle) {
     auto tprfile = fileHandle.get();
     // TODO: convert to exception / decide whether null handles are allowed.
     assert(tprfile);
@@ -585,22 +627,73 @@ GmxMdParams getMdParams(const TprFileHandle &fileHandle) {
     return params;
 }
 
-TprFileHandle::TprFileHandle(std::shared_ptr<TprFile> tprFile) :
+TopologySource getTopologySource(const TprReadHandle &filehandle) {
+    TopologySource source;
+    source.tprFile_ = filehandle.get();
+    return source;
+}
+
+SimulationState getSimulationState(const TprReadHandle &filehandle) {
+    SimulationState source;
+    source.tprFile_ = filehandle.get();
+    return source;
+}
+
+StructureSource getStructureSource(const TprReadHandle &filehandle) {
+    StructureSource source;
+    source.tprFile_ = filehandle.get();
+    return source;
+}
+
+TprReadHandle::TprReadHandle(std::shared_ptr<TprFile> tprFile) :
     tprFile_{std::move(tprFile)}
 {
 }
 
-TprFileHandle::TprFileHandle(TprFile &&tprFile) :
-    TprFileHandle{std::make_shared<TprFile>(std::move(tprFile))}
+TprReadHandle getSourceFileHandle(const GmxMdParams &params)
+{
+    return params.params_->getSource();
+}
+
+void writeTprFile(const std::string &filename,
+                  const GmxMdParams &params,
+                  const StructureSource &structure,
+                  const SimulationState &state,
+                  const TopologySource &topology)
+{
+    assert(params.params_);
+    // The only way we can check for consistent input right now is to make sure
+    // it all comes from the same file.
+    if (structure.tprFile_.get() != state.tprFile_.get() ||
+        state.tprFile_.get() != topology.tprFile_.get() ||
+        topology.tprFile_.get() != params.params_->getSource().get().get() ||
+        params.params_->getSource().get().get() != structure.tprFile_.get()
+    )
+    {
+        throw ValueError("writeTprFile does not yet know how to reconcile data from different TPR file sources.");
+    }
+
+    auto tprFileHandle = params.params_->getSource();
+    auto tprFile = tprFileHandle.get();
+    assert(tprFile);
+    auto& inputRecord = tprFile->inputRecord();
+    auto& writeState = tprFile->state();
+    auto& writeTopology = tprFile->molecularTopology();
+    write_tpx_state(filename.c_str(), &inputRecord, &writeState, &writeTopology);
+
+}
+
+TprReadHandle::TprReadHandle(TprFile &&tprFile) :
+    TprReadHandle{std::make_shared<TprFile>(std::move(tprFile))}
 {
 }
 
-std::shared_ptr<TprFile> TprFileHandle::get() const {
+std::shared_ptr<TprFile> TprReadHandle::get() const {
     return tprFile_;
 }
 
 // defaulted here to delay definition until after member types are defined.
-TprFileHandle::~TprFileHandle() = default;
+TprReadHandle::~TprReadHandle() = default;
 
 GmxMdParams::~GmxMdParams() = default;
 
@@ -616,6 +709,21 @@ GmxMdParams &GmxMdParams::operator=(GmxMdParams &&) noexcept = default;
 
 namespace gmxpy
 {
+
+// maybe this should return a handle to the new file?
+bool copy_tprfile(const gmxapicompat::TprReadHandle& input, std::string outfile)
+{
+    if (!input.get())
+    {
+        return false;
+    }
+    gmxapicompat::writeTprFile(outfile,
+                               gmxapicompat::getMdParams(input),
+                               gmxapicompat::getStructureSource(input),
+                               gmxapicompat::getSimulationState(input),
+                               gmxapicompat::getTopologySource(input));
+    return true;
+}
 
 bool copy_tprfile(std::string infile, std::string outfile, double until_t) {
     bool success = false;

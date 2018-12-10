@@ -11,7 +11,7 @@ from __future__ import unicode_literals
 
 import os
 
-__all__ = ['TprFile', 'read_tpr']
+__all__ = ['TprFile', 'read_tpr', 'write_tpr_file']
 
 import gmx.core
 import gmx.util
@@ -67,12 +67,11 @@ class TprFile:
 class _NodeOutput(object):
     """Implement the `output` attribute of a simulation input node.
 
-        Attributes:
-            parameters: Simulation parameters for (re)written TPR file.
-            structure: Atomic details (not yet implemented)
-            topology: Molecular force field details (not yet implemented)
-            state: Simulation state information (not yet implemented)
-
+    Attributes:
+        parameters: Simulation parameters for (re)written TPR file.
+        structure: Atomic details (not yet implemented)
+        topology: Molecular force field details (not yet implemented)
+        state: Simulation state information (not yet implemented)
 
     """
     def __init__(self, parameters=None, structure=None, topology=None, state=None):
@@ -103,7 +102,10 @@ class _SimulationInput(object):
     Simulation input interface for a TPR file read by gmx.fileio.read_tpr()
 
     Attributes:
-        output : provides the `parameters` output port
+        parameters: Simulation parameters for (re)written TPR file.
+        structure: Atomic details (not yet implemented)
+        topology: Molecular force field details (not yet implemented)
+        state: Simulation state information (not yet implemented)
 
     """
     def __init__(self, tprfile):
@@ -111,27 +113,44 @@ class _SimulationInput(object):
             # This class is an implementation detail of TPR file I/O...
             raise gmx.exceptions.ApiError("Must be initialized from a gmx.fileio.TprFile object.")
         self.__tprfile = tprfile
+        self.__parameters = None
 
     @property
-    def output(self):
-        """Access the output ports of SimulationInput."""
-        return _NodeOutput(parameters=self.__tprfile)
+    def parameters(self):
+        if self.__parameters is None:
+            with self.__tprfile as fh:
+                self.__parameters = fh._tprFileHandle.params()
+        return self.__parameters
+
+    @property
+    def structure(self):
+        raise gmx.exceptions.FeatureNotAvailableError("property not implemented.")
+
+    @property
+    def topology(self):
+        raise gmx.exceptions.FeatureNotAvailableError("property not implemented.")
+
+    @property
+    def state(self):
+        raise gmx.exceptions.FeatureNotAvailableError("property not implemented.")
 
 
 def read_tpr(tprfile=None):
     """
     Get a simulation input object from a TPR run input file.
 
-    :param tprfile: TPR input object or filename
-    :return: simulation input object
+    Arguments:
+        tprfile : TPR input object or filename
+
+    Returns:
+         simulation input object
 
     The returned object may be inspected by the user. Simulation input parameters
-    may be extracted from the object's `output` through the nested attribute
-    `output.parameters`.
+    may be extracted through the `parameters` attribute.
 
     Example:
         >>> sim_input = gmx.fileio.read_tpr(tprfile=tprfilename)
-        >>> params = sim_input.output.parameters.extract()
+        >>> params = sim_input.parameters.extract()
         >>> print(params['init-step'])
         0
 
@@ -147,6 +166,71 @@ def read_tpr(tprfile=None):
 
     return _SimulationInput(tprfile)
 
+# In initial implementation, we extract the entire TPR file contents through the
+# TPR-backed GmxMdParams implementation.
+def write_tpr_file(output, input=None):
+    """
+    Create a new TPR file, combining user-provided input.
+
+    .. versionadded:: 0.0.8
+        Initial version of this tool does not know how to generate a valid simulation
+        run input file from scratch, so it requires input derived from an already valid
+        TPR file.
+
+    The simulation input object should provide the gmx simulation_input interface,
+    with output ports for `parameters`, `structure`, `topology`, and `state`, such
+    as a TprFileHandle
+
+    Arguments:
+        output : TPR file name to write.
+        input : simulation input data from which to write a simulation run input file.
+
+    Use this function to write a new TPR file with data updated from an
+    existing TPR file. Keyword arguments are objects that can provide gmxapi
+    compatible access to the necessary simulation input data.
+
+    In the initial version, data must originate from an existing TPR file, and
+    only simulation parameters may be rewritten. See gmx.fileio.read_tpr()
+
+    Example:
+        >>> sim_input = gmx.fileio.read_tpr(tprfile=tprfilename)
+        >>> sim_input.parameters.set('init-step', 1)
+        >>> gmx.fileio.write_tpr_file(newfilename, input=sim_input)
+
+    Warning:
+        The interface is in flux.
+
+    TODO:
+        Be consistent about terminology for "simulation state".
+        We are currently using "simulation state" to refer both to the aggregate of
+        data (superset) necessary to launch or continue a simulation _and_ to the
+        extra data (subset) necessary to capture full program state, beyond the
+        model/method input parameters and current phase space coordinates. Maybe we
+        shouldn't expose that as a separate user-accessible object and should instead
+        make it an implementation detail of a wrapper object that has standard
+        interfaces for the non-implementation-dependent encapsulated data.
+
+    Returns:
+        TBD : possibly a completion condition of some sort and/or handle to the new File
+    """
+
+    if not hasattr(input, 'parameters'):
+        if hasattr(input, 'output'):
+            if hasattr(input.output, 'parameters'):
+                parameters = input.output.parameters
+            else:
+                raise ValueError("Need output.parameters")
+        else:
+            raise ValueError("Need output.parameters")
+    else:
+        parameters = input.parameters
+
+    if not isinstance(parameters, gmx.core.SimulationParameters):
+        raise gmx.exceptions.TypeError("You must provide a gmx.core.SimulationParameters object to `parameters` as input.")
+    gmx.core.write_tprfile(output, parameters)
+
+
+# Note: this has been dead since at least 0.0.3, but we should revive it...
 class TrajectoryFile:
     """Provides an interface to Gromacs supported trajectory file formats.
 
