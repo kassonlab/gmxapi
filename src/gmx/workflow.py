@@ -508,19 +508,22 @@ def from_tpr(input=None, **kwargs):
     Returns:
         simulation member of a gmx.workflow.WorkSpec object
 
-    Produces a WorkSpec with the following data::
+    Produces a WorkSpec with data like the following.::
 
         version: gmxapi_workspec_0_1
         elements:
-            tpr_input:
+            tpr_input_xxxxx:
                 namespace: gromacs
                 operation: load_tpr
                 params: {'input': ['tpr_filename1', 'tpr_filename2', ...]}
-            md_sim:
+            md_sim_yyyyy:
                 namespace: gmxapi
                 operation: md
                 depends: ['tpr_input']
                 params: {'kw1': arg1, 'kw2': arg2, ...}
+
+    Above, `xxxxx` and `yyyyy` are unique identifiers that are generated based
+    on the operation parameters.
 
     Bugs: version 0.0.6
         * There is not a way to programatically check the current step number on disk.

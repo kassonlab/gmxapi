@@ -57,9 +57,15 @@ def _load_tpr(self, element):
     return Builder(element.params['input'])
 
 def _md(context, element):
-    """Implement the gmxapi.md operation by returning a builder that can populate a data flow graph for the element.
+    """Implement the gmxapi.md operation by returning a director that can populate a data flow graph for the element.
 
-    Inspects dependencies to set up the simulation runner.
+    Inspects dependencies to set up the simulation runner. This is the original
+    gmxapi simulation operation. It uses a subscription to a `load_tpr` operation
+    to find a TPR filename, but the pair of operations results in only one node
+    on the execution graph with essentially no inputs or outputs: only input
+    parameters, default filesystem output, and a binding interface for plugin
+    potentials. Newer molecular simulation operations are the subject of
+    issue #85.
 
     The graph node created will have `launch` and `run` attributes with function references, and a `width`
     attribute declaring the workflow parallelism requirement.
@@ -119,7 +125,7 @@ def _md(context, element):
                 temp_filename = None
                 if 'end_time' in self.runtime_params:
                     # Note that mkstemp returns a file descriptor as the first part of the tuple.
-                    # We can make this cleaner in 0.0.7 with a separate node that manages the
+                    # We can make this cleaner at some point with a separate node that manages the
                     # altered input.
                     _, temp_filename = tempfile.mkstemp(suffix='.tpr')
                     logger.debug('Updating input. Using temp file {}'.format(temp_filename))
