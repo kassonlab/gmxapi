@@ -175,6 +175,121 @@ def _md(context, element):
     return Builder(element)
 
 
+def _mdrun(context, element):
+    """Implement the gromacs.mdrun operation by returning a director that can populate a data flow graph for the
+    element.
+
+    The graph node created will have `launch` and `run` attributes with function references, and a `width`
+    attribute declaring the workflow parallelism requirement.
+
+    Arguments:
+        context: The Context in which this operation is being loaded.
+        element: WorkElement specifying the operation.
+
+    Returns:
+        A Director that the Context can use in launching the Session.
+    """
+    import gmx.core
+    class Director(object):
+        """Translate md work element to a node in the session's DAG."""
+        def __init__(self, element):
+            try:
+                self.name = element.name
+                # Note that currently the calling code is in charge of subscribing this builder to its dependencies.
+                # A list of tpr files will be set when the calling code subscribes this builder to a tpr provider.
+                self.infile = None
+                # Other dependencies in the element may register potentials when subscribed to.
+                self.potential = []
+                self.input_nodes = []
+                self.runtime_params = element.params
+            except AttributeError:
+                raise exceptions.ValueError("object provided does not seem to be a WorkElement.")
+        def add_subscriber(self, builder):
+            """The md operation does not yet have any subscribeable facilities.
+
+            TODO: the outputs should be subscribable, like `conformation` and `trajectory`
+            """
+            pass
+        def build(self, dag):
+            """Add a node to the graph that, when launched, will construct a simulation runner.
+
+            Complete the definition of appropriate graph edges for dependencies.
+
+            The launch() method of the added node creates the runner from the tpr file for the current rank and adds
+            modules from the incoming edges.
+            """
+            if not (hasattr(dag, 'add_node')
+                    and hasattr(dag, 'add_edge')
+                    and hasattr(dag, 'graph')
+                    and hasattr(dag, 'nodes')):
+                raise gmx.exceptions.TypeError("dag argument does not have a DiGraph interface.")
+            name = self.name
+            dag.add_node(name)
+            for neighbor in self.input_nodes:
+                dag.add_edge(neighbor, name)
+            infile = self.infile
+            assert not infile is None
+            potential_list = self.potential
+            assert dag.graph['width'] >= len(infile)
+
+            # Provide closure with which to execute tasks for this node.
+            def launch(rank=None):
+                assert not rank is None
+
+                # Copy and update, if required by `end_time` parameter.
+                temp_filename = None
+                if 'end_time' in self.runtime_params:
+                    # Note that mkstemp returns a file descriptor as the first part of the tuple.
+                    # We can make this cleaner in 0.0.7 with a separate node that manages the
+                    # altered input.
+                    _, temp_filename = tempfile.mkstemp(suffix='.tpr')
+                    logger.debug('Updating input. Using temp file {}'.format(temp_filename))
+                    gmx.core.copy_tprfile(source=infile[rank],
+                                          destination=temp_filename,
+                                          end_time=self.runtime_params['end_time'])
+                    tpr_file = temp_filename
+                else:
+                    tpr_file = infile[rank]
+
+                logger.info('Loading TPR file: {}'.format(tpr_file))
+                system = gmx.core.from_tpr(tpr_file)
+                dag.nodes[name]['system'] = system
+                mdargs = gmx.core.MDArgs()
+                mdargs.set(self.runtime_params)
+                # Workaround to give access to plugin potentials used in a context.
+                pycontext = element.workspec._context
+                pycontext.potentials = potential_list
+                context = pycontext._api_object
+                context.setMDArgs(mdargs)
+                for potential in potential_list:
+                    context.add_mdmodule(potential)
+                dag.nodes[name]['session'] = system.launch(context)
+                dag.nodes[name]['close'] = dag.nodes[name]['session'].close
+
+                if 'end_time' in self.runtime_params:
+                    def special_close():
+                        dag.nodes[name]['session'].close()
+                        logger.debug("Unlinking temporary TPR file {}.".format(temp_filename))
+                        os.unlink(temp_filename)
+                    dag.nodes[name]['close'] = special_close
+                else:
+                    dag.nodes[name]['close'] = dag.nodes[name]['session'].close
+
+                def runner():
+                    """Currently we only support a single call to run."""
+                    def done():
+                        raise StopIteration()
+                    # Replace the runner with a stop condition for subsequent passes.
+                    dag.nodes[name]['run'] = done
+                    return dag.nodes[name]['session'].run()
+                dag.nodes[name]['run'] = runner
+                return dag.nodes[name]['run']
+
+            dag.nodes[name]['launch'] = launch
+
+    return Director(element)
+
+
 def _get_mpi_ensemble_communicator(session_communicator, ensemble_size):
     """Get an ensemble communicator from an MPI communicator.
 
