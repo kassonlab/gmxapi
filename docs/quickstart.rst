@@ -67,7 +67,7 @@ using so that you can just run Python normally and ``import gmx``.
 
     mkdir gromacs-build
     pushd gromacs-build
-    cmake ../gromacs-release-2019 -DCMAKE_INSTALL_PREFIX=$HOME/gromacs
+    cmake ../gromacs-release-2019 -DGMXAPI=ON -DCMAKE_INSTALL_PREFIX=$HOME/gromacs
     make install
     popd
 

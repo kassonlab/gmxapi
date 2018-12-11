@@ -494,8 +494,7 @@ Before updating the ``gmx`` package it is generally a good idea to remove the
 previous installation and to start with a fresh build directory. You should be
 able to just ``pip uninstall gmx``.
 
-If you have not installed GROMACS already or if ``gmxapi_DIR`` does not contain directories like
-``bin`` and ``share`` then you will get an error along the lines of the following.
+Do you see something like the following?
 
 .. code-block:: none
 
@@ -510,6 +509,13 @@ If you have not installed GROMACS already or if ``gmxapi_DIR`` does not contain 
       "gmxapi_DIR" to a directory containing one of the above files.  If "gmxapi"
       provides a separate development package or SDK, be sure it has been
       installed.
+
+This could be because
+
+* GROMACS is not already installed
+* GROMACS was built without the CMake variable ``GMXAPI=ON``
+* or if ``gmxapi_DIR`` (or ``GROMACS_DIR``) is not a path containing directories
+  like ``bin`` and ``share``.
 
 If you are not a system administrator you are encouraged to install in a Python virtual environment,
 created with virtualenv or Conda.
