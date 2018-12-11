@@ -328,7 +328,6 @@ def _get_ensemble_communicator(communicator, ensemble_size):
 
     Currently, only one ensemble can be managed in a session.
     """
-    ensemble_communicator = None
 
     class TrivialEnsembleCommunicator(object):
         def __init__(self):
