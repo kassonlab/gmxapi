@@ -508,25 +508,30 @@ def from_tpr(input=None, **kwargs):
     Returns:
         simulation member of a gmx.workflow.WorkSpec object
 
-    Produces a WorkSpec with the following data::
+    Produces a WorkSpec with data like the following.::
 
         version: gmxapi_workspec_0_1
         elements:
-            tpr_input:
+            tpr_input_xxxxx:
                 namespace: gromacs
                 operation: load_tpr
                 params: {'input': ['tpr_filename1', 'tpr_filename2', ...]}
-            md_sim:
+            md_sim_yyyyy:
                 namespace: gmxapi
                 operation: md
                 depends: ['tpr_input']
                 params: {'kw1': arg1, 'kw2': arg2, ...}
+
+    Above, `xxxxx` and `yyyyy` are unique identifiers that are generated based
+    on the operation parameters.
 
     Bugs: version 0.0.6
         * There is not a way to programatically check the current step number on disk.
           See https://github.com/kassonlab/gmxapi/issues/56 and https://github.com/kassonlab/gmxapi/issues/85
     """
     import os
+    import gmx
+    import hashlib
 
     usage = "argument to from_tpr() should be a valid filename or list of filenames, followed by optional key word arguments."
 
@@ -589,23 +594,44 @@ def from_tpr(input=None, **kwargs):
         else:
             raise exceptions.UsageError("Invalid key word argument: {}. {}".format(arg_key, usage))
 
-    # Create an empty WorkSpec
-    workspec = WorkSpec()
+    # Play fast and loose with the package namespace. Get or set a default workspec.
+    # TODO: Do this better!
+    # Reference https://github.com/kassonlab/gmxapi/issues/90 and
+    # https://github.com/kassonlab/gmxapi/milestone/5
+    # try:
+    #     # Get the default workspec, if it exists.
+    #     workspec = gmx._default_workspec
+    # except:
+    #     # Create an empty WorkSpec
+    #     gmx._default_workspec = WorkSpec()
+    #     workspec = gmx._default_workspec
+    #
+    # Assume someone calling this helper function wants to initialize an empty work graph
+    gmx._default_workspec = WorkSpec()
+    workspec = gmx._default_workspec
 
     # Create and add the Element for the tpr file(s)
     inputelement = WorkElement(namespace='gromacs', operation='load_tpr', params={'input': tpr_list})
-    inputelement.name = 'tpr_input'
+    # Get a unique identifier for this set of input.
+    data = to_utf8(tpr_list)
+    result = hashlib.sha256(data)
+    unique_id = result.hexdigest()
+    inputelement.name = 'tpr_input_' + str(unique_id)
     if inputelement.name not in workspec.elements:
         # Operations such as this need to be replaced with accessors or properties that can check the validity of the WorkSpec
-        workspec.elements[inputelement.name] = inputelement.serialize()
-        inputelement.workspec = workspec
+        workspec.add_element(inputelement)
 
     # Create and add the simulation element
     # We can add smarter handling of the `depends` argument, but it is only critical to check when adding the element
     # to a WorkSpec.
     mdelement = WorkElement(operation='md', depends=[inputelement.name], params=params)
-    mdelement.name = 'md_sim'
+    # Get a unique identifier for this set of input.
+    data = to_utf8(str(mdelement.depends) + str(mdelement.params))
+    result = hashlib.sha256(data)
+    unique_id = result.hexdigest()
+    mdelement.name = 'md_sim_' + str(unique_id)
     # Check that the element has not already been added, but that its dependency has.
-    workspec.add_element(mdelement)
+    if mdelement.name not in workspec.elements:
+        workspec.add_element(mdelement)
 
     return mdelement

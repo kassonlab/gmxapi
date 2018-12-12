@@ -227,8 +227,15 @@ class WorkflowFreeFunctions(unittest.TestCase):
         elements = set(workspec.elements)
         sources = set([element.name for element in gmx.workflow.get_source_elements(workspec)])
         # workspec should have 'tpr_input' and 'md_sim' elements. 'tpr_input' is the only source.
-        assert "tpr_input" in sources
-        assert "md_sim" not in sources
+        found_tpr_input = False
+        found_md_sim = False
+        for source in sources:
+            if str(source).startswith('tpr_input'):
+                found_tpr_input = True
+            if str(source).startswith('md_sim'):
+                found_md_sim = True
+        assert found_tpr_input
+        assert not found_md_sim
         # confirm sources is a subset of elements and sources does not equal elements
         assert len(sources) < len(elements)
     #
