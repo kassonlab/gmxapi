@@ -32,6 +32,8 @@ FROM gmxapi/gromacs-gmxapi:0.0.7
 
 # Allow build for an arbitrary branch or tag, but default to the tip of `master`
 ARG BRANCH=master
+# URL where the archive file for BRANCH is located.
+ARG SOURCE_URL=https://github.com/kassonlab/gmxapi/archive
 
 RUN conda install pytest tox cmake
 
@@ -45,7 +47,7 @@ RUN pip install --upgrade pip && \
 
 RUN pip install --upgrade setuptools --user
 
-RUN wget https://github.com/kassonlab/gmxapi/archive/$BRANCH.zip && \
+RUN wget $SOURCE_URL/$BRANCH.zip && \
     unzip $BRANCH.zip && \
     rm -rf /home/jovyan/gmxpy && \
     mv gmxapi-$BRANCH /home/jovyan/gmxpy && \
