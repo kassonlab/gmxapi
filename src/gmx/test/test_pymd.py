@@ -112,25 +112,62 @@ def test_simpleSimulation(caplog):
     gmx.run(md)
 
 @pytest.mark.usefixtures("cleandir")
-def test_modifiedInput(caplog):
-    """Load a work specification with a single TPR file and updated params."""
-    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1, end_time='0.02')
-    with gmx.context.ParallelArrayContext(md) as session:
-        session.run()
+@pytest.mark.filterwarnings("ignore:Using or importing the ABCs from 'collections'")
+@pytest.mark.usefixtures("caplog")
+def test_idempotence1(caplog):
+    """Confirm that a work graph can be run repeatedly, even after completed.
+
+    Use gmx.run and avoid extra references held by user code.
+    """
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
+    gmx.run(md)
+    gmx.run(md)
+    gmx.run(md)
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
+    gmx.run(md)
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
+    gmx.run(md)
 
 @pytest.mark.usefixtures("cleandir")
+@pytest.mark.filterwarnings("ignore:Using or importing the ABCs from 'collections'")
 @pytest.mark.usefixtures("caplog")
-@withmpi_only
-def test_array_context(caplog):
+def test_idempotence2(caplog):
+    """Confirm that a work graph can be run repeatedly, even after completed.
+
+    Interact with Context more directly.
+    Check that more unpredictable references held by user are still safe.
+    """
     md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
-    context = gmx.context.ParallelArrayContext(md)
+    with gmx.get_context(md) as session:
+        session.run()
+
+    context = gmx.get_context(md)
+    with context as session:
+        session.run()
+
+    context = gmx.context.Context()
+    context.work = md
     with context as session:
         session.run()
 
 @pytest.mark.usefixtures("cleandir")
+def test_modifiedInput(caplog):
+    """Load a work specification with a single TPR file and updated params."""
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1, end_time='0.02')
+    context = gmx.get_context(md)
+    with context as session:
+        session.run()
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1, end_time='0.03')
+    context.work = md
+    with context as session:
+        session.run()
+    md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1, end_time='0.04')
+    gmx.run(md)
+
+@pytest.mark.usefixtures("cleandir")
 @pytest.mark.usefixtures("caplog")
 @withmpi_only
-def test_plugin(caplog):
+def test_plugin_no_ensemble(caplog):
     # Test attachment of external code
     md = gmx.workflow.from_tpr(tpr_filename, threads_per_rank=1)
 
@@ -145,7 +182,44 @@ def test_plugin(caplog):
     after = md.workspec.elements[md.name]
     assert not before is after
 
-    context = gmx.context.ParallelArrayContext()
+    # Workaround for https://github.com/kassonlab/gmxapi/issues/42
+    # We can't add an operation to a context that doesn't exist yet, but we can't
+    # add a work graph with an operation that is not defined in a context.
+    context = gmx.get_context()
+    context.add_operation(potential_element.namespace, potential_element.operation, my_plugin)
+    context.work = md
+
+    with warnings.catch_warnings():
+        # Swallow warning about wide MPI context
+        warnings.simplefilter("ignore")
+        with context as session:
+            if context.rank == 0:
+                print(context.work)
+            session.run()
+
+
+@pytest.mark.usefixtures("cleandir")
+@pytest.mark.usefixtures("caplog")
+@withmpi_only
+def test_plugin_with_ensemble(caplog):
+    # Test in ensemble.
+    md = gmx.workflow.from_tpr([tpr_filename, tpr_filename], threads_per_rank=1)
+
+    # Create a WorkElement for the potential
+    #potential = gmx.core.TestModule()
+    potential_element = gmx.workflow.WorkElement(namespace="testing", operation="create_test")
+    potential_element.name = "test_module"
+    before = md.workspec.elements[md.name]
+    md.add_dependency(potential_element)
+    assert potential_element.name in md.workspec.elements
+    assert potential_element.workspec is md.workspec
+    after = md.workspec.elements[md.name]
+    assert not before is after
+
+    # Workaround for https://github.com/kassonlab/gmxapi/issues/42
+    # We can't add an operation to a context that doesn't exist yet, but we can't
+    # add a work graph with an operation that is not defined in a context.
+    context = gmx.get_context()
     context.add_operation(potential_element.namespace, potential_element.operation, my_plugin)
     context.work = md
 

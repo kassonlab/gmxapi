@@ -31,6 +31,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import warnings
+import weakref
 
 from gmx import exceptions
 from gmx import logging
@@ -124,7 +125,20 @@ class WorkSpec(object):
     def __init__(self):
         self.version = workspec_version
         self.elements = dict()
-        self._context = None
+        self.__context_weak_ref = None
+
+    @property
+    def _context(self):
+        referent = None
+        if self.__context_weak_ref is not None:
+            referent = self.__context_weak_ref()
+        return referent
+
+    @_context.setter
+    def _context(self, context):
+        # We're moving towards having the context own the work, so the work should
+        # not own the context.
+        self.__context_weak_ref = weakref.ref(context)
 
     def _chase_deps(self, source_set, name_list):
         """Helper to recursively generate dependencies before dependents.

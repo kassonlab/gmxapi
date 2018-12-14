@@ -10,6 +10,7 @@
 
 #include "tprfile.h"
 #include "gmxapi/status.h"
+#include "gmxapi/version.h"
 
 #include "pybind11/pybind11.h"
 
@@ -69,6 +70,9 @@ PYBIND11_MODULE(core, m) {
     m.doc() = docstring;
 
     // Export core bindings
+
+    m.def("has_feature", &gmxapi::Version::hasFeature, "Check the gmxapi library for a named feature.");
+
     py::class_< ::gmxapi::Status > gmx_status(m, "Status", "Holds status for API operations.");
 
 
