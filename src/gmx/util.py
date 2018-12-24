@@ -6,11 +6,12 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+__all__ = ['to_utf8', 'to_string', 'which']
+
 import sys
 import os
 
-from gmx.exceptions import UsageError
-from gmx.exceptions import ValueError
+from gmx import exceptions
 
 def _filetype(filename):
     """Use Gromacs file I/O module to identify known file types.
@@ -43,7 +44,7 @@ def _filetype(filename):
     if os.path.isfile(filename):
         return fileio.TprFile
     else:
-        raise UsageError("Argument is not a readable file.")
+        raise exceptions.UsageError("Argument is not a readable file.")
 
 def to_utf8(input):
     """Return a utf8 encoded byte sequence of the Unicode ``input`` or its string representation.
@@ -60,7 +61,7 @@ def to_utf8(input):
             try:
                 string = str(input)
             except:
-                raise UsageError("Cannot find a Python 3 string representation of input.")
+                raise exceptions.UsageError("Cannot find a Python 3 string representation of input.")
             value = string.encode('utf-8')
     else:
         assert py_version == 2
@@ -70,7 +71,7 @@ def to_utf8(input):
             try:
                 value = str(input)
             except:
-                raise UsageError("Cannot find a Python 2 string representation of input.")
+                raise exceptions.UsageError("Cannot find a Python 2 string representation of input.")
     return value
 
 def to_string(input):
@@ -97,7 +98,7 @@ def to_string(input):
                 try:
                     value = str(input)
                 except:
-                    raise UsageError("Cannot find a Python 3 string representation of input.")
+                    raise exceptions.UsageError("Cannot find a Python 3 string representation of input.")
     else:
         assert py_version == 2
         if isinstance(input, unicode):
@@ -106,7 +107,7 @@ def to_string(input):
             try:
                 string = str(input)
             except:
-                raise UsageError("Cannot find a Python 2 string representation of input.")
+                raise exceptions.UsageError("Cannot find a Python 2 string representation of input.")
             value = string.decode('utf-8')
     return value
 
@@ -122,7 +123,7 @@ def which(command):
     try:
         command_path = to_utf8(command)
     except:
-        raise ValueError("Argument must be representable on the command line.")
+        raise exceptions.ValueError("Argument must be representable on the command line.")
     if os.path.exists(command_path):
         command_path = os.path.abspath(command_path)
         if os.access(command_path, os.X_OK):

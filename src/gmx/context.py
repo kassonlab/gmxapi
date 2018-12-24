@@ -102,7 +102,7 @@ def _md(context, element):
                     and hasattr(dag, 'add_edge')
                     and hasattr(dag, 'graph')
                     and hasattr(dag, 'nodes')):
-                raise gmx.exceptions.TypeError("dag argument does not have a DiGraph interface.")
+                raise exceptions.TypeError("dag argument does not have a DiGraph interface.")
             name = self.name
             dag.add_node(name)
             for neighbor in self.input_nodes:
@@ -695,7 +695,10 @@ class Context(object):
         #   * add_subscriber(another_builder) : allow other builders to subscribe to this one.
         #   * build(dag) : Fulfill the builder responsibilities by adding an arbitrary number of nodes and edges to a Graph.
         #
-        # The gmxapi namespace of operations should be consistent with a specified universal set of functionalities
+        # The gmxapi namespace of operations should be consistent with a specified universal set of functionalities.
+        # Note: these lambdas do not act quite like normal member functions.
+        # Consider that `self` in the lambda function is bound to `self` in this
+        # block and is not the implicit argument placeholder found in member functions.
         self.__operations['gmxapi'] = {'md': lambda element : _md(self, element),
                                        # 'global_data' : shared_data_maker,
                                       }
