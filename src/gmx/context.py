@@ -17,6 +17,8 @@ import tempfile
 from gmx import exceptions
 from gmx import logging
 from gmx import status
+import gmx.core as gmxapi
+
 
 # Module-level logger
 logger = logging.getLogger(__name__)
@@ -71,7 +73,6 @@ def _md(context, element):
     Returns:
         A Director that the Context can use in launching the Session.
     """
-    import gmx.core
     class Builder(object):
         """Translate md work element to a node in the session's DAG."""
         def __init__(self, element):
@@ -123,7 +124,7 @@ def _md(context, element):
                     # altered input.
                     _, temp_filename = tempfile.mkstemp(suffix='.tpr')
                     logger.debug('Updating input. Using temp file {}'.format(temp_filename))
-                    gmx.core.copy_tprfile(source=infile[rank],
+                    gmxapi.copy_tprfile(source=infile[rank],
                                           destination=temp_filename,
                                           end_time=self.runtime_params['end_time'])
                     tpr_file = temp_filename
@@ -131,9 +132,9 @@ def _md(context, element):
                     tpr_file = infile[rank]
 
                 logger.info('Loading TPR file: {}'.format(tpr_file))
-                system = gmx.core.from_tpr(tpr_file)
+                system = gmxapi.from_tpr(tpr_file)
                 dag.nodes[name]['system'] = system
-                mdargs = gmx.core.MDArgs()
+                mdargs = gmxapi.MDArgs()
                 mdargs.set(self.runtime_params)
                 # Workaround to give access to plugin potentials used in a context.
                 pycontext = element.workspec._context
@@ -664,7 +665,6 @@ class Context(object):
 
         # self.__context_array = list([Context(work_element) for work_element in work])
         from gmx.workflow import WorkSpec
-        import gmx.core
 
         # Until better Session abstraction exists at the Python level, a
         # _session_communicator attribute will be added to and removed from the
@@ -723,7 +723,7 @@ class Context(object):
         # This setter must be called after the operations map has been populated.
         self.work = work
 
-        self._api_object = gmx.core.Context()
+        self._api_object = gmxapi.Context()
 
     @property
     def work(self):
@@ -996,7 +996,9 @@ class Context(object):
                 if not runner is None:
                     runners.append(runner)
                     closers.append(graph.nodes[name]['close'])
+
             # Get a session object to return. It must simply provide a `run()` function.
+            context = self # Part of workaround for bug gmxapi-214
             class Session(object):
                 def __init__(self, runners, closers):
                     self.runners = list(runners)
@@ -1012,22 +1014,33 @@ class Context(object):
                             to_be_deleted.insert(0, i)
                     for i in to_be_deleted:
                         del self.runners[i]
+                    return True
 
                 def close(self):
                     for close in self.closers:
                         logger.debug("Closing node: {}".format(close))
                         close()
+                    # Workaround for bug gmxapi-214
+                    if not gmxapi.has_feature('0.0.7-bugfix-https://github.com/kassonlab/gmxapi/issues/214'):
+                        context._api_object = gmxapi.Context()
+
 
             self._session = Session(runners, closers)
         else:
             logger.info("Context rank {} has no work to do".format(self.rank))
+
+            context = self # Part of workaround for bug gmxapi-214
             class NullSession(object):
                 def run(self):
                     logger.info("Running null session on rank {}.".format(self.rank))
                     return status.Status()
                 def close(self):
                     logger.info("Closing null session.")
+                    # Workaround for bug gmxapi-214
+                    if not gmxapi.has_feature('0.0.7-bugfix-https://github.com/kassonlab/gmxapi/issues/214'):
+                        context._api_object = gmxapi.Context()
                     return
+
             self._session = NullSession()
             self._session.rank = self.rank
 
