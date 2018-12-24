@@ -103,7 +103,7 @@ def run(work=None):
     return status
 
 
-def commandline_operation(executable=None, shell=False, arguments=None, input=None, output=None):
+def commandline_operation(executable=None, arguments=None, input=None, output=None, shell=False):
     """Execute in a subprocess.
 
     Configure an executable in a subprocess. Executes when run in an execution
