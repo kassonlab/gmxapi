@@ -5,6 +5,7 @@ add_subdirectory(core)
 # Everything that needs to get installed that isn't installed with install(TARGET...)
 set(_pure_sources
         __init__.py
+        _commandline_operation.py
         context.py
         data.py
         exceptions.py

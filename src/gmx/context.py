@@ -170,6 +170,76 @@ def _md(context, element):
     return Builder(element)
 
 
+def _commandline_operation(context, element):
+    """Implement Session launch protocol for gmxapi.commandline_operation operation.
+    Return a director that can populate a data flow graph for the element.
+
+    The graph node created will have `launch` and `run` attributes with function references, and a `width`
+    attribute declaring the workflow parallelism requirement.
+
+    Arguments:
+        context: The Context in which this operation is being loaded.
+        element: WorkElement specifying the operation.
+
+    Returns:
+        A Director that the Context can use in launching the Session.
+    """
+    class Director(object):
+        """Translate md work element to a node in the session's DAG."""
+        def __init__(self, element):
+            try:
+                self.name = element.name
+                # Note that currently the calling code is in charge of subscribing this builder to its dependencies.
+                # Other dependencies in the element may register potentials when subscribed to.
+                self.input_nodes = []
+                self.runtime_params = element.params
+
+            except AttributeError:
+                raise exceptions.ValueError("object provided does not seem to be a WorkElement.")
+        def add_subscriber(self, builder):
+            """The operation does not yet have any subscribeable facilities."""
+            pass
+        def build(self, dag):
+            """Add a node to the graph that.
+
+            The launch() function of the added node sets the working directory for
+            the command line executable.
+
+            The run() function executes the command line program.
+            """
+            if not (hasattr(dag, 'add_node')
+                    and hasattr(dag, 'add_edge')
+                    and hasattr(dag, 'graph')
+                    and hasattr(dag, 'nodes')):
+                raise exceptions.TypeError("dag argument does not have a DiGraph interface.")
+            name = self.name
+            dag.add_node(name)
+            for neighbor in self.input_nodes:
+                dag.add_edge(neighbor, name)
+            # infile = self.infile
+            # assert not infile is None
+            # potential_list = self.potential
+            # assert dag.graph['width'] >= len(infile)
+
+            # Provide closure with which to execute tasks for this node.
+            # Capture reference to `dag`, the graph provided to build()
+            def launch(rank=None):
+                assert not rank is None
+                def first_runner():
+                    """Command is only executed the first time the graph is run."""
+                    def done():
+                        raise StopIteration()
+                    run = lambda : True
+                    # Replace the runner with a completion condition for subsequent passes.
+                    dag.nodes[name]['run'] = done
+                    return run()
+                dag.nodes[name]['run'] = first_runner
+                return dag.nodes[name]['run']
+
+            dag.nodes[name]['launch'] = launch
+
+    return Director(element)
+
 def _get_mpi_ensemble_communicator(session_communicator, ensemble_size):
     """Get an ensemble communicator from an MPI communicator.
 
@@ -700,6 +770,7 @@ class Context(object):
         # Consider that `self` in the lambda function is bound to `self` in this
         # block and is not the implicit argument placeholder found in member functions.
         self.__operations['gmxapi'] = {'md': lambda element : _md(self, element),
+                                       'commandline_operation': lambda element : _commandline_operation(self, element),
                                        # 'global_data' : shared_data_maker,
                                       }
         # Even if TPR file loading were to become a common and stable enough operation to be specified in
@@ -810,6 +881,12 @@ class Context(object):
     def add_operation(self, namespace, operation, get_builder):
         """Add a builder factory to the operation map.
 
+        TODO: This probably should not be part of the public API.
+        To load work graphs from a serialized form, the Context has to be able
+        to discover and automatically map factory functions from Python modules.
+        Effectively, a user can add to the Python module path to expose additional
+        modules.
+
         Extends the known operations of the Context by mapping an operation in a namespace to a function
         that returns a builder to process a work element referencing the operation. Must be called before
         the work specification is added, since the spec is inspected to confirm that the Context can run it.
@@ -917,6 +994,9 @@ class Context(object):
             # dispatch builders for operation implementations
             try:
                 new_builder = self.__operations[element.namespace][element.operation](element)
+                # TODO: Check whether the returned object provides the director interface.
+                # Check for a _gmxapi_graph_director attribute
+
                 assert hasattr(new_builder, 'add_subscriber')
                 assert hasattr(new_builder, 'build')
 

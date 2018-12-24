@@ -6,12 +6,13 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-__all__ = ['to_utf8', 'to_string', 'which']
+__all__ = ['to_utf8', 'to_string', 'which', 'commandline_operation']
 
 import sys
 import os
 
 from gmx import exceptions
+from gmx._commandline_operation import commandline_operation
 
 def _filetype(filename):
     """Use Gromacs file I/O module to identify known file types.

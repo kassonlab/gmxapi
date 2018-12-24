@@ -62,6 +62,7 @@ from __future__ import unicode_literals
 __all__ = ['get_context', 'run']
 
 # Import system facilities
+import json
 import logging
 logging.getLogger().addHandler(logging.NullHandler(level=logging.DEBUG))
 logging.getLogger().setLevel(logging.DEBUG)
@@ -104,7 +105,7 @@ def run(work=None):
 
 
 def commandline_operation(executable=None, arguments=None, input=None, output=None, shell=False):
-    """Execute in a subprocess.
+    """Execute a command line program in a subprocess.
 
     Configure an executable in a subprocess. Executes when run in an execution
     Context, as part of a work graph or via gmx.run(). Runs in the current
@@ -143,44 +144,19 @@ def commandline_operation(executable=None, arguments=None, input=None, output=No
             >>> gmx.run(my_op)
 
     Returns:
-        An Operation to invoke local subprocess(es)
-
-    Note:
-        STDOUT is available if a consuming operation is bound to `output.stdout`.
-        STDERR is available if a consuming operation is bound to `output.stderr`.
-        Otherwise, STDOUT and/or STDERR is(are) closed when command is called.
-
-    Warning:
-        Commands using STDIN cannot be used and is closed when command is called.
-
-    Todo:
-        We can be more helpful about managing the work graph for operations, but
-        we need to resolve issue #90 and others first.
+        Proxy to an operation in a work graph.
 
     """
-    import subprocess
-    import os
+    import hashlib
     from gmx import util
-    if hasattr(os, 'devnull'):
-        devnull = os.devnull
-    elif os.path.exists('/dev/null'):
-        devnull = '/dev/null'
-    else:
-        devnull = None
     if shell != False:
         raise exceptions.UsageError("Operation does not support shell processing.")
-    command = ""
-    try:
-        command = util.which(executable)
-    except:
-        # We could handle specific errors, but right now we only care
-        # whether we have something we can run.
-        pass
-    command_args = []
-    if command is None or command == "":
+    params = {}
+    command = util.to_string(executable)
+    if command is None or command == '':
         raise exceptions.UsageError("Need an executable command.")
     else:
-        command_args = [util.to_utf8(command)]
+        params['executable'] = command
         # If we can confirm that we are handling iterables well, we can update
         # the documentation, revising the warning about single string arguments
         # and noting the automatic conversion of single scalars.
@@ -196,100 +172,37 @@ def commandline_operation(executable=None, arguments=None, input=None, output=No
             # Python 3 does not have unicode type
             pass
         if arguments is not None:
-            for arg in arguments:
-                command_args.append(util.to_utf8(arg))
+            params['arguments'] = list([util.to_string(arg) for arg in arguments])
 
         if input is not None:
+            params['input'] = []
             for kwarg in input:
                 # the flag
-                command_args.append(util.to_utf8(kwarg))
+                params['input'].append(util.to_string(kwarg))
                 # the filename argument
-                command_args.append(util.to_utf8(input[kwarg]))
+                # TODO: this needs to trigger scatter when appropriate
+                params['input'].append(util.to_string(input[kwarg]))
 
         if output is not None:
+            params['output'] = []
             for kwarg in input:
                 # the flag
-                command_args.append(util.to_utf8(kwarg))
+                params['output'].append(util.to_utf8(kwarg))
                 # the filename argument
-                command_args.append(util.to_utf8(input[kwarg]))
+                # TODO: this needs to trigger scatter when appropriate
+                params['output'].append(util.to_utf8(input[kwarg]))
 
-    class CommandlineOperation(object):
-        def __init__(self, command):
-            self.command = command
-
-            self.__input = {}
-            self.__output = {}
-
-        @property
-        def input(self):
-            """Operation graph input(s) not implemented.
-
-            See issue #203
-            """
-            # value = object()
-            # value.stdin = self.__input['stdin']
-            # return value
-            raise exceptions.FeatureNotAvailableError("command_line operation input ports not implemented (yet).")
-
-        # Provide an `output` attribute that is an object with properties for
-        # each output port.
-        @property
-        def output(self):
-            """Graph output(s) for the operation, if bound to subscribers.
-
-            The subprocess is executed with STDOUT and STDERR closed, by default.
-            But if a consuming operation is bound to one of the output ports,
-            output.stdout or output.stderr, then the output of the command is
-            captured and stored.
-
-            To do: we should take precautions to handle buffering and memory
-            tidiness. The session manager could make sure that the output buffers
-            for the subprocess are read frequently and published to subscribers,
-            but it might make sense to require that stdout and stderr are at
-            least intermediately sent directly to files until the operation is
-            completed and the output filehandles closed, such that a command
-            line operation produces a single clear data event when it completes.
-            """
-            # This will need to be a class instance with more sophisticated
-            # property attributes in the future...
-            _output = {}
-            if 'stdout' in self.__output:
-                _output['stdout'] = self.__output['stdout']
-            if 'stderr' in self.__output:
-                _output['stderr'] = self.__output['stderr']
-            if 'returncode' in self.__output:
-                _output['returncode'] = self.__output['returncode']
-            return _output
-
-        def __call__(self):
-            # File descriptors 0, 1, and 2 are inherited from parent and we don't
-            # want to close them for the parent, so we need to redirect or close
-            # them in the subprocess. Setting to the null device is probably
-            # sufficient, but it might not be easy to find on all systems.
-            # Python 3.3+ has better support.
-            # To do: Handle input and output flow.
-            null_filehandle = open(devnull, 'w')
-            try:
-                returncode = subprocess.check_call(self.command,
-                                                   shell=shell,
-                                                   stdin=null_filehandle,
-                                                   stdout=null_filehandle,
-                                                   stderr=null_filehandle)
-            except subprocess.CalledProcessError as e:
-                returncode = e.returncode
-                # What should we do with error (non-zero) exit codes?
-                logger.info("commandline operation had non-zero return status when calling {}".format(e.cmd))
-                self.__output['erroroutput'] = e.output
-            self.__output['returncode'] = returncode
-            # return self.output.returncode == 0
-            return self.output['returncode'] == 0
-
-    operation = None
-    if len(command_args) > 0:
-        operation = CommandlineOperation(command_args)
-    else:
-        raise exceptions.UsageError("No command line could be constructed.")
-    return operation
+    namespace = 'gmxapi'
+    operation = 'commandline_operation'
+    element = workflow.WorkElement(namespace=namespace,
+                                   operation=operation,
+                                   params=params)
+    # Uniquely identify the input and output of this operation for placement in
+    # a work graph.
+    identifying_string = util.to_utf8(json.dumps([namespace, operation, params]))
+    digest = hashlib.sha256(identifying_string).hexdigest()
+    element.name = 'cli_{}'.format(digest)
+    return element
 
 # if __name__ == "__main__":
 #     import doctest
