@@ -12,6 +12,41 @@ building from source code.
 
 Please report bugs or updates at https://github.com/kassonlab/gmxapi/issues
 
+Simple "pip" installation
+=========================
+
+In the simplest case, the following should just work::
+
+    git clone https://github.com/kassonlab/gmxapi.git
+    cd gmxapi
+    pip install -r requirements.txt
+    pip install .
+    cd
+
+.. note::
+
+    The trailing ``.`` after ``pip install`` indicates to install from the
+    current directory.
+
+
+``pip`` will need to be able to find a GROMACS 2019 installation with gmxapi
+enabled. When building GROMACS, make sure to use the ``-DGMXAPI=ON`` CMake
+option. Then, make sure you tell ``pip`` where to find the GROMACS installation
+by setting ``gmxapi_DIR`` or just "source"ing the ``GMXRC`` file, as usual.
+
+If you install to the directory ``/path/to/gromacs``, then you should have a
+``/path/to/gromacs/bin/GMXRC`` configuration script that you would normally run
+or source before using ``gmx`` command line tools. Do that first.
+E.g. for the ``bash`` shell::
+
+    source /path/to/gromacs/bin/GMXRC
+
+.. note::
+
+    We recommend installing in a Python virtual environment. If not using a venv
+    you can tell ``pip`` to install the package to your home directory by including
+    the ``--user`` flag to ``pip install``.
+
 .. _docker_container:
 
 Docker
