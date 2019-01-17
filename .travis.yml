@@ -36,8 +36,6 @@ addons:
     sources:
     - ubuntu-toolchain-r-test
     packages:
-    - cmake
-    - cmake-data
     - doxygen
     - g++-6
     - libblas-dev
@@ -57,7 +55,9 @@ before_install:
 install:
   - export CCACHE_DIR=$HOME/.ccache_gmxapi
   - ccache -s
-  - ./ci_scripts/install_gromacs_2019.sh
+  - ./ci_scripts/install_cmake.sh
+# 0.0.8 Does not currently attempt to be compatible with GROMACS 2019.
+#  - ./ci_scripts/install_gromacs_2019.sh
   - if [ "${TRAVIS_BRANCH}" != "master" ] ; then ./ci_scripts/install_gromacs_devel.sh ; fi
 
 before_script:
@@ -66,9 +66,16 @@ before_script:
   - eval $(./ci_scripts/prepare_python.sh)
 
 script:
-  - source $HOME/install/gromacs_2019/bin/GMXRC && ./ci_scripts/test_installers.sh
-  - source $HOME/install/gromacs_2019/bin/GMXRC && ./ci_scripts/pygmx.sh
-  - ./ci_scripts/sample_restraint.sh release-0_0_7
+# 0.0.8 Does not currently attempt to be compatible with GROMACS 2019.
+#  - source $HOME/install/gromacs_2019/bin/GMXRC && ./ci_scripts/test_installers.sh
+#  - source $HOME/install/gromacs_2019/bin/GMXRC && ./ci_scripts/pygmx.sh
+#  - ./ci_scripts/sample_restraint.sh release-0_0_7
+# The following scripting structure looks funny, but exists to control the
+# failure exit points and Travis-CI output.
+  - |
+    if [ "${TRAVIS_BRANCH}" != master ] ; then
+      source $HOME/install/gromacs_devel/bin/GMXRC && ./ci_scripts/test_installers.sh
+    fi
   - |
     if [ "${TRAVIS_BRANCH}" != master ] ; then
       source $HOME/install/gromacs_devel/bin/GMXRC && ./ci_scripts/pygmx.sh
