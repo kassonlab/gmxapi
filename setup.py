@@ -160,7 +160,6 @@ class CMakeGromacsBuild(build_ext):
             cfg = 'Debug'
         build_args = ['--config', cfg]
         cmake_args = ['-DPYTHON_EXECUTABLE=' + sys.executable,
-                      '-DGMXAPI=ON'
                       ]
         env = os.environ.copy()
         if 'CC' in env:
@@ -209,12 +208,16 @@ class CMakeGromacsBuild(build_ext):
                                     '-DGMX_OPENMP=OFF',
                                     '-DGMX_SIMD=None',
                                     '-DGMX_USE_RDTSCP=OFF',
-                                    '-DGMX_MPI=OFF']
+                                    '-DGMX_MPI=OFF',
+                                    '-DGMXAPI=ON',
+                                    ]
             else:
                 extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
                                     '-DGMX_BUILD_OWN_FFTW=ON',
                                     '-DGMX_GPU=OFF',
-                                    '-DGMX_THREAD_MPI=ON']
+                                    '-DGMX_THREAD_MPI=ON',
+                                    '-DGMXAPI=ON',
+                                    ]
 
             # Warning: make sure not to recursively build the Python module...
             get_gromacs(gromacs_url,
