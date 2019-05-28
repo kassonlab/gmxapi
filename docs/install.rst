@@ -56,9 +56,11 @@ Requirements
 * This Python package
 * MD restraint plugins and sample gmxapi client code
 
-First, install `GROMACS 2019 <http://www.gromacs.org>`_ (beta 2 or more recent)
+First, install `GROMACS 2019 <http://www.gromacs.org>`_
 or the Kasson Lab GROMACS fork available from
-`github.com/kassonlab/gromacs-gmxapi <https://github.com/kassonlab/gromacs-gmxapi/>`_
+`github.com/kassonlab/gromacs-gmxapi <https://github.com/kassonlab/gromacs-gmxapi/>`_.
+Build from source and set ``GMXAPI=ON`` with ``ccmake`` or using the ``-DGMXAPI=ON``
+``cmake`` command line configuration flag.
 
 Then, install this Python package as documented below. E.g.
 `github.com/kassonlab/gmxapi <https://github.com/kassonlab/gmxapi/>`_.
@@ -76,10 +78,12 @@ of CMake.
 Full gmxapi functionality may also require an MPI compiler (e.g. ``mpicc``).
 
 The Python package requires a GROMACS installation.
-Build and install `GROMACS 2019 <http://www.gromacs.org>`_ (beta 2 or more recent)
+Build and install `GROMACS 2019 <http://www.gromacs.org>`_
 or the Kasson Lab GROMACS fork (available from
 `github.com/kassonlab/gromacs-gmxapi <https://github.com/kassonlab/gromacs-gmxapi/>`_)
 before proceeding.
+Be sure to set ``GMXAPI=ON`` with ``ccmake`` or using the ``-DGMXAPI=ON``
+``cmake`` command line configuration flag.
 Then, "source" the GMXRC file from the GROMACS installation as you normally would
 before using GROMACS, or note its installation location so that you can pass it
 to the build configuration.
@@ -240,9 +244,10 @@ home directory.
     mkdir build
     cd build
     cmake ../gromacs -DGMX_THREAD_MPI=ON \
-                     -DCMAKE_CXX_COMPILER=`which g++`
-                     -DCMAKE_C_COMPILER=`which gcc`
-                     -DCMAKE_INSTALL_PREFIX=$HOME/gromacs-gmxapi
+                     -DCMAKE_CXX_COMPILER=`which g++` \
+                     -DCMAKE_C_COMPILER=`which gcc` \
+                     -DCMAKE_INSTALL_PREFIX=$HOME/gromacs-gmxapi \
+                     -DGMXAPI=ON
     make -j8 && make install
 
 .. note::
