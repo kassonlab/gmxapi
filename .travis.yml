@@ -5,9 +5,8 @@ version: "= 0"
 # For extra debugging of failed jobs, see
 # https://docs.travis-ci.com/user/common-build-problems/#Troubleshooting-Locally-in-a-Docker-Image
 
-os: linux
+dist: trusty
 language: cpp
-sudo: false
 
 # Different compiler or env are supposed to trigger different caches, but I had a hard time diagnosing problems
 # in gromacs-gmxapi until I specified a separate ccache for each matrix build element.
@@ -34,7 +33,7 @@ env:
 addons:
   apt:
     sources:
-    - ubuntu-toolchain-r-test
+    - sourceline: 'ppa:ubuntu-toolchain-r/test'
     packages:
     - doxygen
     - g++-6
