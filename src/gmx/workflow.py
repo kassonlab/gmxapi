@@ -30,6 +30,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+__all__ = ['WorkSpec', 'WorkElement']
+
 import warnings
 import weakref
 
@@ -37,8 +39,6 @@ from gmx import exceptions
 from gmx import logging
 from gmx.util import to_string
 from gmx.util import to_utf8
-
-__all__ = ['WorkSpec', 'WorkElement']
 
 # Module-level logger
 logger = logging.getLogger(__name__)
@@ -50,6 +50,29 @@ logger.info("Using schema version {}.".format(workspec_version))
 
 # module-level constant indicating a workflow implementing parallel array work.
 # ARRAY = 0
+
+
+class GmxMap(dict):
+    """Utility/compatibility class to ensure consistent keys.
+
+    Allow subscripting to use native str or Python 2 Unicode objects.
+    Internally, converts all keys to native str for the current interpreter.
+    """
+    def keys(self):
+        for key in dict.keys(self):
+            if not isinstance(key, str):
+                raise exceptions.ApiError('Invalid key type found: {} {}'.format(key, type(key)))
+            yield key
+
+    def __getitem__(self, key):
+        return super(GmxMap, self).__getitem__(str(key))
+
+    def __setitem__(self, key, item):
+        super(GmxMap, self).__setitem__(str(key), item)
+
+    def __delitem__(self, key):
+        super(GmxMap, self).__delitem__(str(key))
+
 
 class WorkSpec(object):
     """
@@ -124,7 +147,7 @@ class WorkSpec(object):
     """
     def __init__(self):
         self.version = workspec_version
-        self.elements = dict()
+        self.elements = GmxMap()
         self.__context_weak_ref = None
 
     @property
@@ -350,12 +373,17 @@ class WorkElement(object):
         # Note: Nothing currently prevents attribute updates by assignment after adding the element to a workspec,
         # but this protocol will be clarified with https://github.com/kassonlab/gmxapi/issues/92
         if params is None:
-            self.params = {}
+            self.params = GmxMap()
         elif isinstance(params, dict):
-            self.params = {to_string(name): params[name] for name in params}
+            self.params = GmxMap({to_string(name): params[name] for name in params})
         else:
             raise exceptions.UsageError("If provided, params must be a dictionary of keyword arguments")
-        self.depends = list(depends)
+        self.depends = []
+        for d in depends:
+            if isinstance(d, (list, tuple)):
+                self.depends.append([str(name) for name in d])
+            else:
+                self.depends.append(str(d))
 
         # The Python class for work elements keeps a strong reference to a WorkSpec object containing its description
         self._name = None
@@ -363,11 +391,12 @@ class WorkElement(object):
 
     @property
     def name(self):
+        assert isinstance(self._name, (str, type(None)))
         return self._name
 
     @name.setter
     def name(self, new_name):
-        self._name = to_string(new_name)
+        self._name = str(to_string(new_name))
 
     @property
     def workspec(self):

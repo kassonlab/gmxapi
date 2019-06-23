@@ -688,7 +688,7 @@ class Context(object):
         # initialize the operations map. May be extended during the lifetime of a Context.
         # Note that there may be a difference between built-in operations provided by this module and
         # additional operations registered at run time.
-        self.__operations = {}
+        self.__operations = dict()
         # The map contains a builder for each operation. The builder is created by passing the element to the function
         # in the map. The object returned must have the following methods:
         #
