@@ -928,7 +928,15 @@ class Context(object):
             # are a facility provided by the Context, in which case they may be member functions
             # of the Context. We will probably need to pass at least some
             # of the Session to the `launch()` method, though...
-            for name in element.depends:
+            dependencies = element.depends
+            for dependency in dependencies:
+                # If a dependency is a list, assume it is an "ensemble" of dependencies
+                # and pick the element for corresponding to the local rank.
+                if isinstance(dependency, (list, tuple)):
+                    assert len(dependency) > context_rank
+                    name = str(dependency[context_rank])
+                else:
+                    name = dependency
                 logger.info("Subscribing {} to {}.".format(element.name, name))
                 builders[name].add_subscriber(new_builder)
             builders[element.name] = new_builder
