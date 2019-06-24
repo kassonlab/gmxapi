@@ -1,4 +1,5 @@
 #!/bin/bash
+# Install the kassonlab GROMACS fork for experimental features.
 set -ev
 
 export GMX_DOUBLE=OFF
@@ -18,12 +19,9 @@ pushd $HOME
  [ -d gromacs-gmxapi ] || \
      git clone \
          --depth=1 \
-         --no-single-branch \
          https://github.com/kassonlab/gromacs-gmxapi.git \
          gromacs-kassonlab
  pushd gromacs-kassonlab
-  git branch -a
-  git checkout devel
   pwd
   rm -rf build
   mkdir build
