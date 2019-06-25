@@ -25,27 +25,9 @@ $PYTHON -m pip uninstall -y gmx
 rm -rf _skbuild dist gmx* build
 $PYTHON -m pip install .
 
-$PYTHON -m pytest src/gmx/test
-
 #
 # Test install with setup.py
 #
 $PYTHON -m pip uninstall -y gmx
 rm -rf _skbuild dist gmx* build
 $PYTHON setup.py install
-
-$PYTHON -m pytest src/gmx/test
-
-#
-# Test CMake-driven install
-#
-# Inactive. Duplicate of pygmx.sh
-#pip uninstall -y gmx
-#rm -rf _skbuild dist gmx* build
-#
-#rm -rf build
-#mkdir -p build
-#pushd build
-# cmake .. -DCMAKE_CXX_COMPILER=$CXX -DCMAKE_C_COMPILER=$CC -DPYTHON_EXECUTABLE=$PYTHON
-# make -j2
-#popd

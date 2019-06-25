@@ -18,7 +18,8 @@ if [ -x "$PYTHON" ] ; then
     # Quiet output if QUIET is non-null
     echo "$PYTHON -m pip install --upgrade pip setuptools ${QUIET:+'-q'};
     $PYTHON -m pip install --no-cache-dir --upgrade --no-binary \":all:\" --force-reinstall mpi4py  ${QUIET:+'-q'};
-    $PYTHON -m pip install -r requirements.txt ${QUIET:+'-q'}"
+    $PYTHON -m pip install -r requirements.txt ${QUIET:+'-q'};
+    $PYTHON -m pip install -r docs/requirements.txt ${QUIET:+'-q'}"
 else
     echo "echo Set PYTHON to a Python interpreter before using prepare_python.sh"
 fi
