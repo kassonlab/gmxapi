@@ -205,5 +205,46 @@ def test_plugin_with_ensemble(caplog):
             session.run()
 
 
+@pytest.mark.usefixtures("cleandir")
+@pytest.mark.usefixtures("caplog")
+@withmpi_only
+def test_plugin_array(caplog):
+    # Test in ensemble.
+    md = gmx.workflow.from_tpr([tpr_filename, tpr_filename], threads_per_rank=1)
+
+    # Create a WorkElement for the potential
+    #potential = gmx.core.TestModule()
+    potential1 = gmx.workflow.WorkElement(namespace="testing", operation="create_test")
+    potential1.name = "test_module1"
+
+    potential2 = gmx.workflow.WorkElement(namespace="testing", operation="create_test")
+    potential2.name = "test_module2"
+
+    # before = md.workspec.elements[md.name]
+    # md.add_dependency(potential_element)
+    # assert potential_element.name in md.workspec.elements
+    # assert potential_element.workspec is md.workspec
+    # after = md.workspec.elements[md.name]
+    # assert not before is after
+
+    md.add_dependency([potential1, potential2])
+
+    # Workaround for https://github.com/kassonlab/gmxapi/issues/42
+    # We can't add an operation to a context that doesn't exist yet, but we can't
+    # add a work graph with an operation that is not defined in a context.
+    context = gmx.get_context()
+    context.add_operation(potential1.namespace, potential1.operation, my_plugin)
+    context.work = md
+
+    with warnings.catch_warnings():
+        # Swallow warning about wide MPI context
+        warnings.simplefilter("ignore")
+        with context as session:
+            if context.rank == 0:
+                print(context.work)
+            session.run()
+
+
+
 if __name__ == '__main__':
     unittest.main()
