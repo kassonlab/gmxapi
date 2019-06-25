@@ -27,7 +27,7 @@ DOI: [10.1093/bioinformatics/bty484](https://doi.org/10.1093/bioinformatics/bty4
 [![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=latest)](http://gmxapi.readthedocs.io/en/latest/?badge=latest)
 
 ## Development branch
-[![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=devel)](https://travis-ci.org/kassonlab/devel)
+[![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=devel)](https://travis-ci.org/kassonlab/gmxapi)
 [![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=devel)](http://gmxapi.readthedocs.io/en/devel/?badge=latest)
 
 Note: automated documentation generation may not be up to date for development branch.
