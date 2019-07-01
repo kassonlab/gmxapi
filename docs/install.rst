@@ -56,14 +56,12 @@ Requirements
 * This Python package
 * MD restraint plugins and sample gmxapi client code
 
-First, install `GROMACS 2019 <http://www.gromacs.org>`_
-or the Kasson Lab GROMACS fork available from
-`github.com/kassonlab/gromacs-gmxapi <https://github.com/kassonlab/gromacs-gmxapi/>`_.
+First, install `GROMACS 2019 <http://www.gromacs.org>`_.
 Build from source and set ``GMXAPI=ON`` with ``ccmake`` or using the ``-DGMXAPI=ON``
 ``cmake`` command line configuration flag.
 
 Then, install this Python package as documented below. E.g.
-`github.com/kassonlab/gmxapi <https://github.com/kassonlab/gmxapi/>`_.
+`github.com/kassonlab/gmxapi <https://github.com/kassonlab/gmxapi/tree/release-0_0_7>`_.
 
 A `sample plugin <https://github.com/kassonlab/sample_restraint>`_ demonstrates
 how to extend GROMACS with C++ code that can be controlled from the Python interface.
@@ -78,10 +76,7 @@ of CMake.
 Full gmxapi functionality may also require an MPI compiler (e.g. ``mpicc``).
 
 The Python package requires a GROMACS installation.
-Build and install `GROMACS 2019 <http://www.gromacs.org>`_
-or the Kasson Lab GROMACS fork (available from
-`github.com/kassonlab/gromacs-gmxapi <https://github.com/kassonlab/gromacs-gmxapi/>`_)
-before proceeding.
+Build and install `GROMACS 2019 <http://www.gromacs.org>`_.
 Be sure to set ``GMXAPI=ON`` with ``ccmake`` or using the ``-DGMXAPI=ON``
 ``cmake`` command line configuration flag.
 Then, "source" the GMXRC file from the GROMACS installation as you normally would
@@ -228,15 +223,6 @@ Official GROMACS release branch::
     cd gromacs
     git checkout release-2019
 
-The Kasson Lab GROMACS fork may have experimental features that have not yet
-appeared in an official GROMACS release.
-::
-
-    git clone https://github.com/kassonlab/gromacs-gmxapi.git gromacs
-    cd gromacs
-    # for that absolute latest code, check out the "development branch" (optional)
-    git checkout devel
-
 Configure and build GROMACS. Install into a ``gromacs-gmxapi`` directory in your
 home directory.
 ::
@@ -317,28 +303,31 @@ Get a copy of `the source code <https://github.com/kassonlab/gmxapi/releases/lat
 if you haven't already.
 For a specific `release version <https://github.com/kassonlab/gmxapi/releases>`_,
 you can just download a source package.
+
 ::
 
     wget https://github.com/kassonlab/gmxapi/archive/v0.0.7.zip
     unzip v0_0_7.zip
     cd gmxapi-v0_0_7
 
-For a development branch, you should probably clone the repository. You may not already have ``git`` installed on your
+Alternatively you can clone the repository. You may not already have ``git`` installed on your
 system or you may need to load a module for it on an HPC system, which you will need to do before trying the following.
+
 ::
 
     git clone https://github.com/kassonlab/gmxapi.git
     cd gmxapi
-    git checkout devel
 
 You will need to install some additional dependencies. The :file:`requirements.txt`
 file is provided for convenience. Also, note that ``pip`` must be
 version 10.1 or higher.
+
 ::
 
     pip install -r requirements.txt
 
 Create a ``build`` directory.
+
 ::
 
     mkdir build
