@@ -15,10 +15,8 @@ else
 fi
 
 pushd $HOME
- [ -d gromacs-gmxapi ] || git clone --depth=1 --no-single-branch https://github.com/gromacs/gromacs.git gromacs
+ [ -d gromacs-gmxapi ] || git clone --depth=1 -b release-2019 --single-branch https://github.com/gromacs/gromacs.git gromacs
  pushd gromacs
-  git branch -a
-  git checkout release-2019
   pwd
   rm -rf build
   mkdir build

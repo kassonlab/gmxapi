@@ -8,7 +8,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9 CACHE STRING "OS X deployment target below 10.9 does not use C++11 standard library" FORCE)
 
 # Sets the PROJECT_VERSION variable, as well...
-project(gmxpy VERSION 0.0.8)
+project(gmxpy VERSION 0.0.7)
 
 # Only interpret if() arguments as variables or keywords when unquoted.
 cmake_policy(SET CMP0054 NEW)
@@ -51,8 +51,10 @@ unset(PYTHONLIBS_FOUND)
 find_package(PythonInterp)
 if (PYTHONINTERP_FOUND)
     message(STATUS "Found Python interpreter: ${PYTHON_EXECUTABLE}")
-    find_package(PythonLibs ${PYTHON_VERSION_STRING} EXACT)
-    if (PYTHONLIBS_FOUND)
+    # pybind11 is included as a subtree and updated just with squash merges.
+    # Refer to https://www.atlassian.com/blog/git/alternatives-to-git-submodule-git-subtree
+    add_subdirectory(pybind11)
+    if (PYTHON_LIBRARIES)
         message(STATUS "Python headers in ${PYTHON_INCLUDE_DIRS}")
         message(STATUS "Python libraries in ${PYTHON_LIBRARIES}")
         if (GMXAPI_USER_INSTALL)
@@ -95,10 +97,6 @@ set(GMXAPI_INSTALL_PATH ${GMXAPI_DEFAULT_SITE_PACKAGES}/gmx CACHE PATH
     directory.")
 
 message(STATUS "Python module will be installed to GMXAPI_INSTALL_PATH cache value ${GMXAPI_INSTALL_PATH}")
-
-# pybind11 is included as a subtree and updated just with squash merges.
-# Refer to https://www.atlassian.com/blog/git/alternatives-to-git-submodule-git-subtree
-add_subdirectory(pybind11)
 
 add_subdirectory(src)
 
