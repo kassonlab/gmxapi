@@ -33,8 +33,6 @@ DOI: [10.1093/bioinformatics/bty484](https://doi.org/10.1093/bioinformatics/bty4
 [![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=master)](https://travis-ci.org/kassonlab/gmxapi)
 [![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=latest)](http://gmxapi.readthedocs.io/en/latest/?badge=latest)
 
-Note: automated documentation generation may not be up to date for development branch.
-
 # Running simulations from Python
 
 To run a simulation as you would with the `gmx` command-line tool, a gmxapi
