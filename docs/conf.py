@@ -30,6 +30,7 @@ needs_sphinx = '1.4'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
     'sphinx.ext.doctest',
     'sphinx.ext.todo',
@@ -371,6 +372,9 @@ latex_elements = {
 # New in version 1.3.
 #
 # autodoc_mock_imports = []
+
+# See http://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#confval-autoclass_content
+autoclass_content = 'both'
 
 ## Napoleon settings
 #napoleon_google_docstring = True

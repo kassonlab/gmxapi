@@ -31,13 +31,11 @@ namespace detail
 
 void export_md(pybind11::module &m);
 
-void export_runner(pybind11::module &m);
-
 void export_context(pybind11::module &m);
 
-void export_session(pybind11::module &m);
-
 void export_system(pybind11::module &m);
+
+void export_tprfile(pybind11::module &m);
 
 } // end namespace gmxpy::detail
 

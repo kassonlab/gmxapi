@@ -19,7 +19,6 @@ from warnings import warn
 import setuptools
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
-from setuptools.command.test import test as TestCommand
 
 #import gmx.version
 __version__ = '0.0.7'
@@ -45,9 +44,19 @@ if not build_gromacs:
         raise RuntimeError("Either set gmxapi_DIR or GROMACS_DIR to an existing installation\n"
                            "or set BUILDGROMACS to get a private copy. See installation docs...")
 
-def get_gromacs(url, cmake_args=(), build_args=()):
+def get_gromacs(url, cmake_args=(), build_args=(), install_dir=None):
     """Download, build, and install a local copy of gromacs to a temporary location.
     """
+    if os.path.exists(install_dir):
+        # Exit early if we've already got it.
+        cmake_config_dir = os.path.join(install_dir, 'share', 'cmake', 'gmxapi')
+        if not os.path.isdir(cmake_config_dir):
+            raise RuntimeError(
+                "No gmxapi cmake hints at {}. GROMACS built without gmxapi enabled?".format(
+                    cmake_config_dir))
+        return
+
+    cmake_args = list(cmake_args) + ['-DCMAKE_INSTALL_PREFIX=' + install_dir]
     try:
         import ssl
     except:
@@ -177,7 +186,7 @@ class CMakeGromacsBuild(build_ext):
                 # save some RAM
                 # We're pushing the limits of the readthedocs build host provisions. We might soon need
                 # a binary package or mock library for libgmxapi / libgromacs.
-                build_args += ['--', '-j2']
+                build_args += ['--', '-j4']
             else:
                 build_args += ['--', '-j8']
 
@@ -199,26 +208,28 @@ class CMakeGromacsBuild(build_ext):
         # Linking is a pain because the package is relocated to the site-packages directory. We should really do this
         # in two stages.
         if build_gromacs:
-            gromacs_url = "https://github.com/kassonlab/gromacs-gmxapi/archive/release-0_0_7.zip"
+            gromacs_url = "https://github.com/gromacs/gromacs/archive/release-2019.zip"
             gmxapi_DIR = os.path.join(extdir, 'data/gromacs')
             if build_for_readthedocs:
-                extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
-                                    '-DGMX_FFT_LIBRARY=fftpack',
+                extra_cmake_args = ['-DGMX_FFT_LIBRARY=fftpack',
                                     '-DGMX_GPU=OFF',
                                     '-DGMX_OPENMP=OFF',
                                     '-DGMX_SIMD=None',
                                     '-DGMX_USE_RDTSCP=OFF',
-                                    '-DGMX_MPI=OFF']
+                                    '-DGMX_MPI=OFF',
+                                    '-DGMXAPI=ON',
+                                    ]
             else:
-                extra_cmake_args = ['-DCMAKE_INSTALL_PREFIX=' + gmxapi_DIR,
-                                    '-DGMX_BUILD_OWN_FFTW=ON',
+                extra_cmake_args = ['-DGMX_BUILD_OWN_FFTW=ON',
                                     '-DGMX_GPU=OFF',
-                                    '-DGMX_THREAD_MPI=ON']
+                                    '-DGMX_THREAD_MPI=ON',
+                                    '-DGMXAPI=ON',
+                                    ]
 
             # Warning: make sure not to recursively build the Python module...
             get_gromacs(gromacs_url,
                         cmake_args + extra_cmake_args,
-                        build_args)
+                        build_args, gmxapi_DIR)
             GROMACS_DIR = gmxapi_DIR
         env['GROMACS_DIR'] = GROMACS_DIR
 
@@ -289,7 +300,7 @@ setup(
     # optional targets:
     #   docs requires 'docutils', 'sphinx>=1.4', 'sphinx_rtd_theme'
     #   build_gromacs requires 'cmake>=3.4'
-    install_requires=['setuptools>=28', 'scikit-build', 'cmake', 'networkx'],
+    install_requires=['setuptools>=28', 'cmake>=3.4', 'networkx>2'],
 
     author='M. Eric Irrgang',
     author_email='ericirrgang@gmail.com',

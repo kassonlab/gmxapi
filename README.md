@@ -3,8 +3,9 @@ dynamics simulation workflows. In this repository, a Python package provides the
 `gmx` module for high-level  interaction with GROMACS. `gmx.core` provides 
 Python bindings to the `gmxapi` C++ GROMACS external API.
 
-The project is hosted on [GitHub](https://github.com/kassonlab/gmxapi) and 
-includes the `gmxapi` repository along with supporting respositories. The 
+The gmxapi 0.0.7 Python project is hosted on
+[GitHub](https://github.com/kassonlab/gmxapi)
+and includes the `gmxapi` repository along with supporting respositories. The 
 [`gromacs-gmxapi`](https://github.com/kassonlab/gromacs-gmxapi) repository 
 includes a modified version of GROMACS that supports the latest `gmxapi` 
 features not yet available through an official GROMACS distribution. A 
@@ -25,10 +26,6 @@ DOI: [10.1093/bioinformatics/bty484](https://doi.org/10.1093/bioinformatics/bty4
 ## Current master branch
 [![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=master)](https://travis-ci.org/kassonlab/gmxapi)
 [![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=latest)](http://gmxapi.readthedocs.io/en/latest/?badge=latest)
-
-## Development branch
-[![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=devel)](https://travis-ci.org/kassonlab/devel)
-[![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=devel)](http://gmxapi.readthedocs.io/en/devel/?badge=latest)
 
 Note: automated documentation generation may not be up to date for development branch.
 
@@ -74,9 +71,9 @@ suggestions or describe your own  priorities and research needs in the
 
 # Installation and getting started
 
-A compatible version of GROMACS must be installed before building the Python
-package. See [`gromacs-gmxapi`](https://github.com/kassonlab/gromacs-gmxapi)
-or GROMACS 2019.
+[GROMACS 2019](http://manual.gromacs.org/documentation/2019-current/download.html) with
+[`GMXAPI=ON`](http://manual.gromacs.org/2019-current/install-guide/index.html#gmxapi-external-api) 
+must be installed before building the Python package.
 
 We recommend installing gmxapi in a Python virtual environment. See [docs/install.rst](docs/install.rst) for details
 or refer to the online [user documentation](http://gmxapi.readthedocs.io/).

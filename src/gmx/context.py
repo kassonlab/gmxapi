@@ -561,6 +561,7 @@ class DefaultContext(_libgromacsContext):
     """
     def __init__(self, work):
         # There is very little context abstraction at this point...
+        warnings.warn("Behavior of DefaultContext is unspecified starting in gmxapi 0.0.8.", DeprecationWarning)
         super(DefaultContext, self).__init__(work)
 
 class Context(object):
@@ -687,7 +688,7 @@ class Context(object):
         # initialize the operations map. May be extended during the lifetime of a Context.
         # Note that there may be a difference between built-in operations provided by this module and
         # additional operations registered at run time.
-        self.__operations = {}
+        self.__operations = dict()
         # The map contains a builder for each operation. The builder is created by passing the element to the function
         # in the map. The object returned must have the following methods:
         #
@@ -927,7 +928,15 @@ class Context(object):
             # are a facility provided by the Context, in which case they may be member functions
             # of the Context. We will probably need to pass at least some
             # of the Session to the `launch()` method, though...
-            for name in element.depends:
+            dependencies = element.depends
+            for dependency in dependencies:
+                # If a dependency is a list, assume it is an "ensemble" of dependencies
+                # and pick the element for corresponding to the local rank.
+                if isinstance(dependency, (list, tuple)):
+                    assert len(dependency) > context_rank
+                    name = str(dependency[context_rank])
+                else:
+                    name = dependency
                 logger.info("Subscribing {} to {}.".format(element.name, name))
                 builders[name].add_subscriber(new_builder)
             builders[element.name] = new_builder

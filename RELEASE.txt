@@ -1,8 +1,6 @@
 # Brief release notes
 
 The gmxapi 0.0.7 C++ API, defined by GROMACS 2019, is incompatible with gmxapi 0.0.6.
-The gromacs-gmxapi 0.0.8 development branch will claim compatibility with 0.0.7
-while possible.
 
 Note that version compatibility in ``find_package`` is handled by the installed
 cmake version file of the targeted package, including handling of the `EXACT`
@@ -10,23 +8,5 @@ key word, but the CMake macros used in gromacs-gmxapi should take care of this.
 
 See docs/changelog.rst and https://github.com/kassonlab/gmxapi for more information.
 
-# Preparing for a release
-
-When a new release is about to be tagged, version and release information needs
-to be updated in a few places.
-
-Once the required features in gromacs-gmxapi have been merged to its master
-branch, update the several lines in .travis.yml to reference the gromacs-gmxapi
-release archive instead of master or a  development branch.
-
-Similarly, update the `gromacs_url` embedded in setup.py
-
-After merging the gmxapi development branch to master and before tagging the release, 
-update version.in so that it writes a version.py file with `release = True`.
-
-Once the gmxapi gmxpy release is tagged and any touch-up commits are merged
-(fast-forwarded) to the refreshed development branch,
-bump the version in the development branch in CMakeLists.txt _and_ in setup.py.
-
-If / when feature branches require new libgmxapi features,
-`find_package(gmxapi...)` can be updated in `src/gmx/core/CMakeLists.txt`.
+The gmxapi 0.0.7 Python package is the final release of gmxapi in its own repository.
+Ongoing gmxapi development is entirely within the GROMACS repository or its forks.

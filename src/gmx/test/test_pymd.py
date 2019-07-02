@@ -73,37 +73,10 @@ class BindingsTestCase(unittest.TestCase):
         session = apisystem.launch(context)
         assert hasattr(session, 'run')
         session.run()
-        # Test rerunability
-        # system = gmx.System()
-        # runner = gmx.runner.SimpleRunner()
-        # runner._runner = apirunner
-        # system.runner = runner
-        # assert isinstance(system, gmx.System)
-        # assert isinstance(system.runner, gmx.runner.Runner)
-        # assert isinstance(system.runner._runner, gmx.core.SimpleRunner)
-        # with gmx.context.DefaultContext(system.runner) as session:
-        #     session.run()
-    def test_SystemFromTpr(self):
-        system = gmx.System._from_file(tpr_filename)
-        system.run()
-    # def test_Extension(self):
-    #     import pytest
-    #     # Test attachment of external code
-    #     system = gmx.System._from_file(tpr_filename)
-    #     potential = gmx.core.TestModule()
-    #     assert isinstance(potential, gmx.core.MDModule)
-    #     system.add_potential(potential)
-    #
-    #     assert hasattr(potential, "bind")
-    #     generic_object = object()
-    #     with pytest.raises(Exception) as exc_info:
-    #         potential.bind(generic_object)
-    #     assert str(exc_info).endswith("MDModule bind method requires properly named PyCapsule input.")
-    #
-    #     with gmx.context.DefaultContext(system.workflow) as session:
-    #         session.run()
 
+# Ignore deprecation warning from networkx...
 @pytest.mark.usefixtures("cleandir")
+@pytest.mark.filterwarnings("ignore:Using or importing the ABCs from 'collections'")
 @pytest.mark.usefixtures("caplog")
 def test_simpleSimulation(caplog):
     """Load a work specification with a single TPR file and run."""
@@ -230,6 +203,47 @@ def test_plugin_with_ensemble(caplog):
             if context.rank == 0:
                 print(context.work)
             session.run()
+
+
+@pytest.mark.usefixtures("cleandir")
+@pytest.mark.usefixtures("caplog")
+@withmpi_only
+def test_plugin_array(caplog):
+    # Test in ensemble.
+    md = gmx.workflow.from_tpr([tpr_filename, tpr_filename], threads_per_rank=1)
+
+    # Create a WorkElement for the potential
+    #potential = gmx.core.TestModule()
+    potential1 = gmx.workflow.WorkElement(namespace="testing", operation="create_test")
+    potential1.name = "test_module1"
+
+    potential2 = gmx.workflow.WorkElement(namespace="testing", operation="create_test")
+    potential2.name = "test_module2"
+
+    # before = md.workspec.elements[md.name]
+    # md.add_dependency(potential_element)
+    # assert potential_element.name in md.workspec.elements
+    # assert potential_element.workspec is md.workspec
+    # after = md.workspec.elements[md.name]
+    # assert not before is after
+
+    md.add_dependency([potential1, potential2])
+
+    # Workaround for https://github.com/kassonlab/gmxapi/issues/42
+    # We can't add an operation to a context that doesn't exist yet, but we can't
+    # add a work graph with an operation that is not defined in a context.
+    context = gmx.get_context()
+    context.add_operation(potential1.namespace, potential1.operation, my_plugin)
+    context.work = md
+
+    with warnings.catch_warnings():
+        # Swallow warning about wide MPI context
+        warnings.simplefilter("ignore")
+        with context as session:
+            if context.rank == 0:
+                print(context.work)
+            session.run()
+
 
 
 if __name__ == '__main__':

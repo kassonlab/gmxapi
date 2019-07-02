@@ -35,11 +35,19 @@ Refer to the Python source code itself for additional clarification.
 Procedural interface
 ====================
 
+.. alphabetize the functions except for gmx.run (put first)
+
 - :func:`gmx.run`
 - :func:`gmx.get_context`
 - :func:`gmx.workflow.from_tpr`
 - :func:`gmx.workflow.get_source_elements`
 - :func:`gmx.version.api_is_at_least`
+
+.. list in the same order as above. This makes for more compact documentation
+   than if each function had a different section. If there is a way to extract
+   a table of contents automatically, that would be great, too. Alternatively,
+   maybe we could use `..automodule:: gmx` with limited depth and some tweaks to
+   `__all__`. But it would be nice if we could generate side-bar contents entries...
 
 .. autofunction:: gmx.run
 
@@ -62,7 +70,7 @@ Python Classes
 - :class:`gmx.workflow.WorkSpec`
 - :class:`gmx.workflow.WorkElement`
 - :class:`gmx.context.Context`
-- :class:`gmx.context.ParallelArrayContext`
+- :class:`gmx.fileio.TprFile`
 - :class:`gmx.status.Status`
 
 Python context managers
@@ -76,37 +84,46 @@ produces a :class:`Session` object. See examples below.
 
     :class:`Session` is not well specified in gmxapi 0.0.6.
 
-gmx.system module
+gmx.fileio module
 -----------------
 
-.. automodule:: gmx.system
+..  automodule:: gmx.fileio
+    :members:
+
+gmx.context module
+------------------
+..  automodule:: gmx.context
+    :members:
+
+Depends on gmx.status, gmx.exceptions, gmx.workflow
+
+gmx.exceptions module
+---------------------
+..  automodule:: gmx.exceptions
+    :members:
+
+gmx.status module
+-----------------
+..  automodule:: gmx.status
+    :members:
+
+gmx.system module
+-----------------
+..  automodule:: gmx.system
+    :members:
+
+gmx.version module
+------------------
+..  automodule:: gmx.version
     :members:
 
 gmx.workflow module
 -------------------
 
-.. automodule:: gmx.workflow
+..  automodule:: gmx.workflow
     :members:
 
-gmx.context module
-------------------
-.. automodule:: gmx.context
-    :members:
-
-gmx.status
-----------
-.. automodule:: gmx.status
-    :members:
-
-gmx.exceptions
---------------
-.. automodule:: gmx.exceptions
-    :members:
-
-gmx.version
------------
-.. automodule:: gmx.version
-    :members:
+Depends on gmx.exceptions, gmx.util
 
 Core API
 ========

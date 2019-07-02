@@ -1,28 +1,3 @@
-# Sourcing GMXRC from a GROMACS installation should allow discovery of exported CMake config to import `libgmxapi` target.
-# If the libgmxapi dependency is satisfied by allowing setuptools to build GROMACS, it should use GROMACS_DIR to hint
-# the location.
-#
-# find_package should find gmxapiConfig.cmake if the path to `gmx` is in PATH,
-# if gmxapi_DIR is set to the GROMACS installation directory, or if
-# cmake was invoked with `-DCMAKE_PREFIX_PATH=...` pointing to the GROMACS
-# installation directory. We can also check now for a GROMACS_DIR environment
-# variable and provide it with the HINTS option.
-find_package(gmxapi 0.0.7 REQUIRED
-             HINTS "$ENV{GROMACS_DIR}"
-             )
-if(gmxapi_FOUND)
-    set(_suffix "")
-    # GROMACS master branch and forked development branches may have divergent
-    # pre-release APIs. This check allows us to distinguish them and behave
-    # differently if needed. github.com/kassonlab/gromacs-gmxapi devel branch
-    # sets gmxapi_EXPERIMENTAL=TRUE. Upstream GROMACS master branch does not.
-    # Ref: https://github.com/kassonlab/gmxapi/issues/166
-    if(gmxapi_EXPERIMENTAL)
-        set(_suffix " (unofficial)")
-    endif()
-    message(STATUS "Found gmxapi version ${gmxapi_VERSION}${_suffix}")
-endif()
-
 # Build the C++ extension
 include_directories(${PYTHON_INCLUDE_DIRS})
 
@@ -32,6 +7,7 @@ pybind11_add_module(pygmx_core
                     export_md.cpp
                     export_system.cpp
                     pycontext.cpp
+                    export_tprfile.cpp
                     pymdmodule.cpp
                     pysystem.cpp
                     tprfile.cpp

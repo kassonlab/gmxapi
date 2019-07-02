@@ -30,6 +30,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+__all__ = ['WorkSpec', 'WorkElement']
+
 import warnings
 import weakref
 
@@ -37,8 +39,6 @@ from gmx import exceptions
 from gmx import logging
 from gmx.util import to_string
 from gmx.util import to_utf8
-
-__all__ = ['WorkSpec', 'WorkElement']
 
 # Module-level logger
 logger = logging.getLogger(__name__)
@@ -50,6 +50,29 @@ logger.info("Using schema version {}.".format(workspec_version))
 
 # module-level constant indicating a workflow implementing parallel array work.
 # ARRAY = 0
+
+
+class GmxMap(dict):
+    """Utility/compatibility class to ensure consistent keys.
+
+    Allow subscripting to use native str or Python 2 Unicode objects.
+    Internally, converts all keys to native str for the current interpreter.
+    """
+    def keys(self):
+        for key in dict.keys(self):
+            if not isinstance(key, str):
+                raise exceptions.ApiError('Invalid key type found: {} {}'.format(key, type(key)))
+            yield key
+
+    def __getitem__(self, key):
+        return super(GmxMap, self).__getitem__(str(key))
+
+    def __setitem__(self, key, item):
+        super(GmxMap, self).__setitem__(str(key), item)
+
+    def __delitem__(self, key):
+        super(GmxMap, self).__delitem__(str(key))
+
 
 class WorkSpec(object):
     """
@@ -124,7 +147,7 @@ class WorkSpec(object):
     """
     def __init__(self):
         self.version = workspec_version
-        self.elements = dict()
+        self.elements = GmxMap()
         self.__context_weak_ref = None
 
     @property
@@ -155,20 +178,54 @@ class WorkSpec(object):
         times, giving us extra flexibility in implementation and arguments.
 
         Args:
-            source_set: a copy of a set of element names (will be consumed during execution)
-            name_list: name list to be expanded with dependencies and sequenced
+            sources: a (super)set of element names from the current work spec (will be consumed)
+            name_list: subset of *sources* to be sequenced
 
-        Note that source_set is a reference to an object that is modified arbitrarily.
+        Returns:
+            Sequence of WorkElement objects drawn from the names in *source_set*
 
+        Requires that WorkElements named in *name_list* and any elements on which
+        they depend are all named in *source_list* and available in the current
+        work spec.
+
+        Note: *source_set* is a reference to an object that is modified arbitrarily.
+        The caller should not re-use the object after calling _chase_deps().
+
+        TODO: Separate out DAG topology operations from here and Context.__enter__()
+        Our needs are simple enough that we probably don't need an external dependency
+        like networkx...
         """
+        # Recursively (depth-first) generate a topologically valid serialized DAG from source_set.
         assert isinstance(source_set, set)
+        # Warning: This is not at all a rigorous check.
+        # It is hard to check whether this is string-like or list-like in both Py 2.7 and 3.x
+        if not isinstance(name_list, (list, tuple, set)):
+            raise exceptions.ValueError('Must disambiguate "name_list" by passing a list or tuple.')
+        # Make a copy of name_list in case the input reference is being used elsewhere during
+        # iteration, such as for source_set, which is modified during the loop.
         for name in tuple(name_list):
             if name in source_set:
                 source_set.remove(name)
                 element = WorkElement.deserialize(self.elements[name], name=name, workspec=self)
-                for dep in self._chase_deps(source_set, element.depends):
-                    yield dep
+                dependencies = element.depends
+                # items in element.depends are either element names or ensembles of element names.
+                for item in dependencies:
+                    if isinstance(item, (list, tuple, set)):
+                        dependency_list = item
+                    else:
+                        if not isinstance(item, str):
+                            raise exceptions.ValueError(
+                                'Dependencies should be a string or sequence of strings. Got {}'.format(type(item)))
+                        dependency_list = [item]
+                    for dependency in dependency_list:
+                        for recursive_dep in self._chase_deps(source_set, (dependency,)):
+                            yield recursive_dep
                 yield element
+            else:
+                # Note: The user is responsible for ensuring that source_set is complete.
+                # Otherwise, we would need to maintain a list of elements previously yielded.
+                pass
+
 
     def __iter__(self):
         source_set = set(self.elements.keys())
@@ -350,12 +407,17 @@ class WorkElement(object):
         # Note: Nothing currently prevents attribute updates by assignment after adding the element to a workspec,
         # but this protocol will be clarified with https://github.com/kassonlab/gmxapi/issues/92
         if params is None:
-            self.params = {}
+            self.params = GmxMap()
         elif isinstance(params, dict):
-            self.params = {to_string(name): params[name] for name in params}
+            self.params = GmxMap({to_string(name): params[name] for name in params})
         else:
             raise exceptions.UsageError("If provided, params must be a dictionary of keyword arguments")
-        self.depends = list(depends)
+        self.depends = []
+        for d in depends:
+            if isinstance(d, (list, tuple)):
+                self.depends.append([str(name) for name in d])
+            else:
+                self.depends.append(str(d))
 
         # The Python class for work elements keeps a strong reference to a WorkSpec object containing its description
         self._name = None
@@ -363,11 +425,12 @@ class WorkElement(object):
 
     @property
     def name(self):
+        assert isinstance(self._name, (str, type(None)))
         return self._name
 
     @name.setter
     def name(self, new_name):
-        self._name = to_string(new_name)
+        self._name = str(to_string(new_name))
 
     @property
     def workspec(self):
@@ -383,14 +446,22 @@ class WorkElement(object):
         First move the provided element to the same WorkSpec, if not already here.
         Then, add to ``depends`` and update the WorkSpec.
         """
-        if element.workspec is None:
-            self.workspec.add_element(element)
-            assert element.workspec is self.workspec
-            assert element.name in self.workspec.elements
-        elif element.workspec is not self.workspec:
-            raise exceptions.ApiError("Element will need to be moved to the same workspec.")
+        def check_element(element):
+            if element.workspec is None:
+                self.workspec.add_element(element)
+                assert element.workspec is self.workspec
+                assert element.name in self.workspec.elements
+            elif element.workspec is not self.workspec:
+                raise exceptions.ApiError("Element will need to be moved to the same workspec.")
+            return True
 
-        self.depends.append(element.name)
+        if hasattr(element, 'workspec') and hasattr(element, 'name'):
+            check_element(element)
+            self.depends.append(element.name)
+        else:
+            assert isinstance(element, (list, tuple))
+            self.depends.append(tuple([item.name for item in element if check_element(item)]))
+
         self.workspec.elements[self.name] = self.serialize()
 
     def serialize(self):

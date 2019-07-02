@@ -8,7 +8,7 @@ gmx Python package are defined in the gmx.exceptions submodule.
 The Gromacs gmx Python package defines a root exception,
 gmx.exceptions.Error, from which all Exceptions thrown from
 within the module should derive. If a published component of
-the gmx package throws an execption that cannot be caught
+the gmx package throws an exception that cannot be caught
 as a gmx.exceptions.Error, please report the bug.
 """
 
@@ -24,8 +24,6 @@ __all__ = ['Error',
            'FeatureNotAvailableError',
            'FeatureNotAvailableWarning',
            'FileError',
-           'OptionalFeatureNotAvailableError',
-           'OptionalFeatureNotAvailableWarning',
            'TypeError',
            'UsageError',
            'ValueError',
@@ -55,22 +53,8 @@ class FileError(Error):
 class FeatureNotAvailableError(Error):
     """Feature is not installed, is missing dependencies, or is not compatible."""
 
-class OptionalFeatureNotAvailableError(FeatureNotAvailableError):
-    """Optional feature is not installed or is missing dependencies.
-    Deprecated. The 'Optional" word is confusing."""
-    def __init__(self, message, *args, **kwargs):
-        forwarded_message = message + "\nThis Error is deprecated and the code that issued it should be updated."
-        super(OptionalFeatureNotAvailableError, self).__init__(forwarded_message, *args, **kwargs)
-
 class FeatureNotAvailableWarning(Warning):
     """Feature is not installed, is missing dependencies, or is not compatible."""
-
-class OptionalFeatureNotAvailableWarning(FeatureNotAvailableWarning):
-    """A feature is not installed or is missing dependencies.
-    Deprecated. The 'Optional" word is confusing."""
-    def __init__(self, message, *args, **kwargs):
-        forwarded_message = message + "\nThis Warning is deprecated and the code that issued it should be updated."
-        super(OptionalFeatureNotAvailableWarning, self).__init__(forwarded_message, *args, **kwargs)
 
 class TypeError(Error):
     """An object is of a type incompatible with the API operation."""

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.4.3)
 
 # CMake modules/macros are in a subdirectory to keep this file cleaner
 # This needs to be set before project() in order to pick up toolchain files
-#list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # skbuild sets OS X deployment target to 10.6 for compatibility, but we want to require 10.9 and C++11 compatibility.
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9 CACHE STRING "OS X deployment target below 10.9 does not use C++11 standard library" FORCE)
@@ -12,8 +12,23 @@ project(gmxpy VERSION 0.0.7)
 
 # Only interpret if() arguments as variables or keywords when unquoted.
 cmake_policy(SET CMP0054 NEW)
-set(CMAKE_CXX_STANDARD 11)
+# honor the language standard settings for try_compile()
+cmake_policy(SET CMP0067 NEW)
+
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# It may help to disable extensions to encourage consistent standard library implementations,
+# but I don't know whether this would disable necessary attributes for symbol visibility
+# or unused variable annotation, etc. TBD. Also, may be incompatible with pybind config (also TBD).
+# See https://crascit.com/2015/03/28/enabling-cxx11-in-cmake/
+#set(CMAKE_CXX_EXTENSIONS OFF)
+
 include(Ccache.cmake)
+
+include(stdlibFeatures)
+if(NOT STDLIB_MAKE_UNIQUE)
+    message(FATAL_ERROR "gmxapi requires a C++ stdlib with std::make_unique (i.e. C++14)")
+endif()
 
 # If the user is not in a virtual environment and is not a privileged user and has not specified an install location
 # for the Python module (GMXAPI_INSTALL_PATH), this option causes the automatic install location to query the user
@@ -36,8 +51,10 @@ unset(PYTHONLIBS_FOUND)
 find_package(PythonInterp)
 if (PYTHONINTERP_FOUND)
     message(STATUS "Found Python interpreter: ${PYTHON_EXECUTABLE}")
-    find_package(PythonLibs ${PYTHON_VERSION_STRING} EXACT)
-    if (PYTHONLIBS_FOUND)
+    # pybind11 is included as a subtree and updated just with squash merges.
+    # Refer to https://www.atlassian.com/blog/git/alternatives-to-git-submodule-git-subtree
+    add_subdirectory(pybind11)
+    if (PYTHON_LIBRARIES)
         message(STATUS "Python headers in ${PYTHON_INCLUDE_DIRS}")
         message(STATUS "Python libraries in ${PYTHON_LIBRARIES}")
         if (GMXAPI_USER_INSTALL)
@@ -80,10 +97,6 @@ set(GMXAPI_INSTALL_PATH ${GMXAPI_DEFAULT_SITE_PACKAGES}/gmx CACHE PATH
     directory.")
 
 message(STATUS "Python module will be installed to GMXAPI_INSTALL_PATH cache value ${GMXAPI_INSTALL_PATH}")
-
-# pybind11 is included as a subtree and updated just with squash merges.
-# Refer to https://www.atlassian.com/blog/git/alternatives-to-git-submodule-git-subtree
-add_subdirectory(pybind11)
 
 add_subdirectory(src)
 

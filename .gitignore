@@ -1,10 +1,14 @@
 .DS_Store
 .cache/
+.eggs/
 .idea/
 .tox/
 *build*/
 dist/
 gmx.egg-info
+html/
 *.pyc
 __pycache__
 .pytest_cache
+.python-version
+venv/

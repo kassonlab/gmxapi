@@ -32,7 +32,7 @@ popd
 mpiexec -n 2 $PYTHON -m mpi4py -m pytest src/gmx/test
 
 # Check how well our compiler cache is working.
-`which ccache` && ccache -s
+ccache -s
 
 # Generate the list of Python packages present in the current environment.
 # Helpful, but not necessarily sufficient, for reproducibility.

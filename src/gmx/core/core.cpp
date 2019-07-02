@@ -77,14 +77,12 @@ PYBIND11_MODULE(core, m) {
 
 
     // Get bindings exported by the various components.
+    // In the current implementation, sequence may be important. Exports that
+    // reference bindings from other exports should not be called before the
+    // dependencies are exported.
+    export_tprfile(m);
     export_md(m);
     export_context(m);
     export_system(m);
 
-    m.def("copy_tprfile",
-            &gmxpy::copy_tprfile,
-            py::arg("source"),
-            py::arg("destination"),
-            py::arg("end_time"),
-            "Copy a TPR file from `source` to `destination`, replacing `nsteps` with `end_time`.");
 }

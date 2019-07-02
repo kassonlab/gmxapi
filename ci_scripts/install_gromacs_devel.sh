@@ -1,4 +1,5 @@
 #!/bin/bash
+# Install the kassonlab GROMACS fork for experimental features.
 set -ev
 
 export GMX_DOUBLE=OFF
@@ -18,12 +19,9 @@ pushd $HOME
  [ -d gromacs-gmxapi ] || \
      git clone \
          --depth=1 \
-         --no-single-branch \
          https://github.com/kassonlab/gromacs-gmxapi.git \
          gromacs-kassonlab
  pushd gromacs-kassonlab
-  git branch -a
-  git checkout devel
   pwd
   rm -rf build
   mkdir build
@@ -35,6 +33,7 @@ pushd $HOME
          -DGMX_DOUBLE=$GMX_DOUBLE \
          -DGMX_MPI=$GMX_MPI \
          -DGMX_THREAD_MPI=$GMX_THREAD_MPI \
+         -DGMXAPI=ON \
          -DCMAKE_INSTALL_PREFIX=$HOME/install/gromacs_devel \
          ..
    make -j2 install
