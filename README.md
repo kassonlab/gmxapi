@@ -1,22 +1,28 @@
 The gmxapi project provides interfaces for managing and extending molecular
 dynamics simulation workflows. In this repository, a Python package provides the 
-`gmx` module for high-level  interaction with GROMACS. `gmx.core` provides 
-Python bindings to the `gmxapi` C++ GROMACS external API.
+`gmx` module for high-level interaction with GROMACS via gmxapi 0.0.7.
+`gmx.core` provides Python bindings to the `gmxapi` C++ GROMACS external API.
 
-The gmxapi 0.0.7 Python project is hosted on
-[GitHub](https://github.com/kassonlab/gmxapi)
-and includes the `gmxapi` repository along with supporting respositories. The 
-[`gromacs-gmxapi`](https://github.com/kassonlab/gromacs-gmxapi) repository 
-includes a modified version of GROMACS that supports the latest `gmxapi` 
-features not yet available through an official GROMACS distribution. A 
-[sample repository](https://github.com/kassonlab/sample_restraint) illustrates
+The gmxapi 0.0.7 Python project for GROMACS 2019 is hosted at
+[GitHub](https://github.com/kassonlab/gmxapi/tree/release-0_0_7)
+and includes the `gmxapi` repository along with supporting respositories.
+(For current version, see GROMACS 2020+ or the
+[latest work](https://github.com/kassonlab/gmxapi)
+ from the Kasson Lab.)
+
+A [sample repository](https://github.com/kassonlab/sample_restraint) illustrates
 how to implement a GROMACS plugin that applies restrained-ensemble forces
 to a loosely-coupled ensemble of simulation trajectories.
 
 The whole thing is driven at the highest level by a simple Python interface.
 
-See the latest documentation at 
+See the [version 0.0.7 documentation](https://gmxapi.readthedocs.io/en/release-0_0_7/)
+or the latest documentation at 
 [http://gmxapi.readthedocs.io/](http://gmxapi.readthedocs.io/en/latest/)
+
+Note that gmxapi is now (after 0.0.7) maintained as
+[part of](https://redmine.gromacs.org/projects/gromacs/repository/revisions/master/entry/python_packaging/README.md)
+the GROMACS project.
 
 ##### Reference:
 Irrgang, M. E., Hays, J. M., & Kasson, P. M.
