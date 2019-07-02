@@ -397,10 +397,10 @@ class WorkSpec(object):
 class WorkElement(object):
     """Encapsulate an element of a work specification."""
     def __init__(self, namespace="gmxapi", operation=None, params=None, depends=()):
-        self.namespace = to_string(namespace)
+        self._namespace = str(to_string(namespace))
         # We can add an operations submodule to validate these. E.g. self.operation = gmx.workflow.operations.normalize(operation)
         if operation is not None:
-            self.operation = to_string(operation)
+            self._operation = str(to_string(operation))
         else:
             raise exceptions.UsageError("Invalid argument type for operation.")
 
@@ -422,6 +422,16 @@ class WorkElement(object):
         # The Python class for work elements keeps a strong reference to a WorkSpec object containing its description
         self._name = None
         self._workspec = None
+
+    @property
+    def namespace(self):
+        assert isinstance(self._namespace, str)
+        return self._namespace
+
+    @property
+    def operation(self):
+        assert isinstance(self._operation, str)
+        return self._operation
 
     @property
     def name(self):
