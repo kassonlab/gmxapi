@@ -759,16 +759,26 @@ class Context(object):
         for e in workspec.elements:
             element = WorkElement.deserialize(workspec.elements[e])
 
-            if element.namespace not in {'gmxapi', 'gromacs'} and element.namespace not in self.__operations:
-                # Non-built-in namespaces are treated as modules to import.
-                try:
-                    element_module = importlib.import_module(element.namespace)
-                except ImportError as e:
-                    raise exceptions.UsageError(
-                        'This context does not know how to invoke {} from {}. ImportError: {}'.format(
-                            element.operation,
+            # Note: Non-built-in namespaces (non-native) are treated as modules to import.
+            # Native namespaces may not be completely implemented in a particular version of a particular Context.
+            if element.namespace in {'gmxapi', 'gromacs'}:
+                assert element.namespace in self.__operations
+                if not element.operation in self.__operations[element.namespace]:
+                    # The requested element is a built-in operation but not available in this Context.
+                    # element.namespace should be mapped, but not all operations are necessarily implemented.
+                    logger.error("Operation {} not found in map {}".format(element.operation,
+                                                                           str(self.__operations)))
+                    # This check should be performed when deciding if the context is appropriate for the work.
+                    # If we are just going to use a try/catch block for this test, then we should differentiate
+                    # this exception from those raised due to incorrect usage.
+                    # The exception thrown here may evolve with https://github.com/kassonlab/gmxapi/issues/125
+                    raise exceptions.FeatureNotAvailableError(
+                        'Specified work cannot be performed due to unimplemented operation {}.{}.'.format(
                             element.namespace,
-                            str(e)))
+                            element.operation))
+
+            else:
+                assert element.namespace not in {'gmxapi', 'gromacs'}
 
                 # Don't leave an empty nested dictionary if we couldn't map the operation.
                 if element.namespace in self.__operations:
@@ -776,30 +786,25 @@ class Context(object):
                 else:
                     namespace_map = dict()
 
+                # Set or update namespace map iff we have something new.
                 if element.operation not in namespace_map:
                     try:
+                        element_module = importlib.import_module(element.namespace)
                         element_operation = getattr(element_module, element.operation)
-                        namespace_map[element.operation] = element_operation
-                    except:
-                        raise exceptions.ApiError('Operation {} not found in {}.'.format(element.operation,
-                                                                                         element.namespace))
-                    # Set or update namespace map only if we have something to contribute.
+                    except ImportError as e:
+                        raise exceptions.UsageError(
+                            'Cannot find implementation for namespace {}. ImportError: {}'.format(
+                                element.namespace,
+                                str(e)))
+                    except AttributeError:
+                        raise exceptions.UsageError(
+                            'Cannot find factory for operation {}.{}'.format(
+                                element.namespace,
+                                element.operation
+                            )
+                        )
+                    namespace_map[element.operation] = element_operation
                     self.__operations[element.namespace] = namespace_map
-            else:
-                # The requested element is a built-in operation or otherwise already configured.
-                # element.namespace should be mapped, but not all operations are necessarily implemented.
-                assert element.namespace in self.__operations
-                if not element.operation in self.__operations[element.namespace]:
-                    logger.error("Operation {} not found in map {}".format(element.operation,
-                                                                           str(self.__operations)))
-                    # This check should be performed when deciding if the context is appropriate for the work.
-                    # If we are just going to use a try/catch block for this test, then we should differentiate
-                    # this exception from those raised due to incorrect usage.
-                    # The exception thrown here may evolve with https://github.com/kassonlab/gmxapi/issues/125
-                    raise exceptions.ApiError(
-                        'Specified work cannot be performed due to unimplemented operation {}.{}.'.format(
-                            element.namespace,
-                            element.operation))
 
         self.__work = workspec
 
