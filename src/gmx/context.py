@@ -790,9 +790,8 @@ class Context(object):
                 # element.namespace should be mapped, but not all operations are necessarily implemented.
                 assert element.namespace in self.__operations
                 if not element.operation in self.__operations[element.namespace]:
-                    if self.rank < 1:
-                        logger.error("Operation {} not found in map {}".format(element.operation,
-                                                                               str(self.__operations)))
+                    logger.error("Operation {} not found in map {}".format(element.operation,
+                                                                           str(self.__operations)))
                     # This check should be performed when deciding if the context is appropriate for the work.
                     # If we are just going to use a try/catch block for this test, then we should differentiate
                     # this exception from those raised due to incorrect usage.
