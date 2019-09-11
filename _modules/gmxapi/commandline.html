@@ -1,0 +1,561 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>gmxapi.commandline &mdash; GROMACS External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> GROMACS scripting and extension API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../userguide/userguide.html">Python User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../reference/reference.html">Developer Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">GROMACS scripting and extension API</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>gmxapi.commandline</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for gmxapi.commandline</h1><div class="highlight"><pre>
+<span></span><span class="c1">#</span>
+<span class="c1"># This file is part of the GROMACS molecular simulation package.</span>
+<span class="c1">#</span>
+<span class="c1"># Copyright (c) 2019, by the GROMACS development team, led by</span>
+<span class="c1"># Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,</span>
+<span class="c1"># and including many others, as listed in the AUTHORS file in the</span>
+<span class="c1"># top-level source directory and at http://www.gromacs.org.</span>
+<span class="c1">#</span>
+<span class="c1"># GROMACS is free software; you can redistribute it and/or</span>
+<span class="c1"># modify it under the terms of the GNU Lesser General Public License</span>
+<span class="c1"># as published by the Free Software Foundation; either version 2.1</span>
+<span class="c1"># of the License, or (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># GROMACS is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="c1"># Lesser General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU Lesser General Public</span>
+<span class="c1"># License along with GROMACS; if not, see</span>
+<span class="c1"># http://www.gnu.org/licenses, or write to the Free Software Foundation,</span>
+<span class="c1"># Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.</span>
+<span class="c1">#</span>
+<span class="c1"># If you want to redistribute modifications to GROMACS, please</span>
+<span class="c1"># consider that scientific software is very special. Version</span>
+<span class="c1"># control is crucial - bugs must be traceable. We will be happy to</span>
+<span class="c1"># consider code for inclusion in the official distribution, but</span>
+<span class="c1"># derived work must not be called official GROMACS. Details are found</span>
+<span class="c1"># in the README &amp; COPYING files - if they are missing, get the</span>
+<span class="c1"># official version at http://www.gromacs.org.</span>
+<span class="c1">#</span>
+<span class="c1"># To help us fund GROMACS development, we humbly ask that you cite</span>
+<span class="c1"># the research papers on the package. Check out http://www.gromacs.org.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Provide command line operation.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;commandline_operation&#39;</span><span class="p">]</span>
+
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+
+<span class="kn">import</span> <span class="nn">gmxapi</span> <span class="k">as</span> <span class="nn">gmx</span>
+<span class="kn">from</span> <span class="nn">gmxapi</span> <span class="k">import</span> <span class="n">exceptions</span>
+<span class="kn">from</span> <span class="nn">gmxapi</span> <span class="k">import</span> <span class="n">logger</span> <span class="k">as</span> <span class="n">root_logger</span>
+<span class="kn">from</span> <span class="nn">gmxapi.datamodel</span> <span class="k">import</span> <span class="n">NDArray</span>
+<span class="kn">from</span> <span class="nn">gmxapi.operation</span> <span class="k">import</span> <span class="n">OutputCollectionDescription</span>
+
+<span class="c1"># Module-level logger</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">root_logger</span><span class="o">.</span><span class="n">getChild</span><span class="p">(</span><span class="s1">&#39;commandline&#39;</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Importing </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="vm">__name__</span><span class="p">))</span>
+
+
+<span class="c1"># Create an Operation that consumes a list and a boolean to produce a string and an integer.</span>
+<span class="c1">#</span>
+<span class="c1"># Wrap the defined function using a decorator that</span>
+<span class="c1">#    * strips the `output` parameter from the signature</span>
+<span class="c1">#    * provides `output` publishing proxy to the inner function and</span>
+<span class="c1">#    * produce a result with attributes for</span>
+<span class="c1">#       * file: mapping of output flags to output filenames</span>
+<span class="c1">#       * erroroutput: text results in case of error</span>
+<span class="c1">#       * returncode: integer return code of wrapped command</span>
+<span class="c1">#</span>
+<span class="c1"># Note that the existence of the &#39;file&#39; output map is expressed here, but</span>
+<span class="c1"># the keys of the map are not implicit or set by the wrapped function.</span>
+<span class="c1"># For the map to be non-empty, it must be defined before the resulting helper</span>
+<span class="c1"># function is called.</span>
+<span class="c1">#</span>
+<span class="c1"># TODO: Operation returns the output object when called with the shorter signature.</span>
+<span class="c1">#</span>
+<span class="nd">@gmx</span><span class="o">.</span><span class="n">function_wrapper</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;erroroutput&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="s1">&#39;returncode&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">})</span>
+<span class="k">def</span> <span class="nf">cli</span><span class="p">(</span><span class="n">command</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">,</span> <span class="n">shell</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="n">OutputCollectionDescription</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Execute a command line program in a subprocess.</span>
+
+<span class="sd">    Configure an executable in a subprocess. Executes when run in an execution</span>
+<span class="sd">    Context, as part of a work graph or via gmx.run(). Runs in the current</span>
+<span class="sd">    working directory.</span>
+
+<span class="sd">    Shell processing is not enabled, but can be considered for a future version.</span>
+<span class="sd">    This means that shell expansions such as environment variables, globbing (`*`),</span>
+<span class="sd">    and other special symbols (like `~` for home directory) are not available.</span>
+<span class="sd">    This allows a simpler and more robust implementation, as well as a better</span>
+<span class="sd">    ability to uniquely identify the effects of a command line operation. If you</span>
+<span class="sd">    think this disallows important use cases, please let us know.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">         command : a tuple (or list) to be the subprocess arguments, including `executable`</span>
+<span class="sd">         output : mapping of command line flags to output filename arguments</span>
+<span class="sd">         shell : unused (provides forward-compatibility)</span>
+
+<span class="sd">    Arguments are iteratively added to the command line with standard Python</span>
+<span class="sd">    iteration, so you should use a tuple or list even if you have only one parameter.</span>
+<span class="sd">    I.e. If you provide a string with `arguments=&quot;asdf&quot;` then it will be passed as</span>
+<span class="sd">    `... &quot;a&quot; &quot;s&quot; &quot;d&quot; &quot;f&quot;`. To pass a single string argument, `arguments=(&quot;asdf&quot;)`</span>
+<span class="sd">    or `arguments=[&quot;asdf&quot;]`.</span>
+
+<span class="sd">    `input` and `output` should be a dictionary with string keys, where the keys</span>
+<span class="sd">    name command line &quot;flags&quot; or options.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        Execute a command named `exe` that takes a flagged option for file name</span>
+<span class="sd">        (stored in a local Python variable `my_filename`) and an `origin` flag</span>
+<span class="sd">        that uses the next three arguments to define a vector.</span>
+
+<span class="sd">            &gt;&gt;&gt; my_filename = &quot;somefilename&quot;</span>
+<span class="sd">            &gt;&gt;&gt; result = cli((&#39;exe&#39;, &#39;--origin&#39;, 1.0, 2.0, 3.0, &#39;-f&#39;, my_filename), shell=False)</span>
+<span class="sd">            &gt;&gt;&gt; assert hasattr(result, &#39;file&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; assert hasattr(result, &#39;erroroutput&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; assert hasattr(result, &#39;returncode&#39;)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A data structure with attributes for each of the results `file`, `erroroutput`, and `returncode`</span>
+
+<span class="sd">    Result object attributes:</span>
+<span class="sd">        * `file`: the mapping of CLI flags to filename strings resulting from the `output` kwarg</span>
+<span class="sd">        * `erroroutput`: A string of error output (if any) if the process failed.</span>
+<span class="sd">        * `returncode`: return code of the subprocess.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Note: we could make provisions for stdio filehandles in a future version. E.g.</span>
+    <span class="c1"># * STDOUT is available if a consuming operation is bound to `output.stdout`.</span>
+    <span class="c1"># * STDERR is available if a consuming operation is bound to `output.stderr`.</span>
+    <span class="c1"># * Otherwise, STDOUT and/or STDERR is(are) closed when command is called.</span>
+    <span class="c1">#</span>
+    <span class="c1"># Warning:</span>
+    <span class="c1">#     Commands relying on STDIN cannot be used and is closed when command is called.</span>
+
+    <span class="c1"># In the operation implementation, we expect the `shell` parameter to be intercepted by the</span>
+    <span class="c1"># wrapper and set to False.</span>
+    <span class="k">if</span> <span class="n">shell</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">exceptions</span><span class="o">.</span><span class="n">UsageError</span><span class="p">(</span><span class="s2">&quot;Operation does not support shell processing.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)):</span>
+        <span class="n">command</span> <span class="o">=</span> <span class="p">[</span><span class="n">command</span><span class="p">]</span>
+    <span class="n">command</span> <span class="o">=</span> <span class="nb">list</span><span class="p">([</span><span class="n">arg</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">command</span><span class="p">])</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">command</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="n">command</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">exceptions</span><span class="o">.</span><span class="n">ValueError</span><span class="p">(</span><span class="s1">&#39;command argument could not be resolved to an executable file path.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># TODO: (FR9) Can OS input/output filehandles be a responsibility of</span>
+    <span class="c1">#  the code providing &#39;resources&#39;?</span>
+
+    <span class="n">erroroutput</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;executing subprocess&#39;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># TODO: If Python &gt;=3.5 is required, switch to subprocess.run()</span>
+        <span class="n">command_output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span><span class="n">command</span><span class="p">,</span>
+                                                 <span class="n">shell</span><span class="o">=</span><span class="n">shell</span><span class="p">,</span>
+                                                 <span class="n">stdin</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+                                                 <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span><span class="p">,</span>
+                                                 <span class="p">)</span>
+        <span class="n">returncode</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># TODO: Resource management code should manage a safe data object for `output`.</span>
+        <span class="c1"># WARNING: We have no reason to assume the output is utf-8 encoded text!!!</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">command_output</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;commandline operation had non-zero return status when calling </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">cmd</span><span class="p">))</span>
+        <span class="n">erroroutput</span> <span class="o">=</span> <span class="n">e</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+        <span class="n">returncode</span> <span class="o">=</span> <span class="n">e</span><span class="o">.</span><span class="n">returncode</span>
+    <span class="c1"># resources.output.erroroutput.publish(erroroutput)</span>
+    <span class="c1"># resources.output.returncode.publish(returncode)</span>
+    <span class="c1"># `publish` is descriptive, but redundant. Access to the output data handler is</span>
+    <span class="c1"># assumed to coincide with publishing, and we assume data is published when the</span>
+    <span class="c1"># handler is released. A class with a single `publish` method is overly complex</span>
+    <span class="c1"># since we can just use the assignment operator.</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">erroroutput</span> <span class="o">=</span> <span class="n">erroroutput</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">returncode</span> <span class="o">=</span> <span class="n">returncode</span>
+    <span class="c1"># TODO: Handle the file output at the higher level wrapper.</span>
+    <span class="c1"># output.file = None</span>
+
+
+<span class="c1"># TODO: (FR4) Make this a formal operation to properly handle gmxapi data dependencies.</span>
+<span class="c1">#  The consumer of this operation has an NDArray input. filemap may contain gmxapi data flow</span>
+<span class="c1">#  aspects that we want the framework to handle for us.</span>
+<span class="k">def</span> <span class="nf">filemap_to_flag_list</span><span class="p">(</span><span class="n">filemap</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convert a map of command line flags and filenames to a list of command line arguments.</span>
+
+<span class="sd">    Used to map inputs and outputs of command line tools to and from gmxapi data handles.</span>
+<span class="sd">    User provides mappings of flags and filenames so that gmxapi can construct an</span>
+<span class="sd">    executable command line.</span>
+
+<span class="sd">    Primary use case is implicit. commandline_operation() instantiates this operation based on</span>
+<span class="sd">    user input, and sends the output to cli()</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        filemap : key-value map of command line flags and filename arguments</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of strings and/or gmxapi data references</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">filemap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">filemap</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># Note that the value may be a string, a list, an ndarray, or a future</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">NDArray</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;result&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">NDArray</span><span class="p">:</span>
+                    <span class="k">pass</span>
+                <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;result&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">NDArray</span><span class="p">:</span>
+                    <span class="c1"># TODO: Fix this ugly hack when we have proper Future slicing and can make NDArray futures.</span>
+                    <span class="n">result_function</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">result</span>
+                    <span class="n">value</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">function</span><span class="o">=</span><span class="n">result_function</span><span class="p">:</span> <span class="p">[</span><span class="n">function</span><span class="p">()]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span><span class="p">]</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">join_arrays</span><span class="p">(</span><span class="n">front</span><span class="o">=</span><span class="n">result</span><span class="p">,</span> <span class="n">back</span><span class="o">=</span><span class="n">gmx</span><span class="o">.</span><span class="n">join_arrays</span><span class="p">(</span><span class="n">front</span><span class="o">=</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">back</span><span class="o">=</span><span class="n">value</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="c1"># TODO: (FR4) Use generating function or decorator that can validate kwargs?</span>
+<span class="c1"># TODO: (FR4) Outputs need to be fully formed and typed in the object returned</span>
+<span class="c1">#  from the helper (decorated function).</span>
+<div class="viewcode-block" id="commandline_operation"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.commandline_operation">[docs]</a><span class="k">def</span> <span class="nf">commandline_operation</span><span class="p">(</span><span class="n">executable</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                          <span class="n">arguments</span><span class="o">=</span><span class="p">(),</span>
+                          <span class="n">input_files</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                          <span class="n">output_files</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                          <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Helper function to define a new operation that executes a subprocess in gmxapi data flow.</span>
+
+<span class="sd">    Define a new Operation for a particular executable and input/output parameter set.</span>
+<span class="sd">    Generate a chain of operations to process the named key word arguments and handle</span>
+<span class="sd">    input/output data dependencies.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        executable : name of an executable on the path</span>
+<span class="sd">        arguments : list of positional arguments to insert at argv[1]</span>
+<span class="sd">        input_files : mapping of command-line flags to input file names</span>
+<span class="sd">        output_files : mapping of command-line flags to output file names</span>
+
+<span class="sd">    Output:</span>
+<span class="sd">        The output node of the resulting operation handle contains</span>
+
+<span class="sd">        - file: the mapping of CLI flags to filename strings resulting from the ``output`` kwarg.</span>
+<span class="sd">        - erroroutput: A string of error output (if any) if the process failed.</span>
+<span class="sd">        - returncode: return code of the subprocess.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        Terminal I/O is managed by the gmxapi execution Context. Standard input</span>
+<span class="sd">        and output are not yet accessible to the user.</span>
+
+<span class="sd">        &gt;&gt;&gt; operation = gmx.commandline_operation(executable=&#39;echo&#39;,</span>
+<span class="sd">        ...                                       arguments=[&#39;hi there&#39;])</span>
+<span class="sd">        &gt;&gt;&gt; assert operation.output.returncode.result() == 0</span>
+
+<span class="sd">    The main utility of commandline_operation is to establish data flow constraints</span>
+<span class="sd">    on command line programs such as the</span>
+<span class="sd">    `GROMACS tools &lt;http://manual.gromacs.org/current/user-guide/cmdline.html&gt;`_.</span>
+
+<span class="sd">    The key words can be omitted when there is no ambiguity. If you have already</span>
+<span class="sd">    &quot;sourced&quot; your GMXRC (or the ``gmx`` executable is already on your PATH),</span>
+<span class="sd">    then consider the following.</span>
+
+<span class="sd">        &gt;&gt;&gt; trjcat = gmx.commandline_operation(</span>
+<span class="sd">        ...     &#39;gmx&#39;,</span>
+<span class="sd">        ...     &#39;trjcat&#39;,</span>
+<span class="sd">        ...     input_files={&#39;-f&#39;: &#39;traj_comp.part0001.xtc&#39;},</span>
+<span class="sd">        ...     output_files={&#39;-o&#39;: &#39;trjcat.xtc&#39;})</span>
+
+<span class="sd">    The above snippet defines an operation and produces a reference named ``trjcat``.</span>
+<span class="sd">    When executed, this operation will run a command that looks like</span>
+
+<span class="sd">        $ gmx trjcat -f traj_comp.part0001.xtc -o trjcat.xtc</span>
+
+<span class="sd">    in a subprocess. Execution does not occur immediately, and nothing is executed</span>
+<span class="sd">    at all if nothing forces it to. As with all gmxapi operations, execution is</span>
+<span class="sd">    handled internally on an as-needed basis (1) when output data from one operation</span>
+<span class="sd">    is needed by another, (2) when the caller (script or interactive user) requests</span>
+<span class="sd">    a *result*, or (3) when explicitly requested with *run*.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        Assume the above assingment to ``trjcat``. Then,</span>
+
+<span class="sd">        &gt;&gt;&gt; import os</span>
+<span class="sd">        &gt;&gt;&gt; outfile = trjcat.output.file[&#39;-o&#39;].result()</span>
+<span class="sd">        &gt;&gt;&gt; assert os.path.exists(outfile)</span>
+<span class="sd">        &gt;&gt;&gt; trjcat.run()</span>
+
+<span class="sd">        The command line is run when *result()* is called, producing the intended</span>
+<span class="sd">        output file. If *result()* had not been called, the call to *run()* would</span>
+<span class="sd">        have forced execution. But since the operation has already been performed,</span>
+<span class="sd">        it is not re-executed.</span>
+
+<span class="sd">    Warning:</span>
+<span class="sd">        commandline_operation can only find executables on your PATH. In other</span>
+<span class="sd">        words, if you couldn&#39;t execute it before starting Python, gmxapi cannot</span>
+<span class="sd">        execute it either. This includes GROMACS command line tools, so don&#39;t</span>
+<span class="sd">        forget to &quot;source&quot; your</span>
+<span class="sd">        `GMXRC &lt;http://manual.gromacs.org/documentation/current/install-guide/index.html?highlight=gmxrc&gt;`_</span>
+<span class="sd">        See `issue 2961 &lt;https://redmine.gromacs.org/issues/2961&gt;`_</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Implementation details: When used in a script, this function returns an</span>
+    <span class="c1"># instance of an operation. However, because of the dynamic specification of</span>
+    <span class="c1"># inputs and outputs, each invocation may have the overhead of defining new</span>
+    <span class="c1"># types to express the data flow topology, regardless of the executable.</span>
+    <span class="c1"># If this overhead is problematic, consider exposing the intermediate step</span>
+    <span class="c1"># at which the Operation is fully specified to facilitate reuse.</span>
+
+    <span class="c1">##</span>
+    <span class="c1"># 1. Define a new operation with outputs from `cli()` plus `file` from `output_files`</span>
+
+    <span class="c1"># output_files is essentially passed through, but we need assurance that results</span>
+    <span class="c1"># will not be published until the rest of the operation has run (i.e. the cli() executable.)</span>
+
+    <span class="c1"># Warning: decorating a local function like this is counter to the notion of Operations</span>
+    <span class="c1"># as portable (importable, serializable/deserializable). The big picture here needs</span>
+    <span class="c1"># some more consideration.</span>
+    <span class="c1"># TODO: (NOW) Distinguish portable Operations from relocatable Futures.</span>
+    <span class="c1"># There is nothing antithetical about objects implementing gmxapi data interfaces</span>
+    <span class="c1"># that are only resolvable by a certain Context as long as that Context can convey</span>
+    <span class="c1"># the results to another Context upon request. Re-instantiating Operations is</span>
+    <span class="c1"># only one way of relocating Futures. In this case, though, the dynamic creation of</span>
+    <span class="c1"># merged_ops doesn&#39;t seem right, and commandline_operation should probably be</span>
+    <span class="c1"># a proper Operation.</span>
+    <span class="c1">#</span>
+    <span class="c1"># TODO: (FR4+) Characterize the `file` dictionary key type:</span>
+    <span class="c1">#  explicitly sequences rather than maybe-string/maybe-sequence-of-strings</span>
+    <span class="nd">@gmx</span><span class="o">.</span><span class="n">function_wrapper</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;erroroutput&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="s1">&#39;returncode&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="s1">&#39;file&#39;</span><span class="p">:</span> <span class="nb">dict</span><span class="p">})</span>
+    <span class="k">def</span> <span class="nf">merged_ops</span><span class="p">(</span><span class="n">erroroutput</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">returncode</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">file</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                   <span class="n">output</span><span class="p">:</span> <span class="n">OutputCollectionDescription</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">erroroutput</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">assert</span> <span class="n">returncode</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">assert</span> <span class="n">file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">assert</span> <span class="n">output</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">file</span> <span class="o">=</span> <span class="n">file</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">returncode</span> <span class="o">=</span> <span class="n">returncode</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">erroroutput</span> <span class="o">=</span> <span class="n">erroroutput</span>
+
+    <span class="c1">##</span>
+    <span class="c1"># 2. Prepare data flow.</span>
+
+    <span class="k">if</span> <span class="n">input_files</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">input_files</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">output_files</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">output_files</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arguments</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)):</span>
+        <span class="n">arguments</span> <span class="o">=</span> <span class="p">[</span><span class="n">arguments</span><span class="p">]</span>
+    <span class="n">command</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">concatenate_lists</span><span class="p">([[</span><span class="n">executable</span><span class="p">],</span>
+                                     <span class="n">arguments</span><span class="p">,</span>
+                                     <span class="n">filemap_to_flag_list</span><span class="p">(</span><span class="n">input_files</span><span class="p">),</span>
+                                     <span class="n">filemap_to_flag_list</span><span class="p">(</span><span class="n">output_files</span><span class="p">)])</span>
+    <span class="n">shell</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">make_constant</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">cli_args</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;command&#39;</span><span class="p">:</span> <span class="n">command</span><span class="p">,</span>
+                <span class="s1">&#39;shell&#39;</span><span class="p">:</span> <span class="n">shell</span><span class="p">}</span>
+    <span class="n">cli_args</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="c1">##</span>
+    <span class="c1"># 3. Merge operations</span>
+    <span class="c1">#</span>
+    <span class="c1"># Note: Without a `label` argument, repeated calls to cli(**cli_args) should</span>
+    <span class="c1"># produce references to the same unique resource (but currently do not).</span>
+    <span class="c1"># Creating this handle separately should not be necessary,</span>
+    <span class="c1"># but we&#39;ve got a way to go until we have the fingerprinting and Context</span>
+    <span class="c1"># resource management we need for that.</span>
+    <span class="c1"># TODO: ``label`` kwarg</span>
+    <span class="c1"># TODO: input fingerprinting</span>
+    <span class="n">cli_result</span> <span class="o">=</span> <span class="n">cli</span><span class="p">(</span><span class="o">**</span><span class="n">cli_args</span><span class="p">)</span>
+    <span class="n">merged_result</span> <span class="o">=</span> <span class="n">merged_ops</span><span class="p">(</span><span class="n">erroroutput</span><span class="o">=</span><span class="n">cli_result</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">erroroutput</span><span class="p">,</span>
+                               <span class="n">returncode</span><span class="o">=</span><span class="n">cli_result</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">returncode</span><span class="p">,</span>
+                               <span class="n">file</span><span class="o">=</span><span class="n">output_files</span><span class="p">,</span>
+                               <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="c1"># Return an object with an OutputCollection granting access to outputs of</span>
+    <span class="c1"># cli() and of output_files (as &quot;file&quot;)</span>
+    <span class="k">return</span> <span class="n">merged_result</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

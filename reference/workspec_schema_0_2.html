@@ -1,0 +1,1064 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Work specification schema &mdash; GROMACS External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> GROMACS scripting and extension API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../userguide/userguide.html">Python User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Developer Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GROMACS scripting and extension API</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>Work specification schema</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/reference/workspec_schema_0_2.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="work-specification-schema">
+<h1>Work specification schema<a class="headerlink" href="#work-specification-schema" title="Permalink to this headline">¶</a></h1>
+<div class="contents local topic" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#changes-in-second-version" id="id5">Changes in second version</a></p></li>
+<li><p><a class="reference internal" href="#goals" id="id6">Goals</a></p></li>
+<li><p><a class="reference internal" href="#serialization-format" id="id7">Serialization format</a></p>
+<ul>
+<li><p><a class="reference internal" href="#uniqueness" id="id8">Uniqueness</a></p></li>
+<li><p><a class="reference internal" href="#heuristics" id="id9">Heuristics</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#namespaces" id="id10">Namespaces</a></p>
+<ul>
+<li><p><a class="reference internal" href="#python-work-graph-serialization-spec-and-extension-modules" id="id11">Python, work graph serialization spec, and extension modules</a></p></li>
+<li><p><a class="reference internal" href="#operation-and-object-references" id="id12">Operation and Object References</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#canonical-work-graph-representation" id="id13">Canonical work graph representation</a></p></li>
+<li><p><a class="reference internal" href="#core-api-roles-and-collaborations" id="id14">Core API roles and collaborations</a></p>
+<ul>
+<li><p><a class="reference internal" href="#interfaces-and-or-base-classes" id="id15">Interfaces and/or Base classes</a></p>
+<ul>
+<li><p><a class="reference internal" href="#operationfactory" id="id16">OperationFactory</a></p></li>
+<li><p><a class="reference internal" href="#context" id="id17">Context</a></p></li>
+<li><p><a class="reference internal" href="#nodebuilder" id="id18">NodeBuilder</a></p></li>
+<li><p><a class="reference internal" href="#operation" id="id19">Operation</a></p></li>
+<li><p><a class="reference internal" href="#result" id="id20">Result</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#behaviors" id="id21">Behaviors</a></p>
+<ul>
+<li><p><a class="reference internal" href="#launcher" id="id22">Launcher</a></p></li>
+<li><p><a class="reference internal" href="#runner" id="id23">Runner</a></p></li>
+<li><p><a class="reference internal" href="#operationdirector" id="id24">OperationDirector</a></p></li>
+<li><p><a class="reference internal" href="#graph" id="id25">Graph</a></p></li>
+<li><p><a class="reference internal" href="#outputproxy" id="id26">OutputProxy</a></p></li>
+<li><p><a class="reference internal" href="#input" id="id27">Input</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#middleware-api" id="id28">Middleware API</a></p>
+<ul>
+<li><p><a class="reference internal" href="#work-graph-grammar" id="id29">Work graph grammar</a></p></li>
+<li><p><a class="reference internal" href="#operations" id="id30">Operations</a></p>
+<ul>
+<li><p><a class="reference internal" href="#helper" id="id31">Helper</a></p></li>
+<li><p><a class="reference internal" href="#servicing-the-proxy" id="id32">Servicing the proxy</a></p></li>
+<li><p><a class="reference internal" href="#factory" id="id33">Factory</a></p></li>
+<li><p><a class="reference internal" href="#director" id="id34">Director</a></p></li>
+<li><p><a class="reference internal" href="#session-callable" id="id35">Session callable</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#gmxapi-operations" id="id36"><code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> operations</a></p></li>
+<li><p><a class="reference internal" href="#gromacs-operations" id="id37"><code class="docutils literal notranslate"><span class="pre">gromacs</span></code> operations</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#extension-api" id="id38">Extension API</a></p></li>
+<li><p><a class="reference internal" href="#python-interface" id="id39">Python interface</a></p>
+<ul>
+<li><p><a class="reference internal" href="#work-graph-procedural-interface" id="id40">Work graph procedural interface</a></p></li>
+<li><p><a class="reference internal" href="#types" id="id41">Types</a></p></li>
+<li><p><a class="reference internal" href="#additional-classes-and-specified-interfaces" id="id42">Additional classes and specified interfaces</a></p></li>
+<li><p><a class="reference internal" href="#utilities" id="id43">Utilities</a></p></li>
+<li><p><a class="reference internal" href="#reference-implementation" id="id44">Reference implementation</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#specification-module" id="id45">Specification module</a></p>
+<ul>
+<li><p><a class="reference internal" href="#specification" id="id46">Specification</a></p></li>
+<li><p><a class="reference internal" href="#helpers" id="id47">Helpers</a></p></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="changes-in-second-version">
+<h2><a class="toc-backref" href="#id5">Changes in second version</a><a class="headerlink" href="#changes-in-second-version" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Use the term “work graph” instead of “work specification”.
+<code class="docutils literal notranslate"><span class="pre">gmx.workflow.WorkSpec</span></code> is replaced with an interface for a view to a work graph owned
+by a Context instance.</p></li>
+<li><p>Schema version string changes from <code class="docutils literal notranslate"><span class="pre">gmxapi_workspec_0_1</span></code> to <code class="docutils literal notranslate"><span class="pre">gmxapi_graph_0_2</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gmx.workflow.WorkElement</span></code> class is replaced with an interface definition
+for an instance of an Operation. Users no longer create objects representing
+work directly.</p></li>
+<li><p>Proposed: <em>``elements`` map name changed to ``nodes``?</em></p></li>
+<li><p>Deprecate work graph operations <code class="docutils literal notranslate"><span class="pre">gmxapi.md</span></code> and <code class="docutils literal notranslate"><span class="pre">gromacs.load_tpr</span></code></p></li>
+<li><dl class="simple">
+<dt>User-provided <code class="docutils literal notranslate"><span class="pre">name</span></code> properties are replaced with two new properties:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">label</span></code> optionally identifies the entity to the user.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">uid</span></code> is a unique identifier that is deterministically generated by the API to
+completely and verifiably characterize an entity in terms of its inputs to facilitate
+reproducibility, optimization, and flexibility in graph manipulation.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Proposed: <em>Serialized work graphs may be bundled, nested as a map of named graphs. By
+convention, the graph named ``default`` would be examined as an entry point.</em></p></li>
+</ul>
+</div>
+<div class="section" id="goals">
+<h2><a class="toc-backref" href="#id6">Goals</a><a class="headerlink" href="#goals" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Serializeable representation of a molecular simulation and analysis workflow.</p></li>
+<li><p>Simple enough to be robust to API updates and uncoupled from implementation details.</p></li>
+<li><p>Complete enough to unambiguously direct translation of work to API calls.</p></li>
+<li><p>Facilitate easy integration between independent but compatible implementation code in Python or C++</p></li>
+<li><p>Verifiable compatibility with a given API level.</p></li>
+<li><p>Provide enough information to uniquely identify the “state” of deterministic inputs and outputs.</p></li>
+</ul>
+<p>The last point warrants further discussion.</p>
+<p>One point to make is that we need to be able to recover the state of an
+executing graph after an interruption, so we need to be able to identify whether or not work has been partially completed
+and how checkpoint data matches up between nodes, which may not all (at least initially) be on the same computing host.</p>
+<p>The other point that is not completely unrelated is how to minimize duplicated data or computation. Due to numerical
+optimizations, molecular simulation results for the exact same inputs and parameters may not produce output that is
+binary identical, but which should be treated as scientifically equivalent. We need to be able to identify equivalent
+rather than identical output. Input that draws from the results of a previous operation should be able to verify whether
+valid results for any identically specified operation exists, or at what state it is in progress.</p>
+<p>The degree of granularity and room for optimization we pursue affects the amount of data in the work specification, its
+human-readability / editability, and the amount of additional metadata that needs to be stored in association with a
+Session.</p>
+<p>If one element is added to the end of a work specification, results of the previous operations should not be invalidated.</p>
+<p>If an element at the beginning of a work specification is added or altered, “downstream” data should be easily invalidated.</p>
+</div>
+<div class="section" id="serialization-format">
+<h2><a class="toc-backref" href="#id7">Serialization format</a><a class="headerlink" href="#serialization-format" title="Permalink to this headline">¶</a></h2>
+<p>The work specification record is valid JSON serialized data, restricted to the latin-1 character set, encoded in utf-8.</p>
+<div class="section" id="uniqueness">
+<h3><a class="toc-backref" href="#id8">Uniqueness</a><a class="headerlink" href="#uniqueness" title="Permalink to this headline">¶</a></h3>
+<p>Goal: results should be clearly mappable to the work specification that led to them, such that the same work could be
+repeated from scratch, interrupted, restarted, etcetera, in part or in whole, and verifiably produce the same results
+(which can not be artificially attributed to a different work specification) without requiring recomputing intermediate
+values that are available to the Context.</p>
+<p>The entire record, as well as individual elements, have a well-defined hash that can be used to compare work for
+functional equivalence.</p>
+<p>State is not contained in the work specification, but state is attributable to a work specification.</p>
+<p>If we can adequately normalize utf-8 Unicode string representation, we could checksum the full text, but this may be more
+work than defining a scheme for hashing specific data or letting each operation define its own comparator.</p>
+<p>Question: If an input value in a workflow is changed from a verifiably consistent result to an equivalent constant of a
+different “type”, do we invalidate or preserve the downstream output validity? E.g. the work spec changes from
+“operationB.input = operationA.output” to “operationB.input = final_value(operationA)”</p>
+<p>The question is moot if we either only consider final values for terminating execution or if we know exactly how many
+iterations of sequenced output we will have, but that is not generally true.</p>
+<p>Maybe we can leave the answer to this question unspecified for now and prepare for implementation in either case by
+recording more disambiguating information in the work specification (such as checksum of locally available files) and
+recording initial, ongoing, and final state very granularly in the session metadata. It could be that this would be
+an optimization that is optionally implemented by the Context.</p>
+<p>It may be that we allow the user to decide what makes data unique. This would need to be very clearly documented, but
+it could be that provided parameters always become part of the unique ID and are always not-equal to unprovided/default
+values. Example: a <code class="docutils literal notranslate"><span class="pre">load_tpr</span></code> operation with a <code class="docutils literal notranslate"><span class="pre">checksum</span></code> parameter refers to a specific file and immediately
+produces a <code class="docutils literal notranslate"><span class="pre">final</span></code> output, but a <code class="docutils literal notranslate"><span class="pre">load_tpr</span></code> operation with a missing <code class="docutils literal notranslate"><span class="pre">checksum</span></code> parameter produces non-final
+output from whatever file is resolved for the operation at run time.</p>
+<p>It may also be that some data occurs as a “stream” that does not make an operation unique, such as log file output or
+trajectory output that the user wants to accumulate regardless of the data flow scheme; or as a “result” that indicates
+a clear state transition and marks specific, uniquely produced output, such as a regular sequence of 1000 trajectory
+frames over 1ns, or a converged observable. “result”s must be mapped to the representation of the
+workflow that produced them. To change a workflow without invalidating results might be possible with changes that do
+not affect the part of the workflow that fed those results, such as a change that only occurs after a certain point in
+trajectory time. Other than the intentional ambiguity that could be introduced with parameter semantics in the previous
+paragraph,</p>
+</div>
+<div class="section" id="heuristics">
+<h3><a class="toc-backref" href="#id9">Heuristics</a><a class="headerlink" href="#heuristics" title="Permalink to this headline">¶</a></h3>
+<p>Dependency order affects order of instantiation and the direction of binding operations at session launch.</p>
+<p class="rubric">Rules of thumb</p>
+<p>An element can not depend on another element that is not in the work specification.
+<em>Caveat: we probably need a special operation just to expose the results of a different work flow.</em></p>
+<p>Dependency direction affects sequencing of Director calls when launching a session, but also may be used at some point
+to manage checkpoints or data flow state checks at a higher level than the execution graph.</p>
+</div>
+</div>
+<div class="section" id="namespaces">
+<h2><a class="toc-backref" href="#id10">Namespaces</a><a class="headerlink" href="#namespaces" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="python-work-graph-serialization-spec-and-extension-modules">
+<h3><a class="toc-backref" href="#id11">Python, work graph serialization spec, and extension modules</a><a class="headerlink" href="#python-work-graph-serialization-spec-and-extension-modules" title="Permalink to this headline">¶</a></h3>
+<p>I need to work on expressing it more clearly (maybe through Sphinx formatting),
+but it is important to note that there are three different concepts implied by
+the prefixes to names used here.</p>
+<p>Names starting with <code class="docutils literal notranslate"><span class="pre">gmx.</span></code> are symbols in the Python <code class="docutils literal notranslate"><span class="pre">gmx</span></code> package.
+Names starting with <code class="docutils literal notranslate"><span class="pre">gmxapi.</span></code> are not Python names, but work graph operations
+defined for gmxapi and implemented by a gmxapi compatible execution Context.</p>
+<p>Names starting with <code class="docutils literal notranslate"><span class="pre">gromacs.</span></code> are also work graph operations, but are implemented
+throught GROMACS library bindings (currently <code class="docutils literal notranslate"><span class="pre">gmx.core</span></code> but it seems like we should
+separate out).
+They are less firmly specified because they
+are dependent on GROMACS terminology, conventions, and evolution.
+Operations
+implemented by extension modules use a namespace equal to their importable module name.</p>
+<p>The Context implementation in the Python package implements the runtime aspects
+of gmxapi operations in submodules of <code class="docutils literal notranslate"><span class="pre">gmx</span></code>, named (hopefully conveniently) the
+same as the work graph operation or <code class="docutils literal notranslate"><span class="pre">gmx</span></code> helper function.</p>
+<p>The procedural interface in the <code class="xref py py-mod docutils literal notranslate"><span class="pre">gmx</span></code> module provides helper functions that produce handles to work graph
+operations and to simplify more involved API tasks.</p>
+</div>
+<div class="section" id="operation-and-object-references">
+<h3><a class="toc-backref" href="#id12">Operation and Object References</a><a class="headerlink" href="#operation-and-object-references" title="Permalink to this headline">¶</a></h3>
+<p>Entities in a work graph also have (somewhat) human readable names with nested
+scope indicated by <code class="docutils literal notranslate"><span class="pre">.</span></code> delimiters. Within the scope of a work node, namespaces
+distinguish several types of interaction behavior. (See <a class="reference internal" href="#grammar"><span class="std std-ref">Work graph grammar</span></a>.)
+Within those scopes, operation definitions specify named “ports” that are
+available for nodes of a given operation.
+Port names and object types are defined in the API spec (for operations in the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code>
+namespace) and expressed through the lower level API.</p>
+<p>The ports for a work graph node are accessible by proxy in the Python interface,
+using correspondingly named nested attributes of a Python reference to the node.</p>
+<p>Note: we need a unique identifier and a well defined scheme for generating them so
+that the API can determine data flow, tag artifacts, and detect complet or partially
+complete work. It could be that we should separate work node ‘name’ into ‘uid’
+and ‘label’, where ‘label’ is a non-canonical and non-required part of a work
+graph representation.</p>
+</div>
+</div>
+<div class="section" id="canonical-work-graph-representation">
+<h2><a class="toc-backref" href="#id13">Canonical work graph representation</a><a class="headerlink" href="#canonical-work-graph-representation" title="Permalink to this headline">¶</a></h2>
+<p><em>Define the deterministic way to identify a work graph and its artifacts for
+persistence across interruptions and to avoid duplication of work…</em></p>
+</div>
+<div class="section" id="core-api-roles-and-collaborations">
+<h2><a class="toc-backref" href="#id14">Core API roles and collaborations</a><a class="headerlink" href="#core-api-roles-and-collaborations" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="interfaces-and-or-base-classes">
+<h3><a class="toc-backref" href="#id15">Interfaces and/or Base classes</a><a class="headerlink" href="#interfaces-and-or-base-classes" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="operationfactory">
+<h4><a class="toc-backref" href="#id16">OperationFactory</a><a class="headerlink" href="#operationfactory" title="Permalink to this headline">¶</a></h4>
+<p>An OperationFactory receives a Context and Input, and returns an OperationHandle to the caller.</p>
+</div>
+<div class="section" id="context">
+<h4><a class="toc-backref" href="#id17">Context</a><a class="headerlink" href="#context" title="Permalink to this headline">¶</a></h4>
+<p>Variations include</p>
+<ul class="simple">
+<li><p>GraphContext that just builds a graph that can be serialized for deserialization by another context.</p></li>
+<li><p>LaunchContext that processes a graph to be run in appropriate OperationContexts. Produces a Session.</p></li>
+<li><p>OperationContext or ImmediateContext that immediately executes the implemented operation</p></li>
+</ul>
+</div>
+<div class="section" id="nodebuilder">
+<h4><a class="toc-backref" href="#id18">NodeBuilder</a><a class="headerlink" href="#nodebuilder" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">addResource()</span></code> Configures inputs, outputs, framework requirements, and factory functions.
+<code class="docutils literal notranslate"><span class="pre">build()</span></code> returns an OperationHandle</p>
+</div>
+<div class="section" id="operation">
+<h4><a class="toc-backref" href="#id19">Operation</a><a class="headerlink" href="#operation" title="Permalink to this headline">¶</a></h4>
+<p>The OperationHandle returned by a factory may be a an implementing object or some sort of wrapper or proxy object.
+output() provides getters for Results.</p>
+<p>Has a Runner behavior.</p>
+</div>
+<div class="section" id="result">
+<h4><a class="toc-backref" href="#id20">Result</a><a class="headerlink" href="#result" title="Permalink to this headline">¶</a></h4>
+<p>gmxapi-typed output data. May be implemented with futures and/or proxies. Provides
+extract() method to convert to a valid local owning data handle.</p>
+</div>
+</div>
+<div class="section" id="behaviors">
+<h3><a class="toc-backref" href="#id21">Behaviors</a><a class="headerlink" href="#behaviors" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="launcher">
+<h4><a class="toc-backref" href="#id22">Launcher</a><a class="headerlink" href="#launcher" title="Permalink to this headline">¶</a></h4>
+<p>Callable that accepts a Session (Context) and produces a Runnable (Operation).
+A special case of OperationDirector.</p>
+</div>
+<div class="section" id="runner">
+<h4><a class="toc-backref" href="#id23">Runner</a><a class="headerlink" href="#runner" title="Permalink to this headline">¶</a></h4>
+<p>Takes input, runs, and returns a Runner that can be called in the same way.</p>
+<p>run() -&gt; Runner
+run(Runner::Resources) -&gt; Runner</p>
+</div>
+<div class="section" id="operationdirector">
+<h4><a class="toc-backref" href="#id24">OperationDirector</a><a class="headerlink" href="#operationdirector" title="Permalink to this headline">¶</a></h4>
+<p>Takes Context and Input to produce a Runner.</p>
+<p>Use a Context to get one or more NodeBuilders to configure the operation in a new context.
+Then return a properly configured OperationHandle for the context.</p>
+</div>
+<div class="section" id="graph">
+<h4><a class="toc-backref" href="#id25">Graph</a><a class="headerlink" href="#graph" title="Permalink to this headline">¶</a></h4>
+<p>Can produce NodeBuilders, store directorFactories.</p>
+<p>Can serialize / deserialize the workflow representation.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">serialize()</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">uid()</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">newOperation()</span></code>: get a NodeBuilder</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">node(uid)</span></code>: getter</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_node_by_label(str)</span></code>: find uid</p></li>
+<li><p>iterator</p></li>
+</ul>
+</div>
+<div class="section" id="outputproxy">
+<h4><a class="toc-backref" href="#id26">OutputProxy</a><a class="headerlink" href="#outputproxy" title="Permalink to this headline">¶</a></h4>
+<p>Service requests for Results for an Operator’s output nodes.</p>
+</div>
+<div class="section" id="input">
+<h4><a class="toc-backref" href="#id27">Input</a><a class="headerlink" href="#input" title="Permalink to this headline">¶</a></h4>
+<p>Input is highly dependent on the implementation of the operation and the context in which
+it is executing. The important thing is that it is something that can be interpreted by a DirectorFactory.</p>
+<p>Arbitrary lists of arguments and keyword arguments can be accepted by a Python
+module director to direct the construction of one or more graph nodes or to
+get an immediately executed runner.</p>
+<p>GraphNode or serialized Operation Input is accepted by a LaunchContext or
+DispatchingContext.</p>
+<p>A runner implementing the operation execution accepts Input in the form of
+SessionResources.</p>
+</div>
+</div>
+</div>
+<div class="section" id="middleware-api">
+<h2><a class="toc-backref" href="#id28">Middleware API</a><a class="headerlink" href="#middleware-api" title="Permalink to this headline">¶</a></h2>
+<p>The work graph has a basic grammar and structure that maps well to basic data structures.
+We use JSON for serialization of a Python dictionary.</p>
+<p>Integers and floating point numbers are 64-bit.</p>
+<p>The JSON data should be utf-8 compatible, but note that JSON codecs probably map Unicode string
+objects on the program side to un-annotated strings in the serialized data
+(encoding is at the level of the entire byte stream).</p>
+<div class="section" id="work-graph-grammar">
+<span id="grammar"></span><h3><a class="toc-backref" href="#id29">Work graph grammar</a><a class="headerlink" href="#work-graph-grammar" title="Permalink to this headline">¶</a></h3>
+<p>Names (labels and UIDs) in the work graph are strings from the ASCII / Latin-1 character set.
+Periods (<code class="docutils literal notranslate"><span class="pre">.</span></code>) have special meaning as delimiters.</p>
+<p>Bare string values are interpreted as references to other work graph entities. Strings in
+lists are interpreted as strings.</p>
+<p>TODO: I am testing a possible convention for helper function, factory function, and implementation.
+For the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> work graph operation name space, <code class="docutils literal notranslate"><span class="pre">gmx.context</span></code> looks for
+operations in <code class="docutils literal notranslate"><span class="pre">gmx._&lt;name&gt;</span></code>, where <em>&lt;name&gt;</em> is the operation name. We will
+probably adopt a slightly different convention for the <code class="docutils literal notranslate"><span class="pre">gromacs</span></code> name space.
+For all other name spaces, the package attempts to import the namespace as a
+module and to look for operation implementations as a module attribute matching
+the name of the operation. The attribute may be a callable or an object implementing
+the Operation interface. Such an object may itself be a module.
+(Note this would also provide a gateway to mixing Python and C++ in plugins,
+since the namespace module may contain other code or import additional modules.)</p>
+<p>The work graph node <code class="docutils literal notranslate"><span class="pre">output</span></code> contains a <code class="docutils literal notranslate"><span class="pre">file</span></code> port that is
+a gmxapiMap output of command line arguments to filenames.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.0.8: </span>Graph node structure::
+‘elements’: {</p>
+<blockquote>
+<div><dl>
+<dt>’cli_op_aaaaaa’: {</dt><dd><p>#’label’: ‘exe1’,
+‘namespace’: ‘gmxapi’,
+‘operation’: ‘commandline’,
+‘params’: {</p>
+<blockquote>
+<div><p>’executable’: [],
+‘arguments’: [[]],</p>
+</div></blockquote>
+<p>},
+‘depends’: []</p>
+</dd>
+</dl>
+<p>},
+‘cli_op_bbbbbb’: {</p>
+<blockquote>
+<div><p>#’label’: ‘exe2’,
+‘namespace’: ‘gmxapi’,
+‘operation’: ‘commandline’,
+‘params’: {</p>
+<blockquote>
+<div><p>’executable’: [],
+‘arguments’: [[], []],</p>
+</div></blockquote>
+<p>},
+‘depends’: [‘cli_op_aaaaaa’]</p>
+</div></blockquote>
+<p>},</p>
+</div></blockquote>
+<p>}</p>
+</div>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 0.1: </span>Output ports are determined by querying the operation.</p>
+<p>Graph node structure::
+‘elements’: {</p>
+<blockquote>
+<div><dl>
+<dt>’filemap_aaaaaa’: {</dt><dd><p>operation: ‘make_map’,
+‘input’: {</p>
+<blockquote>
+<div><p>’-f’: [‘some_filename’],
+‘-t’: [‘filename1’, ‘filename2’]</p>
+</div></blockquote>
+<p>},
+# ‘output’: {
+#     ‘file’: ‘gmxapi.Map’
+# }</p>
+</dd>
+</dl>
+<p>},
+‘cli_op_aaaaaa’: {</p>
+<blockquote>
+<div><p>’label’: ‘exe1’,
+‘namespace’: ‘gmxapi’,
+‘operation’: ‘commandline’,
+‘input’: {</p>
+<blockquote>
+<div><p>’executable’: [],
+‘arguments’: [[]],
+# this indirection avoids naming complications. Alternatively,
+# we could make parsing recursive and allow arbitrary nesting
+# with special semantics for dictionaries (as well as lists)
+‘input_file_arguments’: ‘filemap_aaaaaa’,</p>
+</div></blockquote>
+<p>},
+# ‘output’: {
+#     ‘file’: ‘gmxapi.Map’
+# }</p>
+</div></blockquote>
+<p>},
+‘filemap_bbbbbb: {</p>
+<blockquote>
+<div><p>’label’: ‘exe1_output_files’,
+‘namespace’: ‘gmxapi’,
+‘operation’: ‘make_map’,
+‘input’: {</p>
+<blockquote>
+<div><p>’-in1’: ‘cli_op_aaaaaa.output.file.-o’,
+‘-in2’: [‘static_fileB’],
+‘-in3’: [‘arrayfile1’, ‘arrayfile2’] # matches dimensionality of inputs</p>
+</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p>},
+‘cli_op_bbbbbb’: {</p>
+<blockquote>
+<div><p>’label’: ‘exe2’,
+‘namespace’: ‘gmxapi’,
+‘operation’: ‘commandline’,
+‘input’: {</p>
+<blockquote>
+<div><p>’executable’: [],
+‘arguments’: [],
+‘input_file_arguments’: ‘filemap_bbbbbb’</p>
+</div></blockquote>
+<p>},</p>
+</div></blockquote>
+<p>},</p>
+</div></blockquote>
+<p>}</p>
+</div>
+</div>
+<div class="section" id="operations">
+<h3><a class="toc-backref" href="#id30">Operations</a><a class="headerlink" href="#operations" title="Permalink to this headline">¶</a></h3>
+<p>Each node in a work graph represents an instance of an Operation.
+The API specifies operations that a gmxapi-compliant execution context <em>should</em> provide in
+the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> namespace.</p>
+<p>All specified <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> operations are provided by the reference implementation in released
+versions of the <code class="docutils literal notranslate"><span class="pre">gmx</span></code> package. <code class="docutils literal notranslate"><span class="pre">gmx.context.Context</span></code> also provides operations in the <code class="docutils literal notranslate"><span class="pre">gromacs</span></code>
+namespace. This support will probably move to a separate module, but the <code class="docutils literal notranslate"><span class="pre">gromacs</span></code> namespace
+is reserved and should not be reimplemented in external software.</p>
+<p>When translating a work graph for execution, the Context calls a factory function for each
+operation to get a Director. A Python-based Context <em>should</em> consult an internal map for
+factory functions for the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> namespace. <strong>TODO:</strong> <em>How to handle errors?
+We don’t really want middleware clients to have to import ``gmx``, but how would a Python
+script know what exception to catch? Errors need to be part of an API-specified result type
+or protocol, and/or the exceptions need to be defined in the package implementing the context.</em></p>
+<p>namespace is imported</p>
+<p>operation is an attribute in namespace that</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.0: </span>is callable with the signature <code class="docutils literal notranslate"><span class="pre">operation(element)</span></code> to get a Director</p>
+</div>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 0.1: </span>has a <code class="docutils literal notranslate"><span class="pre">_gmxapi_graph_director</span></code> attribute to get a Director</p>
+</div>
+<div class="section" id="helper">
+<h4><a class="toc-backref" href="#id31">Helper</a><a class="headerlink" href="#helper" title="Permalink to this headline">¶</a></h4>
+<p>Add operation instance to work graph and return a proxy object.
+If proxy object has <code class="docutils literal notranslate"><span class="pre">input</span></code> or <code class="docutils literal notranslate"><span class="pre">output</span></code> attributes, they should forward <code class="docutils literal notranslate"><span class="pre">getattr</span></code>
+calls to the context… <em>TBD</em></p>
+<p>The helper makes API calls to the default or provided Context and then asks the Context for
+an object to return to the caller. Generally, this is a proxy Operation object, but when the
+context is a local context in the process of launching a session, the object can be a
+graph Director that can be used to finish configuring and launch the execution graph.</p>
+<p>Signatures</p>
+<p><code class="docutils literal notranslate"><span class="pre">myplugin.myoperation(arg0:</span> <span class="pre">WorkElement)</span> <span class="pre">-&gt;</span> <span class="pre">gmx.Operation</span></code></p>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 0.1: </span>Operation helpers are no longer required to accept a <code class="docutils literal notranslate"><span class="pre">gmx.workflow.WorkElement</span></code> argument.</p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">myplugin.myoperation(*args,</span> <span class="pre">input:</span> <span class="pre">inputobject,</span> <span class="pre">output:</span> <span class="pre">outputobject,</span> <span class="pre">**kwargs)</span></code></p>
+<blockquote>
+<div><dl class="simple">
+<dt>inputobject<span class="classifier">dict</span></dt><dd><p>Map of named input ports to typed gmxapi data, implicitly mappable Python objects,
+or objects implementing the gmxapi Output interface.</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>Some operations (<code class="docutils literal notranslate"><span class="pre">gmx.commandline</span></code>) need to provide an <code class="docutils literal notranslate"><span class="pre">output</span></code> keyword argument to define
+data types and/or placeholders (not represented in the work graph).</p>
+<blockquote>
+<div><dl class="simple">
+<dt>outputobject<span class="classifier">dict</span></dt><dd><p>Map of named output ports to</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>Additional <code class="docutils literal notranslate"><span class="pre">args</span></code> and <code class="docutils literal notranslate"><span class="pre">kwargs</span></code> may be used by the helper function to set up the work
+graph node. Note that the context will not use them when launching the operation, though,
+so ….</p>
+<p>… Maybe let <code class="docutils literal notranslate"><span class="pre">input</span></code> and <code class="docutils literal notranslate"><span class="pre">output</span></code> kwargs be interpreted by the helper function, too,
+and let the operation node input be completely specified by <code class="docutils literal notranslate"><span class="pre">parameters</span></code>?</p>
+<p><code class="docutils literal notranslate"><span class="pre">myplugin.myoperation(arg0:</span> <span class="pre">graph_ref,</span> <span class="pre">*args,</span> <span class="pre">parameters:</span> <span class="pre">inputobject,</span> <span class="pre">**kwargs)</span></code></p>
+<p>… I think we can go ahead and let <code class="docutils literal notranslate"><span class="pre">gmx.Operation.input</span></code> and <code class="docutils literal notranslate"><span class="pre">gmx.Operation.output</span></code>
+implement <code class="docutils literal notranslate"><span class="pre">get_item</span></code>…</p>
+<p>Implementation note: the input and output attributes can have common implementations,
+provided with Python “Descriptor”s</p>
+</div>
+<div class="section" id="servicing-the-proxy">
+<h4><a class="toc-backref" href="#id32">Servicing the proxy</a><a class="headerlink" href="#servicing-the-proxy" title="Permalink to this headline">¶</a></h4>
+<p>When the Python client added the operation to the work graph, it used a helper function
+to get a reference to an Operation proxy object. This object holds a weak reference to
+the context and work graph to which it was added.</p>
+</div>
+<div class="section" id="factory">
+<h4><a class="toc-backref" href="#id33">Factory</a><a class="headerlink" href="#factory" title="Permalink to this headline">¶</a></h4>
+<p>get Director for session launch</p>
+</div>
+<div class="section" id="director">
+<h4><a class="toc-backref" href="#id34">Director</a><a class="headerlink" href="#director" title="Permalink to this headline">¶</a></h4>
+<p>subscribable to implement data dependencies</p>
+<p><code class="docutils literal notranslate"><span class="pre">build</span></code> method adds <code class="docutils literal notranslate"><span class="pre">launch</span></code> and <code class="docutils literal notranslate"><span class="pre">run</span></code> objects to execution graph.</p>
+<p>To do: change <code class="docutils literal notranslate"><span class="pre">build</span></code> to <code class="docutils literal notranslate"><span class="pre">construct</span></code></p>
+</div>
+<div class="section" id="session-callable">
+<h4><a class="toc-backref" href="#id35">Session callable</a><a class="headerlink" href="#session-callable" title="Permalink to this headline">¶</a></h4>
+</div>
+</div>
+<div class="section" id="gmxapi-operations">
+<h3><a class="toc-backref" href="#id36"><code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> operations</a><a class="headerlink" href="#gmxapi-operations" title="Permalink to this headline">¶</a></h3>
+<p>Operation namespace: gmxapi</p>
+<p class="rubric">operation: make_input</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version gmxapi_graph_0_2.</span></p>
+</div>
+<p>Produced by <code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.make_input()</span></code></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">input</span></code> ports</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">structure</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">topology</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">state</span></code></p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">output</span></code> ports</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">structure</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">topology</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">state</span></code></p></li>
+</ul>
+</li>
+</ul>
+<p class="rubric">operation: md</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version gmxapi_workspec_0_1.</span></p>
+</div>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version gmxapi_graph_0_2.</span></p>
+</div>
+<p>Produced by <code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.workflow.from_tpr()</span></code></p>
+<p>Ports:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">depends</span></code></p></li>
+</ul>
+<p class="rubric">operation: modify_input</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version gmxapi_graph_0_2.</span></p>
+</div>
+<p>Produced by <a class="reference internal" href="#gmx.modify_input" title="gmx.modify_input"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.modify_input()</span></code></a></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">input</span></code> ports</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">structure</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">topology</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">state</span></code></p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">output</span></code> ports</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">structure</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">topology</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">state</span></code></p></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="gromacs-operations">
+<h3><a class="toc-backref" href="#id37"><code class="docutils literal notranslate"><span class="pre">gromacs</span></code> operations</a><a class="headerlink" href="#gromacs-operations" title="Permalink to this headline">¶</a></h3>
+<p>Operation namespace: gromacs</p>
+<p class="rubric">operation: load_tpr</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version gmxapi_workspec_0_1.</span></p>
+</div>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version gmxapi_graph_0_2.</span></p>
+</div>
+<p>Produced by <code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.workflow.from_tpr()</span></code></p>
+<p class="rubric">operation: mdrun</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version gmxapi_graph_0_2.</span></p>
+</div>
+<p>Produced by <a class="reference internal" href="#gmx.mdrun" title="gmx.mdrun"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.mdrun()</span></code></a></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">input</span></code> ports</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">structure</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">topology</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">state</span></code></p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">output</span></code> ports</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">trajectory</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">conformation</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">state</span></code></p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">interface</span></code> ports</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">potential</span></code></p></li>
+</ul>
+</li>
+</ul>
+<p class="rubric">operation: read_tpr</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version gmxapi_graph_0_2.</span></p>
+</div>
+<p>Produced by <a class="reference internal" href="#gmx.read_tpr" title="gmx.read_tpr"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.read_tpr()</span></code></a></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">input</span></code> ports</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code> takes a list of filenames</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">output</span></code> ports</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">params</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">structure</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">topology</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">state</span></code></p></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="extension-api">
+<h2><a class="toc-backref" href="#id38">Extension API</a><a class="headerlink" href="#extension-api" title="Permalink to this headline">¶</a></h2>
+<p>Extension modules provide a high-level interface to gmxapi operations with functions
+that produce Operation objects. Operation objects maintain a weak reference to the
+context and work graph to which they have been added so that they can provide a
+consistent proxy interface to operation data. Several object properties provide
+accessors that are forwarded to the context.</p>
+<p><code class="docutils literal notranslate"><span class="pre">input</span></code> contains the input ports of the operation. Allows a typed graph edge. Can
+contain static information or a reference to another gmxapi object in the work graph.</p>
+<p><code class="docutils literal notranslate"><span class="pre">output</span></code> contains the output ports of the operation. Allows a typed graph edge. Can
+contain static information or a reference to another gmxapi object in the work graph.</p>
+<p><code class="docutils literal notranslate"><span class="pre">interface</span></code> allows operation objects to bind lower-level interfaces at run time.</p>
+<p>Connections between <code class="docutils literal notranslate"><span class="pre">input</span></code> and <code class="docutils literal notranslate"><span class="pre">output</span></code> ports define graph edges that can be
+checkpointed by the library with additional metadata.</p>
+</div>
+<div class="section" id="python-interface">
+<h2><a class="toc-backref" href="#id39">Python interface</a><a class="headerlink" href="#python-interface" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference internal" href="#gmx.read_tpr" title="gmx.read_tpr"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.read_tpr()</span></code></a> creates a node for a <code class="docutils literal notranslate"><span class="pre">gromacs.read_tpr</span></code> operation implemented
+with <code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.fileio.read_tpr()</span></code></p>
+<p><a class="reference internal" href="#gmx.mdrun" title="gmx.mdrun"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.mdrun()</span></code></a> creates a node for a <code class="docutils literal notranslate"><span class="pre">gromacs.mdrun</span></code> operation, implemented
+with <code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.context._mdrun()</span></code></p>
+<p><a class="reference internal" href="#gmx.init_subgraph" title="gmx.init_subgraph"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.init_subgraph()</span></code></a></p>
+<p><a class="reference internal" href="#gmx.while_loop" title="gmx.while_loop"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.while_loop()</span></code></a> creates a node for a <a href="#id1"><span class="problematic" id="id2">`</span></a>gmxapi.while_loop</p>
+<div class="section" id="work-graph-procedural-interface">
+<h3><a class="toc-backref" href="#id40">Work graph procedural interface</a><a class="headerlink" href="#work-graph-procedural-interface" title="Permalink to this headline">¶</a></h3>
+<p>Python syntax available in the imported <code class="docutils literal notranslate"><span class="pre">gmx</span></code> module.</p>
+<dl class="function">
+<dt id="gmx.commandline_operation">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">commandline_operation</code><span class="sig-paren">(</span><em class="sig-param">executable</em>, <em class="sig-param">arguments=[]</em>, <em class="sig-param">input=[]</em>, <em class="sig-param">output=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#gmx.commandline_operation" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.0.8.</span></p>
+</div>
+<p>lorem ipsum</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">get_context</code><span class="sig-paren">(</span><em class="sig-param">work=None</em><span class="sig-paren">)</span></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.0.4.</span></p>
+</div>
+<p>Get a handle to an execution context that can be used to launch a session
+(for the given work graph, if provided).</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="gmx.logical_not">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">logical_not</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#gmx.logical_not" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.1.</span></p>
+</div>
+<p>Create a work graph operation that negates a boolean input value on its
+output port.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">make_input</code><span class="sig-paren">(</span><span class="sig-paren">)</span></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.1.</span></p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="gmx.mdrun">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">mdrun</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#gmx.mdrun" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.0.8.</span></p>
+</div>
+<p>Creates a node for a <code class="docutils literal notranslate"><span class="pre">gromacs.mdrun</span></code> operation, implemented
+with <code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.context._mdrun()</span></code></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="gmx.modify_input">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">modify_input</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#gmx.modify_input" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.0.8.</span></p>
+</div>
+<p>Creates a node for a <code class="docutils literal notranslate"><span class="pre">gmxapi.modify_input</span></code> operation. Initial implementation
+uses <code class="docutils literal notranslate"><span class="pre">gmx.fileio.read_tpr</span></code> and <code class="docutils literal notranslate"><span class="pre">gmx.fileio.write_tpr</span></code></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="gmx.read_tpr">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">read_tpr</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#gmx.read_tpr" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.0.8.</span></p>
+</div>
+<p>Creates a node for a <code class="docutils literal notranslate"><span class="pre">gromacs.read_tpr</span></code> operation implemented
+with <code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.fileio.read_tpr()</span></code></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="gmx.gather">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">gather</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#gmx.gather" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.0.8.</span></p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="gmx.reduce">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">reduce</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#gmx.reduce" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.1.</span></p>
+</div>
+<p>Previously only available as an ensemble operation with implicit reducing
+mode of <code class="docutils literal notranslate"><span class="pre">mean</span></code>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">work=None</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span></dt>
+<dd><p>Run the current work graph, or the work provided as an argument.</p>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 0.0.8.</span></p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">**kwargs</span></code> are passed to the gmxapi execution context. Refer to the
+documentation for the Context for usage. (E.g. see <code class="xref py py-class docutils literal notranslate"><span class="pre">gmx.context.Context</span></code>)</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="gmx.init_subgraph">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">init_subgraph</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#gmx.init_subgraph" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.1.</span></p>
+</div>
+<p>Prepare a subgraph. Alternative name: <code class="docutils literal notranslate"><span class="pre">gmx.subgraph</span></code></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="gmx.tool">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">tool</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#gmx.tool" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.1.</span></p>
+</div>
+<p>Add a graph operation for one of the built-in tools, such as a GROMACS
+analysis tool that would typically be invoked with a <code class="docutils literal notranslate"><span class="pre">gmx</span> <span class="pre">toolname</span> <span class="pre">&lt;args&gt;</span></code>
+command line syntax. Improves interoperability of tools previously accessible
+only through <a class="reference internal" href="#gmx.commandline_operation" title="gmx.commandline_operation"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.commandline_operation()</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="gmx.while_loop">
+<code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">while_loop</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#gmx.while_loop" title="Permalink to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 0.1.</span></p>
+</div>
+<p>Creates a node for a <code class="docutils literal notranslate"><span class="pre">gmxapi.while_loop</span></code></p>
+</dd></dl>
+
+</div>
+<div class="section" id="types">
+<h3><a class="toc-backref" href="#id41">Types</a><a class="headerlink" href="#types" title="Permalink to this headline">¶</a></h3>
+<p>Python classes for gmxapi object and data types.</p>
+<dl class="class">
+<dt id="gmx.InputFile">
+<em class="property">class </em><code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">InputFile</code><a class="headerlink" href="#gmx.InputFile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxy for</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="gmx.NDArray">
+<em class="property">class </em><code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">NDArray</code><a class="headerlink" href="#gmx.NDArray" title="Permalink to this definition">¶</a></dt>
+<dd><p>N-dimensional array of gmxapi data.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="gmx.OutputFile">
+<em class="property">class </em><code class="sig-prename descclassname">gmx.</code><code class="sig-name descname">OutputFile</code><a class="headerlink" href="#gmx.OutputFile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Proxy for</p>
+</dd></dl>
+
+</div>
+<div class="section" id="additional-classes-and-specified-interfaces">
+<h3><a class="toc-backref" href="#id42">Additional classes and specified interfaces</a><a class="headerlink" href="#additional-classes-and-specified-interfaces" title="Permalink to this headline">¶</a></h3>
+<p>We support Python duck-typing where possible, in that objects do not need to
+inherit from a gmxapi-provided base class to be compatible with specified
+gmxapi behaviors. This section describes the important attributes of specified
+gmxapi interfaces.</p>
+<p>This section also notes</p>
+<ul class="simple">
+<li><p>classes in the reference implementation that implement specified interfaces</p></li>
+<li><p>utilities and helpers provided to support creating gmxapi compatible wrappers</p></li>
+</ul>
+<p class="rubric">Operation</p>
+</div>
+<div class="section" id="utilities">
+<h3><a class="toc-backref" href="#id43">Utilities</a><a class="headerlink" href="#utilities" title="Permalink to this headline">¶</a></h3>
+<dl class="function">
+<dt id="gmx.operation.make_operation">
+<code class="sig-prename descclassname">gmx.operation.</code><code class="sig-name descname">make_operation</code><span class="sig-paren">(</span><em class="sig-param">class</em>, <em class="sig-param">input=[]</em>, <em class="sig-param">output=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#gmx.operation.make_operation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate a function object that can be used to manipulate the work graph
+_and_ to launch the custom-defined work graph operation.</p>
+<p>Example: <a class="reference external" href="https://github.com/kassonlab/gmxapi-scripts/blob/master/analysis.py">https://github.com/kassonlab/gmxapi-scripts/blob/master/analysis.py</a></p>
+</dd></dl>
+
+</div>
+<div class="section" id="reference-implementation">
+<h3><a class="toc-backref" href="#id44">Reference implementation</a><a class="headerlink" href="#reference-implementation" title="Permalink to this headline">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">gmx</span></code> Python package implements <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> operations in the <code class="docutils literal notranslate"><span class="pre">gmx.context.Context</span></code>
+reference implementation to support top-level <code class="docutils literal notranslate"><span class="pre">gmx</span></code> functions using various
+<code class="docutils literal notranslate"><span class="pre">gmx</span></code> submodules.</p>
+<p><code class="xref py py-func docutils literal notranslate"><span class="pre">gmx.fileio.read_tpr()</span></code> Implements <code class="xref py py-func docutils literal notranslate"><span class="pre">gromacs.read_tpr()</span></code></p>
+</div>
+</div>
+<div class="section" id="specification-module">
+<h2><a class="toc-backref" href="#id45">Specification module</a><a class="headerlink" href="#specification-module" title="Permalink to this headline">¶</a></h2>
+<p>Documentation for the specification should be extracted from the package.
+It will be migrated to <a href="#id3"><span class="problematic" id="id4">:module:`gmx._workspec_0_2`</span></a>.</p>
+<p>The module (eventually) provides helpers, with utilities to validate API implementations / data structures / interfaces,
+and (possibly) wrappers or factories.</p>
+<p>The remaining content in this document is automatically extracted from the
+<code class="xref py py-mod docutils literal notranslate"><span class="pre">gmx._workspec_0_2</span></code> module. The above content can be migrated into this
+module shortly, but the intent is that the module will also contain syntax and
+schema checkers.</p>
+<div class="section" id="specification">
+<h3><a class="toc-backref" href="#id46">Specification</a><a class="headerlink" href="#specification" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="helpers">
+<h3><a class="toc-backref" href="#id47">Helpers</a><a class="headerlink" href="#helpers" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -1,0 +1,303 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Using the Python package &mdash; GROMACS External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="gmxapi Python module reference" href="pythonreference.html" />
+    <link rel="prev" title="Full installation instructions" href="install.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> GROMACS scripting and extension API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="userguide.html">Python User Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="install.html">Full installation instructions</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Using the Python package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#running-simulations">Running simulations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#plugins">Plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#the-work-graph">The work graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#parallelism">Parallelism</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#simulation-input">Simulation input</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#preparing-simulation-input">Preparing simulation input</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#manipulating-simulation-parameters">Manipulating simulation parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#accessing-trajectory-data">Accessing trajectory data</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#from-files">From files</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#from-in-memory-objects">From in-memory objects</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#from-gmxapi-operation-results">From gmxapi operation results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="pythonreference.html">gmxapi Python module reference</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/reference.html">Developer Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GROMACS scripting and extension API</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="userguide.html">Python User Guide</a> &raquo;</li>
+        
+      <li>Using the Python package</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/userguide/usage.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="using-the-python-package">
+<h1>Using the Python package<a class="headerlink" href="#using-the-python-package" title="Permalink to this headline">¶</a></h1>
+<p>After installing GROMACS, sourcing the “GMXRC” (see GROMACS docs), and installing
+the gmxapi Python package (see <a class="reference internal" href="install.html"><span class="doc">Full installation instructions</span></a>), import the package in a Python
+script or interactive interpreter. This documentation assumes a convenient alias
+of <code class="docutils literal notranslate"><span class="pre">gmx</span></code> to refer to the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python package.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">gmxapi</span> <span class="k">as</span> <span class="nn">gmx</span>
+</pre></div>
+</div>
+<p>For full documentation of the Python-level interface and API, use the <code class="docutils literal notranslate"><span class="pre">pydoc</span></code>
+command line tool or the <a class="reference external" href="https://docs.python.org/3/library/functions.html#help" title="(in Python v3.7)"><code class="xref py py-func docutils literal notranslate"><span class="pre">help()</span></code></a> interactive Python function, or refer to
+the <a class="reference internal" href="pythonreference.html#python-procedural"><span class="std std-ref">procedural interface</span></a> documentation.</p>
+<p>Python does not wrap any command-line tool, so once installation is complete,
+there shouldn’t be any additional configuration necessary, and any errors that
+occur should be caught at the Python level. Any Python <em>exception</em> raised by gmxapi
+should be descended from (and catchable as) <a class="reference internal" href="pythonreference.html#gmxapi.exceptions.Error" title="gmxapi.exceptions.Error"><code class="xref py py-class docutils literal notranslate"><span class="pre">gmxapi.exceptions.Error</span></code></a>.</p>
+<p>As an exception to the preceding paragraph, we have a tool specifically for
+wrapping arbitrary (unintegrated) command line tools: See <a class="reference internal" href="pythonreference.html#gmxapi.commandline_operation" title="gmxapi.commandline_operation"><code class="xref py py-class docutils literal notranslate"><span class="pre">gmxapi.commandline_operation</span></code></a>.</p>
+<div class="section" id="running-simulations">
+<h2>Running simulations<a class="headerlink" href="#running-simulations" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="plugins">
+<h3>Plugins<a class="headerlink" href="#plugins" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="the-work-graph">
+<h3>The work graph<a class="headerlink" href="#the-work-graph" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="parallelism">
+<h3>Parallelism<a class="headerlink" href="#parallelism" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="synchronous-and-asynchronous-work">
+<h4>Synchronous and asynchronous work<a class="headerlink" href="#synchronous-and-asynchronous-work" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="accelerated-computation">
+<h4>Accelerated computation<a class="headerlink" href="#accelerated-computation" title="Permalink to this headline">¶</a></h4>
+</div>
+</div>
+</div>
+<div class="section" id="simulation-input">
+<h2>Simulation input<a class="headerlink" href="#simulation-input" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="preparing-simulation-input">
+<h3>Preparing simulation input<a class="headerlink" href="#preparing-simulation-input" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="with-work-graph-operations">
+<h4>With work graph operations<a class="headerlink" href="#with-work-graph-operations" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="with-file-utilities">
+<h4>With file utilities<a class="headerlink" href="#with-file-utilities" title="Permalink to this headline">¶</a></h4>
+</div>
+</div>
+<div class="section" id="manipulating-simulation-parameters">
+<h3>Manipulating simulation parameters<a class="headerlink" href="#manipulating-simulation-parameters" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="with-key-word-arguments">
+<h4>With key word arguments<a class="headerlink" href="#with-key-word-arguments" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="id1">
+<h4>With work graph operations<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h4>
+</div>
+</div>
+</div>
+<div class="section" id="accessing-trajectory-data">
+<h2>Accessing trajectory data<a class="headerlink" href="#accessing-trajectory-data" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="from-files">
+<h3>From files<a class="headerlink" href="#from-files" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="from-in-memory-objects">
+<h3>From in-memory objects<a class="headerlink" href="#from-in-memory-objects" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="from-gmxapi-operation-results">
+<h3>From gmxapi operation results<a class="headerlink" href="#from-gmxapi-operation-results" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="pythonreference.html" class="btn btn-neutral float-right" title="gmxapi Python module reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="install.html" class="btn btn-neutral float-left" title="Full installation instructions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

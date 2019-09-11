@@ -1,0 +1,321 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>gmxapi.exceptions &mdash; GROMACS External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> GROMACS scripting and extension API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../userguide/userguide.html">Python User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../reference/reference.html">Developer Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">GROMACS scripting and extension API</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>gmxapi.exceptions</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for gmxapi.exceptions</h1><div class="highlight"><pre>
+<span></span><span class="c1">#</span>
+<span class="c1"># This file is part of the GROMACS molecular simulation package.</span>
+<span class="c1">#</span>
+<span class="c1"># Copyright (c) 2019, by the GROMACS development team, led by</span>
+<span class="c1"># Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,</span>
+<span class="c1"># and including many others, as listed in the AUTHORS file in the</span>
+<span class="c1"># top-level source directory and at http://www.gromacs.org.</span>
+<span class="c1">#</span>
+<span class="c1"># GROMACS is free software; you can redistribute it and/or</span>
+<span class="c1"># modify it under the terms of the GNU Lesser General Public License</span>
+<span class="c1"># as published by the Free Software Foundation; either version 2.1</span>
+<span class="c1"># of the License, or (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># GROMACS is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="c1"># Lesser General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU Lesser General Public</span>
+<span class="c1"># License along with GROMACS; if not, see</span>
+<span class="c1"># http://www.gnu.org/licenses, or write to the Free Software Foundation,</span>
+<span class="c1"># Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.</span>
+<span class="c1">#</span>
+<span class="c1"># If you want to redistribute modifications to GROMACS, please</span>
+<span class="c1"># consider that scientific software is very special. Version</span>
+<span class="c1"># control is crucial - bugs must be traceable. We will be happy to</span>
+<span class="c1"># consider code for inclusion in the official distribution, but</span>
+<span class="c1"># derived work must not be called official GROMACS. Details are found</span>
+<span class="c1"># in the README &amp; COPYING files - if they are missing, get the</span>
+<span class="c1"># official version at http://www.gromacs.org.</span>
+<span class="c1">#</span>
+<span class="c1"># To help us fund GROMACS development, we humbly ask that you cite</span>
+<span class="c1"># the research papers on the package. Check out http://www.gromacs.org.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Exceptions and Warnings raised by gmxapi module operations</span>
+<span class="sd">==========================================================</span>
+
+<span class="sd">Errors, warnings, and other exceptions used in the GROMACS</span>
+<span class="sd">Python package are defined in the `exceptions` submodule.</span>
+
+<span class="sd">The gmxapi Python package defines a root exception,</span>
+<span class="sd">exceptions.Error, from which all Exceptions thrown from</span>
+<span class="sd">within the module should derive. If a published component of</span>
+<span class="sd">the gmxapi package throws an exception that cannot be caught</span>
+<span class="sd">as a gmxapi.exceptions.Error, please report the bug.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;ApiError&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;DataShapeError&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;Error&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;FeatureNotAvailableError&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;NotImplementedError&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;ProtocolError&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;TypeError&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;UsageError&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;ValueError&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;Warning&#39;</span>
+           <span class="p">]</span>
+
+
+<div class="viewcode-block" id="Error"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.Error">[docs]</a><span class="k">class</span> <span class="nc">Error</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base exception for gmx.exceptions classes.&quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Warning"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.Warning">[docs]</a><span class="k">class</span> <span class="nc">Warning</span><span class="p">(</span><span class="ne">Warning</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base warning class for gmx.exceptions.&quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="ApiError"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.ApiError">[docs]</a><span class="k">class</span> <span class="nc">ApiError</span><span class="p">(</span><span class="n">Error</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;An API operation was attempted with an incompatible object.&quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="DataShapeError"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.DataShapeError">[docs]</a><span class="k">class</span> <span class="nc">DataShapeError</span><span class="p">(</span><span class="n">Error</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;An object has an incompatible shape.</span>
+
+<span class="sd">    This exception does not imply that the Type or any other aspect of the data</span>
+<span class="sd">    has been checked.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="NotImplementedError"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.NotImplementedError">[docs]</a><span class="k">class</span> <span class="nc">NotImplementedError</span><span class="p">(</span><span class="n">Error</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Specified feature is not implemented in the current code.</span>
+
+<span class="sd">    This exception indicates that the implemented code does not support the</span>
+<span class="sd">    API as specified. The calling code has used valid syntax, as documented for</span>
+<span class="sd">    the API, but has reached incompletely implemented code, which should be</span>
+<span class="sd">    considered a bug.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+    <span class="c1"># May be useful for error checking in base classes or as a development tool</span>
+    <span class="c1"># to avoid releasing incomplete implementations (e.g. overlooked &quot;To do&quot;s)</span>
+
+
+<div class="viewcode-block" id="FeatureNotAvailableError"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.FeatureNotAvailableError">[docs]</a><span class="k">class</span> <span class="nc">FeatureNotAvailableError</span><span class="p">(</span><span class="n">Error</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Requested feature not available in the current environment.</span>
+
+<span class="sd">    This exception will usually indicate an issue with the user&#39;s environment or</span>
+<span class="sd">    run time details. There may be a missing optional dependency, which should</span>
+<span class="sd">    be specified in the exception message.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="ProtocolError"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.ProtocolError">[docs]</a><span class="k">class</span> <span class="nc">ProtocolError</span><span class="p">(</span><span class="n">Error</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unexpected API behavior or protocol violation.</span>
+
+<span class="sd">    This exception generally indicates a gmxapi bug, since it should only</span>
+<span class="sd">    occur through incorrect assumptions or misuse of API implementation internals.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="TypeError"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.TypeError">[docs]</a><span class="k">class</span> <span class="nc">TypeError</span><span class="p">(</span><span class="n">Error</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Incompatible type for gmxapi data.</span>
+
+<span class="sd">    Reference datamodel.rst for more on gmxapi data typing.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="UsageError"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.UsageError">[docs]</a><span class="k">class</span> <span class="nc">UsageError</span><span class="p">(</span><span class="n">Error</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Unsupported syntax or call signatures.</span>
+
+<span class="sd">    Generic usage error for gmxapi module.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="ValueError"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.exceptions.ValueError">[docs]</a><span class="k">class</span> <span class="nc">ValueError</span><span class="p">(</span><span class="n">Error</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A user-provided value cannot be interpreted or doesn&#39;t make sense.&quot;&quot;&quot;</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

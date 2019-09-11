@@ -1,0 +1,621 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>gmxapi.simulation.read_tpr &mdash; GROMACS External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> GROMACS scripting and extension API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../userguide/userguide.html">Python User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../reference/reference.html">Developer Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">GROMACS scripting and extension API</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>gmxapi.simulation.read_tpr</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for gmxapi.simulation.read_tpr</h1><div class="highlight"><pre>
+<span></span><span class="c1">#</span>
+<span class="c1"># This file is part of the GROMACS molecular simulation package.</span>
+<span class="c1">#</span>
+<span class="c1"># Copyright (c) 2019, by the GROMACS development team, led by</span>
+<span class="c1"># Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,</span>
+<span class="c1"># and including many others, as listed in the AUTHORS file in the</span>
+<span class="c1"># top-level source directory and at http://www.gromacs.org.</span>
+<span class="c1">#</span>
+<span class="c1"># GROMACS is free software; you can redistribute it and/or</span>
+<span class="c1"># modify it under the terms of the GNU Lesser General Public License</span>
+<span class="c1"># as published by the Free Software Foundation; either version 2.1</span>
+<span class="c1"># of the License, or (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># GROMACS is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</span>
+<span class="c1"># Lesser General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU Lesser General Public</span>
+<span class="c1"># License along with GROMACS; if not, see</span>
+<span class="c1"># http://www.gnu.org/licenses, or write to the Free Software Foundation,</span>
+<span class="c1"># Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.</span>
+<span class="c1">#</span>
+<span class="c1"># If you want to redistribute modifications to GROMACS, please</span>
+<span class="c1"># consider that scientific software is very special. Version</span>
+<span class="c1"># control is crucial - bugs must be traceable. We will be happy to</span>
+<span class="c1"># consider code for inclusion in the official distribution, but</span>
+<span class="c1"># derived work must not be called official GROMACS. Details are found</span>
+<span class="c1"># in the README &amp; COPYING files - if they are missing, get the</span>
+<span class="c1"># official version at http://www.gromacs.org.</span>
+<span class="c1">#</span>
+<span class="c1"># To help us fund GROMACS development, we humbly ask that you cite</span>
+<span class="c1"># the research papers on the package. Check out http://www.gromacs.org.</span>
+
+<span class="sd">&quot;&quot;&quot;read_tpr operation module</span>
+
+<span class="sd">Provides implementation classes and user interface for gmxapi.read_tpr.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">inspect</span>
+<span class="kn">import</span> <span class="nn">typing</span>
+
+<span class="kn">import</span> <span class="nn">gmxapi</span>
+<span class="kn">import</span> <span class="nn">gmxapi.abc</span>
+<span class="kn">import</span> <span class="nn">gmxapi.exceptions</span>
+<span class="kn">import</span> <span class="nn">gmxapi.operation</span> <span class="k">as</span> <span class="nn">_op</span>
+<span class="kn">import</span> <span class="nn">gmxapi.typing</span>
+<span class="kn">from</span> <span class="nn">gmxapi.operation</span> <span class="k">import</span> <span class="n">InputCollectionDescription</span>
+<span class="kn">from</span> <span class="nn">gmxapi.simulation.abc</span> <span class="k">import</span> <span class="n">ModuleObject</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">fileio</span>
+
+<span class="c1"># Initialize module-level logger</span>
+<span class="kn">from</span> <span class="nn">gmxapi</span> <span class="k">import</span> <span class="n">logger</span> <span class="k">as</span> <span class="n">root_logger</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">root_logger</span><span class="o">.</span><span class="n">getChild</span><span class="p">(</span><span class="s1">&#39;read_tpr&#39;</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Importing </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="vm">__name__</span><span class="p">))</span>
+
+
+<span class="c1">#</span>
+<span class="c1"># Interface classes and internal details</span>
+<span class="c1">#</span>
+
+<span class="c1"># TODO: The output of read_tpr and modify_input should be the same and part of the</span>
+<span class="c1">#  simulation module specification. Such output is either a special type of output proxy</span>
+<span class="c1">#  or Future.</span>
+<span class="n">_output_descriptors</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">_op</span><span class="o">.</span><span class="n">OutputDataDescriptor</span><span class="p">(</span><span class="s1">&#39;_simulation_input&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span>
+    <span class="n">_op</span><span class="o">.</span><span class="n">OutputDataDescriptor</span><span class="p">(</span><span class="s1">&#39;parameters&#39;</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="n">_publishing_descriptors</span> <span class="o">=</span> <span class="p">{</span><span class="n">desc</span><span class="o">.</span><span class="n">_name</span><span class="p">:</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">operation</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="n">desc</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">desc</span><span class="o">.</span><span class="n">_dtype</span><span class="p">)</span> <span class="k">for</span> <span class="n">desc</span> <span class="ow">in</span>
+                           <span class="n">_output_descriptors</span><span class="p">}</span>
+<span class="n">_output</span> <span class="o">=</span> <span class="n">_op</span><span class="o">.</span><span class="n">OutputCollectionDescription</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">descriptor</span><span class="o">.</span><span class="n">_name</span><span class="p">:</span> <span class="n">descriptor</span><span class="o">.</span><span class="n">_dtype</span> <span class="k">for</span> <span class="n">descriptor</span> <span class="ow">in</span>
+                                             <span class="n">_output_descriptors</span><span class="p">})</span>
+
+
+
+<span class="k">class</span> <span class="nc">OutputDataProxy</span><span class="p">(</span><span class="n">ModuleObject</span><span class="p">,</span>
+                      <span class="n">_op</span><span class="o">.</span><span class="n">DataProxyBase</span><span class="p">,</span>
+                      <span class="n">descriptors</span><span class="o">=</span><span class="n">_output_descriptors</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Implement the &#39;output&#39; attribute of ReadTpr operations.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">_op</span><span class="o">.</span><span class="n">DataProxyBase</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">PublishingDataProxy</span><span class="p">(</span><span class="n">_op</span><span class="o">.</span><span class="n">DataProxyBase</span><span class="p">,</span>
+                          <span class="n">descriptors</span><span class="o">=</span><span class="n">_publishing_descriptors</span>
+                          <span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Manage output resource updates for ReadTpr operation.&quot;&quot;&quot;</span>
+
+
+<span class="n">_output_factory</span> <span class="o">=</span> <span class="n">_op</span><span class="o">.</span><span class="n">OutputFactory</span><span class="p">(</span><span class="n">output_proxy</span><span class="o">=</span><span class="n">OutputDataProxy</span><span class="p">,</span>
+                                    <span class="n">output_description</span><span class="o">=</span><span class="n">_output</span><span class="p">,</span>
+                                    <span class="n">publishing_data_proxy</span><span class="o">=</span><span class="n">PublishingDataProxy</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">SessionResources</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Input and output run-time resources for a ReadTpr operation.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tpr_filename</span><span class="p">,</span> <span class="n">publisher</span><span class="p">:</span> <span class="n">PublishingDataProxy</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tpr_object</span> <span class="o">=</span> <span class="n">fileio</span><span class="o">.</span><span class="n">TprFile</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">tpr_filename</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="n">publisher</span>
+
+
+<span class="c1">#</span>
+<span class="c1"># Helpers</span>
+<span class="c1">#</span>
+
+
+<span class="n">_input</span> <span class="o">=</span> <span class="n">_op</span><span class="o">.</span><span class="n">InputCollectionDescription</span><span class="p">(</span>
+    <span class="p">[(</span><span class="s1">&#39;filename&#39;</span><span class="p">,</span> <span class="n">inspect</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="s1">&#39;filename&#39;</span><span class="p">,</span>
+                                    <span class="n">inspect</span><span class="o">.</span><span class="n">Parameter</span><span class="o">.</span><span class="n">POSITIONAL_OR_KEYWORD</span><span class="p">,</span>
+                                    <span class="n">annotation</span><span class="o">=</span><span class="nb">str</span><span class="p">))])</span>
+
+
+<span class="c1"># TODO: Clarify. The actual input and output arguments passed are customized for this operation.</span>
+<span class="k">def</span> <span class="nf">_session_resource_factory</span><span class="p">(</span><span class="nb">input</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">InputPack</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="s1">&#39;PublishingDataProxy&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SessionResources</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Translate resources from the gmxapi.operation Context to the ReadTpr implementation.&quot;&quot;&quot;</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;filename&#39;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">SessionResources</span><span class="p">(</span><span class="n">tpr_filename</span><span class="o">=</span><span class="n">filename</span><span class="p">,</span> <span class="n">publisher</span><span class="o">=</span><span class="n">output</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_standard_node_resource_factory</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Translate Python UI input to the gmxapi.operation node builder inputs.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">_input</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_run</span><span class="p">(</span><span class="n">resources</span><span class="p">:</span> <span class="n">SessionResources</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Operation implementation in the gmxapi.operation module context.&quot;&quot;&quot;</span>
+    <span class="c1"># TODO: Implement for other source/target contexts. We don&#39;t always need to</span>
+    <span class="c1">#  produce all outputs.</span>
+    <span class="k">with</span> <span class="n">resources</span><span class="o">.</span><span class="n">tpr_object</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="n">fh</span><span class="o">.</span><span class="n">_tprFileHandle</span><span class="o">.</span><span class="n">params</span><span class="p">()</span><span class="o">.</span><span class="n">extract</span><span class="p">()</span>
+        <span class="n">resources</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="n">params</span>
+        <span class="n">resources</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">_simulation_input</span> <span class="o">=</span> <span class="n">fh</span><span class="o">.</span><span class="n">filename</span>
+
+
+<span class="c1">#</span>
+<span class="c1"># Implementation</span>
+<span class="c1">#</span>
+
+<span class="c1"># Note: we borrow the implementation from operation.ResourceManager for now,</span>
+<span class="c1"># but in the future we want the implementations to either be decoupled or</span>
+<span class="c1"># for implementations in a given context to be coupled to details that are clearly</span>
+<span class="c1"># and explicitly related to that context. Right now, operation.ResourceManager</span>
+<span class="c1"># is tied to the implementation of Contexts in gmxapi.operation, but that is not</span>
+<span class="c1"># sufficiently clear and explicit.</span>
+<span class="k">class</span> <span class="nc">ResourceManager</span><span class="p">(</span><span class="n">gmxapi</span><span class="o">.</span><span class="n">operation</span><span class="o">.</span><span class="n">ResourceManager</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Manage resources for the ReadTpr operation in the gmxapi.operation contexts.</span>
+
+<span class="sd">    Extends gmxapi.operation.ResourceManager to tolerate non-standard data payloads.</span>
+<span class="sd">    Futures managed by this resource manager may contain additional attributes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">future</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">description</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">ResultDescription</span><span class="p">):</span>
+        <span class="n">tpr_future</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">future</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">tpr_future</span>
+
+    <span class="k">def</span> <span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OutputDataProxy</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">OutputDataProxy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">update_output</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Updating output for </span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">operation_id</span><span class="p">))</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update_output</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">descriptor</span> <span class="ow">in</span> <span class="n">_output_descriptors</span><span class="p">:</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">descriptor</span><span class="o">.</span><span class="n">_name</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_done</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ApiError</span><span class="p">(</span><span class="s1">&#39;Expected output </span><span class="si">{}</span><span class="s1"> not updated.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
+
+<span class="c1"># TODO: Consider making Generic in source and target context type variables,</span>
+<span class="c1">#  or leave unspecified and use generic function or pair of single_dispatch functions.</span>
+<span class="c1">#  Need to know the right home for input_description, if needed.</span>
+<span class="k">class</span> <span class="nc">ResourceFactory</span><span class="p">(</span><span class="n">gmxapi</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">ResourceFactory</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;ReadTpr resource factory.</span>
+
+<span class="sd">    Generic class for creating resources passed to read_tpr implementation details.</span>
+<span class="sd">    Dispatching may occur based on the source and target Context of factory action.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_context</span><span class="p">,</span> <span class="n">source_context</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize an instance to support read_tpr action.</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            source_context: The source of the resources in the calling scope.</span>
+<span class="sd">            target_context: The Context in which the factory product will be consumed.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">source_context</span> <span class="o">=</span> <span class="n">source_context</span>  <span class="c1"># Determine input form of *create* method.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_context</span> <span class="o">=</span> <span class="n">target_context</span>  <span class="c1"># Context in which resources are consumed.</span>
+
+    <span class="c1"># TODO: clean up the dispatching. What to do when input comes from multiple sources?</span>
+    <span class="c1"># Use a typing overload or a single-dispatch functor for clearer input/result typing.</span>
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create the resource product.</span>
+
+<span class="sd">        Dispatch to appropriate factory functionality based on the *source_context*</span>
+<span class="sd">        and *target_context*.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># context is used for dispatching and annotates the Context of the other arguments.</span>
+        <span class="c1"># context == None implies inputs are from Python UI.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_context</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_context</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">_standard_node_resource_factory</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">source_context</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+            <span class="c1"># TODO: Check whether the consumer is a Context.NodeBuilder or an operation runner.</span>
+            <span class="c1"># We don&#39;t yet use this dispatcher for building nodes, so assume we are launching a session.</span>
+            <span class="k">assert</span> <span class="s1">&#39;input&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span>
+            <span class="k">assert</span> <span class="s1">&#39;output&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span>
+            <span class="k">return</span> <span class="n">_session_resource_factory</span><span class="p">(</span><span class="nb">input</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;input&#39;</span><span class="p">],</span> <span class="n">output</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;output&#39;</span><span class="p">])</span>
+        <span class="k">raise</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NotImplementedError</span><span class="p">(</span>
+            <span class="s1">&#39;No translation from </span><span class="si">{}</span><span class="s1"> context to </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">source_context</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_context</span><span class="p">))</span>
+
+    <span class="nd">@typing</span><span class="o">.</span><span class="n">overload</span>
+    <span class="k">def</span> <span class="nf">input_description</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_op</span><span class="o">.</span><span class="n">InputDescription</span><span class="p">:</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span> <span class="nf">input_description</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get an input description usable in the indicated Context.</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            context: Context for which to dispatch the generation of input description.</span>
+
+<span class="sd">        Overrides gmxapi.abc.ResourceFactory for collaboration between this</span>
+<span class="sd">        resource factory and a target Context.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO: Clarify exposure and scope as gmxapi.abc.ResourceFactory is refined.</span>
+        <span class="c1"># The expected use case is that a Context implementation may consult the</span>
+        <span class="c1"># input_description when preparing input to a resource factory, or even</span>
+        <span class="c1"># when determining in which Context a resource should be created or an</span>
+        <span class="c1"># operation dispatched. It seems sensible that the ResourceFactory should</span>
+        <span class="c1"># be able to describe its possible inputs. Instance functions are the</span>
+        <span class="c1"># most common and simple Python detail, so it makes sense for this to be</span>
+        <span class="c1"># an instance method instead of classmethod or staticmethod, until shown</span>
+        <span class="c1"># otherwise.</span>
+        <span class="c1"># Also note that ResourceFactory is likely to be a Generic class or a</span>
+        <span class="c1"># container for composed functionality. Customizing method signatures</span>
+        <span class="c1"># based on instance data is more brittle than behavior determined at the</span>
+        <span class="c1"># class level. The behavior of this function is determined at the class</span>
+        <span class="c1"># level to be a dispatcher, which may utilize instance data, but as an</span>
+        <span class="c1"># implementation detail that is not the business of the caller.</span>
+        <span class="c1"># This should probably be implemented in terms of the standard Python</span>
+        <span class="c1"># functools.single_dispatch generic function, but it is cleaner if the</span>
+        <span class="c1"># method itself is not generic beyond the level of typing overloads.</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">StandardInputDescription</span><span class="p">()</span>
+        <span class="k">raise</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;No input description available for </span><span class="si">{}</span><span class="s1"> context&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">context</span><span class="p">))</span>
+
+
+<span class="k">class</span> <span class="nc">StandardInputDescription</span><span class="p">(</span><span class="n">_op</span><span class="o">.</span><span class="n">InputDescription</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Provide the ReadTpr input description in gmxapi.operation Contexts.&quot;&quot;&quot;</span>
+
+    <span class="c1"># TODO: Improve fingerprinting.</span>
+    <span class="c1"># If _make_uid can&#39;t make sufficiently unique IDs, use additional &quot;salt&quot;:</span>
+    <span class="c1"># _next_uid = 0</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_make_uid</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="c1"># TODO: Use input fingerprint for more useful identification.</span>
+        <span class="n">salt</span> <span class="o">=</span> <span class="nb">hash</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+        <span class="c1"># If can&#39;t make sufficiently unique IDs, use additional &quot;salt&quot;</span>
+        <span class="c1"># from a class data member. E.g.</span>
+        <span class="c1">#     new_uid = &#39;read_tpr_{}_{}&#39;.format(_next_uid, salt)</span>
+        <span class="c1">#     _next_uid += 1</span>
+        <span class="n">new_uid</span> <span class="o">=</span> <span class="s1">&#39;read_tpr_</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">salt</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">new_uid</span>
+
+    <span class="k">def</span> <span class="nf">signature</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InputCollectionDescription</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_input</span>
+
+    <span class="k">def</span> <span class="nf">make_uid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">DataEdge</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">DataEdge</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_uid</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">RegisteredOperation</span><span class="p">(</span><span class="n">_op</span><span class="o">.</span><span class="n">OperationImplementation</span><span class="p">,</span> <span class="n">metaclass</span><span class="o">=</span><span class="n">_op</span><span class="o">.</span><span class="n">OperationMeta</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Provide the gmxapi compatible ReadTpr implementation.&quot;&quot;&quot;</span>
+
+    <span class="c1"># This is a class method to allow the class object to be used in gmxapi.operation._make_registry_key</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Canonical name for the operation.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s1">&#39;read_tpr&#39;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">namespace</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;read_tpr is importable from the gmxapi module.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s1">&#39;gmxapi&#39;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">director</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_op</span><span class="o">.</span><span class="n">OperationDirector</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">StandardDirector</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NotImplementedError</span><span class="p">(</span>
+            <span class="s1">&#39;No dispatcher for context </span><span class="si">{}</span><span class="s1"> of type </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">context</span><span class="p">)))</span>
+
+
+<span class="k">class</span> <span class="nc">StandardOperationHandle</span><span class="p">(</span><span class="n">_op</span><span class="o">.</span><span class="n">AbstractOperation</span><span class="p">,</span> <span class="n">ModuleObject</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Handle used in Python UI or gmxapi.operation Contexts.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resource_manager</span><span class="p">:</span> <span class="n">ResourceManager</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__resource_manager</span> <span class="o">=</span> <span class="n">resource_manager</span>
+
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__resource_manager</span><span class="o">.</span><span class="n">update_output</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">output</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OutputDataProxy</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__resource_manager</span><span class="o">.</span><span class="n">data</span><span class="p">()</span>
+
+
+<span class="k">class</span> <span class="nc">StandardDirector</span><span class="p">(</span><span class="n">gmxapi</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">OperationDirector</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Direct the instantiation of a read_tpr node in a gmxapi.operation Context.</span>
+
+<span class="sd">    .. todo:: Compose this behavior in a more generic class.</span>
+
+<span class="sd">    .. todo:: Describe where instances live.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ValueError</span><span class="p">(</span><span class="s1">&#39;StandardDirector requires a gmxapi.operation Context.&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">context</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resources</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">DataSourceCollection</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StandardOperationHandle</span><span class="p">:</span>
+        <span class="n">builder</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">node_builder</span><span class="p">(</span><span class="n">operation</span><span class="o">=</span><span class="n">RegisteredOperation</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+
+        <span class="n">builder</span><span class="o">.</span><span class="n">set_resource_factory</span><span class="p">(</span><span class="n">_session_resource_factory</span><span class="p">)</span>
+        <span class="n">builder</span><span class="o">.</span><span class="n">set_input_description</span><span class="p">(</span><span class="n">StandardInputDescription</span><span class="p">())</span>
+        <span class="n">builder</span><span class="o">.</span><span class="n">set_handle</span><span class="p">(</span><span class="n">StandardOperationHandle</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">runner_director</span><span class="p">(</span><span class="n">resources</span><span class="p">):</span>
+            <span class="k">def</span> <span class="nf">runner</span><span class="p">():</span>
+                <span class="n">_run</span><span class="p">(</span><span class="n">resources</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">runner</span>
+
+        <span class="n">builder</span><span class="o">.</span><span class="n">set_runner_director</span><span class="p">(</span><span class="n">runner_director</span><span class="p">)</span>
+        <span class="n">builder</span><span class="o">.</span><span class="n">set_output_factory</span><span class="p">(</span><span class="n">_output_factory</span><span class="p">)</span>
+
+        <span class="c1"># Note: we have not yet done any dispatching based on *resources*. We should</span>
+        <span class="c1"># translate the resources provided into the form that the Context can subscribe to</span>
+        <span class="c1"># using the dispatching resource_factory. In the second draft, this operation</span>
+        <span class="c1"># is dispatched to a SimulationModuleContext, which can be subscribed directly</span>
+        <span class="c1"># to sources that are either literal filenames or gmxapi.simulation sources,</span>
+        <span class="c1"># while standard Futures can be resolved in the standard context.</span>
+        <span class="c1">#</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">resources</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">DataSourceCollection</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="s1">&#39;filename&#39;</span> <span class="ow">in</span> <span class="n">resources</span>
+        <span class="n">builder</span><span class="o">.</span><span class="n">add_input</span><span class="p">(</span><span class="s1">&#39;filename&#39;</span><span class="p">,</span> <span class="n">resources</span><span class="p">[</span><span class="s1">&#39;filename&#39;</span><span class="p">])</span>
+
+        <span class="n">handle</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">handle</span><span class="p">,</span> <span class="n">StandardOperationHandle</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">handle</span>
+
+    <span class="k">def</span> <span class="nf">handle_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">StandardOperationHandle</span>
+
+    <span class="k">def</span> <span class="nf">resource_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                         <span class="n">source</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="n">gmxapi</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                         <span class="n">target</span><span class="p">:</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Context</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResourceFactory</span><span class="p">:</span>
+        <span class="c1"># Distinguish between the UIContext, in which input is in the form</span>
+        <span class="c1"># of function call arguments, and the StandardContext, implemented in</span>
+        <span class="c1"># gmxapi.operation. UIContext is probably a virtual context that is</span>
+        <span class="c1"># asserted by callers in order to get a factory that normalizes UI input</span>
+        <span class="c1"># for the StandardContext.</span>
+        <span class="c1">#</span>
+        <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span>
+        <span class="k">if</span> <span class="n">source</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">ResourceFactory</span><span class="p">(</span><span class="n">target_context</span><span class="o">=</span><span class="n">target</span><span class="p">,</span> <span class="n">source_context</span><span class="o">=</span><span class="n">source</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ResourceFactory</span><span class="p">(</span><span class="n">target_context</span><span class="o">=</span><span class="n">target</span><span class="p">,</span> <span class="n">source_context</span><span class="o">=</span><span class="n">source</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ValueError</span><span class="p">(</span><span class="s1">&#39;No dispatching from </span><span class="si">{}</span><span class="s1"> context to </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">target</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="read_tpr"><a class="viewcode-back" href="../../../userguide/pythonreference.html#gmxapi.read_tpr">[docs]</a><span class="k">def</span> <span class="nf">read_tpr</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        filename: input file name</span>
+<span class="sd">        label: optional human-readable label with which to tag the new node</span>
+<span class="sd">        context: Context in which to return a handle to the new node.</span>
+<span class="sd">                 Use default (None) for Python scripting interface</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Reference (handle) to the new operation instance (node).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">handle_context</span> <span class="o">=</span> <span class="n">context</span>
+    <span class="k">if</span> <span class="n">handle_context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NotImplementedError</span><span class="p">(</span>
+            <span class="s1">&#39;context must be None. This factory is only for the Python UI right now.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># 1. Handle node creation in the scripting interface.</span>
+    <span class="c1"># When *context* input is None, dispatch to the current Context. Confirm that</span>
+    <span class="c1"># it is a standard context from the gmxapi.operation module, translate the</span>
+    <span class="c1"># input into that context, and create the node.</span>
+
+    <span class="c1"># 2. Dispatch to SimulationModuleContext.</span>
+    <span class="c1"># Operation is not fully implemented in gmxapi.operation context. When creating</span>
+    <span class="c1"># a node in a gmxapi.operation context, dispatch and subscribe to a SimulationModuleContext,</span>
+    <span class="c1"># in which</span>
+
+    <span class="c1"># 3. Handle consumption in SimulationModuleContext.</span>
+    <span class="c1"># When a consuming operation is native to the SimulationModuleContext,</span>
+    <span class="c1"># detect that a richer interface is available and use it. Possible implementation:</span>
+    <span class="c1"># Chain of Responsibility: subscribe() is serviced by the Context &quot;closest&quot;</span>
+    <span class="c1"># to the source. subscriber is the most native compatible Context for the consuming operation</span>
+    <span class="c1"># but decays to the context in which the handle is being created. subscribe()</span>
+    <span class="c1"># can accept a callback function and an indication of the form of the message</span>
+    <span class="c1"># to send (a consuming Context or ResourceFactory).</span>
+
+    <span class="c1"># TODO: Other types of input, such as File placeholders.</span>
+
+    <span class="n">target_context</span> <span class="o">=</span> <span class="n">_op</span><span class="o">.</span><span class="n">current_context</span><span class="p">()</span>
+    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_context</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span>
+    <span class="c1"># Get a director that will create a node in the standard context.</span>
+    <span class="n">node_director</span> <span class="o">=</span> <span class="n">_op</span><span class="o">.</span><span class="n">_get_operation_director</span><span class="p">(</span><span class="n">RegisteredOperation</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="n">target_context</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node_director</span><span class="p">,</span> <span class="n">StandardDirector</span><span class="p">)</span>
+    <span class="c1"># TODO: refine this protocol</span>
+    <span class="k">assert</span> <span class="n">handle_context</span> <span class="ow">is</span> <span class="kc">None</span>
+    <span class="n">resource_factory</span> <span class="o">=</span> <span class="n">node_director</span><span class="o">.</span><span class="n">resource_factory</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">handle_context</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">target_context</span><span class="p">)</span>
+    <span class="n">resources</span> <span class="o">=</span> <span class="n">resource_factory</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">filename</span><span class="p">)</span>
+    <span class="n">handle</span> <span class="o">=</span> <span class="n">node_director</span><span class="p">(</span><span class="n">resources</span><span class="o">=</span><span class="n">resources</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+    <span class="c1"># Note: One effect of the assertions above is to help the type checker infer</span>
+    <span class="c1"># the return type of the handle. It is hard to convince the type checker that</span>
+    <span class="c1"># the return value of the node builder is up-cast. We might be able to resolve</span>
+    <span class="c1"># this by making both get_operation_director and ReadTprImplementation</span>
+    <span class="c1"># generics of the handle type, or using the handle type as the key for</span>
+    <span class="c1"># get_operation_director.</span>
+    <span class="k">return</span> <span class="n">handle</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

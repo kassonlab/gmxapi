@@ -1,0 +1,572 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Execution model &mdash; GROMACS External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Change Log" href="../changelog.html" />
+    <link rel="prev" title="gmxapi data model" href="datamodel.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> GROMACS scripting and extension API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../userguide/userguide.html">Python User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="reference.html">Developer Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="projectstructure.html">Implementation overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="extending.html">Extending</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="datamodel.html">gmxapi data model</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Execution model</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#operations">Operations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GROMACS scripting and extension API</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="reference.html">Developer Guide</a> &raquo;</li>
+        
+      <li>Execution model</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/reference/executionmodel.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="execution-model">
+<h1>Execution model<a class="headerlink" href="#execution-model" title="Permalink to this headline">¶</a></h1>
+<p>stub</p>
+<p><em>explain what happens (serializability, factory functions) when outputs are used as inputs</em></p>
+<p class="plantuml">
+<img src="../_images/plantuml-9c1906eee634ed6e737f006e2d1a0869942e6d82.png" alt="&#64;startuml
+/' Illustrate client interaction with a graph Context.
+ Client creates an operation from a module that provides input to gromacs.mdrun,
+ then launches session. '/
+participant &quot;Python Interpreter&quot; as script &lt;&lt; client &gt;&gt;
+participant opHandle &lt;&lt; Operation &gt;&gt;
+participant mdrunHandle &lt;&lt; Operation &gt;&gt;
+participant session &lt;&lt; Operation &gt;&gt;
+
+box &quot;mymodule&quot; #LightBlue
+    participant &quot;mymodule.mytool&quot; as opFactory &lt;&lt; OperationFactory &gt;&gt;
+    participant moduleDirector &lt;&lt;mymodule impl&gt;&gt;
+end box
+
+box &quot;gmx package&quot; #LightGreen
+    participant &quot;gmx.mdrun&quot; as mdrunFactory &lt;&lt; OperationFactory &gt;&gt;
+    participant graphDirector &lt;&lt;OperationDirector&gt;&gt;
+    participant gmxContext &lt;&lt;graphContext&gt;&gt;
+    participant graphNodeBuilder &lt;&lt;OperationBuilder&gt;&gt;
+end box
+
+box &quot;gromacs submodule&quot;
+    participant &quot;gmx._gromacs.mdrun&quot; as mdrunImpl &lt;&lt; Operation &gt;&gt;
+end box
+
+box &quot;gmx context submodule&quot; #Yellow
+end box
+
+activate opFactory
+    script -&gt; opFactory: input args
+    opFactory -&gt; moduleDirector: dispatch factory
+    activate moduleDirector
+        note left: module decides how to process input
+
+        moduleDirector -&gt; opHandle: create
+        opFactory &lt;-- moduleDirector: opHandle
+    deactivate moduleDirector
+    script &lt;-- opFactory: opHandle
+deactivate opFactory
+
+activate mdrunFactory
+    script -&gt; mdrunFactory: input args
+    mdrunFactory -&gt; mdrunFactory: directorFactory(gmxContext, input)
+    activate mdrunFactory
+        mdrunFactory -&gt; graphDirector: construct
+
+        activate graphDirector
+            graphDirector -&gt; gmxContext: newOperator()
+            gmxContext -&gt; graphNodeBuilder: create
+            activate graphNodeBuilder
+
+            graphDirector &lt;-- gmxContext: return graphNodeBuilder
+            graphDirector -&gt; graphNodeBuilder: registerResource(Input, ...)
+            graphDirector -&gt; graphNodeBuilder: registerResource(Output, ...)
+            graphDirector -&gt; graphNodeBuilder: addDirectorFactory(functor)
+            graphDirector -&gt; graphNodeBuilder: build()
+            graphNodeBuilder -&gt; gmxContext: setupOutputProxy
+                gmxContext -&gt; mdrunHandle: create
+                graphDirector &lt;-- graphNodeBuilder: return mdrunHandle
+            destroy graphNodeBuilder
+            mdrunFactory &lt;-- graphDirector: mdrunHandle
+        destroy graphDirector
+    deactivate mdrunFactory
+
+    script &lt;-- mdrunFactory: mdrunHandle
+deactivate mdrunFactory
+
+ref over script: launch
+
+&#64;enduml
+"/>
+</p>
+<p>Output is generated to satisfy data dependencies when a Session is launched from
+the <code class="docutils literal notranslate"><span class="pre">gmx</span></code> graph-enabled Context.</p>
+<p class="plantuml">
+<img src="../_images/plantuml-aa878e5bccf24474c6f198940f923f93a621fa1e.png" alt="&#64;startuml
+participant &quot;Session launcher&quot; as launcher &lt;&lt; client &gt;&gt;
+participant opHandle &lt;&lt; Operation &gt;&gt;
+participant mdrunHandle &lt;&lt; Operation &gt;&gt;
+participant session &lt;&lt; Operation &gt;&gt;
+
+box &quot;mymodule&quot; #LightBlue
+    participant &quot;mymodule.mytool&quot; as opFactory &lt;&lt; OperationFactory &gt;&gt;
+    participant moduleDirector &lt;&lt;mymodule impl&gt;&gt;
+end box
+
+box &quot;gmx package&quot; #LightGreen
+    participant &quot;gmx.mdrun&quot; as mdrunFactory &lt;&lt; OperationFactory &gt;&gt;
+    participant graphDirector &lt;&lt;OperationDirector&gt;&gt;
+    participant gmxContext &lt;&lt;graphContext&gt;&gt;
+    participant graphNodeBuilder &lt;&lt;OperationBuilder&gt;&gt;
+end box
+
+box &quot;gromacs submodule&quot;
+    participant &quot;gmx._gromacs.mdrun&quot; as mdrunImpl &lt;&lt; Operation &gt;&gt;
+end box
+
+box &quot;gmx context submodule&quot; #Yellow
+end box
+
+ref over launcher, opHandle, mdrunHandle: set up graph
+
+loop for operation in topological sequence
+end
+
+note left: note
+
+note left: note
+
+activate mdrunFactory
+    launcher -&gt; mdrunFactory: input args
+    mdrunFactory -&gt; mdrunFactory: directorFactory(gmxContext, input)
+    activate mdrunFactory
+        mdrunFactory -&gt; graphDirector: construct
+
+        activate graphDirector
+            graphDirector -&gt; gmxContext: newOperator()
+            gmxContext -&gt; graphNodeBuilder: create
+            activate graphNodeBuilder
+
+            graphDirector &lt;-- gmxContext: return graphNodeBuilder
+            graphDirector -&gt; graphNodeBuilder: registerResource(Input, ...)
+            graphDirector -&gt; graphNodeBuilder: registerResource(Output, ...)
+            graphDirector -&gt; graphNodeBuilder: addDirectorFactory(functor)
+            graphDirector -&gt; graphNodeBuilder: build()
+            graphNodeBuilder -&gt; gmxContext: setupOutputProxy
+                gmxContext -&gt; mdrunHandle: create
+                graphDirector &lt;-- graphNodeBuilder: return mdrunHandle
+            destroy graphNodeBuilder
+            mdrunFactory &lt;-- graphDirector: mdrunHandle
+        destroy graphDirector
+    deactivate mdrunFactory
+
+    launcher &lt;-- mdrunFactory: mdrunHandle
+deactivate mdrunFactory
+
+
+activate opFactory
+    launcher -&gt; opFactory: input args
+    opFactory -&gt; moduleDirector: dispatch factory
+    activate moduleDirector
+        note left: module decides how to process input
+
+        moduleDirector -&gt; opHandle: create
+        opFactory &lt;-- moduleDirector: opHandle
+    deactivate moduleDirector
+    launcher &lt;-- opFactory: opHandle
+deactivate opFactory
+
+
+note right launcher
+    gmx.run() resolves all outputs for all operations in the current scope.
+end note
+
+launcher -&gt; gmxContext: launch / build
+launcher &lt;-- gmxContext: session
+launcher -&gt; session: run()
+
+
+&#64;enduml
+"/>
+</p>
+<p>We maximize opportunities for deferred execution and minimal data copies while
+minimizing code dependencies and implementation overhead by specifying some
+protocols for data proxies, data futures, and data access control.</p>
+<p class="plantuml">
+<img src="../_images/plantuml-7cf64f4e5d4c7f357f3bdfe35578444888dde450.png" alt="/' Illustrate client interaction with a graph Context.
+ Client creates an operation from a module that provides input to gromacs.mdrun,
+ then launches session. '/
+&#64;startuml
+
+title Optimized data access across API boundary
+
+participant &quot;Python Interpreter&quot; as script &lt;&lt; client &gt;&gt;
+participant mdrunHandle &lt;&lt; Operation &gt;&gt;
+
+ref over script, mdrunHandle
+    set up work graph
+end ref
+
+note right script
+    gmx.run() resolves all outputs for all operations in the current scope.
+    The client here requests just the resolution of the mdrun output
+    to illustrate the resolution of data dependencies.
+    Assume:
+        numpy.asarray(mdrunHandle.output.trajectory['position'].extract())
+end note
+
+participant outputProxy &lt;&lt;property&gt;&gt;
+participant trajectoryResult as trajectory &lt;&lt;Result, gmxapiMap&gt;&gt;
+participant position &lt;&lt;gmxapiNDArray&gt;&gt;
+participant pyDataRef &lt;&lt;PyObject, BufferInterface&gt;&gt;
+participant gmxArray as gmxArray &lt;&lt;refCounted&gt;&gt;
+participant traj &lt;&lt;numpy arrayView&gt;&gt;
+
+script -&gt; mdrunHandle: getattr(output)
+create outputProxy
+mdrunHandle -&gt; outputProxy: get
+note right
+    getter implementation is a detail of the context in which the handle
+    is serviced and can optionally hold references to additional resources
+    or dispatching behaviors.
+end note
+script -&gt; outputProxy: getattr(trajectory)
+create trajectory
+outputProxy -&gt; trajectory: get
+note right
+    Result objects can have accessors with &quot;futures&quot; behavior,
+    but must allow translation to the context of the consumer.
+    See notes elsewhere.
+end note
+script -&gt; trajectory: getitem(position)
+create position
+trajectory -&gt; position: get
+script -&gt; position: extract()
+
+
+ref over position
+    resolve data dependencies
+    copy data or inc ref count
+end ref
+
+position -&gt; position: access local data
+activate position
+
+note right
+    When C++ API has a local array view, the GROMACS allocator template
+    determines whether to deep copy or just increase the reference count
+    of data. gmxapi implementation maps mdspan descriptor to Python
+    buffer protocol descriptor of memory layout. Note that client constraints
+    on memory layout of the requested buffer are expressed at run time.
+    Provider may dispatch to different allocators as an implementation
+    detail.
+end note
+
+create pyDataRef
+activate pyDataRef
+position -&gt; pyDataRef: create
+pyDataRef -&gt; gmxArray: acquire
+activate gmxArray
+
+note right
+    Implementation is simplest if the C++ data reference
+    is tied to the Python object providing the buffer
+    interface, but decisions on whether to deep copy data
+    could be deferred until the interface is actually used.
+end note
+
+script &lt;-- position: gmxapi NDArray reference
+deactivate position
+
+create traj
+script -&gt; traj: numpy.asarray(pyDataRef)
+traj -&gt; pyDataRef: PyObject_GetBuffer()
+activate pyDataRef
+traj &lt;-- gmxArray: *buf
+note right
+    API result includes metadata
+    on memory layout.
+end note
+script &lt;-- traj: numpy object reference
+
+note right pyDataRef
+    Under the Python buffer protocol, the provider guarantees the validity of
+    the data handle while the buffer interface is open. In this case, that is
+    the lifetime of the numpy array view.
+end note
+
+...
+script -&gt; traj: numpy API
+activate traj
+traj -&gt; gmxArray: memory access
+deactivate traj
+...
+script -&gt; traj: del
+traj -&gt; pyDataRef: PyBuffer_Release()
+deactivate pyDataRef
+destroy traj
+pyDataRef -&gt; gmxArray: release
+destroy pyDataRef
+destroy gmxArray
+
+&#64;enduml
+"/>
+</p>
+<div class="section" id="operations">
+<h2>Operations<a class="headerlink" href="#operations" title="Permalink to this headline">¶</a></h2>
+<p><em>illustrate the implications for what happens in the mdrun CLI program or libgromacs MD session.</em></p>
+<p class="plantuml">
+<img src="../_images/plantuml-98a70ce44dfc1b9acdfcde713ac273af761e7143.png" alt="&#64;startuml
+participant client
+participant &quot;namespace.operation&quot; as operationFactory &lt;&lt; OperationFactory &gt;&gt;
+participant &quot;context&quot;
+
+alt null context
+
+    client -&gt; operationFactory: call(input)
+    note right
+        operation factory may accept call with no Context provided,
+        in which case it is free to use a module-default Context.
+    end note
+    ' operationFactory -&gt; moduleContext: create
+
+else context provided
+
+    client -&gt; operationFactory: call(context, input)
+    alt is_graph_context(context)
+
+        create graphDirector
+        operationFactory -&gt; graphDirector: create
+        activate context
+        activate graphDirector
+        graphDirector -&gt; context: newOperator()
+        activate context
+        create graphNodeBuilder
+        context -&gt; graphNodeBuilder: create
+        graphDirector &lt;-- context: graphNodeBuilder
+        activate graphNodeBuilder
+        deactivate context
+        graphDirector -&gt; graphNodeBuilder: addResource(input, ...)
+        graphDirector -&gt; graphNodeBuilder: addResource(output, ...)
+        graphDirector -&gt; graphNodeBuilder: addDirectorFactory(functor)
+        graphDirector -&gt; graphNodeBuilder: build()
+        activate graphNodeBuilder
+        graphNodeBuilder -&gt; context: set up output proxy
+        activate context
+        context -&gt; operationHandle: create
+        graphDirector &lt;-- graphNodeBuilder: operationHandle
+        deactivate context
+        deactivate graphNodeBuilder
+        deactivate graphNodeBuilder
+
+        operationFactory &lt;-- graphDirector: operationHandle
+        deactivate context
+        destroy graphDirector
+
+    else immediateContext
+    else remoteContext
+    end
+
+end
+
+client &lt;-- operationFactory: operationHandle
+&#64;enduml
+"/>
+</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../changelog.html" class="btn btn-neutral float-right" title="Change Log" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="datamodel.html" class="btn btn-neutral float-left" title="gmxapi data model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

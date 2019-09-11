@@ -1,0 +1,543 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>gmxapi data model &mdash; GROMACS External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Execution model" href="executionmodel.html" />
+    <link rel="prev" title="Contributing" href="contributing.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> GROMACS scripting and extension API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../userguide/userguide.html">Python User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="reference.html">Developer Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="projectstructure.html">Implementation overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="extending.html">Extending</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">gmxapi data model</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#basic-data-types-containers">Basic data types, containers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#handles-and-futures">Handles and Futures</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#proxies-and-managed-resources">Proxies and managed resources</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#operations-factories-and-data-flow-declaration-definition-and-initialization">Operations, factories, and data flow: declaration, definition, and initialization</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#data">Data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#proxies">Proxies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#expressing-inputs-and-outputs">Expressing inputs and outputs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#future-types-versus-proxy-types">Future types versus Proxy types</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#ndarray-specialization">NDArray specialization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#arrays">Arrays</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#version-1-ensemble-input-determination">Version 1 Ensemble input determination</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#version-2-ensemble-input-determination">Version 2 Ensemble input determination</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#consider">Consider</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id1">Consider</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#operation-implementation">Operation implementation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#data-future-protocol">Data Future protocol</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#notes-on-data-compatibility">Notes on data compatibility</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#avoid-dependencies">Avoid dependencies</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="executionmodel.html">Execution model</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GROMACS scripting and extension API</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="reference.html">Developer Guide</a> &raquo;</li>
+        
+      <li>gmxapi data model</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/reference/datamodel.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="gmxapi-data-model">
+<h1>gmxapi data model<a class="headerlink" href="#gmxapi-data-model" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="basic-data-types-containers">
+<h2>Basic data types, containers<a class="headerlink" href="#basic-data-types-containers" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="handles-and-futures">
+<h2>Handles and Futures<a class="headerlink" href="#handles-and-futures" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="proxies-and-managed-resources">
+<h2>Proxies and managed resources<a class="headerlink" href="#proxies-and-managed-resources" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="operations-factories-and-data-flow-declaration-definition-and-initialization">
+<h2>Operations, factories, and data flow: declaration, definition, and initialization<a class="headerlink" href="#operations-factories-and-data-flow-declaration-definition-and-initialization" title="Permalink to this headline">¶</a></h2>
+<p>Data proxies (Results, OutputCollections, PublishingDataProxies)
+are created in a specific Context and maintain a reference
+to the Context in which they are created.
+The proxy is essentially a subscription to resources,
+and the Context implementation will generally allow the
+proxy to extend the life of resources that may be accessed
+through the proxy. If the resources become unavailable,
+access through the proxy must raise an informative exception
+regarding the reason for the resource inaccessibility.</p>
+<p>Examples could be</p>
+<ul class="simple">
+<li><p>the Context has finalized access to the resource, such as</p>
+<ul>
+<li><p>after completing the definition of a subgraph</p></li>
+<li><p>a write-once resource or iterator has already been used</p></li>
+</ul>
+</li>
+</ul>
+<div class="section" id="data">
+<h3>Data<a class="headerlink" href="#data" title="Permalink to this headline">¶</a></h3>
+<p>For compatibility and versatility, gmxapi data typing does not require specific
+classes. In C++, typing uses C++ templating. In Python, abstract base classes
+and duck typing are used. A C API provides a data description struct that is
+easily convertible to the metadata structs for Python ctypes, numpy, Eigen, HDF5, etc.</p>
+<div class="section" id="fundamental-data-types">
+<h4>Fundamental data types<a class="headerlink" href="#fundamental-data-types" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><p>Integer</p></li>
+<li><p>Float</p></li>
+<li><p>Boolean</p></li>
+</ul>
+</div>
+<div class="section" id="containers">
+<h4>Containers<a class="headerlink" href="#containers" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><p>NDArray</p></li>
+<li><p>String</p></li>
+<li><p>AssociativeArray</p></li>
+</ul>
+</div>
+<div class="section" id="constraints-and-placeholders">
+<h4>Constraints and placeholders<a class="headerlink" href="#constraints-and-placeholders" title="Permalink to this headline">¶</a></h4>
+<p>Specify some parameters within a type.</p>
+</div>
+</div>
+<div class="section" id="proxies">
+<h3>Proxies<a class="headerlink" href="#proxies" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>File()</p></li>
+<li><p>Future()</p></li>
+<li><p>Handle()</p></li>
+</ul>
+<p>“””
+# Notes…
+# Handle and Future are two implementations of the gmxapi Data interface.
+# Data objects have type and shape. The handle to the Data object points to a
+# specific dimension in that shape.
+# Handle is implicitly convertible to Python data in addition to supporting the buffer
+# protocol. Future has a <cite>result()</cite> method that returns a Handle, and supports a
+# protocol to move managed resources between Contexts.</p>
+</div>
+<div class="section" id="expressing-inputs-and-outputs">
+<h3>Expressing inputs and outputs<a class="headerlink" href="#expressing-inputs-and-outputs" title="Permalink to this headline">¶</a></h3>
+<p>An operation type must express its allowed inputs (in order to be able to bind
+at initialization of new instances).</p>
+<p>An operation instance must express well-defined available outputs. Note that an
+“instance” may not be runnable in all contexts, but must be inspectable such that
+the context of operationB can inspect the outputs of operationA to determine
+compatibility.</p>
+</div>
+<div class="section" id="future-types-versus-proxy-types">
+<h3>Future types versus Proxy types<a class="headerlink" href="#future-types-versus-proxy-types" title="Permalink to this headline">¶</a></h3>
+<p>Future types require explicit action to convert to directly-accessible data via
+the <cite>result()</cite> call, whether or not data flow resolution is necessary. Data is
+not writeable through the Future handle.</p>
+<p>Proxy types resolve data dependencies as necessary when converted to native types.
+(In Python, they express <cite>__int__</cite>, <cite>__float__</cite>, etc.)
+Proxy types may be writeable, but are obtained with access controls.</p>
+<p>Consider <cite>memoryview</cite> as a model for proxies and Results: has a <cite>release()</cite>
+method that is called automatically when handle is obtained in a context manager,
+after which accesses produce
+<cite>ValueError: operation forbidden on released memoryview object</cite></p>
+</div>
+</div>
+<div class="section" id="ndarray-specialization">
+<h2>NDArray specialization<a class="headerlink" href="#ndarray-specialization" title="Permalink to this headline">¶</a></h2>
+<p>Will this work?!</p>
+<p>Python: NDArray[shape=(N,3), dtype=float]</p>
+<p>C++: NDArray&lt;float, shape&lt;shape::any, 3&gt;&gt;</p>
+<p>subclasses of NDArray used to constrain input and output definitions</p>
+</div>
+<div class="section" id="arrays">
+<h2>Arrays<a class="headerlink" href="#arrays" title="Permalink to this headline">¶</a></h2>
+<p>Version 1: NDArray handle is opaque: not iterable
+Version 2: ensemble and NDArray follow strict hierarchy of dimensional rank
+Version 3: ensemble and NDArray merged with numpy-like dimensionality and rank transformations?</p>
+<div class="section" id="version-1-ensemble-input-determination">
+<h3>Version 1 Ensemble input determination<a class="headerlink" href="#version-1-ensemble-input-determination" title="Permalink to this headline">¶</a></h3>
+<p>Scalar input</p>
+<dl class="simple">
+<dt>function fill_from_scalar_source(input, source):</dt><dd><dl class="simple">
+<dt>try:</dt><dd><p>input.set(input.dtype(source))</p>
+</dd>
+<dt>else try:</dt><dd><p>input.set(gmxapi_future(source, dtype=input.dtype))</p>
+</dd>
+<dt>else try:</dt><dd><dl class="simple">
+<dt>if iterable(source) and not isinstance(source, (str, bytes)):</dt><dd><dl class="simple">
+<dt>for i, element in enumerate(source):</dt><dd><p>input.ensemble_rank(i).set(fill_from_scalar_source(input.ensemble_rank(i), element))</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>Array input treated as a type of scalar</p>
+</div>
+<div class="section" id="version-2-ensemble-input-determination">
+<h3>Version 2 Ensemble input determination<a class="headerlink" href="#version-2-ensemble-input-determination" title="Permalink to this headline">¶</a></h3>
+<p>Scalar input: get handle to dimension 0</p>
+<blockquote>
+<div><dl class="simple">
+<dt>function fill_from_scalar_source(input, source):</dt><dd><dl class="simple">
+<dt>try:</dt><dd><p>input[…] = input.dtype(source)</p>
+</dd>
+<dt>else try:</dt><dd><p>input[…] = gmxapi_future(source)</p>
+</dd>
+<dt>else try:</dt><dd><dl class="simple">
+<dt>if iterable(source) and not isinstance(source, (str, bytes)):</dt><dd><dl class="simple">
+<dt>for i, element in enumerate(source):</dt><dd><p>fill_from_scalar(input[i], element)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+</div></blockquote>
+<p>(specify recursion depth.)
+Generators must be explicitly resolved or converted to futures for v1.</p>
+<p>array input</p>
+<blockquote>
+<div><dl>
+<dt>function get_array_input(source, N):</dt><dd><dl>
+<dt>if isinstance(source, (str, bytes):</dt><dd><dl class="simple">
+<dt>if issubclass(input.dtype, (str, bytes)):</dt><dd><p>fill_from_scalar(input[…], source)</p>
+</dd>
+</dl>
+</dd>
+<dt>try:</dt><dd><p># could broadcast up or down
+input(N) = gmxapi_future(source)</p>
+</dd>
+<dt>else:</dt><dd><p># could broadcast up or down
+input(N) = from_buffer(source)</p>
+</dd>
+<dt>else:</dt><dd><dl>
+<dt>if iterable(source):</dt><dd><dl class="simple">
+<dt>foreach element in source:</dt><dd><p>input(N-1)[:] = get_array_input(element)</p>
+</dd>
+</dl>
+<p>input(N-1) = get_array_input(</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+</div></blockquote>
+<p>Input tries to consume the source as a _gmxapi_future.
+Input tries to consume source as a non-str, non-bytes buffer.
+Input tries to consume source as a memoryview-like object.
+Input tries to consume source as a sequence of compatible Scalar input (see above)</p>
+<p>map input</p>
+<p>Input tries to consume the source as a _gmxapi_future.</p>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt>Can the input consume the source?</dt><dd><p>a. Scalar -&gt; Scalar: yes. not ensemble
+b.</p>
+</dd>
+</dl>
+</li>
+</ol>
+<p>Input argument is assumed to be an ensemble of values if it</p>
+<ol class="arabic simple">
+<li><p>does not implement the _gmxapi_future interface</p></li>
+<li><p>is iterable</p></li>
+</ol>
+<p>3. not isinstace(arg, (str, bytes)
+4a. is not a generator and has dimensionality that is greater than the consuming input
+4b. is a generator or has dimensionality greater than the consuming input
+4c.</p>
+<p>Note: This implies that numpy.ndarray requires explicit wrapping to avoid being
+considered as ensemble input.</p>
+</div>
+<div class="section" id="consider">
+<h3>Consider<a class="headerlink" href="#consider" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic simple">
+<li><p>All data has a shape.</p></li>
+<li><p>Inputs can constrain their shape (zero-dimensions for scalar) with a type hint, default value, or decorator. Individual dimensions can be constrained to a fixed size or left unconstrained.</p></li>
+<li><p>Automatically, data sources and sinks try to make a best match that minimizes the edge dimensionality. Ensemble dimension may be increased to allow implicit scatter or map. Implicit broadcast may occur to satisfy topology but will _not_ occur to fill an explicitly sized dimension of a sink. This means that, in two steps, data source and sink shape are inspected to determine the necessary topology, then implicit scatter or broadcast occurs. Implicit gather never occurs.</p></li>
+<li><p>The automatic edge shape can be overridden. <cite>scatter()</cite> converts the outermost (non-ensemble?) dimension to an ensemble dimension or broadcasts where necessary. <cite>gather()</cite> converts the outermost ensemble dimension to a local data dimension, broadcasting (instead of implicitly scattering) to satisfy edge topology if necessary.</p></li>
+</ol>
+<p>Note: this implies there is a distinction between a data source, a collection of data sources, and an edge fed by a data source collection.</p>
+<p>Clarify: How do the various shapes of data in a collection affect their shapes in the resulting edge?
+Clarify / confirm: scatter and gather should probably always have an effect even if it breaks data shape compatibility while an implicit operation would not.</p>
+<p>Annotations: Data is represented by numpy-like gmxapi data handles with dimensionality. NDArray becomes an abstract base class for annotation, type hinting, and type checking.</p>
+<p>Observation: The introspection of sink shape means this proposal calls for avoidance of ensemble creation in cases where we previously might have aggressively created ensembles.</p>
+</div>
+<div class="section" id="id1">
+<h3>Consider<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<p>Do operation handles need output attributes to provide a safe namespace or do
+we just work out namespace conflict avoidance and have some reserved words?</p>
+<p>Proposed reserved words for input and output names: <code class="docutils literal notranslate"><span class="pre">input</span></code>, <code class="docutils literal notranslate"><span class="pre">output</span></code>, <code class="docutils literal notranslate"><span class="pre">context</span></code>, <code class="docutils literal notranslate"><span class="pre">run</span></code>, <code class="docutils literal notranslate"><span class="pre">result</span></code>, <code class="docutils literal notranslate"><span class="pre">dtype</span></code></p>
+<p>Furthermore, we can consider allowing unnamed outputs when output is singular or a collection type.</p>
+<p>Keeping with the principle “there should be one, and preferably only one, obvious way to do something,” we should prefer either
+collection behavior (sized, iterable…) or aggregate type / namespace-like behavior with named attributes.
+The latter is more like the statically-typed data ports we expect in C++ and is friendly to tab-completion and object inspection,
+but means that it is a little inconsistent to implement __getitem__. However, it would seem fine to have member functions
+that produce helpful views, such as <code class="docutils literal notranslate"><span class="pre">outputs()</span></code>, <code class="docutils literal notranslate"><span class="pre">inputs()</span></code>.</p>
+</div>
+<div class="section" id="operation-implementation">
+<h3>Operation implementation<a class="headerlink" href="#operation-implementation" title="Permalink to this headline">¶</a></h3>
+<p>The implementation expresses its named inputs and their types. The framework
+guarantees that the operation will be provided with input of the indicated type
+and structure when called.</p>
+<p>The framework considers input compatible if the input is a compatible type or
+future of a compatible type, or if the input is an ensemble of compatible input.</p>
+<p>In the Python implementation, the framework checks the expressed input type and
+resolves the abstract base class / metaclass. To type-check input arguments, the
+framework can perform the following checks.
+1. If the input object has a <cite>_gmxapi_future</cite> attribute, the Data Future Protocol</p>
+<blockquote>
+<div><p>is used to confirm compatibility and bind. All gmxapi types can implement the
+Data Future Protocol.</p>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><p>If the input is Iterable and not a string or bytes</p></li>
+</ol>
+<p>Note: need to warn users that <cite>bytes</cite> will be interpreted as utf-8 encoded strings,
+and that if they want to provide binary data through the Python buffer interface,
+they should not do so by subclassing <cite>bytes</cite>, or they should first wrap their <cite>bytes</cite>
+derived object with <cite>memoryview()</cite> or <cite>gmxapi.ndarray()</cite></p>
+</div>
+<div class="section" id="data-future-protocol">
+<h3>Data Future protocol<a class="headerlink" href="#data-future-protocol" title="Permalink to this headline">¶</a></h3>
+<p># Result scenarios:
+#
+# In (rough) order of increasing complexity:
+#
+# * stateless and reproducible locally: calculate when needed
+# * stateful and reproducible locally: calculate as needed, but implementation
+#   needs to avoid resource contention, race conditions, reentrancy issues.
+# * deferred: need to allow resource manager to provide data as it becomes available.
+#
+# In the general case, then, the Result handle should
+#
+# 1. allow a consumer to register its interest in the result with its own resource
+#    manager and allow itself to be provided with the result when it is available.
+# 2. Allow the holder of the Result handle to request the data immediately,
+#    with the understanding that the surrounding code is blocked on the request.
+#
+# Note that in case (1), the holder of the handle may not use the facility,
+# especially if it will be using (2).</p>
+<p># Questions:
+#  * Are the members of <cite>output</cite> statically specified?
+#  * Are the keys of a Map statically specified?
+#  * Is <cite>output</cite> a Map?
+# Answers:
+# Compiled code should be able to discover an output format. A Map may have different keys depending
+# on the work and user input, even when consumed or produced by compiled code. (A Map with statically
+# specified keys would be a schema, which will not be implemented for a while.) Therefore, <cite>output</cite>
+# is not a Map or a Result of Map type, but a ResultCollection or ResultCollectionDescriptor
+# (which may be the output version of the future schema implementation).</p>
+</div>
+</div>
+<div class="section" id="notes-on-data-compatibility">
+<h2>Notes on data compatibility<a class="headerlink" href="#notes-on-data-compatibility" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="avoid-dependencies">
+<h3>Avoid dependencies<a class="headerlink" href="#avoid-dependencies" title="Permalink to this headline">¶</a></h3>
+<p>The same C++ symbol can have different bindings in each extension module, so
+don’t rely on C++ typing through bindings. Need schema for PyCapsules.</p>
+<p>Adding gmxapi compatible Python bindings should not require dependency on gmxapi
+Python package. Compatibility through interfaces instead of inheritance.</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="executionmodel.html" class="btn btn-neutral float-right" title="Execution model" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="contributing.html" class="btn btn-neutral float-left" title="Contributing" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
