@@ -1,3 +1,5 @@
+.. _gmxapi:
+
 =====================
 gmxapi Python package
 =====================
@@ -15,7 +17,6 @@ and
     :maxdepth: 2
     :caption: Documentation sections
 
-    quickstart
     userguide/userguide.rst
     reference/reference.rst
     changelog
@@ -31,5 +32,4 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`

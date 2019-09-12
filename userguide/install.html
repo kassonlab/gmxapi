@@ -86,7 +86,6 @@
             
               <p class="caption"><span class="caption-text">Documentation sections</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="userguide.html">Python User Guide</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Full installation instructions</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#requirements">Requirements</a><ul>
@@ -99,6 +98,9 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#installing-the-python-package">Installing the Python package</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#recommended-installation">Recommended installation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#install-from-source">Install from source</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#offline-install">Offline install</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#building-a-source-archive">Building a source archive</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#documentation">Documentation</a></li>
@@ -189,7 +191,7 @@ source code.</p>
 use a variety of Python distributions,
 so gmxapi extension code is most useful when built from source code for a specific
 GROMACS installation and Python environment.</p>
-<p>Read this document if the <a class="reference internal" href="../quickstart.html"><span class="doc">Quick start</span></a> instructions are not sufficient for you.
+<p>This document has a lot of detail.
 If you don’t need a lot of reference material, you may just jump ahead to the <a class="reference internal" href="#installation"><span class="std std-ref">Recommended installation</span></a>.</p>
 <p>Command line examples assume the <a class="reference external" href="https://www.gnu.org/software/bash/">bash</a> shell.</p>
 <div class="admonition note">
@@ -197,32 +199,35 @@ If you don’t need a lot of reference material, you may just jump ahead to the 
 <p>Regarding multiple GROMACS installations:
 Many GROMACS users switch between multiple GROMACS installations on the same
 computer using an HPC module system and/or a GMXRC configuration script.
-For the equivalent sort of environment switching with the <code class="docutils literal notranslate"><span class="pre">gmx</span></code> Python package,
-we recommend installing <code class="docutils literal notranslate"><span class="pre">gmx</span></code> in a different
+For the equivalent sort of environment switching with the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python package,
+we recommend installing it in a different
 <a class="reference external" href="https://www.google.com/search?q=python+virtual+environment">Python virtual environment</a>
 for each GROMACS installation.
-Once built, a particular copy of the <code class="docutils literal notranslate"><span class="pre">gmx</span></code> Python package always refers to the
+Once built, a particular copy of the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python package always refers to the
 same GROMACS installation.</p>
 </div>
 <div class="contents local topic" id="contents">
 <p class="topic-title first">Contents</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="#requirements" id="id4">Requirements</a></p>
+<li><p><a class="reference internal" href="#requirements" id="id9">Requirements</a></p>
 <ul>
-<li><p><a class="reference internal" href="#build-system-requirements" id="id5">Build system requirements</a></p></li>
-<li><p><a class="reference internal" href="#python-environment-requirements" id="id6">Python environment requirements</a></p></li>
-<li><p><a class="reference internal" href="#documentation-build-requirements" id="id7">Documentation build requirements</a></p></li>
-<li><p><a class="reference internal" href="#testing-requirements" id="id8">Testing requirements</a></p></li>
-<li><p><a class="reference internal" href="#mpi-requirements" id="id9">MPI requirements</a></p></li>
+<li><p><a class="reference internal" href="#build-system-requirements" id="id10">Build system requirements</a></p></li>
+<li><p><a class="reference internal" href="#python-environment-requirements" id="id11">Python environment requirements</a></p></li>
+<li><p><a class="reference internal" href="#documentation-build-requirements" id="id12">Documentation build requirements</a></p></li>
+<li><p><a class="reference internal" href="#testing-requirements" id="id13">Testing requirements</a></p></li>
+<li><p><a class="reference internal" href="#mpi-requirements" id="id14">MPI requirements</a></p></li>
 </ul>
 </li>
-<li><p><a class="reference internal" href="#installing-the-python-package" id="id10">Installing the Python package</a></p>
+<li><p><a class="reference internal" href="#installing-the-python-package" id="id15">Installing the Python package</a></p>
 <ul>
-<li><p><a class="reference internal" href="#recommended-installation" id="id11">Recommended installation</a></p></li>
+<li><p><a class="reference internal" href="#recommended-installation" id="id16">Recommended installation</a></p></li>
+<li><p><a class="reference internal" href="#install-from-source" id="id17">Install from source</a></p></li>
+<li><p><a class="reference internal" href="#offline-install" id="id18">Offline install</a></p></li>
+<li><p><a class="reference internal" href="#building-a-source-archive" id="id19">Building a source archive</a></p></li>
 </ul>
 </li>
-<li><p><a class="reference internal" href="#documentation" id="id12">Documentation</a></p></li>
-<li><p><a class="reference internal" href="#troubleshooting" id="id13">Troubleshooting</a></p></li>
+<li><p><a class="reference internal" href="#documentation" id="id20">Documentation</a></p></li>
+<li><p><a class="reference internal" href="#troubleshooting" id="id21">Troubleshooting</a></p></li>
 </ul>
 </div>
 <div class="admonition note">
@@ -236,26 +241,40 @@ running <code class="docutils literal notranslate"><span class="pre">pip</span><
 this documentation. If you need the <code class="docutils literal notranslate"><span class="pre">--user</span></code> flag, you should modify the
 example commands to look something like <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--upgrade</span> <span class="pre">somepackage</span> <span class="pre">--user</span></code></p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>These instructions use the executable names <code class="docutils literal notranslate"><span class="pre">python</span></code> and <code class="docutils literal notranslate"><span class="pre">pip</span></code>
+instead of <code class="docutils literal notranslate"><span class="pre">python3</span></code> or <code class="docutils literal notranslate"><span class="pre">pip3</span></code>. Some Python installations require the <code class="docutils literal notranslate"><span class="pre">3</span></code>
+suffix, but it is usually not necessary if you have already activated a Python
+virtual environment (recommended).</p>
+</div>
 <div class="section" id="requirements">
-<h2><a class="toc-backref" href="#id4">Requirements</a><a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
+<h2><a class="toc-backref" href="#id9">Requirements</a><a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> comes in three parts:</p>
 <ul class="simple">
-<li><p>GROMACS gmxapi library for C++</p></li>
-<li><p>This Python package</p></li>
+<li><p>GROMACS gmxapi library for C++.</p></li>
+<li><p>This Python package, supporting Python 3.5 and higher</p></li>
 <li><p>MD restraint plugins and sample gmxapi client code</p></li>
 </ul>
 <div class="section" id="build-system-requirements">
-<h3><a class="toc-backref" href="#id5">Build system requirements</a><a class="headerlink" href="#build-system-requirements" title="Permalink to this headline">¶</a></h3>
-<p>The preferred installation method is via <a class="reference external" href="https://cmake.org/">CMake</a>.</p>
-<p>You will need a C++ 11 compatible compiler and a reasonably up-to-date version
+<h3><a class="toc-backref" href="#id10">Build system requirements</a><a class="headerlink" href="#build-system-requirements" title="Permalink to this headline">¶</a></h3>
+<p>gmxapi can be built for Python 3.5 and higher.</p>
+<p>You will need a C++ 14 compatible compiler and a reasonably up-to-date version
 of CMake.
 Full gmxapi functionality may also require an MPI compiler (e.g. <code class="docutils literal notranslate"><span class="pre">mpicc</span></code>).</p>
 <p>The Python package requires a GROMACS installation.
-Build and install <a class="reference external" href="http://www.gromacs.org">GROMACS</a>
-before proceeding.
-Then, “source” the GMXRC file from the GROMACS installation as you normally would
+Build and install
+<a class="reference external" href="http://manual.gromacs.org/documentation/current/install-guide/index.html">GROMACS</a>
+before proceeding. Be sure to configure CMake with the <code class="docutils literal notranslate"><span class="pre">GMXAPI=ON</span></code> option.</p>
+<p>Then, “source” the GMXRC file from the GROMACS installation as you normally would
 before using GROMACS, or note its installation location so that you can pass it
 to the build configuration.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you are using a managed computing resource, such as a research HPC cluster,
+GROMACS may already be installed, but you will need GROMACS 2019 or later, and
+it must be configured with <code class="docutils literal notranslate"><span class="pre">GMXAPI=ON</span></code>.</p>
+</div>
 <p>Important: To build a module that can be imported by Python, you need a Python
 installation that includes the Python headers. Unfortunately, it is not always
 obvious whether these headers are present or where to find them. The simplest
@@ -271,7 +290,7 @@ be able to just <code class="docutils literal notranslate"><span class="pre">mod
 that works.</p>
 </div>
 <div class="section" id="python-environment-requirements">
-<h3><a class="toc-backref" href="#id6">Python environment requirements</a><a class="headerlink" href="#python-environment-requirements" title="Permalink to this headline">¶</a></h3>
+<h3><a class="toc-backref" href="#id11">Python environment requirements</a><a class="headerlink" href="#python-environment-requirements" title="Permalink to this headline">¶</a></h3>
 <p>gmxapi requires Python 3.5 or higher. Check your version with
 <code class="docutils literal notranslate"><span class="pre">python3</span> <span class="pre">--version</span></code> or <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">--version</span></code>.</p>
 <div class="admonition note">
@@ -297,17 +316,29 @@ instructions on how to install <code class="docutils literal notranslate"><span 
 <p>Install or upgrade required components:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pip install --upgrade pip
 pip install --upgrade setuptools
-pip install -r requirements.txt
 </pre></div>
+</div>
+<div class="section" id="requirements-files-in-gromacs-source-tree">
+<h4>“requirements” files in GROMACS source tree<a class="headerlink" href="#requirements-files-in-gromacs-source-tree" title="Permalink to this headline">¶</a></h4>
+<p>If you are building from source code in a local copy of the GROMACS source
+repository, some helpful files allow you to preinstall the Python requirements
+before installing the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> package.</p>
+<blockquote>
+<div><p>pip install -r python_packaging/src/requirements.txt</p>
+</div></blockquote>
+<p>If building documentation or running tests,
+<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-r</span> <span class="pre">python_packaging/requirements-docs.txt</span></code> or
+<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-r</span> <span class="pre">python_packaging/requirements-test.txt</span></code>,
+respectively, or see below.</p>
 </div>
 </div>
 <div class="section" id="documentation-build-requirements">
-<span id="build-docs"></span><h3><a class="toc-backref" href="#id7">Documentation build requirements</a><a class="headerlink" href="#documentation-build-requirements" title="Permalink to this headline">¶</a></h3>
+<span id="build-docs"></span><h3><a class="toc-backref" href="#id12">Documentation build requirements</a><a class="headerlink" href="#documentation-build-requirements" title="Permalink to this headline">¶</a></h3>
+<p>Documentation is built from a combination of Python module documentation and
+static content, and requires a local copy of the GROMACS source repository.</p>
 <p>Documentation is built with <a class="reference external" href="http://www.sphinx-doc.org/">Sphinx</a>
-from a combination of static content in <code class="docutils literal notranslate"><span class="pre">rst</span></code>
-files and from embedded documentation in the Python package. To build documentation
-locally, you will need a reasonably current copy of Sphinx and the RTD theme.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install --upgrade Sphinx Pygments sphinx-rtd-theme
+To build documentation locally, you will need a reasonably current copy of Sphinx.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install --upgrade Sphinx Pygments
 </pre></div>
 </div>
 <div class="admonition seealso">
@@ -316,19 +347,20 @@ locally, you will need a reasonably current copy of Sphinx and the RTD theme.</p
 </div>
 </div>
 <div class="section" id="testing-requirements">
-<span id="id1"></span><h3><a class="toc-backref" href="#id8">Testing requirements</a><a class="headerlink" href="#testing-requirements" title="Permalink to this headline">¶</a></h3>
+<span id="id1"></span><h3><a class="toc-backref" href="#id13">Testing requirements</a><a class="headerlink" href="#testing-requirements" title="Permalink to this headline">¶</a></h3>
 <p>Testing is performed with <a class="reference external" href="https://docs.pytest.org/en/latest/">pytest</a>.
 Tests also require <code class="docutils literal notranslate"><span class="pre">numpy</span></code>.
 You can probably install both with <code class="docutils literal notranslate"><span class="pre">pip</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install pytest numpy
 </pre></div>
 </div>
-<p>Full functionality requires MPI to test. You will need the <code class="docutils literal notranslate"><span class="pre">mpi4py</span></code> Python
-package and an MPI launcher
-(such as <code class="docutils literal notranslate"><span class="pre">mpiexec</span></code>, <code class="docutils literal notranslate"><span class="pre">mpirun</span></code>, or something provided by your HPC queuing system).</p>
+<p>To test the full functionality also requires an MPI parallel environment.
+You will need the <code class="docutils literal notranslate"><span class="pre">mpi4py</span></code> Python package and an MPI launcher
+(such as <code class="docutils literal notranslate"><span class="pre">mpiexec</span></code>, <code class="docutils literal notranslate"><span class="pre">mpirun</span></code>, a launcher provided by your HPC queuing system,
+or whatever is provided by your favorite MPI package for your operating system).</p>
 </div>
 <div class="section" id="mpi-requirements">
-<span id="id2"></span><h3><a class="toc-backref" href="#id9">MPI requirements</a><a class="headerlink" href="#mpi-requirements" title="Permalink to this headline">¶</a></h3>
+<span id="id2"></span><h3><a class="toc-backref" href="#id14">MPI requirements</a><a class="headerlink" href="#mpi-requirements" title="Permalink to this headline">¶</a></h3>
 <p>For the ensemble simulations features, you will need an MPI installation. On an HPC system, this means you will
 probably have to use <code class="docutils literal notranslate"><span class="pre">module</span> <span class="pre">load</span></code> to load a compatible set of MPI tools and compilers. Check your HPC
 documentation or try <code class="docutils literal notranslate"><span class="pre">module</span> <span class="pre">avail</span></code> to look for an <code class="docutils literal notranslate"><span class="pre">openmpi</span></code>, <code class="docutils literal notranslate"><span class="pre">mpich</span></code>, or <code class="docutils literal notranslate"><span class="pre">mvapich</span></code> module and matching compiler
@@ -355,7 +387,7 @@ pip install --no-cache-dir --upgrade --no-binary <span class="se">\&quot;</span>
 </div>
 </div>
 <div class="section" id="installing-the-python-package">
-<h2><a class="toc-backref" href="#id10">Installing the Python package</a><a class="headerlink" href="#installing-the-python-package" title="Permalink to this headline">¶</a></h2>
+<h2><a class="toc-backref" href="#id15">Installing the Python package</a><a class="headerlink" href="#installing-the-python-package" title="Permalink to this headline">¶</a></h2>
 <p>We recommend you install the gmxapi package in a Python virtual environment
 (<code class="docutils literal notranslate"><span class="pre">virtualenv</span></code> or <code class="docutils literal notranslate"><span class="pre">venv</span></code>). There are several ways to do this, and it is also
 possible to install without a virtual environment. If installing without a
@@ -368,45 +400,22 @@ You can set the <code class="docutils literal notranslate"><span class="pre">PYT
 Python interpreter for your chosen installation.
 For example: <code class="docutils literal notranslate"><span class="pre">-DPYTHON_EXECUTABLE=\`which</span> <span class="pre">python\`</span></code></p>
 <div class="section" id="recommended-installation">
-<span id="installation"></span><h3><a class="toc-backref" href="#id11">Recommended installation</a><a class="headerlink" href="#recommended-installation" title="Permalink to this headline">¶</a></h3>
+<span id="installation"></span><h3><a class="toc-backref" href="#id16">Recommended installation</a><a class="headerlink" href="#recommended-installation" title="Permalink to this headline">¶</a></h3>
 <div class="section" id="locate-or-install-gromacs">
 <h4>Locate or install GROMACS<a class="headerlink" href="#locate-or-install-gromacs" title="Permalink to this headline">¶</a></h4>
-<p>If GROMACS 2019 or higher is already installed, source the GMXRC and skip to the
-next section.</p>
-<p>Otherwise, install a supported version of GROMACS. For instance, clone one of
-the two following <code class="docutils literal notranslate"><span class="pre">git</span></code> repositories.</p>
-<p>Official GROMACS release branch:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/gromacs/gromacs.git gromacs
-<span class="nb">cd</span> gromacs
-git checkout release-2019
-</pre></div>
-</div>
-<p>The Kasson Lab GROMACS fork may have experimental features that have not yet
-appeared in an official GROMACS release.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/kassonlab/gromacs-gmxapi.git gromacs
-<span class="nb">cd</span> gromacs
-<span class="c1"># for that absolute latest code, check out the &quot;development branch&quot; (optional)</span>
-git checkout devel
-</pre></div>
-</div>
-<p>Configure and build GROMACS. Install into a <code class="docutils literal notranslate"><span class="pre">gromacs-gmxapi</span></code> directory in your
-home directory.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir build
-<span class="nb">cd</span> build
-cmake ../gromacs -DGMX_THREAD_MPI<span class="o">=</span>ON <span class="se">\</span>
-                 -DCMAKE_CXX_COMPILER<span class="o">=</span><span class="sb">`</span>which g++<span class="sb">`</span>
-                 -DCMAKE_C_COMPILER<span class="o">=</span><span class="sb">`</span>which gcc<span class="sb">`</span>
-                 -DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$HOME</span>/gromacs-gmxapi
-make -j8 <span class="o">&amp;&amp;</span> make install
-</pre></div>
-</div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p><code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">-j8</span></code> uses up to <code class="docutils literal notranslate"><span class="pre">8</span></code> CPU threads to try to build in parallel
-(using more CPU <em>and memory</em>).
-Adjust according to your computing resources.</p>
-</div>
-<p>Set the environment variables for the GROMACS installation.</p>
+<p>You need a GROMACS installation that includes the gmxapi headers and library.
+If GROMACS 2020 or higher is already installed,
+<em>and</em> was configured with <code class="docutils literal notranslate"><span class="pre">GMXAPI=ON</span></code> at build time,
+you can just source the GMXRC
+(so that the Python package knows where to find GROMACS)
+and skip to the next section.</p>
+<p>Otherwise, install a supported version of GROMACS.
+When building GROMACS from source, be sure to configure cmake with the flag
+<code class="docutils literal notranslate"><span class="pre">-DGMXAPI=ON</span></code> (default).</p>
+<p>Set the environment variables for the GROMACS installation so that the gmxapi
+headers and library can be found when building the Python package.
+If you installed to a <code class="docutils literal notranslate"><span class="pre">gromacs-gmxapi</span></code> directory in your home directory as
+above and you use the <code class="docutils literal notranslate"><span class="pre">bash</span></code> shell, do:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span> <span class="nv">$HOME</span>/gromacs-gmxapi/bin/GMXRC
 </pre></div>
 </div>
@@ -416,19 +425,20 @@ Adjust according to your computing resources.</p>
 <p>We recommend installing the Python package in a virtual environment.
 If not installing in a virtual environment, you may not be able to install
 necessary prerequisites (e.g. if you are not an administrator of the system you are on).</p>
-<p>Create a Python virtual environment.</p>
+<p>Create a Python 3 virtual environment.</p>
 <p>For Python 3, use the <code class="docutils literal notranslate"><span class="pre">venv</span></code> module.
 Depending on your computing environment, the Python 3 interpreter may be accessed
 with the command <code class="docutils literal notranslate"><span class="pre">python</span></code> or <code class="docutils literal notranslate"><span class="pre">python3</span></code>. Use <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">--version</span></code> and
 <code class="docutils literal notranslate"><span class="pre">python3</span> <span class="pre">--version</span></code> to figure out which you need to use. The following assumes
 the Python 3 interpreter is accessed with <code class="docutils literal notranslate"><span class="pre">python3</span></code>.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m venv <span class="nv">$HOME</span>/myvenv
-</pre></div>
-</div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The Python 3 executable may be named <code class="docutils literal notranslate"><span class="pre">python3</span></code> instead of <code class="docutils literal notranslate"><span class="pre">python</span></code>.
-E.g. run <code class="docutils literal notranslate"><span class="pre">python3</span> <span class="pre">-m</span> <span class="pre">venv</span> <span class="pre">$HOME/myvenv</span></code></p>
+<p>After activating the venv, <code class="docutils literal notranslate"><span class="pre">python</span></code> and <code class="docutils literal notranslate"><span class="pre">pip</span></code> are sufficient. (The ‘3’
+suffix will no longer be necessary and will be omitted in the rest of this
+document.)</p>
+</div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3 -m venv <span class="nv">$HOME</span>/myvenv
+</pre></div>
 </div>
 <p>Activate the virtual environment. Your shell prompt will probably be updated with the name of the environment you
 created to make it more obvious.</p>
@@ -440,65 +450,147 @@ created to make it more obvious.</p>
 environment is active. The prompt is omitted from the remainging examples, but
 the remaining examples assume the virtualenv is still active.
 (Don’t do it now, but you can deactivate the environment by running <code class="docutils literal notranslate"><span class="pre">deactivate</span></code>.)</p>
-<p>Install some dependencies. For MPI, we use mpi4py. Make sure it is using the same MPI installation that we are building
+</div>
+<div class="section" id="install-dependencies">
+<h4>Install dependencies<a class="headerlink" href="#install-dependencies" title="Permalink to this headline">¶</a></h4>
+<p>It is always a good idea to update <code class="docutils literal notranslate"><span class="pre">pip</span></code> and <code class="docutils literal notranslate"><span class="pre">setuptools</span></code> before installing
+new Python packages:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install --upgrade pip setuptools
+</pre></div>
+</div>
+<p>The gmxapi installer requires a few additional packages. It is best to make sure
+they are installed and up to date before proceeding.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install --upgrade cmake scikit-build
+</pre></div>
+</div>
+<p>For MPI, we use mpi4py.
+Make sure it is using the same MPI installation that we are building
 GROMACS against and building with compatible compilers.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python -m pip install --upgrade pip setuptools
 <span class="nv">MPICC</span><span class="o">=</span><span class="sb">`</span>which mpicc<span class="sb">`</span> pip install --upgrade mpi4py
 </pre></div>
 </div>
 </div>
-<div class="section" id="build-and-install">
-<h4>Build and install<a class="headerlink" href="#build-and-install" title="Permalink to this headline">¶</a></h4>
-<p>Get a copy of <a class="reference external" href="https://github.com/kassonlab/gromacs-gmxapi">the source code</a>,
-if you haven’t already.
-The python package source code is in the GROMACS repository under
-<code class="docutils literal notranslate"><span class="pre">python_packaging/src</span></code></p>
-<p>You will need to install some additional dependencies. The <code class="file docutils literal notranslate"><span class="pre">requirements.txt</span></code>
-file is provided for convenience. Also, note that <code class="docutils literal notranslate"><span class="pre">pip</span></code> must be
-version 10.1 or higher.</p>
+<div class="section" id="install-the-latest-version-of-gmxapi">
+<h4>Install the latest version of gmxapi<a class="headerlink" href="#install-the-latest-version-of-gmxapi" title="Permalink to this headline">¶</a></h4>
+<blockquote>
+<div><p>pip install gmxapi</p>
+</div></blockquote>
+<p>If <code class="docutils literal notranslate"><span class="pre">pip</span></code> does not find your GROMACS installation, use one of the following
+environment variables to provide a hint.</p>
+<div class="section" id="gmxapi-dir">
+<h5>gmxapi_DIR<a class="headerlink" href="#gmxapi-dir" title="Permalink to this headline">¶</a></h5>
+<p>If you have a single GROMACS installation at <code class="docutils literal notranslate"><span class="pre">/path/to/gromacs</span></code>, it is usually
+sufficient to provide this location to <code class="docutils literal notranslate"><span class="pre">pip</span></code> through the <code class="docutils literal notranslate"><span class="pre">gmxapi_DIR</span></code>
+environment variable.</p>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">gmxapi_DIR</span><span class="o">=</span>/path/to/gromacs pip install gmxapi
+</pre></div>
+</div>
+</div>
+<div class="section" id="gmxtoolchaindir">
+<h5>GMXTOOLCHAINDIR<a class="headerlink" href="#gmxtoolchaindir" title="Permalink to this headline">¶</a></h5>
+<p>If you have multiple builds of GROMACS distinguished by suffixes
+(e.g. <em>_d</em>, <em>_mpi</em>, etcetera), or if you need to provide extra hints to <code class="docutils literal notranslate"><span class="pre">pip</span></code>
+about the software tools that were used to build GROMACS, you can specify a
+directory in which the installer can find a CMake “tool chain”.</p>
+<p>In the following example, <code class="docutils literal notranslate"><span class="pre">${SUFFIX}</span></code> is the suffix that distinguishes the
+particular build of GROMACS you want to target (refer to GROMACS installation
+instructions for more information.) <code class="docutils literal notranslate"><span class="pre">${SUFFIX}</span></code> may simply be empty, or <code class="docutils literal notranslate"><span class="pre">''</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">GMXTOOLCHAINDIR</span><span class="o">=</span>/path/to/gromacs/share/cmake/gromacs<span class="si">${</span><span class="nv">SUFFIX</span><span class="si">}</span> pip install gmxapi
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="install-from-source">
+<h3><a class="toc-backref" href="#id17">Install from source</a><a class="headerlink" href="#install-from-source" title="Permalink to this headline">¶</a></h3>
+<p>You can also install the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python package from within a local copy of
+the GROMACS source repository. Assuming you have already obtained the GROMACS
+source code and you are in the root directory of the source tree, you will find
+the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python package sources in the <code class="docutils literal notranslate"><span class="pre">python_packaging/src</span></code> directory.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> python_packaging/src
 pip install -r requirements.txt
 pip install .
 </pre></div>
 </div>
 </div>
+<div class="section" id="offline-install">
+<h3><a class="toc-backref" href="#id18">Offline install</a><a class="headerlink" href="#offline-install" title="Permalink to this headline">¶</a></h3>
+<p>If the required dependencies are already installed, you can do a quick install
+without internet access, either from the source directory or from a source archive.</p>
+<p>For example, the last line of the previous example could be replaced with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install --no-cache-dir --no-deps --no-index --no-build-isolation .
+</pre></div>
+</div>
+<p>Refer to <code class="docutils literal notranslate"><span class="pre">pip</span></code> documentation for descriptions of these options.</p>
+<p>If you have built or downloaded a source distribution archive, you can provide
+the archive file to <code class="docutils literal notranslate"><span class="pre">pip</span></code> instead of the <code class="docutils literal notranslate"><span class="pre">.</span></code> argument:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install gmxapi-0.0.8.tar.gz
+</pre></div>
+</div>
+</div>
+<div class="section" id="building-a-source-archive">
+<h3><a class="toc-backref" href="#id19">Building a source archive</a><a class="headerlink" href="#building-a-source-archive" title="Permalink to this headline">¶</a></h3>
+<p>A source archive for the gmxapi python package can be built from the GROMACS
+source repository using Python <code class="docutils literal notranslate"><span class="pre">setuptools</span></code> and <code class="docutils literal notranslate"><span class="pre">scikit-build</span></code>.</p>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install --upgrade setuptools scikit-build
+<span class="nb">cd</span> python_packaging/src
+python setup.py sdist
+</pre></div>
+</div>
 </div>
 </div>
 <div class="section" id="documentation">
-<span id="id3"></span><h2><a class="toc-backref" href="#id12">Documentation</a><a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h2>
+<span id="id3"></span><h2><a class="toc-backref" href="#id20">Documentation</a><a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h2>
 <p>Documentation for the Python classes and functions in the gmx module can
 be accessed in the usual ways, using <code class="docutils literal notranslate"><span class="pre">pydoc</span></code> from the command line or
 <code class="docutils literal notranslate"><span class="pre">help()</span></code> in an interactive Python session.</p>
-<p>Additional documentation can be browsed on
-<a class="reference external" href="http://gmxapi.readthedocs.io/en/readthedocs/">readthedocs.org</a> or
-built with Sphinx after installation.</p>
+<p>The complete documentation (which you are currently reading)
+can be browsed <a class="reference external" href="http://gmxapi.org">online</a>
+or built from a copy of the GROMACS source repository.</p>
+<div class="admonition-todo admonition" id="id4">
+<p class="admonition-title">Todo</p>
+<p>Update documentation link.</p>
+</div>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
 <p><a class="reference internal" href="#build-docs"><span class="std std-ref">Documentation build requirements</span></a></p>
 </div>
-<p>Install the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> package so that its built-in documentation can be extracted
-for the API reference. Then build all of the documentation with Sphinx using
-sphinx-build:</p>
+<p>To build the full gmxapi documentation with GROMACS, configure GROMACS with
+<code class="docutils literal notranslate"><span class="pre">-DGMX_PYTHON_PACKAGE=ON</span></code> and build the GROMACS documentation normally.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Developers wishing to build just the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python package documentation
+may do so from the <code class="docutils literal notranslate"><span class="pre">python_packaging</span></code> subdirectory in the GROMACS repo:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> python_packaging
 pip install -r requirements-docs.txt
 sphinx-build -b html documentation docs
 </pre></div>
 </div>
-<p>Then open <code class="file docutils literal notranslate"><span class="pre">docs/index.html</span></code></p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">docs</span></code> build target puts the built documentation in your build directory.</p>
 </div>
 <p>Alternatively, build the <code class="docutils literal notranslate"><span class="pre">docs</span></code> Docker image from <code class="docutils literal notranslate"><span class="pre">python_packaging/docker/docs.dockerfile</span></code>.</p>
+<div class="admonition-todo admonition" id="id5">
+<p class="admonition-title">Todo</p>
+<p>Unify the documentation sources in the GROMACS repository.</p>
+</div>
+<div class="admonition-todo admonition" id="id8">
+<p class="admonition-title">Todo</p>
+<p>Document sample_restraint package. Reference issue
+<a class="reference external" href="https://redmine.gromacs.org/issues/2893">2893</a> and change
+<a class="reference external" href="https://gerrit.gromacs.org/c/gromacs/+/11483">11483</a></p>
+</div>
 </div>
 <div class="section" id="troubleshooting">
-<h2><a class="toc-backref" href="#id13">Troubleshooting</a><a class="headerlink" href="#troubleshooting" title="Permalink to this headline">¶</a></h2>
-<p>Couldn’t find <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code>? If you don’t want to “source” your <code class="docutils literal notranslate"><span class="pre">GMXRC</span></code> file, you
-can tell <code class="docutils literal notranslate"><span class="pre">cmake</span></code> where to find a gmxapi compatible GROMACS installation with
-<code class="docutils literal notranslate"><span class="pre">gmxapi_DIR</span></code>. E.g. <code class="docutils literal notranslate"><span class="pre">gmxapi_DIR=/path/to/gromacs</span> <span class="pre">cmake</span></code>…</p>
+<h2><a class="toc-backref" href="#id21">Troubleshooting</a><a class="headerlink" href="#troubleshooting" title="Permalink to this headline">¶</a></h2>
+<p>Couldn’t find the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> support library?
+If you don’t want to “source” your <code class="docutils literal notranslate"><span class="pre">GMXRC</span></code> file, you
+can tell the package where to find a gmxapi compatible GROMACS installation with
+<code class="docutils literal notranslate"><span class="pre">gmxapi_DIR</span></code>. E.g. <code class="docutils literal notranslate"><span class="pre">gmxapi_DIR=/path/to/gromacs</span> <span class="pre">pip</span> <span class="pre">install</span> <span class="pre">.</span></code></p>
 <p>Before updating the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> package it is generally a good idea to remove the
 previous installation and to start with a fresh build directory. You should be
-able to just <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">uninstall</span> <span class="pre">gmx</span></code>.</p>
+able to just <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">uninstall</span> <span class="pre">gmxapi</span></code>.</p>
 <p>Do you see something like the following?</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>CMake Error at gmx/core/CMakeLists.txt:45 (find_package):
    Could not find a package configuration file provided by &quot;gmxapi&quot; with any
@@ -520,10 +612,9 @@ able to just <code class="docutils literal notranslate"><span class="pre">pip</s
 <li><p>or if <code class="docutils literal notranslate"><span class="pre">gmxapi_DIR</span></code> (or <code class="docutils literal notranslate"><span class="pre">GROMACS_DIR</span></code>) is not a path containing directories
 like <code class="docutils literal notranslate"><span class="pre">bin</span></code> and <code class="docutils literal notranslate"><span class="pre">share</span></code>.</p></li>
 </ul>
-<p>If you are not a system administrator you are encouraged to install in a Python virtual environment,
-created with virtualenv or Conda.
-Otherwise, you will need to specify the <code class="docutils literal notranslate"><span class="pre">--user</span></code> flag to <code class="docutils literal notranslate"><span class="pre">pip</span></code> or <code class="docutils literal notranslate"><span class="pre">-DGMXAPI_USER_INSTALL=ON</span></code> to CMake to
-install to your home directory.</p>
+<p>If you are not a system administrator you are encouraged to install in a Python
+virtual environment, created with virtualenv or Conda.
+Otherwise, you will need to specify the <code class="docutils literal notranslate"><span class="pre">--user</span></code> flag to <code class="docutils literal notranslate"><span class="pre">pip</span></code>.</p>
 <p>Two of the easiest problems to run into are incompatible compilers and
 incompatible Python. Try to make sure that you use the same C and C++
 compilers for GROMACS, for the Python package, and for the sample
@@ -545,7 +636,7 @@ installation. For instance,</p>
 </div>
 <p>Pip and related Python package management tools can be a little too
 flexible and ambiguous sometimes. If things get really messed up, try
-explicitly uninstalling the <code class="docutils literal notranslate"><span class="pre">gmx</span></code> module and its dependencies, then do
+explicitly uninstalling the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> module and its dependencies, then do
 it again and repeat until <code class="docutils literal notranslate"><span class="pre">pip</span></code> can no longer find any version of any
 of the packages.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip uninstall gmxapi

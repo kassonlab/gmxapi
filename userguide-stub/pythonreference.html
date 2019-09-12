@@ -1,0 +1,273 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>gmxapi Python module reference &mdash; GROMACS External Interfaces</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> GROMACS scripting and extension API
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Documentation sections</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../userguide/userguide.html">Python User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/reference.html">Developer Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GROMACS scripting and extension API</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>gmxapi Python module reference</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/userguide-stub/pythonreference.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="gmxapi-python-module-reference">
+<h1>gmxapi Python module reference<a class="headerlink" href="#gmxapi-python-module-reference" title="Permalink to this headline">¶</a></h1>
+<div class="contents local topic" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#gmxapi-basic-pacakage" id="id2">gmxapi basic pacakage</a></p></li>
+<li><p><a class="reference internal" href="#status-messages-and-logging" id="id3">Status messages and Logging</a></p></li>
+<li><p><a class="reference internal" href="#python-api" id="id4">Python API</a></p>
+<ul>
+<li><p><a class="reference internal" href="#python-classes" id="id5">Python Classes</a></p></li>
+<li><p><a class="reference internal" href="#python-context-managers" id="id6">Python context managers</a></p></li>
+<li><p><a class="reference internal" href="#gmx-exceptions-module" id="id7">gmx.exceptions module</a></p></li>
+<li><p><a class="reference internal" href="#gmx-version-module" id="id8">gmx.version module</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#core-api" id="id9">Core API</a></p>
+<ul>
+<li><p><a class="reference internal" href="#functions" id="id10">Functions</a></p></li>
+<li><p><a class="reference internal" href="#classes" id="id11">Classes</a></p></li>
+</ul>
+</li>
+</ul>
+</div>
+<p>The Gromacs Python package includes a high-level scripting interface implemented
+in pure Python and a lower-level API implemented as a C++ extension module.
+The pure Python implementation provides the basic <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> module and
+classes with a very stable syntax that can be maintained with maximal compatibility
+while mapping to lower level interfaces that may take a while to sort out. The
+separation also serves as a reminder that different execution contexts may be
+implemented quite diffently, though Python scripts using only the high-level
+interface should execute on all.</p>
+<p>The following documentation is extracted from the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python module and is also available
+directly, using either <code class="docutils literal notranslate"><span class="pre">pydoc</span></code> from the command line or <a class="reference external" href="https://docs.python.org/3/library/functions.html#help" title="(in Python v3.7)"><code class="xref py py-func docutils literal notranslate"><span class="pre">help()</span></code></a> from within Python, such
+as during an interactive session.</p>
+<p>This documentation was build without the python module, and is thus missing the complete
+source code documentation.</p>
+<p>Refer to the Python source code itself for additional clarification.</p>
+<div class="section" id="gmxapi-basic-pacakage">
+<span id="python-procedural"></span><h2><a class="toc-backref" href="#id2">gmxapi basic pacakage</a><a class="headerlink" href="#gmxapi-basic-pacakage" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">gmxapi</span> <span class="k">as</span> <span class="nn">gmx</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="status-messages-and-logging">
+<h2><a class="toc-backref" href="#id3">Status messages and Logging</a><a class="headerlink" href="#status-messages-and-logging" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="python-api">
+<h2><a class="toc-backref" href="#id4">Python API</a><a class="headerlink" href="#python-api" title="Permalink to this headline">¶</a></h2>
+<div class="contents local topic" id="id1">
+<ul class="simple">
+<li><p><a class="reference internal" href="#python-classes" id="id12">Python Classes</a></p></li>
+<li><p><a class="reference internal" href="#python-context-managers" id="id13">Python context managers</a></p></li>
+<li><p><a class="reference internal" href="#gmx-exceptions-module" id="id14">gmx.exceptions module</a></p></li>
+<li><p><a class="reference internal" href="#gmx-version-module" id="id15">gmx.version module</a></p></li>
+</ul>
+</div>
+<div class="section" id="python-classes">
+<h3><a class="toc-backref" href="#id12">Python Classes</a><a class="headerlink" href="#python-classes" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="python-context-managers">
+<h3><a class="toc-backref" href="#id13">Python context managers</a><a class="headerlink" href="#python-context-managers" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="gmx-exceptions-module">
+<h3><a class="toc-backref" href="#id14">gmx.exceptions module</a><a class="headerlink" href="#gmx-exceptions-module" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="gmx-version-module">
+<h3><a class="toc-backref" href="#id15">gmx.version module</a><a class="headerlink" href="#gmx-version-module" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+<div class="section" id="core-api">
+<h2><a class="toc-backref" href="#id9">Core API</a><a class="headerlink" href="#core-api" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="functions">
+<h3><a class="toc-backref" href="#id10">Functions</a><a class="headerlink" href="#functions" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="classes">
+<h3><a class="toc-backref" href="#id11">Classes</a><a class="headerlink" href="#classes" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
