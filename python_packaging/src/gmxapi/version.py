@@ -43,7 +43,7 @@ Attributes:
 
 """
 
-__version__ = "0.1.0-dev3"
+__version__ = "0.0.8"
 
 # TODO: (pending infrastructure and further discussion) Configure with CMake.
 # __version__ = "@PROJECT_VERSION@"
@@ -54,8 +54,8 @@ __version__ = "0.1.0-dev3"
 from gmxapi.exceptions import Error as GmxapiError
 
 major = 0
-minor = 1
-patch = 0
+minor = 0
+patch = 8
 
 # Note: this is not automatically updated. See RELEASE.txt and https://github.com/kassonlab/gmxapi/issues/152
 release = False

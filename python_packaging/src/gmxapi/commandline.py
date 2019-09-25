@@ -229,9 +229,64 @@ def commandline_operation(executable=None,
 
     Output:
         The output node of the resulting operation handle contains
-        * `file`: the mapping of CLI flags to filename strings resulting from the `output` kwarg
-        * `erroroutput`: A string of error output (if any) if the process failed.
-        * `returncode`: return code of the subprocess.
+
+        - file: the mapping of CLI flags to filename strings resulting from the ``output`` kwarg.
+        - erroroutput: A string of error output (if any) if the process failed.
+        - returncode: return code of the subprocess.
+
+    Example:
+        Terminal I/O is managed by the gmxapi execution Context. Standard input
+        and output are not yet accessible to the user.
+
+        >>> operation = gmx.commandline_operation(executable='echo',
+        ...                                       arguments=['hi there'])
+        >>> assert operation.output.returncode.result() == 0
+
+    The main utility of commandline_operation is to establish data flow constraints
+    on command line programs such as the
+    `GROMACS tools <http://manual.gromacs.org/current/user-guide/cmdline.html>`_.
+
+    The key words can be omitted when there is no ambiguity. If you have already
+    "sourced" your GMXRC (or the ``gmx`` executable is already on your PATH),
+    then consider the following.
+
+        >>> trjcat = gmx.commandline_operation(
+        ...     'gmx',
+        ...     'trjcat',
+        ...     input_files={'-f': 'traj_comp.part0001.xtc'},
+        ...     output_files={'-o': 'trjcat.xtc'})
+
+    The above snippet defines an operation and produces a reference named ``trjcat``.
+    When executed, this operation will run a command that looks like
+
+        $ gmx trjcat -f traj_comp.part0001.xtc -o trjcat.xtc
+
+    in a subprocess. Execution does not occur immediately, and nothing is executed
+    at all if nothing forces it to. As with all gmxapi operations, execution is
+    handled internally on an as-needed basis (1) when output data from one operation
+    is needed by another, (2) when the caller (script or interactive user) requests
+    a *result*, or (3) when explicitly requested with *run*.
+
+    Example:
+        Assume the above assingment to ``trjcat``. Then,
+
+        >>> import os
+        >>> outfile = trjcat.output.file['-o'].result()
+        >>> assert os.path.exists(outfile)
+        >>> trjcat.run()
+
+        The command line is run when *result()* is called, producing the intended
+        output file. If *result()* had not been called, the call to *run()* would
+        have forced execution. But since the operation has already been performed,
+        it is not re-executed.
+
+    Warning:
+        commandline_operation can only find executables on your PATH. In other
+        words, if you couldn't execute it before starting Python, gmxapi cannot
+        execute it either. This includes GROMACS command line tools, so don't
+        forget to "source" your
+        `GMXRC <http://manual.gromacs.org/documentation/current/install-guide/index.html?highlight=gmxrc>`_
+        See `issue 2961 <https://redmine.gromacs.org/issues/2961>`_
 
     """
 
@@ -294,9 +349,10 @@ def commandline_operation(executable=None,
     # 3. Merge operations
     #
     # Note: Without a `label` argument, repeated calls to cli(**cli_args) should
-    # produce references to the same unique resource. Creating this handle
-    # separately should not be necessary, but we've got a way to go until we have the
-    # fingerprinting and Context resource management we need for that.
+    # produce references to the same unique resource (but currently do not).
+    # Creating this handle separately should not be necessary,
+    # but we've got a way to go until we have the fingerprinting and Context
+    # resource management we need for that.
     # TODO: ``label`` kwarg
     # TODO: input fingerprinting
     cli_result = cli(**cli_args)

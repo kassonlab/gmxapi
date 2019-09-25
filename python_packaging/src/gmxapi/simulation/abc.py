@@ -47,6 +47,48 @@ For more on type hinting, see https://docs.python.org/3/library/typing.html
 """
 
 import abc
+from typing import Mapping
+
+from gmxapi.typing import SourceTypeVar
+
+
+class SimulationInput(abc.ABC):
+    """Abstract class for acceptable input to operations in gmxapi.simulation.
+
+    Acceptable simulation input includes:
+        * TPR filename.
+        * Output from read_tpr or modify_input.
+        *
+        * TODO: an acceptable collection of data sources.
+
+    This class is intended for static and dynamic type checking, and to provide
+    a documentation entry point for what is considered to be valid simulation
+    input.
+
+    No code should assume that input objects actually derive from this class.
+
+    The output of ReadTpr and ModifyInput are examples of objects implementing
+    SimulationInput compatible interfaces.
+    """
+
+    @property
+    @abc.abstractmethod
+    def parameters(self) -> Mapping[str, SourceTypeVar]:
+        ...
+
+    @classmethod
+    def __subclasshook__(cls, subclass):
+        if cls is SimulationInput:
+            # TODO: We can do a better job of checking the basic type as well as the schema.
+            has_parameters = any([hasattr(base, 'parameters')
+                                  and getattr(base.parameters, '_dtype', None) is dict
+                                  for base in subclass.__mro__])
+            if all([has_parameters]):
+                return True
+            else:
+                return False
+        else:
+            return NotImplemented
 
 
 class ModuleObject(abc.ABC):

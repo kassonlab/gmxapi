@@ -18,12 +18,12 @@ The following instructions assume the ``bash`` shell and
 
     SOURCE=$PWD/gromacs-gmxapi
 
-Get GROMACS
-^^^^^^^^^^^
+Get the fork
+^^^^^^^^^^^^
 
 ::
 
-    git clone https://gerrit.gromacs.org/gromacs.git $SOURCE
+    git clone https://gerrit.gromacs.org/gromacs.git -b sandbox-gmxapi --single-branch $SOURCE
 
 Build and install GROMACS
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -47,7 +47,7 @@ before proceeding.
 Build and install the gmxapi Python package
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Assuming ``python`` and ``pip`` are from a Python 3 installation (Python 3.5 or higher)::
+Assuming ``python`` and ``pip`` are from a Python 3 installation::
 
     cd $SOURCE/python_packaging
     pip install -r src/requirements.txt
@@ -56,8 +56,33 @@ Assuming ``python`` and ``pip`` are from a Python 3 installation (Python 3.5 or 
 For more detailed instructions, refer to the ``README.md`` file in the ``python_packaging``
 directory.
 
-..  todo::
+Refer to ``python_packaging/examples`` or run ``pydoc gmxapi`` for usage.
 
-    Document sample_restraint package. Reference issue
-    `2893 <https://redmine.gromacs.org/issues/2893>`_ and change
-    `11483 <https://gerrit.gromacs.org/c/gromacs/+/11483>`_
+Build and install the sample_restraint package
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This is the sample source tree for an MD restraint plug-in.
+
+::
+
+    cd sample_restraint
+    mkdir build
+    cd build
+    cmake ..
+    make -j10 install
+    cd ..
+
+Explore the example notebook
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Make sure a recent version of the jupyter notebook server is available::
+
+    pip install --upgrade jupyter
+
+::
+
+    cd $SOURCE/python_packaging/sample_restraint/examples
+    jupyter notebook
+
+and look at ``example.ipynb``
+

@@ -1400,6 +1400,8 @@ class Future(typing.Generic[ResultTypeVar]):
             return handle.data(member=0)
         else:
             return handle.data()
+        # TODO: Richer output behavior.
+        # return self._Result(self)
 
     def _reset(self):
         """Mark the Future "not done" to allow reexecution.

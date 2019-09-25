@@ -34,6 +34,7 @@
 
 """gmxapi data types and interfaces.
 """
+import gmxapi
 
 __all__ = ['ndarray', 'NDArray']
 

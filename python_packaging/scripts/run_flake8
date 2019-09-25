@@ -1,0 +1,6 @@
+#!/bin/bash -x
+
+# Note: E501 specifies a line length limit of 80 characters, but GROMACS allows more.
+# Note: --max-complexity can be used to check McCabe complexity. Compliance
+#       could be a future goal, but is not yet a GROMACS priority.
+python -m flake8 --ignore W503,E501 ${HOME}/gmxapi/src/

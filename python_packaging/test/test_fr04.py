@@ -39,16 +39,18 @@ import pytest
 import gmxapi as gmx
 from gmxapi.version import has_feature
 
+
+@pytest.mark.xfail
 @pytest.mark.skipif(not has_feature('fr4'),
-                   reason="Feature level not met.")
-def test_fr4():
+                    reason="Feature level not met.")
+def test_fr4(spc_water_box):
     """FR4: Dimensionality and typing of named data causes generation of correct work topologies."""
     N = 10
-    simulation_input = gmx.read_tpr(initial_tpr)
+    simulation_input = gmx.read_tpr(spc_water_box)
 
     # Array inputs imply array outputs.
     input_array = gmx.modify_input(
-        simulation_input, params={'tau-t': [t / 10.0 for t in range(N)]})
+        simulation_input, params=gmx.scatter([{'tau-t': t / 10.0} for t in range(N)]))
 
     md = gmx.mdrun(input_array)  # An array of simulations
 
@@ -57,6 +59,6 @@ def test_fr4():
         'rmsf',
         input={
             '-f': md.output.trajectory,
-            '-s': initial_tpr
+            '-s': spc_water_box
         },
         output={'-o': gmx.FileName(suffix='.xvg')})

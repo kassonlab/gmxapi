@@ -25,8 +25,10 @@
 namespace plugin
 {
 
-// Stop-gap for cross-language data exchange pending SharedData implementation and inclusion of Eigen.
+// Stop-gap for cross-language data exchange pending GROMACS updates.
 // Adapted from pybind docs.
+// TODO: Access: need matrix View.
+// TODO: See if we can replace with or converge with newer GROMACS Matrix class.
 template<class T>
 class Matrix
 {
@@ -50,7 +52,13 @@ class Matrix
         std::vector<T>* vector()
         { return &data_; }
 
+        const std::vector<T>* vector() const
+        { return &data_; }
+
         T* data()
+        { return data_.data(); };
+
+        const T* data() const
         { return data_.data(); };
 
         size_t rows() const
@@ -59,6 +67,15 @@ class Matrix
         size_t cols() const
         { return cols_; }
 
+        void swap(Matrix<T>& other) noexcept
+        {
+            if (&other != this)
+            {
+                std::swap(data_, other.data_);
+                std::swap(rows_, other.rows_);
+                std::swap(cols_, other.cols_);
+            }
+        }
     private:
         size_t rows_;
         size_t cols_;
@@ -285,6 +302,34 @@ class RestraintModule : public gmxapi::MDModule // consider names
         std::shared_ptr<R> restraint_{nullptr};
         std::mutex restraintInstantiation_;
 };
+
+
+/*!
+ * \brief Get a gmxapi library version of the object.
+ *
+ * Allows an instance of PyRestraint<T> to be converted to a gmxapi::MDModule instance.
+ * To prevent interface coupling, the various facades all act as owning
+ * instances with shared reference counting. Implementation classes wrapped by
+ * PyRestraint are free to implement the gmxapi::MDModule pointer on their own,
+ * but implementations that already inherit from gmxapi::MDModule (such as
+ * via plugin::RestraintModule) can used the default template, which
+ * creates the managing shared_ptr in create() and generates new handles
+ * with shared_from_this().
+ *
+ * T must either derive from gmxapi::MDModule or provide a template
+ * specialization for getModule(T* module)
+ * before PyRestraint<T>::bind() is instantiated.
+ *
+ * \return a reference-counted gmxapi library handle to this object.
+ *
+ * \todo Check for inheritance of enable_shared_from_this.
+ * \todo Clarify and test for inheritance from gmxapi::MDModule.
+ * \todo Rearrange these template headers.
+ */
+template<typename T> std::shared_ptr<gmxapi::MDModule> getModule(T* module)
+{
+    return module->shared_from_this();
+}
 
 /*!
  * \brief Filehandle management helper class.

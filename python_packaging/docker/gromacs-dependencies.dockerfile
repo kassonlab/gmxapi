@@ -18,6 +18,7 @@ RUN apt-get update && \
         liblapack-dev \
         libxml2-dev \
         make \
+        vim \
         wget \
         zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
