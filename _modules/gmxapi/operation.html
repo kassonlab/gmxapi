@@ -1186,7 +1186,7 @@
     <span class="k">raise</span> <span class="n">exceptions</span><span class="o">.</span><span class="n">ValueError</span><span class="p">(</span><span class="s1">&#39;Not a usable OperationRegistryKey: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
 
 
-<span class="k">class</span> <span class="nc">OperationRegistry</span><span class="p">(</span><span class="n">typing</span><span class="o">.</span><span class="n">Mapping</span><span class="p">[</span><span class="n">OperationRegistryKey</span><span class="p">,</span> <span class="n">OperationImplementation</span><span class="p">],</span> <span class="n">collections</span><span class="o">.</span><span class="n">UserDict</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">OperationRegistry</span><span class="p">(</span><span class="n">collections</span><span class="o">.</span><span class="n">UserDict</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Helper class to map identifiers to Operation implementation instances.</span>
 
 <span class="sd">    This is an implementation detail of gmxapi.operation and should not be used from</span>
@@ -2420,7 +2420,7 @@
 <span class="n">_HandleType</span> <span class="o">=</span> <span class="n">typing</span><span class="o">.</span><span class="n">TypeVar</span><span class="p">(</span><span class="s1">&#39;_HandleType&#39;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="n">gmx</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">OperationReference</span><span class="p">)</span>
 
 
-<span class="k">class</span> <span class="nc">NodeBuilder</span><span class="p">(</span><span class="n">typing</span><span class="o">.</span><span class="n">Generic</span><span class="p">[</span><span class="n">_Context</span><span class="p">,</span> <span class="n">_HandleType</span><span class="p">],</span> <span class="n">gmx</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">NodeBuilder</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">NodeBuilder</span><span class="p">(</span><span class="n">gmx</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">NodeBuilder</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Add an operation node to be managed by a Context.</span>
 
 <span class="sd">    The NodeBuilder interface implies minimal internal logic, and instead</span>
@@ -2608,7 +2608,7 @@
     <span class="c1">#     ...</span>
 
 
-<span class="k">class</span> <span class="nc">ModuleNodeBuilder</span><span class="p">(</span><span class="n">NodeBuilder</span><span class="p">[</span><span class="s1">&#39;ModuleContext&#39;</span><span class="p">,</span> <span class="n">_HandleType</span><span class="p">]):</span>
+<span class="k">class</span> <span class="nc">ModuleNodeBuilder</span><span class="p">(</span><span class="n">NodeBuilder</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Builder for work nodes in gmxapi.operation.ModuleContext.&quot;&quot;&quot;</span>
 
 
@@ -3150,7 +3150,7 @@
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
 
 
-<span class="k">class</span> <span class="nc">SubgraphNodeBuilder</span><span class="p">(</span><span class="n">NodeBuilder</span><span class="p">[</span><span class="s1">&#39;SubgraphContext&#39;</span><span class="p">,</span> <span class="n">_HandleType</span><span class="p">]):</span>
+<span class="k">class</span> <span class="nc">SubgraphNodeBuilder</span><span class="p">(</span><span class="n">NodeBuilder</span><span class="p">):</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
                  <span class="n">context</span><span class="p">:</span> <span class="s1">&#39;SubgraphContext&#39;</span><span class="p">,</span>
