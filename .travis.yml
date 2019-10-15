@@ -21,9 +21,8 @@ compiler: gcc
 
 stages:
   - name: gromacs
-    if: branch = kassonLabFork
+    if: branch = master
   - name: pygmxapi
-#    if: branch != kassonLabFork
 
 jobs:
   include:
