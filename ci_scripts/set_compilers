@@ -1,0 +1,10 @@
+export MPICC=`which mpicc`
+export MPICXX=`which mpicxx`
+export CC=`which gcc-6`
+export CXX=`which g++-6`
+export CCACHE_COMPILERCHECK=content
+${CC} --version
+${CXX} --version
+
+export CMAKE_ROOT=${HOME}/install/cmake
+export PATH=${CMAKE_ROOT}/bin:${PATH}
