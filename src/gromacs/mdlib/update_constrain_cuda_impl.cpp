@@ -56,10 +56,12 @@ class UpdateConstrainCuda::Impl
 };
 
 UpdateConstrainCuda::UpdateConstrainCuda(gmx_unused const t_inputrec     &ir,
-                                         gmx_unused const gmx_mtop_t     &mtop)
+                                         gmx_unused const gmx_mtop_t     &mtop,
+                                         gmx_unused const void           *commandStream,
+                                         gmx_unused GpuEventSynchronizer *xUpdatedOnDevice)
     : impl_(nullptr)
 {
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
+    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
 }
 
 UpdateConstrainCuda::~UpdateConstrainCuda() = default;
@@ -74,57 +76,33 @@ void UpdateConstrainCuda::integrate(gmx_unused const real                       
                                     gmx_unused const float                       dtPressureCouple,
                                     gmx_unused const matrix                      velocityScalingMatrix)
 {
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
+    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
 }
 
-void UpdateConstrainCuda::set(gmx_unused const t_idef     &idef,
-                              gmx_unused const t_mdatoms  &md,
-                              gmx_unused const int         numTempScaleValues)
+void UpdateConstrainCuda::set(gmx_unused DeviceBuffer<float>        d_x,
+                              gmx_unused DeviceBuffer<float>        d_v,
+                              gmx_unused const DeviceBuffer<float>  d_f,
+                              gmx_unused const t_idef              &idef,
+                              gmx_unused const t_mdatoms           &md,
+                              gmx_unused const int                  numTempScaleValues)
 {
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
+    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
 }
 
 void UpdateConstrainCuda::setPbc(gmx_unused const t_pbc *pbc)
 {
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
+    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
 }
 
-void UpdateConstrainCuda::copyCoordinatesToGpu(gmx_unused const rvec *h_x)
+void UpdateConstrainCuda::waitCoordinatesReadyOnDevice()
 {
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
+    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
 }
 
-void UpdateConstrainCuda::copyVelocitiesToGpu(gmx_unused const rvec *h_v)
+GpuEventSynchronizer* UpdateConstrainCuda::getCoordinatesReadySync()
 {
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
-}
-
-void UpdateConstrainCuda::copyForcesToGpu(gmx_unused const rvec *h_f)
-{
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
-}
-
-void UpdateConstrainCuda::copyCoordinatesFromGpu(gmx_unused rvec *h_xp)
-{
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
-}
-
-void UpdateConstrainCuda::copyVelocitiesFromGpu(gmx_unused rvec *h_v)
-{
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
-}
-
-void UpdateConstrainCuda::copyForcesFromGpu(gmx_unused rvec *h_f)
-{
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
-}
-
-void UpdateConstrainCuda::setXVFPointers(gmx_unused rvec *d_x,
-                                         gmx_unused rvec *d_xp,
-                                         gmx_unused rvec *d_v,
-                                         gmx_unused rvec *d_f)
-{
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called insted of the correct implementation.");
+    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
+    return nullptr;
 }
 
 }      // namespace gmx

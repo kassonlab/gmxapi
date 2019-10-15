@@ -45,6 +45,7 @@
 
 #include "gmxpre.h"
 
+#include "gromacs/gpu_utils/gputraits.cuh"
 #include "gromacs/math/functions.h"
 #include "gromacs/math/invertmatrix.h"
 #include "gromacs/math/vec.h"
@@ -194,35 +195,26 @@ class SettleCuda
          *  from the topology data (mtop), check their values for consistency and calls the
          *  following constructor.
          *
-         * \param[in] mtop      Topology of the system to gen the masses for O and H atoms and
-         *                      target O-H and H-H distances. These values are also checked for
-         *                      consistency.
+         * \param[in] mtop           Topology of the system to gen the masses for O and H atoms and
+         *                           target O-H and H-H distances. These values are also checked for
+         *                           consistency.
+         * \param[in] commandStream  Device stream to use.
          */
-        SettleCuda(const gmx_mtop_t  &mtop);
-
-        /*! \brief Create SETTLE object
-         *
-         * \param[in] mO        Mass of the oxygen atom.
-         * \param[in] mH        Mass of the hydrogen atom.
-         * \param[in] dOH       Target distance for O-H bonds.
-         * \param[in] dHH       Target for the distance between two hydrogen atoms.
-         */
-        SettleCuda(const real mO,  const real mH,
-                   const real dOH, const real dHH);
+        SettleCuda(const gmx_mtop_t  &mtop,
+                   CommandStream      commandStream);
 
         ~SettleCuda();
 
         /*! \brief Apply SETTLE.
          *
-         * Applies SETTLE to coordinates and velocities, stored on GPU.
-         * Data at pointers xPrime and v (class fields) change in the GPU
-         * memory. The results are not automatically copied back to the CPU
-         * memory. Method uses this class data structures which should be
-         * updated when needed using update method.
+         * Applies SETTLE to coordinates and velocities, stored on GPU. Data at pointers d_xp and
+         * d_v change in the GPU memory. The results are not automatically copied back to the CPU
+         * memory. Method uses this class data structures which should be updated when needed using
+         * update method.
          *
          * \param[in]     d_x               Coordinates before timestep (in GPU memory)
          * \param[in,out] d_xp              Coordinates after timestep (in GPU memory). The
-         *                                  resulting constrained codrdinates will be saved here.
+         *                                  resulting constrained coordinates will be saved here.
          * \param[in]     updateVelocities  If the velocities should be updated.
          * \param[in,out] d_v               Velocities to update (in GPU memory, can be nullptr
          *                                  if not updated)
@@ -270,7 +262,7 @@ class SettleCuda
     private:
 
         //! CUDA stream
-        cudaStream_t        stream_;
+        CommandStream       commandStream_;
         //! Periodic boundary data
         PbcAiuc             pbcAiuc_;
 

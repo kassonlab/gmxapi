@@ -53,10 +53,7 @@
 #include "gromacs/mdlib/gmx_omp_nthreads.h"
 #include "gromacs/mdtypes/group.h"
 #include "gromacs/mdtypes/md_enums.h"
-#include "gromacs/nbnxm/atomdata.h"
 #include "gromacs/nbnxm/gpu_data_mgmt.h"
-#include "gromacs/nbnxm/nbnxm_geometry.h"
-#include "gromacs/nbnxm/nbnxm_simd.h"
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/simd/simd.h"
@@ -67,9 +64,12 @@
 #include "gromacs/utility/gmxomp.h"
 #include "gromacs/utility/smalloc.h"
 
+#include "atomdata.h"
 #include "boundingboxes.h"
 #include "clusterdistancekerneltype.h"
 #include "gridset.h"
+#include "nbnxm_geometry.h"
+#include "nbnxm_simd.h"
 #include "pairlistset.h"
 #include "pairlistsets.h"
 #include "pairlistwork.h"
@@ -1079,10 +1079,10 @@ makeClusterListSimple(const Grid               &jGrid,
 }
 
 #ifdef GMX_NBNXN_SIMD_4XN
-#include "gromacs/nbnxm/pairlist_simd_4xm.h"
+#include "pairlist_simd_4xm.h"
 #endif
 #ifdef GMX_NBNXN_SIMD_2XNN
-#include "gromacs/nbnxm/pairlist_simd_2xmm.h"
+#include "pairlist_simd_2xmm.h"
 #endif
 
 /* Plain C or SIMD4 code for making a pair list of super-cell sci vs scj.
@@ -3963,6 +3963,61 @@ static void sort_sci(NbnxnPairlistGpu *nbl)
     std::swap(nbl->sci, work.sci_sort);
 }
 
+/* Returns the i-zone range for pairlist construction for the give locality */
+static Range<int>
+getIZoneRange(const Nbnxm::GridSet::DomainSetup &domainSetup,
+              const Nbnxm::InteractionLocality   locality)
+{
+    if (domainSetup.doTestParticleInsertion)
+    {
+        /* With TPI we do grid 1, the inserted molecule, versus grid 0, the rest */
+        return {
+                   1, 2
+        };
+    }
+    else if (locality == InteractionLocality::Local)
+    {
+        /* Local: only zone (grid) 0 vs 0 */
+        return {
+                   0, 1
+        };
+    }
+    else
+    {
+        /* Non-local: we need all i-zones */
+        return {
+                   0, int(domainSetup.zones->iZones.size())
+        };
+    }
+}
+
+/* Returns the j-zone range for pairlist construction for the give locality and i-zone */
+static Range<int>
+getJZoneRange(const gmx_domdec_zones_t          &ddZones,
+              const Nbnxm::InteractionLocality   locality,
+              const int                          iZone)
+{
+    if (locality == InteractionLocality::Local)
+    {
+        /* Local: zone 0 vs 0 or with TPI 1 vs 0 */
+        return {
+                   0, 1
+        };
+    }
+    else if (iZone == 0)
+    {
+        /* Non-local: we need to avoid the local (zone 0 vs 0) interactions */
+        return {
+                   1, *ddZones.iZones[iZone].jZoneRange.end()
+        };
+    }
+    else
+    {
+        /* Non-local with non-local i-zone: use all j-zones */
+        return ddZones.iZones[iZone].jZoneRange;
+    }
+}
+
 //! Prepares CPU lists produced by the search for dynamic pruning
 static void prepareListsForDynamicPruning(gmx::ArrayRef<NbnxnPairlistCpu> lists);
 
@@ -3997,17 +4052,6 @@ PairlistSet::constructPairlists(const Nbnxm::GridSet          &gridSet,
         init_buffer_flags(&nbat->buffer_flags, nbat->numAtoms());
     }
 
-    int nzi;
-    if (locality_ == InteractionLocality::Local)
-    {
-        /* Only zone (grid) 0 vs 0 */
-        nzi = 1;
-    }
-    else
-    {
-        nzi = gridSet.domainSetup().zones->nizone;
-    }
-
     if (!isCpuType_ && minimumIlistCountForGpuBalancing > 0)
     {
         get_nsubpair_target(gridSet, locality_, rlist, minimumIlistCountForGpuBalancing,
@@ -4037,40 +4081,23 @@ PairlistSet::constructPairlists(const Nbnxm::GridSet          &gridSet,
         }
     }
 
-    const gmx_domdec_zones_t *ddZones = gridSet.domainSetup().zones;
+    const gmx_domdec_zones_t &ddZones = *gridSet.domainSetup().zones;
 
-    for (int zi = 0; zi < nzi; zi++)
+    const auto iZoneRange = getIZoneRange(gridSet.domainSetup(), locality_);
+
+    for (const int iZone : iZoneRange)
     {
-        /* With TPI we do grid 1, the inserted molecule, versus grid 0, the rest */
-        if (gridSet.domainSetup().doTestParticleInsertion)
-        {
-            zi = 1;
-        }
-        const Grid &iGrid = gridSet.grids()[zi];
+        const Grid &iGrid = gridSet.grids()[iZone];
 
-        int                 zj0;
-        int                 zj1;
-        if (locality_ == InteractionLocality::Local)
+        const auto jZoneRange = getJZoneRange(ddZones, locality_, iZone);
+
+        for (int jZone : jZoneRange)
         {
-            zj0 = 0;
-            zj1 = 1;
-        }
-        else
-        {
-            zj0 = ddZones->izone[zi].j0;
-            zj1 = ddZones->izone[zi].j1;
-            if (zi == 0)
-            {
-                zj0++;
-            }
-        }
-        for (int zj = zj0; zj < zj1; zj++)
-        {
-            const Grid &jGrid = gridSet.grids()[zj];
+            const Grid &jGrid = gridSet.grids()[jZone];
 
             if (debug)
             {
-                fprintf(debug, "ns search grid %d vs %d\n", zi, zj);
+                fprintf(debug, "ns search grid %d vs %d\n", iZone, jZone);
             }
 
             searchCycleCounting->start(enbsCCsearch);
@@ -4080,7 +4107,7 @@ PairlistSet::constructPairlists(const Nbnxm::GridSet          &gridSet,
             /* With GPU: generate progressively smaller lists for
              * load balancing for local only or non-local with 2 zones.
              */
-            progBal = (locality_ == InteractionLocality::Local || ddZones->n <= 2);
+            progBal = (locality_ == InteractionLocality::Local || ddZones.n <= 2);
 
 #pragma omp parallel for num_threads(numLists) schedule(static)
             for (int th = 0; th < numLists; th++)
@@ -4090,7 +4117,7 @@ PairlistSet::constructPairlists(const Nbnxm::GridSet          &gridSet,
                     /* Re-init the thread-local work flag data before making
                      * the first list (not an elegant conditional).
                      */
-                    if (nbat->bUseBufferFlags && ((zi == 0 && zj == 0)))
+                    if (nbat->bUseBufferFlags && (iZone == 0 && jZone == 0))
                     {
                         init_buffer_flags(&searchWork[th].buffer_flags, nbat->numAtoms());
                     }

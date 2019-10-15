@@ -57,6 +57,7 @@
 #include <memory>
 
 #include "gromacs/commandline/filenm.h"
+#include "gromacs/domdec/builder.h"
 #include "gromacs/domdec/domdec.h"
 #include "gromacs/domdec/domdec_struct.h"
 #include "gromacs/domdec/gpuhaloexchange.h"
@@ -114,6 +115,7 @@
 #include "gromacs/mdtypes/observableshistory.h"
 #include "gromacs/mdtypes/simulation_workload.h"
 #include "gromacs/mdtypes/state.h"
+#include "gromacs/mdtypes/state_propagator_data_gpu.h"
 #include "gromacs/nbnxm/gpu_data_mgmt.h"
 #include "gromacs/nbnxm/nbnxm.h"
 #include "gromacs/nbnxm/pairlist_tuning.h"
@@ -126,6 +128,7 @@
 #include "gromacs/restraint/restraintpotential.h"
 #include "gromacs/swap/swapcoords.h"
 #include "gromacs/taskassignment/decidegpuusage.h"
+#include "gromacs/taskassignment/decidesimulationworkload.h"
 #include "gromacs/taskassignment/resourcedivision.h"
 #include "gromacs/taskassignment/taskassignment.h"
 #include "gromacs/taskassignment/usergpuids.h"
@@ -162,49 +165,75 @@
 namespace gmx
 {
 
-/*! \brief environment variable to enable GPU P2P communication */
-static const bool c_enableGpuHaloExchange = (getenv("GMX_GPU_DD_COMMS") != nullptr)
-    && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA);
-
-/*! \brief environment variable to enable GPU buffer operations */
-static const bool c_enableGpuBufOps       = (getenv("GMX_USE_GPU_BUFFER_OPS") != nullptr);
+/*! \brief Structure that holds boolean flags corresponding to the development
+ *        features present enabled through environemnt variables.
+ *
+ */
+struct DevelopmentFeatureFlags
+{
+    ///! True if the Buffer ops development feature is enabled
+    // TODO: when the trigger of the buffer ops offload is fully automated this should go away
+    bool enableGpuBufferOps     = false;
+    ///! True if the update-constraints development feature is enabled
+    // TODO This needs to be reomved when the code gets cleaned up of GMX_UPDATE_CONSTRAIN_GPU
+    bool useGpuUpdateConstrain  = false;
+    ///! True if the GPU halo exchange development feature is enabled
+    bool enableGpuHaloExchange  = false;
+    ///! True if the PME PP direct commuinication GPU development feature is enabled
+    bool enableGpuPmePPComm     = false;
+};
 
 /*! \brief Manage any development feature flag variables encountered
  *
  * The use of dev features indicated by environment variables is
- * logged in order to ensure that runs with such featrues enabled can
+ * logged in order to ensure that runs with such features enabled can
  * be identified from their log and standard output. Any cross
- * dependencies are also checked, and if unsatisified, a fatal error
+ * dependencies are also checked, and if unsatisfied, a fatal error
  * issued.
  *
- * \param[in]  mdlog        Logger object.
+ * Note that some development features overrides are applied already here:
+ * the GPU communication flags are set to false in non-tMPI and non-CUDA builds.
+ *
+ * \param[in]  mdlog                Logger object.
+ * \param[in]  useGpuForNonbonded   True if the nonbonded task is offloaded in this run.
+ * \returns                         The object populated with development feature flags.
  */
-static void manageDevelopmentFeatures(const gmx::MDLogger &mdlog)
+static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger &mdlog,
+                                                         const bool           useGpuForNonbonded)
 {
-    const bool enableGpuBufOps       = (getenv("GMX_USE_GPU_BUFFER_OPS") != nullptr);
-    const bool useGpuUpdateConstrain = (getenv("GMX_UPDATE_CONSTRAIN_GPU") != nullptr);
-    const bool enableGpuHaloExchange = (getenv("GMX_GPU_DD_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
+    DevelopmentFeatureFlags devFlags;
 
-    if (enableGpuBufOps)
+    // Some builds of GCC 5 give false positive warnings that these
+    // getenv results are ignored when clearly they are used.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+    devFlags.enableGpuBufferOps    = (getenv("GMX_USE_GPU_BUFFER_OPS") != nullptr) && (GMX_GPU == GMX_GPU_CUDA) && useGpuForNonbonded;
+    devFlags.useGpuUpdateConstrain = (getenv("GMX_UPDATE_CONSTRAIN_GPU") != nullptr);
+    devFlags.enableGpuHaloExchange = (getenv("GMX_GPU_DD_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
+    devFlags.enableGpuPmePPComm    = (getenv("GMX_GPU_DD_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
+#pragma GCC diagnostic pop
+
+    if (devFlags.enableGpuBufferOps)
     {
         GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
                 "NOTE: This run uses the 'GPU buffer ops' feature, enabled by the GMX_USE_GPU_BUFFER_OPS environment variable.");
     }
 
-    if (enableGpuHaloExchange)
+    if (devFlags.enableGpuHaloExchange)
     {
-        if (!enableGpuBufOps)
+        if (!devFlags.enableGpuBufferOps)
         {
             gmx_fatal(FARGS, "Cannot enable GPU halo exchange without GPU buffer operations, set GMX_USE_GPU_BUFFER_OPS=1\n");
         }
     }
 
-    if (useGpuUpdateConstrain)
+    if (devFlags.useGpuUpdateConstrain)
     {
         GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
                 "NOTE: This run uses the 'GPU update/constraints' feature, enabled by the GMX_UPDATE_CONSTRAIN_GPU environment variable.");
     }
 
+    return devFlags;
 }
 
 /*! \brief Barrier for safe simultaneous thread access to mdrunner data
@@ -229,9 +258,6 @@ Mdrunner Mdrunner::cloneOnSpawnedThread() const
         newRunner.restraintManager_ = std::make_unique<RestraintManager>(*restraintManager_);
     }
 
-    // Copy original cr pointer before master thread can pass the thread barrier
-    newRunner.cr  = reinitialize_commrec_for_this_thread(cr);
-
     // Copy members of master runner.
     // \todo Replace with builder when Simulation context and/or runner phases are better defined.
     // Ref https://redmine.gromacs.org/issues/2587 and https://redmine.gromacs.org/issues/2375
@@ -249,13 +275,14 @@ Mdrunner Mdrunner::cloneOnSpawnedThread() const
     newRunner.nstlist_cmdline     = nstlist_cmdline;
     newRunner.replExParams        = replExParams;
     newRunner.pforce              = pforce;
+    // Give the spawned thread the newly created valid communicator
+    // for the simulation.
+    newRunner.communicator        = MPI_COMM_WORLD;
     newRunner.ms                  = ms;
     newRunner.startingBehavior    = startingBehavior;
     newRunner.stopHandlerBuilder_ = std::make_unique<StopHandlerBuilder>(*stopHandlerBuilder_);
 
     threadMpiMdrunnerAccessBarrier();
-
-    GMX_RELEASE_ASSERT(!MASTER(newRunner.cr), "cloneOnSpawnedThread should only be called on spawned threads");
 
     return newRunner;
 }
@@ -281,21 +308,8 @@ static void mdrunner_start_fn(const void *arg)
 }
 
 
-/*! \brief Start thread-MPI threads.
- *
- * Called by mdrunner() to start a specific number of threads
- * (including the main thread) for thread-parallel runs. This in turn
- * calls mdrunner() for each thread. All options are the same as for
- * mdrunner(). */
-t_commrec *Mdrunner::spawnThreads(int numThreadsToLaunch) const
+void Mdrunner::spawnThreads(int numThreadsToLaunch)
 {
-
-    /* first check whether we even need to start tMPI */
-    if (numThreadsToLaunch < 2)
-    {
-        return cr;
-    }
-
 #if GMX_THREAD_MPI
     /* now spawn new threads that start mdrunner_start_fn(), while
        the main thread returns. Thread affinity is handled later. */
@@ -305,12 +319,14 @@ t_commrec *Mdrunner::spawnThreads(int numThreadsToLaunch) const
         GMX_THROW(gmx::InternalError("Failed to spawn thread-MPI threads"));
     }
 
+    // Give the master thread the newly created valid communicator for
+    // the simulation.
+    communicator = MPI_COMM_WORLD;
     threadMpiMdrunnerAccessBarrier();
 #else
+    GMX_UNUSED_VALUE(numThreadsToLaunch);
     GMX_UNUSED_VALUE(mdrunner_start_fn);
 #endif
-
-    return reinitialize_commrec_for_this_thread(cr);
 }
 
 }  // namespace gmx
@@ -448,14 +464,15 @@ static bool gpuAccelerationOfNonbondedIsUseful(const MDLogger   &mdlog,
 }
 
 //! Initializes the logger for mdrun.
-static gmx::LoggerOwner buildLogger(FILE *fplog, const t_commrec *cr)
+static gmx::LoggerOwner buildLogger(FILE      *fplog,
+                                    const bool isSimulationMasterRank)
 {
     gmx::LoggerBuilder builder;
     if (fplog != nullptr)
     {
         builder.addTargetFile(gmx::MDLogger::LogLevel::Info, fplog);
     }
-    if (cr == nullptr || SIMMASTER(cr))
+    if (isSimulationMasterRank)
     {
         builder.addTargetStream(gmx::MDLogger::LogLevel::Warning,
                                 &gmx::TextOutputFile::standardError());
@@ -657,13 +674,10 @@ int Mdrunner::mdrunner()
     auto       pmeTarget       = findTaskTarget(pme_opt);
     auto       pmeFftTarget    = findTaskTarget(pme_fft_opt);
     auto       bondedTarget    = findTaskTarget(bonded_opt);
-    auto       updateTarget    = TaskTarget::Cpu;
+    auto       updateTarget    = findTaskTarget(update_opt);
     PmeRunMode pmeRunMode      = PmeRunMode::None;
 
-    // Here we assume that SIMMASTER(cr) does not change even after the
-    // threads are started.
-
-    FILE *fplog = nullptr;
+    FILE      *fplog = nullptr;
     // If we are appending, we don't write log output because we need
     // to check that the old log file matches what the checkpoint file
     // expects. Otherwise, we should start to write log output now if
@@ -672,19 +686,22 @@ int Mdrunner::mdrunner()
     {
         fplog = gmx_fio_getfp(logFileHandle);
     }
-    gmx::LoggerOwner logOwner(buildLogger(fplog, cr));
+    const bool       isSimulationMasterRank = findIsSimulationMasterRank(ms, communicator);
+    gmx::LoggerOwner logOwner(buildLogger(fplog, isSimulationMasterRank));
     gmx::MDLogger    mdlog(logOwner.logger());
 
-    // report any development features that may be enabled by environment variables
-    manageDevelopmentFeatures(mdlog);
-
-    // With thread-MPI, the communicator changes after threads are
-    // launched, so this is rebuilt for the master rank at that
-    // time. The non-master ranks are fine to keep the one made here.
-    PhysicalNodeCommunicator physicalNodeComm(MPI_COMM_WORLD, gmx_physicalnode_id_hash());
+    // TODO The thread-MPI master rank makes a working
+    // PhysicalNodeCommunicator here, but it gets rebuilt by all ranks
+    // after the threads have been launched. This works because no use
+    // is made of that communicator until after the execution paths
+    // have rejoined. But it is likely that we can improve the way
+    // this is expressed, e.g. by expressly running detection only the
+    // master rank for thread-MPI, rather than relying on the mutex
+    // and reference count.
+    PhysicalNodeCommunicator physicalNodeComm(communicator, gmx_physicalnode_id_hash());
     hwinfo = gmx_detect_hardware(mdlog, physicalNodeComm);
 
-    gmx_print_detected_hardware(fplog, isMasterSimMasterRank(ms, MASTER(cr)), mdlog, hwinfo);
+    gmx_print_detected_hardware(fplog, isSimulationMasterRank && isMasterSim(ms), mdlog, hwinfo);
 
     std::vector<int> gpuIdsToUse = makeGpuIdsToUse(hwinfo->gpu_info, hw_opt.gpuIdsAvailable);
 
@@ -698,7 +715,7 @@ int Mdrunner::mdrunner()
 
     auto                     partialDeserializedTpr = std::make_unique<PartialDeserializedTprFile>();
 
-    if (SIMMASTER(cr))
+    if (isSimulationMasterRank)
     {
         /* Only the master rank has the global state */
         globalState = std::make_unique<t_state>();
@@ -711,9 +728,9 @@ int Mdrunner::mdrunner()
     }
 
     /* Check and update the hardware options for internal consistency */
-    checkAndUpdateHardwareOptions(mdlog, &hw_opt, SIMMASTER(cr), domdecOptions.numPmeRanks, inputrec);
+    checkAndUpdateHardwareOptions(mdlog, &hw_opt, isSimulationMasterRank, domdecOptions.numPmeRanks, inputrec);
 
-    if (GMX_THREAD_MPI && SIMMASTER(cr))
+    if (GMX_THREAD_MPI && isSimulationMasterRank)
     {
         bool useGpuForNonbonded = false;
         bool useGpuForPme       = false;
@@ -752,20 +769,21 @@ int Mdrunner::mdrunner()
                                                 doMembed);
 
         // Now start the threads for thread MPI.
-        cr = spawnThreads(hw_opt.nthreads_tmpi);
-        /* The main thread continues here with a new cr. We don't deallocate
-           the old cr because other threads may still be reading it. */
-        // TODO Both master and spawned threads call dup_tfn and
-        // reinitialize_commrec_for_this_thread. Find a way to express
-        // this better.
-        physicalNodeComm = PhysicalNodeCommunicator(MPI_COMM_WORLD, gmx_physicalnode_id_hash());
+        spawnThreads(hw_opt.nthreads_tmpi);
+        // The spawned threads enter mdrunner() and execution of
+        // master and spawned threads joins at the end of this block.
+        physicalNodeComm = PhysicalNodeCommunicator(communicator, gmx_physicalnode_id_hash());
     }
-    // END OF CAUTION: cr and physicalNodeComm are now reliable
+
+    GMX_RELEASE_ASSERT(communicator == MPI_COMM_WORLD, "Must have valid world communicator");
+    CommrecHandle crHandle = init_commrec(communicator, ms);
+    t_commrec    *cr       = crHandle.get();
+    GMX_RELEASE_ASSERT(cr != nullptr, "Must have valid commrec");
 
     if (PAR(cr))
     {
         /* now broadcast everything to the non-master nodes/threads: */
-        if (!SIMMASTER(cr))
+        if (!isSimulationMasterRank)
         {
             inputrec = &inputrecInstance;
         }
@@ -774,10 +792,9 @@ int Mdrunner::mdrunner()
     GMX_RELEASE_ASSERT(inputrec != nullptr, "All ranks should have a valid inputrec now");
     partialDeserializedTpr.reset(nullptr);
 
-    // Now each rank knows the inputrec that SIMMASTER read and used,
-    // and (if applicable) cr->nnodes has been assigned the number of
-    // thread-MPI ranks that have been chosen. The ranks can now all
-    // run the task-deciding functions and will agree on the result
+    // Now the number of ranks is known to all ranks, and each knows
+    // the inputrec read by the master rank. The ranks can now all run
+    // the task-deciding functions and will agree on the result
     // without needing to communicate.
     //
     // TODO Should we do the communication in debug mode to support
@@ -796,7 +813,7 @@ int Mdrunner::mdrunner()
     try
     {
         // It's possible that there are different numbers of GPUs on
-        // different nodes, which is the user's responsibilty to
+        // different nodes, which is the user's responsibility to
         // handle. If unsuitable, we will notice that during task
         // assignment.
         auto canUseGpuForNonbonded = buildSupportsNonbondedOnGpu(nullptr);
@@ -831,6 +848,10 @@ int Mdrunner::mdrunner()
         }
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR;
+
+    // Initialize development feature flags that enabled by environment variable
+    // and report those features that are enabled.
+    const DevelopmentFeatureFlags devFlags = manageDevelopmentFeatures(mdlog, useGpuForNonbonded);
 
     // Build restraints.
     // TODO: hide restraint implementation details from Mdrunner.
@@ -980,7 +1001,7 @@ int Mdrunner::mdrunner()
          */
         if (mdrunOptions.numStepsCommandline > -2)
         {
-            /* Temporarily set the number of steps to unmlimited to avoid
+            /* Temporarily set the number of steps to unlimited to avoid
              * triggering the nsteps check in load_checkpoint().
              * This hack will go away soon when the -nsteps option is removed.
              */
@@ -999,7 +1020,7 @@ int Mdrunner::mdrunner()
             // Now we can start normal logging to the truncated log file.
             fplog    = gmx_fio_getfp(logFileHandle);
             prepareLogAppending(fplog);
-            logOwner = buildLogger(fplog, cr);
+            logOwner = buildLogger(fplog, MASTER(cr));
             mdlog    = logOwner.logger();
         }
     }
@@ -1010,7 +1031,7 @@ int Mdrunner::mdrunner()
             appendText("The -nsteps functionality is deprecated, and may be removed in a future version. "
                        "Consider using gmx convert-tpr -nsteps or changing the appropriate .mdp file field.");
     }
-    /* override nsteps with value set on the commamdline */
+    /* override nsteps with value set on the commandline */
     override_nsteps_cmdline(mdlog, mdrunOptions.numStepsCommandline, inputrec);
 
     if (SIMMASTER(cr))
@@ -1031,17 +1052,19 @@ int Mdrunner::mdrunner()
     prepare_verlet_scheme(fplog, cr, inputrec, nstlist_cmdline, &mtop, box,
                           useGpuForNonbonded || (emulateGpuNonbonded == EmulateGpuNonbonded::Yes), *hwinfo->cpuInfo);
 
-    const bool          prefer1DAnd1PulseDD = (c_enableGpuHaloExchange && useGpuForNonbonded);
-    LocalAtomSetManager atomSets;
+    const bool prefer1DAnd1PulseDD = (devFlags.enableGpuHaloExchange && useGpuForNonbonded);
+    // This builder is necessary while we have multi-part construction
+    // of DD. Before DD is constructed, we use the existence of
+    // the builder object to indicate that further construction of DD
+    // is needed.
+    std::unique_ptr<DomainDecompositionBuilder> ddBuilder;
     if (PAR(cr) && !(EI_TPI(inputrec->eI) ||
                      inputrec->eI == eiNM))
     {
-        cr->dd = init_domain_decomposition(mdlog, cr, domdecOptions, mdrunOptions,
-                                           prefer1DAnd1PulseDD,
-                                           &mtop, inputrec,
-                                           box, positionsFromStatePointer(globalState.get()),
-                                           &atomSets);
-        // Note that local state still does not exist yet.
+        ddBuilder = std::make_unique<DomainDecompositionBuilder>
+                (mdlog, cr, domdecOptions, mdrunOptions,
+                prefer1DAnd1PulseDD, mtop, *inputrec,
+                box, positionsFromStatePointer(globalState.get()));
     }
     else
     {
@@ -1054,6 +1077,60 @@ int Mdrunner::mdrunner()
             gmx_fatal(FARGS,
                       "pbc=screw is only implemented with domain decomposition");
         }
+    }
+
+    // Produce the task assignment for this rank.
+    GpuTaskAssignmentsBuilder gpuTaskAssignmentsBuilder;
+    GpuTaskAssignments        gpuTaskAssignments =
+        gpuTaskAssignmentsBuilder.build(gpuIdsToUse,
+                                        userGpuTaskAssignment,
+                                        *hwinfo,
+                                        cr,
+                                        ms,
+                                        physicalNodeComm,
+                                        nonbondedTarget,
+                                        pmeTarget,
+                                        bondedTarget,
+                                        updateTarget,
+                                        useGpuForNonbonded,
+                                        useGpuForPme,
+                                        thisRankHasDuty(cr, DUTY_PP),
+                                        // TODO cr->duty & DUTY_PME should imply that a PME
+                                        // algorithm is active, but currently does not.
+                                        EEL_PME(inputrec->coulombtype) &&
+                                        thisRankHasDuty(cr, DUTY_PME));
+
+    const bool printHostName = (cr->nnodes > 1);
+    gpuTaskAssignments.reportGpuUsage(mdlog, printHostName, useGpuForBonded, pmeRunMode);
+
+    // If the user chose a task assignment, give them some hints
+    // where appropriate.
+    if (!userGpuTaskAssignment.empty())
+    {
+        gpuTaskAssignments.logPerformanceHints(mdlog,
+                                               ssize(gpuIdsToUse));
+    }
+
+    // Get the device handles for the modules, nullptr when no task is assigned.
+    gmx_device_info_t *nonbondedDeviceInfo   = gpuTaskAssignments.initNonbondedDevice(cr);
+    gmx_device_info_t *pmeDeviceInfo         = gpuTaskAssignments.initPmeDevice();
+
+    // TODO Initialize GPU streams here.
+
+    // TODO Currently this is always built, yet DD partition code
+    // checks if it is built before using it. Probably it should
+    // become an MDModule that is made only when another module
+    // requires it (e.g. pull, CompEl, density fitting), so that we
+    // don't update the local atom sets unilaterally every step.
+    LocalAtomSetManager atomSets;
+    if (ddBuilder)
+    {
+        // TODO Pass the GPU streams to ddBuilder to use in buffer
+        // transfers (e.g. halo exchange)
+        cr->dd = ddBuilder->build(&atomSets);
+        // The builder's job is done, so destruct it
+        ddBuilder.reset(nullptr);
+        // Note that local state still does not exist yet.
     }
 
     if (PAR(cr))
@@ -1119,71 +1196,12 @@ int Mdrunner::mdrunner()
         gmx_feenableexcept();
     }
 
-    // TODO This could move before init_domain_decomposition() as part
-    // of refactoring that separates the responsibility for duty
-    // assignment from setup for communication between tasks, and
-    // setup for tasks handled with a domain (ie including short-ranged
-    // tasks, bonded tasks, etc.).
-    //
-    // Note that in general useGpuForNonbonded, etc. can have a value
-    // that is inconsistent with the presence of actual GPUs on any
-    // rank, and that is not known to be a problem until the
-    // duty of the ranks on a node become known.
-
-    // Produce the task assignment for this rank.
-    GpuTaskAssignmentsBuilder gpuTaskAssignmentsBuilder;
-    GpuTaskAssignments        gpuTaskAssignments =
-        gpuTaskAssignmentsBuilder.build(gpuIdsToUse,
-                                        userGpuTaskAssignment,
-                                        *hwinfo,
-                                        cr,
-                                        ms,
-                                        physicalNodeComm,
-                                        nonbondedTarget,
-                                        pmeTarget,
-                                        bondedTarget,
-                                        updateTarget,
-                                        useGpuForNonbonded,
-                                        useGpuForPme,
-                                        thisRankHasDuty(cr, DUTY_PP),
-                                        // TODO cr->duty & DUTY_PME should imply that a PME
-                                        // algorithm is active, but currently does not.
-                                        EEL_PME(inputrec->coulombtype) &&
-                                        thisRankHasDuty(cr, DUTY_PME));
-
-    const bool printHostName = (cr->nnodes > 1);
-    gpuTaskAssignments.reportGpuUsage(mdlog, printHostName, useGpuForBonded, pmeRunMode);
-
-    // If the user chose a task assignment, give them some hints
-    // where appropriate.
-    if (!userGpuTaskAssignment.empty())
-    {
-        gpuTaskAssignments.logPerformanceHints(mdlog,
-                                               ssize(gpuIdsToUse));
-    }
-
     /* Now that we know the setup is consistent, check for efficiency */
     check_resource_division_efficiency(hwinfo,
                                        gpuTaskAssignments.thisRankHasAnyGpuTask(),
                                        mdrunOptions.ntompOptionIsSet,
                                        cr,
                                        mdlog);
-
-    // Get the device handles for the modules, nullptr when no task is assigned.
-    gmx_device_info_t *nonbondedDeviceInfo   = gpuTaskAssignments.initNonbondedDevice(cr);
-    gmx_device_info_t *pmeDeviceInfo         = gpuTaskAssignments.initPmeDevice();
-    const bool         thisRankHasPmeGpuTask = gpuTaskAssignments.thisRankHasPmeGpuTask();
-
-    // TODO should live in ewald module once its testing is improved
-    //
-    // Later, this program could contain kernels that might be later
-    // re-used as auto-tuning progresses, or subsequent simulations
-    // are invoked.
-    PmeGpuProgramStorage pmeGpuProgram;
-    if (thisRankHasPmeGpuTask)
-    {
-        pmeGpuProgram = buildPmeGpuProgram(pmeDeviceInfo);
-    }
 
     /* getting number of PP/PME threads on this MPI / tMPI rank.
        PME: env variable should be read only on one node to make sure it is
@@ -1245,6 +1263,7 @@ int Mdrunner::mdrunner()
                                  .checkpointOptions.period);
     }
 
+    const bool                   thisRankHasPmeGpuTask = gpuTaskAssignments.thisRankHasPmeGpuTask();
     std::unique_ptr<MDAtoms>     mdAtoms;
     std::unique_ptr<gmx_vsite_t> vsite;
 
@@ -1272,10 +1291,9 @@ int Mdrunner::mdrunner()
         // TODO remove need to pass local stream into GPU halo exchange - Redmine #3093
         if (havePPDomainDecomposition(cr) && prefer1DAnd1PulseDD && is1DAnd1PulseDD(*cr->dd))
         {
-            GMX_RELEASE_ASSERT(c_enableGpuBufOps, "Must use GMX_GPU_BUFFER_OPS=1 to use GMX_GPU_DD_COMMS=1");
-            void *streamLocal                   = Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::NonLocal);
-            void *streamNonLocal                =
-                Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::NonLocal);
+            GMX_RELEASE_ASSERT(devFlags.enableGpuBufferOps, "Must use GMX_GPU_BUFFER_OPS=1 to use GMX_GPU_DD_COMMS=1");
+            void *streamLocal              = Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::Local);
+            void *streamNonLocal           = Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::NonLocal);
             void *coordinatesOnDeviceEvent = fr->nbv->get_x_on_device_event();
             GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
                     "NOTE: This run uses the 'GPU halo exchange' feature, enabled by the GMX_GPU_DD_COMMS environment variable.");
@@ -1344,6 +1362,17 @@ int Mdrunner::mdrunner()
     // This reference hides the fact that PME data is owned by runner on PME-only ranks and by forcerec on other ranks
     GMX_ASSERT(thisRankHasDuty(cr, DUTY_PP) == (fr != nullptr), "Double-checking that only PME-only ranks have no forcerec");
     gmx_pme_t * &pmedata = fr ? fr->pmedata : sepPmeData;
+
+    // TODO should live in ewald module once its testing is improved
+    //
+    // Later, this program could contain kernels that might be later
+    // re-used as auto-tuning progresses, or subsequent simulations
+    // are invoked.
+    PmeGpuProgramStorage pmeGpuProgram;
+    if (thisRankHasPmeGpuTask)
+    {
+        pmeGpuProgram = buildPmeGpuProgram(pmeDeviceInfo);
+    }
 
     /* Initiate PME if necessary,
      * either on all nodes or on dedicated PME nodes only. */
@@ -1491,7 +1520,7 @@ int Mdrunner::mdrunner()
         useGpuForUpdate = decideWhetherToUseGpuForUpdate(DOMAINDECOMP(cr),
                                                          useGpuForPme,
                                                          useGpuForNonbonded,
-                                                         c_enableGpuBufOps,
+                                                         devFlags.enableGpuBufferOps,
                                                          updateTarget,
                                                          gpusWereDetected,
                                                          *inputrec,
@@ -1500,20 +1529,52 @@ int Mdrunner::mdrunner()
                                                          fcd->orires.nr != 0,
                                                          fcd->disres.nsystems != 0);
 
-        // TODO This is not the right place to manage the lifetime of
-        // this data structure, but currently it's the easiest way to
-        // make it work.
-        MdrunScheduleWorkload runScheduleWork;
-
-        GMX_ASSERT(stopHandlerBuilder_, "Runner must provide StopHandlerBuilder to simulator.");
-        SimulatorBuilder simulatorBuilder;
-
-        // build and run simulator object based on user-input
         const bool inputIsCompatibleWithModularSimulator = ModularSimulator::isInputCompatible(
                     false,
                     inputrec, doRerun, vsite.get(), ms, replExParams,
                     fcd, static_cast<int>(filenames.size()), filenames.data(),
                     &observablesHistory, membed);
+
+        const bool useModularSimulator = inputIsCompatibleWithModularSimulator && !(getenv("GMX_DISABLE_MODULAR_SIMULATOR") != nullptr);
+
+        std::unique_ptr<gmx::StatePropagatorDataGpu> stateGpu;
+        if (gpusWereDetected && ((useGpuForPme && thisRankHasDuty(cr, DUTY_PME)) || devFlags.enableGpuBufferOps))
+        {
+            const void         *pmeStream      = pme_gpu_get_device_stream(fr->pmedata);
+            const void         *localStream    = fr->nbv->gpu_nbv != nullptr ? Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::Local) : nullptr;
+            const void         *nonLocalStream = fr->nbv->gpu_nbv != nullptr ? Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::NonLocal) : nullptr;
+            const void         *deviceContext  = pme_gpu_get_device_context(fr->pmedata);
+            const int           paddingSize    = pme_gpu_get_padding_size(fr->pmedata);
+            GpuApiCallBehavior  transferKind   = (inputrec->eI == eiMD && !doRerun && !useModularSimulator) ? GpuApiCallBehavior::Async : GpuApiCallBehavior::Sync;
+
+            stateGpu = std::make_unique<gmx::StatePropagatorDataGpu>(pmeStream,
+                                                                     localStream,
+                                                                     nonLocalStream,
+                                                                     deviceContext,
+                                                                     transferKind,
+                                                                     paddingSize);
+            fr->stateGpu = stateGpu.get();
+        }
+
+        // TODO This is not the right place to manage the lifetime of
+        // this data structure, but currently it's the easiest way to
+        // make it work.
+        MdrunScheduleWorkload runScheduleWork;
+        // Also populates the simulation constant workload description.
+        runScheduleWork.simulationWork = createSimulationWorkload(useGpuForNonbonded,
+                                                                  useGpuForPme,
+                                                                  (pmeRunMode == PmeRunMode::GPU),
+                                                                  useGpuForBonded,
+                                                                  useGpuForUpdate,
+                                                                  devFlags.enableGpuBufferOps,
+                                                                  devFlags.enableGpuHaloExchange,
+                                                                  devFlags.enableGpuPmePPComm);
+
+
+        GMX_ASSERT(stopHandlerBuilder_, "Runner must provide StopHandlerBuilder to simulator.");
+        SimulatorBuilder simulatorBuilder;
+
+        // build and run simulator object based on user-input
         auto simulator = simulatorBuilder.build(
                     inputIsCompatibleWithModularSimulator,
                     fplog, cr, ms, mdlog, static_cast<int>(filenames.size()), filenames.data(),
@@ -1537,8 +1598,7 @@ int Mdrunner::mdrunner()
                     membed,
                     walltime_accounting,
                     std::move(stopHandlerBuilder_),
-                    doRerun,
-                    useGpuForUpdate);
+                    doRerun);
         simulator->run();
 
         if (inputrec->bPull)
@@ -1669,7 +1729,8 @@ class Mdrunner::BuilderImplementation
 {
     public:
         BuilderImplementation() = delete;
-        BuilderImplementation(std::unique_ptr<MDModules> mdModules);
+        BuilderImplementation(std::unique_ptr<MDModules>           mdModules,
+                              compat::not_null<SimulationContext*> context);
         ~BuilderImplementation();
 
         BuilderImplementation &setExtraMdrunOptions(const MdrunOptions &options,
@@ -1681,10 +1742,6 @@ class Mdrunner::BuilderImplementation
         void addVerletList(int nstlist);
 
         void addReplicaExchange(const ReplicaExchangeParameters &params);
-
-        void addMultiSim(gmx_multisim_t* multisim);
-
-        void addCommunicationRecord(t_commrec *cr);
 
         void addNonBonded(const char* nbpu_opt);
 
@@ -1727,10 +1784,10 @@ class Mdrunner::BuilderImplementation
         int         nstlist_ = 0;
 
         //! Multisim communicator handle.
-        std::unique_ptr<gmx_multisim_t*>      multisim_ = nullptr;
+        gmx_multisim_t *multiSimulation_;
 
-        //! Non-owning communication record (only used when building command-line mdrun)
-        t_commrec *communicationRecord_ = nullptr;
+        //! mdrun communicator
+        MPI_Comm communicator_ = MPI_COMM_NULL;
 
         //! Print a warning if any force is larger than this (in kJ/mol nm).
         real forceWarningThreshold_ = -1;
@@ -1769,9 +1826,12 @@ class Mdrunner::BuilderImplementation
         std::unique_ptr<StopHandlerBuilder> stopHandlerBuilder_ = nullptr;
 };
 
-Mdrunner::BuilderImplementation::BuilderImplementation(std::unique_ptr<MDModules> mdModules) :
+Mdrunner::BuilderImplementation::BuilderImplementation(std::unique_ptr<MDModules>           mdModules,
+                                                       compat::not_null<SimulationContext*> context) :
     mdModules_(std::move(mdModules))
 {
+    communicator_    = context->communicator_;
+    multiSimulation_ = context->multiSimulation_.get();
 }
 
 Mdrunner::BuilderImplementation::~BuilderImplementation() = default;
@@ -1802,16 +1862,6 @@ void Mdrunner::BuilderImplementation::addReplicaExchange(const ReplicaExchangePa
     replicaExchangeParameters_ = params;
 }
 
-void Mdrunner::BuilderImplementation::addMultiSim(gmx_multisim_t* multisim)
-{
-    multisim_ = std::make_unique<gmx_multisim_t*>(multisim);
-}
-
-void Mdrunner::BuilderImplementation::addCommunicationRecord(t_commrec *cr)
-{
-    communicationRecord_ = cr;
-}
-
 Mdrunner Mdrunner::BuilderImplementation::build()
 {
     auto newRunner = Mdrunner(std::move(mdModules_));
@@ -1831,18 +1881,10 @@ Mdrunner Mdrunner::BuilderImplementation::build()
 
     newRunner.filenames = filenames_;
 
-    GMX_ASSERT(communicationRecord_, "Bug found. It should not be possible to call build() without a valid communicationRecord_.");
-    newRunner.cr = communicationRecord_;
+    newRunner.communicator = communicator_;
 
-    if (multisim_)
-    {
-        // nullptr is a valid value for the multisim handle, so we don't check the pointed-to pointer.
-        newRunner.ms = *multisim_;
-    }
-    else
-    {
-        GMX_THROW(gmx::APIError("MdrunnerBuilder::addMultiSim() is required before build()"));
-    }
+    // nullptr is a valid value for the multisim handle
+    newRunner.ms = multiSimulation_;
 
     // \todo Clarify ownership and lifetime management for gmx_output_env_t
     // \todo Update sanity checking when output environment has clearly specified invariants.
@@ -1885,6 +1927,16 @@ Mdrunner Mdrunner::BuilderImplementation::build()
     {
         GMX_THROW(gmx::APIError("MdrunnerBuilder::addBondedTaskAssignment() is required before build()"));
     }
+
+    if (update_opt_)
+    {
+        newRunner.update_opt = update_opt_;
+    }
+    else
+    {
+        GMX_THROW(gmx::APIError("MdrunnerBuilder::addUpdateTaskAssignment() is required before build()  "));
+    }
+
 
     newRunner.restraintManager_ = std::make_unique<gmx::RestraintManager>();
 
@@ -1947,8 +1999,9 @@ void Mdrunner::BuilderImplementation::addStopHandlerBuilder(std::unique_ptr<Stop
     stopHandlerBuilder_ = std::move(builder);
 }
 
-MdrunnerBuilder::MdrunnerBuilder(std::unique_ptr<MDModules>           mdModules) :
-    impl_ {std::make_unique<Mdrunner::BuilderImplementation>(std::move(mdModules))}
+MdrunnerBuilder::MdrunnerBuilder(std::unique_ptr<MDModules>           mdModules,
+                                 compat::not_null<SimulationContext*> context) :
+    impl_ {std::make_unique<Mdrunner::BuilderImplementation>(std::move(mdModules), context)}
 {
 }
 
@@ -1977,18 +2030,6 @@ MdrunnerBuilder &MdrunnerBuilder::addNeighborList(int nstlist)
 MdrunnerBuilder &MdrunnerBuilder::addReplicaExchange(const ReplicaExchangeParameters &params)
 {
     impl_->addReplicaExchange(params);
-    return *this;
-}
-
-MdrunnerBuilder &MdrunnerBuilder::addMultiSim(gmx_multisim_t* multisim)
-{
-    impl_->addMultiSim(multisim);
-    return *this;
-}
-
-MdrunnerBuilder &MdrunnerBuilder::addCommunicationRecord(t_commrec *cr)
-{
-    impl_->addCommunicationRecord(cr);
     return *this;
 }
 

@@ -48,6 +48,7 @@
 
 #include "gmxpre.h"
 
+#include "gromacs/gpu_utils/gpueventsynchronizer.cuh"
 #include "gromacs/mdlib/leapfrog_cuda.cuh"
 #include "gromacs/mdlib/lincs_cuda.cuh"
 #include "gromacs/mdlib/settle_cuda.cuh"
@@ -62,15 +63,25 @@ class UpdateConstrainCuda::Impl
 {
 
     public:
-        /*! \brief Create Update-Constrain object
+        /*! \brief Create Update-Constrain object.
          *
-         * \param[in] ir        Input record data: LINCS takes number of iterations and order of
-         *                      projection from it.
-         * \param[in] mtop      Topology of the system: SETTLE gets the masses for O and H atoms
-         *                      and target O-H and H-H distances from this object.
+         * The constructor is given a non-nullptr \p commandStream, in which all the update and constrain
+         * routines are executed. \p xUpdatedOnDevice should mark the completion of all kernels that modify
+         * coordinates. The event is maintained outside this class and also passed to all (if any) consumers
+         * of the updated coordinates. The \p xUpdatedOnDevice also can not be a nullptr because the
+         * markEvent(...) method is called unconditionally.
+         *
+         * \param[in] ir                Input record data: LINCS takes number of iterations and order of
+         *                              projection from it.
+         * \param[in] mtop              Topology of the system: SETTLE gets the masses for O and H atoms
+         *                              and target O-H and H-H distances from this object.
+         * \param[in] commandStream     GPU stream to use. Can be nullptr.
+         * \param[in] xUpdatedOnDevice  The event synchronizer to use to mark that update is done on the GPU.
          */
         Impl(const t_inputrec     &ir,
-             const gmx_mtop_t     &mtop);
+             const gmx_mtop_t     &mtop,
+             const void           *commandStream,
+             GpuEventSynchronizer *xUpdatedOnDevice);
 
         ~Impl();
 
@@ -85,7 +96,7 @@ class UpdateConstrainCuda::Impl
          *   2. This is the temperature coupling step.
          * Parameters virial/lambdas can be nullptr if computeVirial/doTempCouple are false.
          *
-         * \param[in]  dt                     Timestep
+         * \param[in]  dt                     Timestep.
          * \param[in]  updateVelocities       If the velocities should be constrained.
          * \param[in]  computeVirial          If virial should be updated.
          * \param[out] virial                 Place to save virial tensor.
@@ -95,26 +106,31 @@ class UpdateConstrainCuda::Impl
          * \param[in]  dtPressureCouple       Period between pressure coupling steps
          * \param[in]  velocityScalingMatrix  Parrinello-Rahman velocity scaling matrix
          */
-        void integrate(const real                        dt,
-                       const bool                        updateVelocities,
-                       const bool                        computeVirial,
+        void integrate(real                              dt,
+                       bool                              updateVelocities,
+                       bool                              computeVirial,
                        tensor                            virial,
-                       const bool                        doTempCouple,
+                       bool                              doTempCouple,
                        gmx::ArrayRef<const t_grp_tcstat> tcstat,
-                       const bool                        doPressureCouple,
-                       const float                       dtPressureCouple,
+                       bool                              doPressureCouple,
+                       float                             dtPressureCouple,
                        const matrix                      velocityScalingMatrix);
 
-        /*! \brief
-         * Update data-structures (e.g. after NB search step).
+        /*! \brief Set the pointers and update data-structures (e.g. after NB search step).
          *
-         * \param[in] idef                 System topology
-         * \param[in] md                   Atoms data.
-         * \param[in] numTempScaleValues   Number of temperature scaling groups. Set zero for no temperature coupling.
+         * \param[in,out]  d_x            Device buffer with coordinates.
+         * \param[in,out]  d_v            Device buffer with velocities.
+         * \param[in]      d_f            Device buffer with forces.
+         * \param[in] idef                System topology
+         * \param[in] md                  Atoms data.
+         * \param[in] numTempScaleValues  Number of temperature scaling groups. Set zero for no temperature coupling.
          */
-        void set(const t_idef    &idef,
-                 const t_mdatoms &md,
-                 const int        numTempScaleValues);
+        void set(DeviceBuffer<float>        d_x,
+                 DeviceBuffer<float>        d_v,
+                 const DeviceBuffer<float>  d_f,
+                 const t_idef              &idef,
+                 const t_mdatoms           &md,
+                 const int                  numTempScaleValues);
 
         /*! \brief
          * Update PBC data.
@@ -125,77 +141,21 @@ class UpdateConstrainCuda::Impl
          */
         void setPbc(const t_pbc *pbc);
 
-        /*! \brief
-         * Copy coordinates from CPU to GPU.
+        /*! \brief Blocking wait on the update of coordinates being ready.
          *
-         * The data are assumed to be in float3/fvec format (single precision).
-         *
-         * \param[in] h_x  CPU pointer where coordinates should be copied from.
+         * \todo Remove when the "stitching" is done.
          */
-        void copyCoordinatesToGpu(const rvec *h_x);
+        void waitCoordinatesReadyOnDevice();
 
-        /*! \brief
-         * Copy velocities from CPU to GPU.
-         *
-         * The data are assumed to be in float3/fvec format (single precision).
-         *
-         * \param[in] h_v  CPU pointer where velocities should be copied from.
-         */
-        void copyVelocitiesToGpu(const rvec *h_v);
 
-        /*! \brief
-         * Copy forces from CPU to GPU.
-         *
-         * The data are assumed to be in float3/fvec format (single precision).
-         *
-         * \param[in] h_f  CPU pointer where forces should be copied from.
+        /*! \brief Return the synchronizer associated with the event indicated that the coordinates are ready on the device.
          */
-        void copyForcesToGpu(const rvec *h_f);
-
-        /*! \brief
-         * Copy coordinates from GPU to CPU.
-         *
-         * The data are assumed to be in float3/fvec format (single precision).
-         *
-         * \param[out] h_xp CPU pointer where coordinates should be copied to.
-         */
-        void copyCoordinatesFromGpu(rvec *h_xp);
-
-        /*! \brief
-         * Copy velocities from GPU to CPU.
-         *
-         * The velocities are assumed to be in float3/fvec format (single precision).
-         *
-         * \param[in] h_v  Pointer to velocities data.
-         */
-        void copyVelocitiesFromGpu(rvec *h_v);
-
-        /*! \brief
-         * Copy forces from GPU to CPU.
-         *
-         * The forces are assumed to be in float3/fvec format (single precision).
-         *
-         * \param[in] h_f  Pointer to forces data.
-         */
-        void copyForcesFromGpu(rvec *h_f);
-
-        /*! \brief
-         * Set the internal GPU-memory x, xprime and v pointers.
-         *
-         * Data is not copied. The data are assumed to be in float3/fvec format
-         * (float3 is used internally, but the data layout should be identical).
-         *
-         * \param[in] d_x   Pointer to the coordinates for the input (on GPU)
-         * \param[in] d_xp  Pointer to the coordinates for the output (on GPU)
-         * \param[in] d_v   Pointer to the velocities (on GPU)
-         * \param[in] d_f   Pointer to the forces (on GPU)
-         */
-        void setXVFPointers(rvec *d_x, rvec *d_xp, rvec *d_v, rvec *d_f);
+        GpuEventSynchronizer* getCoordinatesReadySync();
 
     private:
 
         //! CUDA stream
-        cudaStream_t        stream_;
+        CommandStream       commandStream_         = nullptr;
 
         //! Periodic boundary data
         PbcAiuc             pbcAiuc_;
@@ -203,33 +163,20 @@ class UpdateConstrainCuda::Impl
         //! Number of atoms
         int                 numAtoms_;
 
-        //! Coordinates before the timestep (on GPU)
+        //! Local copy of the pointer to the device positions buffer
         float3             *d_x_;
-        //! Number of elements in coordinates buffer
-        int                 numX_                  = -1;
-        //! Allocation size for the coordinates buffer
-        int                 numXAlloc_             = -1;
+        //! Local copy of the pointer to the device velocities buffer
+        float3             *d_v_;
+        //! Local copy of the pointer to the device forces buffer
+        float3             *d_f_;
 
-        //! Coordinates after the timestep (on GPU).
+        //! Device buffer for intermediate positions (maintained internally)
         float3             *d_xp_;
         //! Number of elements in shifted coordinates buffer
         int                 numXp_                 = -1;
         //! Allocation size for the shifted coordinates buffer
         int                 numXpAlloc_            = -1;
 
-        //! Velocities of atoms (on GPU)
-        float3             *d_v_;
-        //! Number of elements in velocities buffer
-        int                 numV_                  = -1;
-        //! Allocation size for the velocities buffer
-        int                 numVAlloc_             = -1;
-
-        //! Forces, exerted by atoms (on GPU)
-        float3             *d_f_;
-        //! Number of elements in forces buffer
-        int                 numF_                  = -1;
-        //! Allocation size for the forces buffer
-        int                 numFAlloc_             = -1;
 
         //! 1/mass for all atoms (GPU)
         real               *d_inverseMasses_;
@@ -245,6 +192,8 @@ class UpdateConstrainCuda::Impl
         //! SETTLE CUDA object for water constrains
         std::unique_ptr<SettleCuda>          settleCuda_;
 
+        //! An pointer to the event to indicate when the update of coordinates is complete
+        GpuEventSynchronizer                *coordinatesReady_;
 };
 
 } // namespace gmx

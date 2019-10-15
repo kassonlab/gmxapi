@@ -63,7 +63,11 @@ class LeapFrogCuda
 
     public:
 
-        LeapFrogCuda();
+        /*! \brief Constructor.
+         *
+         * \param[in] commandStream  Device command stream to use.
+         */
+        LeapFrogCuda(CommandStream commandStream);
         ~LeapFrogCuda();
 
         /*! \brief
@@ -78,10 +82,10 @@ class LeapFrogCuda
         /*! \brief Integrate
          *
          * Integrates the equation of motion using Leap-Frog algorithm.
-         * Updates coordinates and velocities on the GPU.
+         * Updates coordinates and velocities on the GPU. The current coordinates are saved for constraints.
          *
-         * \param[in]     d_x                    Initial coordinates.
-         * \param[out]    d_xp                   Place to save the resulting coordinates to.
+         * \param[in,out] d_x                    Coordinates to update
+         * \param[out]    d_xp                   Place to save the values of initial coordinates coordinates to.
          * \param[in,out] d_v                    Velocities (will be updated).
          * \param[in]     d_f                    Forces.
          * \param[in]     dt                     Timestep.
@@ -122,7 +126,7 @@ class LeapFrogCuda
     private:
 
         //! CUDA stream
-        cudaStream_t           stream_;
+        CommandStream          commandStream_;
         //! CUDA kernel launch config
         KernelLaunchConfig     kernelLaunchConfig_;
         //! Periodic boundary data

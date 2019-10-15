@@ -127,7 +127,7 @@ class PmeSplineAndSpreadTest : public ::testing::TestWithParam<SplineAndSpreadIn
                 if (!supportedInput)
                 {
                     /* Testing the failure for the unsupported input */
-                    EXPECT_THROW(pmeInitAtoms(&inputRec, codePath, nullptr, nullptr, coordinates, charges, box), NotImplementedError);
+                    EXPECT_THROW(pmeInitWrapper(&inputRec, codePath, nullptr, nullptr, box), NotImplementedError);
                     continue;
                 }
 
@@ -145,8 +145,10 @@ class PmeSplineAndSpreadTest : public ::testing::TestWithParam<SplineAndSpreadIn
 
                     /* Running the test */
 
-                    PmeSafePointer pmeSafe = pmeInitAtoms(&inputRec, codePath, context->getDeviceInfo(),
-                                                          context->getPmeGpuProgram(), coordinates, charges, box);
+                    PmeSafePointer pmeSafe = pmeInitWrapper(&inputRec, codePath, context->getDeviceInfo(), context->getPmeGpuProgram(), box);
+                    std::unique_ptr<StatePropagatorDataGpu> stateGpu = (codePath == CodePath::GPU) ? makeStatePropagatorDataGpu(*pmeSafe.get()) : nullptr;
+
+                    pmeInitAtoms(pmeSafe.get(), stateGpu.get(), codePath, coordinates, charges);
 
                     const bool     computeSplines = (option.first == PmeSplineAndSpreadOptions::SplineOnly) || (option.first == PmeSplineAndSpreadOptions::SplineAndSpreadUnified);
                     const bool     spreadCharges  = (option.first == PmeSplineAndSpreadOptions::SpreadOnly) || (option.first == PmeSplineAndSpreadOptions::SplineAndSpreadUnified);

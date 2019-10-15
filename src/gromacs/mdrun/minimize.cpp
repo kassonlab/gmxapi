@@ -660,16 +660,19 @@ static bool do_em_step(const t_commrec *cr,
 
         if (DOMAINDECOMP(cr))
         {
-            s2->ddp_count = s1->ddp_count;
-
             /* OpenMP does not supported unsigned loop variables */
 #pragma omp for schedule(static) nowait
             for (gmx::index i = 0; i < gmx::ssize(s2->cg_gl); i++)
             {
                 s2->cg_gl[i] = s1->cg_gl[i];
             }
-            s2->ddp_count_cg_gl = s1->ddp_count_cg_gl;
         }
+    }
+
+    if (DOMAINDECOMP(cr))
+    {
+        s2->ddp_count       = s1->ddp_count;
+        s2->ddp_count_cg_gl = s1->ddp_count_cg_gl;
     }
 
     if (constr)
@@ -948,11 +951,12 @@ static double reorder_partsum(const t_commrec *cr, t_grpopts *opts,
     rvec      *fmg;
     snew(fmg, natoms);
 
-    gmx::ArrayRef<const int> indicesMin = s_b->s.cg_gl;
+    gmx::ArrayRef<const int> indicesMin = s_min->s.cg_gl;
     int i = 0;
     for (int a : indicesMin)
     {
         copy_rvec(fm[i], fmg[a]);
+        i++;
     }
     gmx_sum(top_global->natoms*3, fmg[0], cr);
 

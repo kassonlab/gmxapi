@@ -18,6 +18,9 @@
 #
 # Connect by browsing to http://localhost:8080/
 #
+# Web service is provided by a base `httpd` Docker image. Refer to
+# https://hub.docker.com/_/httpd for additional details.
+#
 
 ARG REF=latest
 FROM gmxapi/ci-mpich:$REF as docsbuild
@@ -34,7 +37,7 @@ USER testing
 RUN . $VENV/bin/activate && \
     pip install -r /home/testing/gmxapi/requirements-docs.txt --no-cache-dir
 
-COPY documentation /home/testing/gmxapi/documentation
+COPY documentation/gmxapi /home/testing/gmxapi/documentation
 RUN cd /home/testing/gmxapi && \
     . $VENV/bin/activate && \
     sphinx-build -b html documentation html

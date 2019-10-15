@@ -1,9 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
- * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2010,2014,2015,2018, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -34,36 +32,36 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-#ifndef GMX_GMXLIB_CHARGEGROUP_H
-#define GMX_GMXLIB_CHARGEGROUP_H
+#ifndef GMX_GPU_UTILS_GPUTRAITS_H
+#define GMX_GPU_UTILS_GPUTRAITS_H
 
-#include <cstdio>
-
-#include "gromacs/math/vectypes.h"
-#include "gromacs/utility/real.h"
-
-struct gmx_mtop_t;
-struct t_block;
-
-void calc_chargegroup_radii(const gmx_mtop_t *mtop, rvec *x,
-                            real *rvdw1, real *rvdw2,
-                            real *rcoul1, real *rcoul2);
-/* This routine calculates the two largest charge group radii in x,
- * separately for VdW and Coulomb interactions.
+/*! \libinternal \file
+ *  \brief Declares the GPU type traits for non-GPU builds
+ *  \author Mark Abraham <mark.j.abraham@gmail.com>
+ *
+ * \inlibraryapi
+ * \ingroup module_gpu_utils
  */
 
-void calc_cgcm(FILE *log, int cg0, int cg1, const t_block *cgs,
-               rvec pos[], rvec cg_cm[]);
-/* Routine to compute centers of geometry of charge groups. No periodicity
- * is used.
- */
+#include "config.h"
 
-void put_charge_groups_in_box (FILE *log, int cg0, int cg1,
-                               int ePBC, matrix box, const t_block *cgs,
-                               rvec pos[],
-                               rvec cg_cm[]);
-/* This routine puts charge groups in the periodic box, keeping them
- * together.
- */
+#if GMX_GPU == GMX_GPU_CUDA
 
-#endif
+#include "gromacs/gpu_utils/gputraits.cuh"
+
+#elif GMX_GPU == GMX_GPU_OPENCL
+
+#include "gromacs/gpu_utils/gputraits_ocl.h"
+
+#else
+
+//! \brief GPU command stream
+using CommandStream = void *;
+//! \brief Single GPU call timing event
+using CommandEvent  = void *;
+//! \brief GPU context
+using DeviceContext = void *;
+
+#endif // GMX_GPU
+
+#endif // GMX_GPU_UTILS_GPUTRAITS_H

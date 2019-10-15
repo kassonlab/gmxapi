@@ -16,7 +16,7 @@ package for MD simulation workflows.
 
 For a quick start, consider pulling a recent Docker image that has
 already been configured for gmxapi and this plug-in.
-** todo: ** check and update (ref: [GitHub issue 230](https://github.com/kassonlab/gmxapi/issues/230))
+**todo:** check and update (ref: [GitHub issue 230](https://github.com/kassonlab/gmxapi/issues/230))
 
 Reference:
 
@@ -119,23 +119,19 @@ To download, build, and install, you may need to first install `wget`,
 The plugin requires libgmxapi to build. See
 [gmxapi](http://manual.gromacs.org/current/install-guide/index.html#gmxapi-external-api).
 Download an official release from http://www.gromacs.org or the latest gmxapi
-development branch from https://github.com/kassonlab/gromacs-gmxapi/tree/kassonLabFork
-
-    # install GROMACS 2020 or higher.
-    wget https://github.com/kassonlab/gromacs-gmxapi/archive/kassonLabFork.zip
-    unzip kassonLabFork.zip
-    cd gromacs-gmxapi-kassonLabFork
-    mkdir build
-    cd mkdir build
-    cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/gromacs -DGMX_THREAD_MPI=ON -DGMXAPI=ON
-    make install # use -j10 to build in parallel with 10 cores (or however many you have)
-    cd ../..
+development branch from https://github.com/kassonlab/gmxapi/
 
 We use CMake to configure and build a C++ library and a Python module
-for interacting with it. After installing the modified GROMACS (see
-above), either source the GMXRC file provided with the GROMACS
-installation or provide the install location to CMake with the
-`gmxapi_DIR` environment variable.
+for interacting with it.
+
+After installing GROMACS, either source the GMXRC file provided with the GROMACS
+installation or set `gmxapi_DIR` to the GROMACS installation path.
+
+The GROMACS installation provides some additional CMake infrastructure to help us build compatible client software.
+To help set the correct compilers, specify the CMake toolchains file with,
+*e.g.*, `-DCMAKE_TOOLCHAIN_FILE=/usr/local/gromacs/share/cmake/gromacs/gromacs-toolchain.cmake` (for GROMACS installed
+ to `/usr/local/gromacs`).
+**todo:** Link to GROMACS docs for the toolchains file.
 
 We recommend installing and using this code in a Python virtual
 environment. (See the documentation for your `gmxapi` distribution or
@@ -160,10 +156,10 @@ unambiguous, provide CMake with the Python interpreter you wish to use
 (the same as you are using for `gmxapi`) with
 `-DPYTHON_EXECUTABLE=/path/to/python3`.
 
-Assuming you downloaded GROMACS as above, the sample_restraint source code is in
-`gromacs-gmxapi-kassonLabFork/python_packaging/sample_restraint`
+From the root directory of the GROMACS source, the sample_restraint source code is in
+`python_packaging/sample_restraint`
 
-    cd gromacs-gmxapi-kassonLabFork/python_packaging/sample_restraint
+    cd python_packaging/sample_restraint
     mkdir build
     cd build
     # Get the GROMACS environment settings.
@@ -248,8 +244,7 @@ Python tests
 ------------
 
 For the Python-level testing, you will need `pytest` and `gmxapi`. We
-recommend setting up a Python virtual environment as described at
-[<https://github.com/kassonlab/gmxapi>](https://github.com/kassonlab/gmxapi)
+recommend setting up a Python virtual environment as described in the gmxapi installation instructions.
 
 You will also need a functioning MPI installation and the `mpi4py`
 package.

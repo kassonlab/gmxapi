@@ -116,8 +116,11 @@
 #include "gromacs/mdtypes/mdrunoptions.h"
 #include "gromacs/mdtypes/observableshistory.h"
 #include "gromacs/mdtypes/pullhistory.h"
+#include "gromacs/mdtypes/simulation_workload.h"
 #include "gromacs/mdtypes/state.h"
+#include "gromacs/mdtypes/state_propagator_data_gpu.h"
 #include "gromacs/modularsimulator/energyelement.h"
+#include "gromacs/nbnxm/gpu_data_mgmt.h"
 #include "gromacs/nbnxm/nbnxm.h"
 #include "gromacs/pbcutil/mshift.h"
 #include "gromacs/pbcutil/pbc.h"
@@ -254,7 +257,7 @@ void gmx::LegacySimulator::do_md()
         pleaseCiteCouplingAlgorithms(fplog, *ir);
     }
     gmx_mdoutf       *outf = init_mdoutf(fplog, nfile, fnm, mdrunOptions, cr, outputProvider, mdModulesNotifier, ir, top_global, oenv, wcycle,
-                                         StartingBehavior::NewSimulation);
+                                         startingBehavior);
     gmx::EnergyOutput energyOutput(mdoutf_get_fp_ene(outf), top_global, ir, pull_work, mdoutf_get_fp_dhdl(outf), false, mdModulesNotifier);
 
     gstat = global_stat_init(ir);
@@ -315,26 +318,59 @@ void gmx::LegacySimulator::do_md()
         upd.setNumAtoms(state->natoms);
     }
 
+/*****************************************************************************************/
+// TODO: The following block of code should be refactored, once:
+//       1. We have the useGpuForBufferOps variable set and available here and in do_force(...)
+//       2. The proper GPU syncronization is introduced, so that the H2D and D2H data copies can be performed in the separate
+//          stream owned by the StatePropagatorDataGpu
+    const auto &simulationWork     = runScheduleWork->simulationWork;
+    const bool  useGpuForPme       = simulationWork.usePmeGpu;
+    const bool  useGpuForNonbonded = simulationWork.useGpuNonbonded;
+    // Temporary solution to make sure that the buffer ops are offloaded when update is offloaded
+    const bool  useGpuForBufferOps   = simulationWork.useGpuBufferOps;
+    const bool  useGpuForUpdate      = simulationWork.useGpuUpdate;
+
     if (useGpuForUpdate)
     {
-        GMX_RELEASE_ASSERT(ir->eI == eiMD, "Only md integrator is supported on the GPU.");
-        GMX_RELEASE_ASSERT(ir->etc != etcNOSEHOOVER, "Nose Hoover temperature coupling is not supported on the GPU.");
-        GMX_RELEASE_ASSERT(ir->epc == epcNO || ir->epc == epcPARRINELLORAHMAN, "Only Parrinello Rahman pressure control is supported on the GPU.");
-        GMX_RELEASE_ASSERT(!mdatoms->haveVsites, "Virtual sites are not supported on the GPU");
-        GMX_RELEASE_ASSERT(ed == nullptr, "Essential dynamics is not supported with GPU-based update constraints.");
-        GMX_LOG(mdlog.info).asParagraph().
-            appendText("Updating coordinates on the GPU.");
-        integrator = std::make_unique<UpdateConstrainCuda>(*ir, *top_global);
-        integrator->set(top.idef, *mdatoms, ekind->ngtc);
-        t_pbc pbc;
-        set_pbc(&pbc, epbcXYZ, state->box);
-        integrator->setPbc(&pbc);
+        GMX_RELEASE_ASSERT(!DOMAINDECOMP(cr), "Domain decomposition is not supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(useGpuForPme || (useGpuForNonbonded && simulationWork.useGpuBufferOps),
+                           "Either PME or short-ranged non-bonded interaction tasks must run on the GPU to use GPU update.\n");
+        GMX_RELEASE_ASSERT(ir->eI == eiMD, "Only the md integrator is supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(ir->etc != etcNOSEHOOVER, "Nose-Hoover temperature coupling is not supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(ir->epc == epcNO || ir->epc == epcPARRINELLORAHMAN, "Only Parrinello-Rahman pressure control is supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(!mdatoms->haveVsites, "Virtual sites are not supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(ed == nullptr, "Essential dynamics is not supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(!ir->bPull && !ir->pull, "Pulling is not supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(fcd->orires.nr == 0, "Orientation restraints are not supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(fcd->disres.npair  == 0, "Distance restraints are not supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(ir->efep == efepNO, "Free energy perturbations are not supported with the GPU update.");
+
+        if (constr != nullptr && constr->numConstraintsTotal() > 0)
+        {
+            GMX_LOG(mdlog.info).asParagraph().
+                appendText("Updating coordinates and applying constraints on the GPU.");
+        }
+        else
+        {
+            GMX_LOG(mdlog.info).asParagraph().
+                appendText("Updating coordinates on the GPU.");
+        }
+        integrator = std::make_unique<UpdateConstrainCuda>(*ir, *top_global, fr->stateGpu->getUpdateStream(), fr->stateGpu->xUpdatedOnDevice());
     }
 
-    if (fr->nbv->useGpu())
+    if (useGpuForPme || (useGpuForNonbonded && useGpuForBufferOps) || useGpuForUpdate)
     {
-        changePinningPolicy(&state->x, gmx::PinningPolicy::PinnedIfSupported);
+        changePinningPolicy(&state->x, PinningPolicy::PinnedIfSupported);
     }
+    if ((useGpuForNonbonded && useGpuForBufferOps) || useGpuForUpdate)
+    {
+        changePinningPolicy(&f, PinningPolicy::PinnedIfSupported);
+    }
+    if (useGpuForUpdate)
+    {
+        changePinningPolicy(&state->v, PinningPolicy::PinnedIfSupported);
+    }
+/*****************************************************************************************/
 
     // NOTE: The global state is no longer used at this point.
     // But state_global is still used as temporary storage space for writing
@@ -1185,16 +1221,19 @@ void gmx::LegacySimulator::do_md()
 
         if (useGpuForUpdate)
         {
+            StatePropagatorDataGpu *stateGpu = fr->stateGpu;
             if (bNS)
             {
-                integrator->set(top.idef, *mdatoms, ekind->ngtc);
+                integrator->set(stateGpu->getCoordinates(), stateGpu->getVelocities(), stateGpu->getForces(),
+                                top.idef, *mdatoms, ekind->ngtc);
                 t_pbc pbc;
                 set_pbc(&pbc, epbcXYZ, state->box);
                 integrator->setPbc(&pbc);
             }
-            integrator->copyCoordinatesToGpu(state->x.rvec_array());
-            integrator->copyVelocitiesToGpu(state->v.rvec_array());
-            integrator->copyForcesToGpu(as_rvec_array(f.data()));
+
+            stateGpu->copyCoordinatesToGpu(ArrayRef<RVec>(state->x), StatePropagatorDataGpu::AtomLocality::All);
+            stateGpu->copyVelocitiesToGpu(state->v, StatePropagatorDataGpu::AtomLocality::All);
+            stateGpu->copyForcesToGpu(ArrayRef<RVec>(f), StatePropagatorDataGpu::AtomLocality::All);
 
             bool doTempCouple     = (ir->etc != etcNO && do_per_step(step + ir->nsttcouple - 1, ir->nsttcouple));
             bool doPressureCouple = (ir->epc == epcPARRINELLORAHMAN && do_per_step(step + ir->nstpcouple - 1, ir->nstpcouple));
@@ -1203,9 +1242,11 @@ void gmx::LegacySimulator::do_md()
             integrator->integrate(ir->delta_t, true, bCalcVir, shake_vir,
                                   doTempCouple, ekind->tcstat,
                                   doPressureCouple, ir->nstpcouple*ir->delta_t, M);
+            stateGpu->copyCoordinatesFromGpu(ArrayRef<RVec>(state->x), StatePropagatorDataGpu::AtomLocality::All);
+            stateGpu->copyVelocitiesFromGpu(state->v, StatePropagatorDataGpu::AtomLocality::All);
 
-            integrator->copyCoordinatesFromGpu(state->x.rvec_array());
-            integrator->copyVelocitiesFromGpu(state->v.rvec_array());
+            // TODO: replace with stateGpu->waitForCopyCoordinatesFromGpu(...)
+            integrator->waitCoordinatesReadyOnDevice();
         }
         else
         {

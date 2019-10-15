@@ -61,7 +61,6 @@
 #include "gromacs/domdec/localatomsetmanager.h"
 #include "gromacs/domdec/mdsetup.h"
 #include "gromacs/ewald/pme.h"
-#include "gromacs/gmxlib/chargegroup.h"
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/gmxlib/nrnb.h"
 #include "gromacs/imd/imd.h"
@@ -1461,7 +1460,6 @@ set_dd_corners(const gmx_domdec_t *dd,
 {
     const gmx_domdec_comm_t  *comm;
     const gmx_domdec_zones_t *zones;
-    int i, j;
 
     comm = dd->comm;
 
@@ -1499,22 +1497,23 @@ set_dd_corners(const gmx_domdec_t *dd,
         if (dd->ndim >= 3)
         {
             dim2 = dd->dim[2];
-            for (j = 0; j < 4; j++)
+            for (int j = 0; j < 4; j++)
             {
                 c->c[2][j] = comm->cell_x0[dim2];
             }
             if (isDlbOn(dd->comm))
             {
                 /* Use the maximum of the i-cells that see a j-cell */
-                for (i = 0; i < zones->nizone; i++)
+                for (const auto &iZone : zones->iZones)
                 {
-                    for (j = zones->izone[i].j0; j < zones->izone[i].j1; j++)
+                    const int iZoneIndex = iZone.iZoneIndex;
+                    for (int jZone : iZone.jZoneRange)
                     {
-                        if (j >= 4)
+                        if (jZone >= 4)
                         {
-                            c->c[2][j-4] =
-                                std::max(c->c[2][j-4],
-                                         comm->zone_d2[zones->shift[i][dim0]][zones->shift[i][dim1]].mch0);
+                            c->c[2][jZone - 4] =
+                                std::max(c->c[2][jZone - 4],
+                                         comm->zone_d2[zones->shift[iZoneIndex][dim0]][zones->shift[iZoneIndex][dim1]].mch0);
                         }
                     }
                 }
@@ -1522,9 +1521,9 @@ set_dd_corners(const gmx_domdec_t *dd,
                 {
                     /* For the multi-body distance we need the maximum */
                     c->bc[2] = comm->cell_x0[dim2];
-                    for (i = 0; i < 2; i++)
+                    for (int i = 0; i < 2; i++)
                     {
-                        for (j = 0; j < 2; j++)
+                        for (int j = 0; j < 2; j++)
                         {
                             c->bc[2] = std::max(c->bc[2], comm->zone_d2[i][j].p1_0);
                         }
@@ -2188,13 +2187,12 @@ static void setup_dd_communication(gmx_domdec_t *dd,
 //! Set boundaries for the charge group range.
 static void set_cg_boundaries(gmx_domdec_zones_t *zones)
 {
-    int c;
-
-    for (c = 0; c < zones->nizone; c++)
+    for (auto &iZone : zones->iZones)
     {
-        zones->izone[c].cg1  = zones->cg_range[c+1];
-        zones->izone[c].jcg0 = zones->cg_range[zones->izone[c].j0];
-        zones->izone[c].jcg1 = zones->cg_range[zones->izone[c].j1];
+        iZone.iAtomRange = gmx::Range<int>(0, zones->cg_range[iZone.iZoneIndex + 1]);
+        iZone.jAtomRange =
+            gmx::Range<int>(zones->cg_range[iZone.jZoneRange.begin()],
+                            zones->cg_range[iZone.jZoneRange.end()]);
     }
 }
 
@@ -2222,7 +2220,7 @@ static void set_zones_size(gmx_domdec_t *dd,
     gmx_domdec_comm_t  *comm;
     gmx_domdec_zones_t *zones;
     gmx_bool            bDistMB;
-    int                 z, zi, d, dim;
+    int                 z, d, dim;
     real                rcs, rcmbs;
     int                 i, j;
     real                vol;
@@ -2316,7 +2314,7 @@ static void set_zones_size(gmx_domdec_t *dd,
 
                     if (bDistMB)
                     {
-                        for (zi = 0; zi < zones->nizone; zi++)
+                        for (size_t zi = 0; zi < zones->iZones.size(); zi++)
                         {
                             if (zones->shift[zi][dim] == 0)
                             {
@@ -2336,18 +2334,25 @@ static void set_zones_size(gmx_domdec_t *dd,
         /* Loop over the i-zones to set the upper limit of each
          * j-zone they see.
          */
-        for (zi = 0; zi < zones->nizone; zi++)
+        for (const auto &iZone : zones->iZones)
         {
+            const int zi = iZone.iZoneIndex;
             if (zones->shift[zi][dim] == 0)
             {
                 /* We should only use zones up to zone_end */
-                int jZoneEnd = std::min(zones->izone[zi].j1, zone_end);
-                for (z = zones->izone[zi].j0; z < jZoneEnd; z++)
+                const auto &jZoneRangeFull = iZone.jZoneRange;
+                if (zone_end <= *jZoneRangeFull.begin())
                 {
-                    if (zones->shift[z][dim] > 0)
+                    continue;
+                }
+                const gmx::Range<int> jZoneRange(*jZoneRangeFull.begin(),
+                                                 std::min(*jZoneRangeFull.end(), zone_end));
+                for (int jZone : jZoneRange)
+                {
+                    if (zones->shift[jZone][dim] > 0)
                     {
-                        zones->size[z].x1[dim] = std::max(zones->size[z].x1[dim],
-                                                          zones->size[zi].x1[dim]+rcs);
+                        zones->size[jZone].x1[dim] = std::max(zones->size[jZone].x1[dim],
+                                                              zones->size[zi].x1[dim]+rcs);
                     }
                 }
             }
@@ -3178,7 +3183,7 @@ void dd_partition_system(FILE                        *fplog,
         }
         else
         {
-            if (EEL_FULL(ir->coulombtype) && dd->n_intercg_excl > 0)
+            if (EEL_FULL(ir->coulombtype) && dd->haveExclusions)
             {
                 nat_f_novirsum = comm->atomRanges.end(DDAtomRanges::Type::Zones);
             }
@@ -3199,7 +3204,7 @@ void dd_partition_system(FILE                        *fplog,
      * allocation, zeroing and copying, but this is probably not worth
      * the complications and checking.
      */
-    forcerec_set_ranges(fr, dd->ncg_home, dd->globalAtomGroupIndices.size(),
+    forcerec_set_ranges(fr,
                         comm->atomRanges.end(DDAtomRanges::Type::Zones),
                         comm->atomRanges.end(DDAtomRanges::Type::Constraints),
                         nat_f_novirsum);

@@ -77,7 +77,9 @@ enum class GpuTask : int
     //! Short-ranged interactions.
     Nonbonded,
     //! Long-ranged interactions.
-    Pme
+    Pme,
+    //! Number of possible tasks.
+    Count
 };
 
 /*! \libinternal
@@ -135,7 +137,8 @@ class GpuTaskAssignmentsBuilder
          *   - the possible existence of multi-simulations
          *
          * to assign the GPUs on each physical node to the tasks on
-         * the ranks of that node.
+         * the ranks of that node. It throws InconsistentInputError
+         * when a/the useful GPU task assignment is not possible.
          *
          * \param[in]  gpuIdsToUse            The compatible GPUs that the user permitted us to use.
          * \param[in]  userGpuTaskAssignment  The user-specified assignment of GPU tasks to device IDs.

@@ -393,7 +393,7 @@ class PmeGatherTest : public ::testing::TestWithParam<GatherInputParameters>
                 if (!supportedInput)
                 {
                     /* Testing the failure for the unsupported input */
-                    EXPECT_THROW(pmeInitAtoms(&inputRec, codePath, nullptr, nullptr, inputAtomData.coordinates, inputAtomData.charges, box), NotImplementedError);
+                    EXPECT_THROW(pmeInitWrapper(&inputRec, codePath, nullptr, nullptr, box), NotImplementedError);
                     continue;
                 }
 
@@ -407,8 +407,10 @@ class PmeGatherTest : public ::testing::TestWithParam<GatherInputParameters>
                                           (inputForceTreatment == PmeForceOutputHandling::ReduceWithInput) ? "with reduction" : "without reduction"
                                           ));
 
-                PmeSafePointer pmeSafe = pmeInitAtoms(&inputRec, codePath, context->getDeviceInfo(),
-                                                      context->getPmeGpuProgram(), inputAtomData.coordinates, inputAtomData.charges, box);
+                PmeSafePointer pmeSafe = pmeInitWrapper(&inputRec, codePath, context->getDeviceInfo(), context->getPmeGpuProgram(), box);
+                std::unique_ptr<StatePropagatorDataGpu> stateGpu = (codePath == CodePath::GPU) ? makeStatePropagatorDataGpu(*pmeSafe.get()) : nullptr;
+
+                pmeInitAtoms(pmeSafe.get(), stateGpu.get(), codePath, inputAtomData.coordinates, inputAtomData.charges);
 
                 /* Setting some more inputs */
                 pmeSetRealGrid(pmeSafe.get(), codePath, nonZeroGridValues);

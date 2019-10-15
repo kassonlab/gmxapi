@@ -47,6 +47,7 @@
 
 #include "testutils/cmdlinetest.h"
 #include "testutils/testfilemanager.h"
+#include "testutils/tprfilegenerator.h"
 
 namespace gmx
 {
@@ -54,65 +55,53 @@ namespace gmx
 namespace test
 {
 
-namespace
+class DumpTest : public ::testing::Test
 {
+    public:
+        //! Run test case.
+        void runTest(CommandLine *cmdline);
+    protected:
+        // TODO this is changed in newer googletest versions
+        //! Prepare shared resources.
+        static void SetUpTestCase()
+        {
+            s_tprFileHandle = new TprAndFileManager("lysozyme");
+        }
+        //! Clean up shared resources.
+        static void TearDownTestCase()
+        {
+            delete s_tprFileHandle;
+            s_tprFileHandle = nullptr;
+        }
+        //! Storage for opened file handles.
+        static TprAndFileManager *s_tprFileHandle;
+};
 
-/*! \brief
- * Generates a tpr for the test.
- *
- * Generates the tpr from a sample pdb file using grompp,and returns the path
- * to the file as std::string for reading it in later.
- *
- * \param[in] fileManager Filemanager to keep track of the input file.
- * \param[in] filename Basename of the input and output files.
- */
-std::string generateTprInput(TestFileManager *fileManager, const std::string &filename)
-{
-// generate temporary tpr file from test system
-    const std::string mdpInputFileName = fileManager->getTemporaryFilePath(filename + ".mdp");
-    TextWriter::writeFileFromString(mdpInputFileName, "");
-    std::string       tprName = fileManager->getTemporaryFilePath(filename + ".tpr");
-    {
-        CommandLine caller;
-        caller.append("grompp");
-        caller.addOption("-f", mdpInputFileName);
-        caller.addOption("-p", TestFileManager::getInputFilePath(filename + ".top"));
-        caller.addOption("-c", TestFileManager::getInputFilePath(filename + ".pdb"));
-        caller.addOption("-o", tprName);
-        EXPECT_EQ(0, gmx_grompp(caller.argc(), caller.argv()));
-    }
-    return tprName;
-}
+TprAndFileManager *DumpTest::s_tprFileHandle = nullptr;
 
-TEST(DumpTest, WorksWithTpr)
+void DumpTest::runTest(CommandLine *cmdline)
 {
-    TestFileManager   fileManager;
-    std::string       tprName   = generateTprInput(&fileManager, "lysozyme");
-    const char *const command[] = {
-        "dump", "-s", tprName.c_str()
-    };
-    CommandLine       cmdline(command);
     EXPECT_EQ(0, gmx::test::CommandLineTestHelper::runModuleFactory(
-                      &gmx::DumpInfo::create, &cmdline));
-
+                      &gmx::DumpInfo::create, cmdline));
 }
 
-TEST(DumpTest, WorksWithTprAndMdpWriting)
+TEST_F(DumpTest, WorksWithTpr)
 {
-    TestFileManager   fileManager;
-    std::string       tprName   = generateTprInput(&fileManager, "lysozyme");
-    std::string       mdpName   = fileManager.getTemporaryFilePath("output.mdp");
-    const char *const command[] = {
-        "dump", "-s", tprName.c_str(), "-om", mdpName.c_str()
-    };
+    const char *const command[] =
+    { "dump", "-s", s_tprFileHandle->tprName().c_str()};
     CommandLine       cmdline(command);
-    EXPECT_EQ(0, gmx::test::CommandLineTestHelper::runModuleFactory(
-                      &gmx::DumpInfo::create, &cmdline));
-
+    runTest(&cmdline);
 }
 
-
-} // namespace
+TEST_F(DumpTest, WorksWithTprAndMdpWriting)
+{
+    TestFileManager    fileManager;
+    std::string        mdpName   = fileManager.getTemporaryFilePath("output.mdp");
+    const char *const  command[] =
+    { "dump", "-s", s_tprFileHandle->tprName().c_str(), "-om", mdpName.c_str() };
+    CommandLine        cmdline(command);
+    runTest(&cmdline);
+}
 
 } // namespace test
 
