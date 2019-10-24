@@ -5,7 +5,7 @@
 # For extra debugging of failed jobs, see
 # https://docs.travis-ci.com/user/common-build-problems/#Troubleshooting-Locally-in-a-Docker-Image
 
-dist: xenial
+dist: bionic
 language: cpp
 
 # Different compiler or env are supposed to trigger different caches, but I had a hard time diagnosing problems
@@ -29,11 +29,10 @@ env:
   - CI_MPI=0 PY=3.5
   - CI_MPI=0 PY=3.6
   - CI_MPI=0 PY=3.7
+  - CI_MPI=0 PY=3.8
 
 addons:
   apt:
-    sources:
-    - sourceline: 'ppa:ubuntu-toolchain-r/test'
     packages:
     - doxygen
     - g++-6
@@ -54,13 +53,12 @@ before_install:
 install:
   - export CCACHE_DIR=$HOME/.ccache_gmxapi
   - ccache -s
-  - ./ci_scripts/install_cmake.sh
   - ./ci_scripts/install_gromacs_2020.sh
 
 before_script:
   - export CCACHE_DIR=$HOME/.ccache_gmxapi
   - ccache -s
-  - eval $(./ci_scripts/prepare_python.sh)
+  - ./ci_scripts/prepare_python.sh
 
 script:
   - source $HOME/install/gromacs_2020/bin/GMXRC && ./ci_scripts/test_installers.sh
