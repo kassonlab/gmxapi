@@ -643,8 +643,7 @@ void gpu_launch_kernel_pruneonly(gmx_nbnxn_cuda_t          *nb,
 void gpu_launch_cpyback(gmx_nbnxn_cuda_t        *nb,
                         nbnxn_atomdata_t        *nbatom,
                         const gmx::StepWorkload &stepWork,
-                        const AtomLocality       atomLocality,
-                        const bool               copyBackNbForce)
+                        const AtomLocality       atomLocality)
 {
     GMX_ASSERT(nb, "Need a valid nbnxn_gpu object");
 
@@ -682,8 +681,10 @@ void gpu_launch_cpyback(gmx_nbnxn_cuda_t        *nb,
         CU_RET_ERR(stat, "cudaStreamWaitEvent on nonlocal_done failed");
     }
 
-    /* DtoH f */
-    if (copyBackNbForce)
+    /* DtoH f
+     * Skip if buffer ops / reduction is offloaded to the GPU.
+     */
+    if (!stepWork.useGpuFBufferOps)
     {
         cu_copy_D2H_async(nbatom->out[0].f.data() + adat_begin * 3, adat->f + adat_begin,
                           (adat_len)*sizeof(*adat->f), stream);
@@ -748,6 +749,7 @@ void nbnxn_gpu_x_to_nbat_x(const Nbnxm::Grid               &grid,
                            bool                             setFillerCoords,
                            gmx_nbnxn_gpu_t                 *nb,
                            DeviceBuffer<float>              d_x,
+                           GpuEventSynchronizer            *xReadyOnDevice,
                            const Nbnxm::AtomLocality        locality,
                            int                              gridId,
                            int                              numColumnsMax)
@@ -769,6 +771,10 @@ void nbnxn_gpu_x_to_nbat_x(const Nbnxm::Grid               &grid,
     {
         // TODO: This will only work with CUDA
         GMX_ASSERT(d_x, "Need a valid device pointer");
+
+        // ensure that coordinates are ready on the device before launching the kernel
+        GMX_ASSERT(xReadyOnDevice, "Need a valid GpuEventSynchronizer object");
+        xReadyOnDevice->enqueueWaitEvent(stream);
 
         KernelLaunchConfig config;
         config.blockSize[0]     = c_bufOpsThreadsPerBlock;
@@ -874,6 +880,11 @@ void nbnxn_gpu_add_nbat_f_to_f(const AtomLocality                          atomL
 
     launchGpuKernel(kernelFn, config, nullptr, "FbufferOps", kernelArgs);
 
+    if (atomLocality == AtomLocality::Local)
+    {
+        GMX_ASSERT(nb->localFReductionDone != nullptr, "localFReductionDone has to be a valid pointer");
+        nb->localFReductionDone->markEvent(stream);
+    }
 }
 
 void* nbnxn_get_x_on_device_event(const gmx_nbnxn_cuda_t   *nb)

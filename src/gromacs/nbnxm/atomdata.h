@@ -41,12 +41,12 @@
 #include "gromacs/gpu_utils/devicebuffer_datatype.h"
 #include "gromacs/gpu_utils/hostallocator.h"
 #include "gromacs/math/vectypes.h"
+#include "gromacs/mdtypes/locality.h"
 #include "gromacs/utility/basedefinitions.h"
 #include "gromacs/utility/bitmask.h"
 #include "gromacs/utility/real.h"
 
 #include "gpu_types.h"
-#include "locality.h"
 
 namespace gmx
 {
@@ -319,7 +319,7 @@ void nbnxn_atomdata_copy_shiftvec(gmx_bool          dynamic_box,
  * \param[in,out] nbat     Data in NBNXM format, used for mapping formats and to locate the output buffer.
  */
 void nbnxn_atomdata_copy_x_to_nbat_x(const Nbnxm::GridSet       &gridSet,
-                                     Nbnxm::AtomLocality         locality,
+                                     gmx::AtomLocality           locality,
                                      bool                        fillLocal,
                                      const rvec                 *coordinates,
                                      nbnxn_atomdata_t           *nbat);
@@ -334,12 +334,14 @@ void nbnxn_atomdata_copy_x_to_nbat_x(const Nbnxm::GridSet       &gridSet,
  * \param[in]     fillLocal  Tells if the local filler particle coordinates should be zeroed.
  * \param[in,out] gpu_nbv    The NBNXM GPU data structure.
  * \param[in]     d_x        Coordinates to be copied (in plain rvec format).
+ * \param[in]     xReadyOnDevice   Event synchronizer indicating that the coordinates are ready in the device memory.
  */
-void nbnxn_atomdata_x_to_nbat_x_gpu(const Nbnxm::GridSet     &gridSet,
-                                    Nbnxm::AtomLocality       locality,
-                                    bool                      fillLocal,
-                                    gmx_nbnxn_gpu_t          *gpu_nbv,
-                                    DeviceBuffer<float>       d_x);
+void nbnxn_atomdata_x_to_nbat_x_gpu(const Nbnxm::GridSet      &gridSet,
+                                    gmx::AtomLocality          locality,
+                                    bool                       fillLocal,
+                                    gmx_nbnxn_gpu_t           *gpu_nbv,
+                                    DeviceBuffer<float>        d_x,
+                                    GpuEventSynchronizer      *xReadyOnDevice);
 
 /*! \brief Add the computed forces to \p f, an internal reduction might be performed as well
  *
@@ -349,7 +351,7 @@ void nbnxn_atomdata_x_to_nbat_x_gpu(const Nbnxm::GridSet     &gridSet,
  * \param[out] totalForce  Buffer to accumulate resulting force
  */
 void reduceForces(nbnxn_atomdata_t                   *nbat,
-                  Nbnxm::AtomLocality                 locality,
+                  gmx::AtomLocality                   locality,
                   const Nbnxm::GridSet               &gridSet,
                   rvec                               *totalForce);
 
@@ -364,7 +366,7 @@ void reduceForces(nbnxn_atomdata_t                   *nbat,
  * \param[in]  useGpuFPmeReduction  Whether PME forces should be added.
  * \param[in]  accumulateForce      Whether there are usefull data already in the total force buffer.
  */
-void reduceForcesGpu(Nbnxm::AtomLocality                         locality,
+void reduceForcesGpu(gmx::AtomLocality                           locality,
                      DeviceBuffer<float>                         totalForcesDevice,
                      const Nbnxm::GridSet                       &gridSet,
                      void                                       *pmeForcesDevice,
@@ -378,7 +380,7 @@ void nbnxn_atomdata_add_nbat_fshift_to_fshift(const nbnxn_atomdata_t   &nbat,
                                               gmx::ArrayRef<gmx::RVec>  fshift);
 
 /* Get the atom start index and number of atoms for a given locality */
-void nbnxn_get_atom_range(Nbnxm::AtomLocality              atomLocality,
+void nbnxn_get_atom_range(gmx::AtomLocality                atomLocality,
                           const Nbnxm::GridSet            &gridSet,
                           int                             *atomStart,
                           int                             *nAtoms);

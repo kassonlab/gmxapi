@@ -65,21 +65,13 @@ void print_ab(FILE *out, const MoleculePatch &ab, const char *nname);
 /* print one add block */
 
 /*! \brief
- * Print database.
- *
- * \param[in] out File to print to.
- * \param[in] globalPatches Database to print.
- */
-void print_h_db(FILE *out, gmx::ArrayRef<const MoleculePatchDatabase> globalPatches);
-
-/*! \brief
  * Search for an entry.
  *
  * \param[in] globalPatches Database to search.
  * \param[in] key Name to search for.
  */
-gmx::ArrayRef<MoleculePatchDatabase>::iterator
-search_h_db(gmx::ArrayRef<MoleculePatchDatabase> globalPatches, char *key);
+gmx::ArrayRef<const MoleculePatchDatabase>::iterator
+search_h_db(gmx::ArrayRef<const MoleculePatchDatabase> globalPatches, const char *key);
 /* Search for an entry in the database */
 
 #endif

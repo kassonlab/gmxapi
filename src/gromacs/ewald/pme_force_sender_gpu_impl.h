@@ -32,45 +32,61 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-/*! \libinternal \file
- * \brief Defines nbnxn locality enums
+/*! \internal \file
  *
- * \author Berk Hess <hess@kth.se>
- * \ingroup module_nbnxm
+ * \brief Declaration of class which sends PME Force from GPU memory to PP task
+ *
+ * \author Alan Gray <alang@nvidia.com>
+ *
+ * \ingroup module_ewald
  */
+#ifndef GMX_PMEFORCESENDERGPU_IMPL_H
+#define GMX_PMEFORCESENDERGPU_IMPL_H
 
-#ifndef GMX_NBNXM_LOCALITY_H
-#define GMX_NBNXM_LOCALITY_H
+#include "gromacs/ewald/pme_force_sender_gpu.h"
+#include "gromacs/gpu_utils/gpueventsynchronizer.cuh"
+#include "gromacs/utility/arrayref.h"
 
-namespace Nbnxm
+namespace gmx
 {
 
-/*! \brief Atom locality indicator: local, non-local, all.
- *
- * Used for calls to:
- * gridding, force calculation, x/f buffer operations
- */
-enum class AtomLocality : int
+/*! \internal \brief Class with interfaces and data for CUDA version of PME Force sending functionality*/
+
+class PmeForceSenderGpu::Impl
 {
-    Local    = 0, //!< Local atoms
-    NonLocal = 1, //!< Non-local atoms
-    All      = 2, //!< Both local and non-local atoms
-    Count    = 3  //!< The number of atom locality types
+
+    public:
+        /*! \brief Creates PME GPU Force sender object
+         * \param[in] pmeStream       CUDA stream used for PME computations
+         * \param[in] comm            Communicator used for simulation
+         * \param[in] ppRanks         List of PP ranks
+         */
+        Impl(void *pmeStream, MPI_Comm comm, gmx::ArrayRef<PpRanks> ppRanks);
+        ~Impl();
+
+        /*! \brief
+         * sends force buffer address to PP rank
+         * \param[in] d_f   force buffer in GPU memory
+         */
+        void sendForceBufferAddressToPpRanks(rvec *d_f);
+
+        /*! \brief
+         * Send PP data to PP rank
+         * \param[in] ppRank           PP rank to receive data
+         */
+        void sendFToPpCudaDirect(int ppRank);
+
+    private:
+        //! CUDA stream for PME operations
+        cudaStream_t           pmeStream_ = nullptr;
+        //! Event triggered when to allow remote PP stream to syn with pme stream
+        GpuEventSynchronizer   pmeSync_;
+        //! communicator for simulation
+        MPI_Comm               comm_;
+        //! list of PP ranks
+        gmx::ArrayRef<PpRanks> ppRanks_;
 };
 
-/*! \brief Interaction locality indicator: local, non-local, all.
- *
- * Used for calls to:
- * pair-search, force calculation, x/f buffer operations
- */
-enum class InteractionLocality : int
-{
-    Local    = 0, //!< Interactions between local atoms only
-    NonLocal = 1, //!< Interactions between non-local and (non-)local atoms
-    Count    = 2  //!< The number of interaction locality types
-};
+} // namespace gmx
 
-}      // namespace Nbnxm
-
-#endif // GMX_NBNXM_LOCALITY_H
+#endif

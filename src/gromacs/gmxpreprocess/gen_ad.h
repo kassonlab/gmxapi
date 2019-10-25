@@ -43,15 +43,10 @@
 struct t_atoms;
 struct t_excls;
 struct MoleculePatchDatabase;
-struct t_nextnb;
 struct InteractionsOfType;
 struct PreprocessResidue;
 
-void generate_excls(t_nextnb *nnb, int nrexcl, t_excls excls[]);
-void clean_excls(t_nextnb *nnb, int nrexcl, t_excls excls[]);
-
-void gen_pad(t_nextnb                                       *nnb,
-             t_atoms                                        *atoms,
+void gen_pad(t_atoms                                        *atoms,
              gmx::ArrayRef<const PreprocessResidue>          rtpFFDB,
              gmx::ArrayRef<InteractionsOfType>               plist,
              t_excls                                         excls[],

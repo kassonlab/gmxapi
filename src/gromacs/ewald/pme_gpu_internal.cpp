@@ -790,8 +790,9 @@ static void pme_gpu_copy_common_data_from(const gmx_pme_t *pme)
     pmeGpu->common->nn.insert(pmeGpu->common->nn.end(), pme->nnx, pme->nnx + cellCount * pme->nkx);
     pmeGpu->common->nn.insert(pmeGpu->common->nn.end(), pme->nny, pme->nny + cellCount * pme->nky);
     pmeGpu->common->nn.insert(pmeGpu->common->nn.end(), pme->nnz, pme->nnz + cellCount * pme->nkz);
-    pmeGpu->common->runMode   = pme->runMode;
-    pmeGpu->common->boxScaler = pme->boxScaler;
+    pmeGpu->common->runMode       = pme->runMode;
+    pmeGpu->common->isRankPmeOnly = !pme->bPPnode;
+    pmeGpu->common->boxScaler     = pme->boxScaler;
 }
 
 /*! \libinternal \brief
@@ -1014,11 +1015,12 @@ std::pair<int, int> inline pmeGpuCreateGrid(const PmeGpu *pmeGpu, int blockCount
     return std::pair<int, int>(colCount, minRowCount);
 }
 
-void pme_gpu_spread(const PmeGpu    *pmeGpu,
-                    int gmx_unused   gridIndex,
-                    real            *h_grid,
-                    bool             computeSplines,
-                    bool             spreadCharges)
+void pme_gpu_spread(const PmeGpu         *pmeGpu,
+                    GpuEventSynchronizer *xReadyOnDevice,
+                    int gmx_unused        gridIndex,
+                    real                 *h_grid,
+                    bool                  computeSplines,
+                    bool                  spreadCharges)
 {
     GMX_ASSERT(computeSplines || spreadCharges, "PME spline/spread kernel has invalid input (nothing to do)");
     const auto   *kernelParamsPtr = pmeGpu->kernelParams.get();
@@ -1036,6 +1038,17 @@ void pme_gpu_spread(const PmeGpu    *pmeGpu,
     // TODO: also consider using cudaFuncSetCacheConfig() for preferring shared memory on older architectures
     //(for spline data mostly, together with varying PME_GPU_PARALLEL_SPLINE define)
     GMX_ASSERT(!c_usePadding || !(c_pmeAtomDataAlignment % atomsPerBlock), "inconsistent atom data padding vs. spreading block size");
+
+    // Ensure that coordinates are ready on the device before launching spread;
+    // only needed with CUDA on PP+PME ranks, not on separate PME ranks, in unit tests
+    // nor in OpenCL as these cases use a single stream (hence xReadyOnDevice == nullptr).
+    GMX_ASSERT(xReadyOnDevice != nullptr ||
+               (GMX_GPU != GMX_GPU_CUDA) || pmeGpu->common->isRankPmeOnly || pme_gpu_is_testing(pmeGpu),
+               "Need a valid coordinate synchronizer on PP+PME ranks with CUDA.");
+    if (xReadyOnDevice)
+    {
+        xReadyOnDevice->enqueueWaitEvent(pmeGpu->archSpecific->pmeStream);
+    }
 
     const int          blockCount = pmeGpu->nAtomsPadded / atomsPerBlock;
     auto               dimGrid    = pmeGpuCreateGrid(pmeGpu, blockCount);

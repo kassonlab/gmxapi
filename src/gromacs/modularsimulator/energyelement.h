@@ -95,7 +95,6 @@ class EnergyElement final :
     public          ITrajectoryWriterClient,
     public          ITrajectorySignallerClient,
     public          IEnergySignallerClient,
-    public          ILoggingSignallerClient,
     public          ICheckpointHelperClient
 {
     public:
@@ -112,7 +111,7 @@ class EnergyElement final :
             FILE                          *fplog,
             t_fcdata                      *fcd,
             const MdModulesNotifier       &mdModulesNotifier,
-            bool                           isMaster,
+            bool                           isMasterRank,
             ObservablesHistory            *observablesHistory,
             StartingBehavior               startingBehavior);
 
@@ -251,8 +250,6 @@ class EnergyElement final :
         registerTrajectoryWriterCallback(TrajectoryEvent event) override;
         //! IEnergySignallerClient implementation
         SignallerCallbackPtr registerEnergyCallback(EnergySignallerEvent event) override;
-        //! ILoggingSignallerClient implementation
-        SignallerCallbackPtr registerLoggingCallback() override;
 
         /*! \brief Save data at energy steps
          *
@@ -271,7 +268,8 @@ class EnergyElement final :
          */
         void write(
             gmx_mdoutf *outf,
-            Step step, Time time);
+            Step step, Time time,
+            bool writeTrajectory, bool writeLog);
 
         //! ICheckpointHelperClient implementation
         void writeCheckpoint(t_state *localState, t_state *globalState) override;
@@ -283,15 +281,13 @@ class EnergyElement final :
         std::unique_ptr<EnergyOutput> energyOutput_;
 
         //! Whether this is the master rank
-        const bool isMaster_;
+        const bool isMasterRank_;
         //! The next communicated energy writing step
         Step       energyWritingStep_;
         //! The next communicated energy calculation step
         Step       energyCalculationStep_;
         //! The next communicated free energy calculation step
         Step       freeEnergyCalculationStep_;
-        //! The next communicated log writing step
-        Step       logWritingStep_;
 
         //! The force virial tensor
         tensor forceVirial_;

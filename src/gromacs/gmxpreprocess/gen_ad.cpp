@@ -521,7 +521,7 @@ static void remove_excl(t_excls *excls, int remove)
     excls->nr--;
 }
 
-void clean_excls(t_nextnb *nnb, int nrexcl, t_excls excls[])
+static void clean_excls(t_nextnb *nnb, int nrexcl, t_excls excls[])
 {
     int      i, j, j1, k, k1, l, l1, e;
     t_excls *excl;
@@ -585,38 +585,16 @@ void clean_excls(t_nextnb *nnb, int nrexcl, t_excls excls[])
     }
 }
 
-void generate_excls(t_nextnb *nnb, int nrexcl, t_excls excls[])
-{
-    int      i, j, n, N;
-    t_excls *excl;
-
-    for (N = 1; (N < std::min(nrexcl, nnb->nrex)); N++)
-    {
-        /* extract all i-j-k-l neighbours from nnb struct */
-        for (i = 0; (i < nnb->nr); i++)
-        {
-            /* For all particles */
-            excl      = &excls[i];
-            n         = excl->nr;
-            excl->nr += nnb->nrexcl[i][N];
-            srenew(excl->e, excl->nr);
-            for (j = 0; (j < nnb->nrexcl[i][N]); j++)
-            {
-                /* For all first neighbours */
-                if (nnb->a[i][N][j] != i)
-                {
-                    excl->e[n++] = nnb->a[i][N][j];
-                }
-            }
-        }
-    }
-}
-
 /* Generate pairs, angles and dihedrals from .rtp settings */
-void gen_pad(t_nextnb *nnb, t_atoms *atoms, gmx::ArrayRef<const PreprocessResidue> rtpFFDB,
+void gen_pad(t_atoms *atoms, gmx::ArrayRef<const PreprocessResidue> rtpFFDB,
              gmx::ArrayRef<InteractionsOfType> plist, t_excls excls[], gmx::ArrayRef<MoleculePatchDatabase> globalPatches,
              bool bAllowMissing)
 {
+    t_nextnb nnb;
+    init_nnb(&nnb, atoms->nr, 4);
+    gen_nnb(&nnb, plist);
+    print_nnb(&nnb, "NNB");
+
     /* These are the angles, dihedrals and pairs that we generate
      * from the bonds. The ones that are already there from the rtp file
      * will be retained.
@@ -646,17 +624,17 @@ void gen_pad(t_nextnb *nnb, t_atoms *atoms, gmx::ArrayRef<const PreprocessResidu
 
     /* Extract all i-j-k-l neighbours from nnb struct to generate all
      * angles and dihedrals. */
-    for (int i = 0; (i < nnb->nr); i++)
+    for (int i = 0; (i < nnb.nr); i++)
     {
         /* For all particles */
-        for (int j = 0; (j < nnb->nrexcl[i][1]); j++)
+        for (int j = 0; (j < nnb.nrexcl[i][1]); j++)
         {
             /* For all first neighbours */
-            int j1 = nnb->a[i][1][j];
-            for (int k = 0; (k < nnb->nrexcl[j1][1]); k++)
+            int j1 = nnb.a[i][1][j];
+            for (int k = 0; (k < nnb.nrexcl[j1][1]); k++)
             {
                 /* For all first neighbours of j1 */
-                int k1 = nnb->a[j1][1][k];
+                int k1 = nnb.a[j1][1][k];
                 if (k1 != i)
                 {
                     /* Generate every angle only once */
@@ -707,10 +685,10 @@ void gen_pad(t_nextnb *nnb, t_atoms *atoms, gmx::ArrayRef<const PreprocessResidu
                        only once */
                     if (j1 < k1)
                     {
-                        for (int l = 0; (l < nnb->nrexcl[k1][1]); l++)
+                        for (int l = 0; (l < nnb.nrexcl[k1][1]); l++)
                         {
                             /* For all first neighbours of k1 */
-                            int l1 = nnb->a[k1][1][l];
+                            int l1 = nnb.a[k1][1][l];
                             if ((l1 != i) && (l1 != j1))
                             {
                                 std::vector<int> atomNumbers = {i, j1, k1, l1};
@@ -769,7 +747,7 @@ void gen_pad(t_nextnb *nnb, t_atoms *atoms, gmx::ArrayRef<const PreprocessResidu
                                     dih.push_back(InteractionOfType(atoms, {},   ""));
                                 }
 
-                                int nbd = nb_dist(nnb, i, l1);
+                                int nbd = nb_dist(&nnb, i, l1);
                                 if (nbd == 3)
                                 {
                                     int  i1    = std::min(i, l1);
@@ -933,5 +911,6 @@ void gen_pad(t_nextnb *nnb, t_atoms *atoms, gmx::ArrayRef<const PreprocessResidu
     cppar(pai, plist, F_LJ14);
 
     /* Remove all exclusions which are within nrexcl */
-    clean_excls(nnb, rtpFFDB[0].nrexcl, excls);
+    clean_excls(&nnb, rtpFFDB[0].nrexcl, excls);
+    done_nnb(&nnb);
 }

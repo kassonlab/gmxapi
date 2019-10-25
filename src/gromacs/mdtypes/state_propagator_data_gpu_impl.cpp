@@ -64,6 +64,14 @@ StatePropagatorDataGpu::StatePropagatorDataGpu(const void *       /* pmeStream  
 {
 }
 
+StatePropagatorDataGpu::StatePropagatorDataGpu(const void *       /* pmeStream       */,
+                                               const void *       /* deviceContext   */,
+                                               GpuApiCallBehavior /* transferKind    */,
+                                               int                /* paddingSize     */)
+    : impl_(nullptr)
+{
+}
+
 StatePropagatorDataGpu::StatePropagatorDataGpu(StatePropagatorDataGpu && /* other */) noexcept = default;
 
 StatePropagatorDataGpu &StatePropagatorDataGpu::operator=(StatePropagatorDataGpu && /* other */) noexcept = default;
@@ -94,6 +102,11 @@ GpuEventSynchronizer* StatePropagatorDataGpu::getCoordinatesReadyOnDeviceEvent(A
 {
     GMX_ASSERT(false, "A CPU stub method from GPU state propagator data was called instead of one from GPU implementation.");
     return nullptr;
+}
+
+void StatePropagatorDataGpu::waitCoordinatesCopiedToDevice(AtomLocality  /* atomLocality */)
+{
+    GMX_ASSERT(false, "A CPU stub method from GPU state propagator data was called instead of one from GPU implementation.");
 }
 
 GpuEventSynchronizer* StatePropagatorDataGpu::xUpdatedOnDevice()

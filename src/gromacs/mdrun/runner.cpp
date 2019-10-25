@@ -66,6 +66,7 @@
 #include "gromacs/ewald/ewald_utils.h"
 #include "gromacs/ewald/pme.h"
 #include "gromacs/ewald/pme_gpu_program.h"
+#include "gromacs/ewald/pme_pp_comm_gpu.h"
 #include "gromacs/fileio/checkpoint.h"
 #include "gromacs/fileio/gmxfio.h"
 #include "gromacs/fileio/oenv.h"
@@ -166,21 +167,20 @@ namespace gmx
 {
 
 /*! \brief Structure that holds boolean flags corresponding to the development
- *        features present enabled through environemnt variables.
+ *        features present enabled through environment variables.
  *
  */
 struct DevelopmentFeatureFlags
 {
-    ///! True if the Buffer ops development feature is enabled
+    //! True if the Buffer ops development feature is enabled
     // TODO: when the trigger of the buffer ops offload is fully automated this should go away
-    bool enableGpuBufferOps     = false;
-    ///! True if the update-constraints development feature is enabled
-    // TODO This needs to be reomved when the code gets cleaned up of GMX_UPDATE_CONSTRAIN_GPU
-    bool useGpuUpdateConstrain  = false;
-    ///! True if the GPU halo exchange development feature is enabled
-    bool enableGpuHaloExchange  = false;
-    ///! True if the PME PP direct commuinication GPU development feature is enabled
-    bool enableGpuPmePPComm     = false;
+    bool enableGpuBufferOps      = false;
+    //! If true, forces 'mdrun -update auto' default to 'gpu'
+    bool forceGpuUpdateDefaultOn = false;
+    //! True if the GPU halo exchange development feature is enabled
+    bool enableGpuHaloExchange   = false;
+    //! True if the PME PP direct communication GPU development feature is enabled
+    bool enableGpuPmePPComm      = false;
 };
 
 /*! \brief Manage any development feature flag variables encountered
@@ -196,10 +196,12 @@ struct DevelopmentFeatureFlags
  *
  * \param[in]  mdlog                Logger object.
  * \param[in]  useGpuForNonbonded   True if the nonbonded task is offloaded in this run.
+ * \param[in]  useGpuForPme         True if the PME task is offloaded in this run.
  * \returns                         The object populated with development feature flags.
  */
 static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger &mdlog,
-                                                         const bool           useGpuForNonbonded)
+                                                         const bool           useGpuForNonbonded,
+                                                         const bool           useGpuForPme)
 {
     DevelopmentFeatureFlags devFlags;
 
@@ -207,10 +209,10 @@ static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger &md
     // getenv results are ignored when clearly they are used.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
-    devFlags.enableGpuBufferOps    = (getenv("GMX_USE_GPU_BUFFER_OPS") != nullptr) && (GMX_GPU == GMX_GPU_CUDA) && useGpuForNonbonded;
-    devFlags.useGpuUpdateConstrain = (getenv("GMX_UPDATE_CONSTRAIN_GPU") != nullptr);
-    devFlags.enableGpuHaloExchange = (getenv("GMX_GPU_DD_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
-    devFlags.enableGpuPmePPComm    = (getenv("GMX_GPU_DD_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
+    devFlags.enableGpuBufferOps      = (getenv("GMX_USE_GPU_BUFFER_OPS") != nullptr) && (GMX_GPU == GMX_GPU_CUDA) && useGpuForNonbonded;
+    devFlags.forceGpuUpdateDefaultOn = (getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") != nullptr);
+    devFlags.enableGpuHaloExchange   = (getenv("GMX_GPU_DD_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
+    devFlags.enableGpuPmePPComm      = (getenv("GMX_GPU_PME_PP_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
 #pragma GCC diagnostic pop
 
     if (devFlags.enableGpuBufferOps)
@@ -221,16 +223,42 @@ static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger &md
 
     if (devFlags.enableGpuHaloExchange)
     {
-        if (!devFlags.enableGpuBufferOps)
+        if (useGpuForNonbonded)
         {
-            gmx_fatal(FARGS, "Cannot enable GPU halo exchange without GPU buffer operations, set GMX_USE_GPU_BUFFER_OPS=1\n");
+            if (!devFlags.enableGpuBufferOps)
+            {
+                gmx_fatal(FARGS, "Cannot enable GPU halo exchange without GPU buffer operations, set GMX_USE_GPU_BUFFER_OPS=1\n");
+            }
+            GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
+                    "NOTE: This run uses the 'GPU halo exchange' feature, enabled by the GMX_GPU_DD_COMMS environment variable.");
+        }
+        else
+        {
+            GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
+                    "NOTE: GMX_GPU_DD_COMMS environment variable detected, but the 'GPU halo exchange' feature will not be enabled as nonbonded interactions are not offloaded.");
+            devFlags.enableGpuHaloExchange = false;
         }
     }
 
-    if (devFlags.useGpuUpdateConstrain)
+    if (devFlags.forceGpuUpdateDefaultOn)
     {
         GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
-                "NOTE: This run uses the 'GPU update/constraints' feature, enabled by the GMX_UPDATE_CONSTRAIN_GPU environment variable.");
+                "NOTE: This run will default to '-update gpu' as requested by the GMX_FORCE_UPDATE_DEFAULT_GPU environment variable.");
+    }
+
+    if (devFlags.enableGpuPmePPComm)
+    {
+        if (useGpuForPme)
+        {
+            GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
+                    "NOTE: This run uses the 'GPU PME-PP communications' feature, enabled by the GMX_GPU_PME_PP_COMMS environment variable.");
+        }
+        else
+        {
+            GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
+                    "NOTE: GMX_GPU_PME_PP_COMMS environment variable detected, but the 'GPU PME-PP communications' feature was not enabled as PME is not offloaded to the GPU.");
+            devFlags.enableGpuPmePPComm = false;
+        }
     }
 
     return devFlags;
@@ -657,8 +685,10 @@ int Mdrunner::mdrunner()
        cr doesn't reflect the final parallel state right now */
     gmx_mtop_t                      mtop;
 
-    bool doMembed = opt2bSet("-membed", filenames.size(), filenames.data());
-    bool doRerun  = mdrunOptions.rerun;
+    /* TODO: inputrec should tell us whether we use an algorithm, not a file option */
+    const bool doEssentialDynamics = opt2bSet("-ei", filenames.size(), filenames.data());
+    const bool doMembed            = opt2bSet("-membed", filenames.size(), filenames.data());
+    const bool doRerun             = mdrunOptions.rerun;
 
     // Handle task-assignment related user options.
     EmulateGpuNonbonded emulateGpuNonbonded = (getenv("GMX_EMULATE_GPU") != nullptr ?
@@ -799,7 +829,9 @@ int Mdrunner::mdrunner()
     //
     // TODO Should we do the communication in debug mode to support
     // having an assertion?
-    //
+    const bool useDomainDecomposition = (PAR(cr) && !(EI_TPI(inputrec->eI) ||
+                                                      inputrec->eI == eiNM));
+
     // Note that these variables describe only their own node.
     //
     // Note that when bonded interactions run on a GPU they always run
@@ -851,7 +883,7 @@ int Mdrunner::mdrunner()
 
     // Initialize development feature flags that enabled by environment variable
     // and report those features that are enabled.
-    const DevelopmentFeatureFlags devFlags = manageDevelopmentFeatures(mdlog, useGpuForNonbonded);
+    const DevelopmentFeatureFlags devFlags = manageDevelopmentFeatures(mdlog, useGpuForNonbonded, useGpuForPme);
 
     // Build restraints.
     // TODO: hide restraint implementation details from Mdrunner.
@@ -1058,8 +1090,7 @@ int Mdrunner::mdrunner()
     // the builder object to indicate that further construction of DD
     // is needed.
     std::unique_ptr<DomainDecompositionBuilder> ddBuilder;
-    if (PAR(cr) && !(EI_TPI(inputrec->eI) ||
-                     inputrec->eI == eiNM))
+    if (useDomainDecomposition)
     {
         ddBuilder = std::make_unique<DomainDecompositionBuilder>
                 (mdlog, cr, domdecOptions, mdrunOptions,
@@ -1213,6 +1244,15 @@ int Mdrunner::mdrunner()
                                   *hwinfo->hardwareTopology,
                                   physicalNodeComm, mdlog);
 
+    // Enable Peer access between GPUs where available
+    // Only for DD, only master PP rank needs to perform setup, and only if thread MPI plus
+    // any of the GPU communication features are active.
+    if (DOMAINDECOMP(cr) && MASTER(cr) && thisRankHasDuty(cr, DUTY_PP) && GMX_THREAD_MPI &&
+        (devFlags.enableGpuHaloExchange || devFlags.enableGpuPmePPComm))
+    {
+        setupGpuDevicePeerAccess(gpuIdsToUse, mdlog);
+    }
+
     if (hw_opt.threadAffinity != ThreadAffinity::Off)
     {
         /* Before setting affinity, check whether the affinity has changed
@@ -1273,6 +1313,7 @@ int Mdrunner::mdrunner()
         mdModulesNotifier.notify(*cr);
         mdModulesNotifier.notify(&atomSets);
         mdModulesNotifier.notify(PeriodicBoundaryConditionType {inputrec->ePBC});
+        mdModulesNotifier.notify(SimulationTimeStep { inputrec->delta_t });
         /* Initiate forcerecord */
         fr                 = new t_forcerec;
         fr->forceProviders = mdModules_->initForceProviders();
@@ -1283,6 +1324,7 @@ int Mdrunner::mdrunner()
                       opt2fns("-tableb", filenames.size(), filenames.data()),
                       *hwinfo, nonbondedDeviceInfo,
                       useGpuForBonded,
+                      pmeRunMode == PmeRunMode::GPU && !thisRankHasDuty(cr, DUTY_PME),
                       pforce,
                       wcycle);
 
@@ -1292,8 +1334,8 @@ int Mdrunner::mdrunner()
         if (havePPDomainDecomposition(cr) && prefer1DAnd1PulseDD && is1DAnd1PulseDD(*cr->dd))
         {
             GMX_RELEASE_ASSERT(devFlags.enableGpuBufferOps, "Must use GMX_GPU_BUFFER_OPS=1 to use GMX_GPU_DD_COMMS=1");
-            void *streamLocal              = Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::Local);
-            void *streamNonLocal           = Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::NonLocal);
+            void *streamLocal              = Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::Local);
+            void *streamNonLocal           = Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::NonLocal);
             void *coordinatesOnDeviceEvent = fr->nbv->get_x_on_device_event();
             GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
                     "NOTE: This run uses the 'GPU halo exchange' feature, enabled by the GMX_GPU_DD_COMMS environment variable.");
@@ -1474,14 +1516,10 @@ int Mdrunner::mdrunner()
                                    startingBehavior);
         }
 
-        /* Let makeConstraints know whether we have essential dynamics constraints.
-         * TODO: inputrec should tell us whether we use an algorithm, not a file option or the checkpoint
-         */
-        bool doEssentialDynamics = (opt2fn_null("-ei", filenames.size(), filenames.data()) != nullptr
-                                    || observablesHistory.edsamHistory);
-        auto constr              = makeConstraints(mtop, *inputrec, pull_work, doEssentialDynamics,
-                                                   fplog, *mdAtoms->mdatoms(),
-                                                   cr, ms, &nrnb, wcycle, fr->bMolPBC);
+        /* Let makeConstraints know whether we have essential dynamics constraints. */
+        auto constr = makeConstraints(mtop, *inputrec, pull_work, doEssentialDynamics,
+                                      fplog, *mdAtoms->mdatoms(),
+                                      cr, ms, &nrnb, wcycle, fr->bMolPBC);
 
         /* Energy terms and groups */
         gmx_enerdata_t enerd(mtop.groups.groups[SimulationAtomGroupType::EnergyOutput].size(), inputrec->fepvals->n_lambda);
@@ -1517,17 +1555,19 @@ int Mdrunner::mdrunner()
         }
 
         // Before we start the actual simulator, try if we can run the update task on the GPU.
-        useGpuForUpdate = decideWhetherToUseGpuForUpdate(DOMAINDECOMP(cr),
+        useGpuForUpdate = decideWhetherToUseGpuForUpdate(devFlags.forceGpuUpdateDefaultOn,
+                                                         DOMAINDECOMP(cr),
                                                          useGpuForPme,
                                                          useGpuForNonbonded,
                                                          devFlags.enableGpuBufferOps,
                                                          updateTarget,
                                                          gpusWereDetected,
                                                          *inputrec,
-                                                         *mdAtoms,
+                                                         mdAtoms->mdatoms()->haveVsites,
                                                          doEssentialDynamics,
-                                                         fcd->orires.nr != 0,
-                                                         fcd->disres.nsystems != 0);
+                                                         gmx_mtop_ftype_count(mtop, F_ORIRES) > 0,
+                                                         gmx_mtop_ftype_count(mtop, F_DISRES) > 0,
+                                                         replExParams.exchangeInterval > 0);
 
         const bool inputIsCompatibleWithModularSimulator = ModularSimulator::isInputCompatible(
                     false,
@@ -1541,8 +1581,8 @@ int Mdrunner::mdrunner()
         if (gpusWereDetected && ((useGpuForPme && thisRankHasDuty(cr, DUTY_PME)) || devFlags.enableGpuBufferOps))
         {
             const void         *pmeStream      = pme_gpu_get_device_stream(fr->pmedata);
-            const void         *localStream    = fr->nbv->gpu_nbv != nullptr ? Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::Local) : nullptr;
-            const void         *nonLocalStream = fr->nbv->gpu_nbv != nullptr ? Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, Nbnxm::InteractionLocality::NonLocal) : nullptr;
+            const void         *localStream    = fr->nbv->gpu_nbv != nullptr ? Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::Local) : nullptr;
+            const void         *nonLocalStream = fr->nbv->gpu_nbv != nullptr ? Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::NonLocal) : nullptr;
             const void         *deviceContext  = pme_gpu_get_device_context(fr->pmedata);
             const int           paddingSize    = pme_gpu_get_padding_size(fr->pmedata);
             GpuApiCallBehavior  transferKind   = (inputrec->eI == eiMD && !doRerun && !useModularSimulator) ? GpuApiCallBehavior::Async : GpuApiCallBehavior::Sync;

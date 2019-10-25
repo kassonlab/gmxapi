@@ -98,10 +98,6 @@ void ModularSimulator::run()
     {
         signaller->signallerSetup();
     }
-    if (pmeLoadBalanceHelper_)
-    {
-        pmeLoadBalanceHelper_->setup();
-    }
     if (domDecHelper_)
     {
         domDecHelper_->setup();
@@ -110,6 +106,11 @@ void ModularSimulator::run()
     for (auto &element : elementsOwnershipList_)
     {
         element->elementSetup();
+    }
+    if (pmeLoadBalanceHelper_)
+    {
+        // State must have been initialized so pmeLoadBalanceHelper_ gets a valid box
+        pmeLoadBalanceHelper_->setup();
     }
 
     while (step_ <= signalHelper_->lastStep_)
@@ -419,7 +420,6 @@ void ModularSimulator::constructElementsAndSignallers()
     trajectoryElementBuilder.registerWriterClient(energyElementPtr);
     trajectoryElementBuilder.registerSignallerClient(energyElementPtr);
     energySignallerBuilder.registerSignallerClient(energyElementPtr);
-    loggingSignallerBuilder.registerSignallerClient(energyElementPtr);
 
     // Register the simulator itself to the neighbor search / last step signaller
     neighborSearchSignallerBuilder.registerSignallerClient(compat::make_not_null(signalHelper_.get()));
@@ -493,6 +493,7 @@ void ModularSimulator::constructElementsAndSignallers()
     auto trajectoryElement = trajectoryElementBuilder.build(
                 fplog, nfile, fnm, mdrunOptions, cr, outputProvider, mdModulesNotifier,
                 inputrec, top_global, oenv, wcycle, startingBehavior);
+    loggingSignallerBuilder.registerSignallerClient(compat::make_not_null(trajectoryElement.get()));
 
     // Add checkpoint helper here since we need a pointer to the trajectory element and
     // need to register it with the lastStepSignallerBuilder
@@ -625,7 +626,7 @@ std::unique_ptr<ISimulatorElement> ModularSimulator::buildIntegrator(
         auto computeGlobalsElement =
             std::make_unique< ComputeGlobalsElement<ComputeGlobalsAlgorithm::LeapFrog> >(
                     statePropagatorDataPtr, energyElementPtr, freeEnergyPerturbationElementPtr,
-                    nstglobalcomm_, fplog, mdlog, cr,
+                    &signals_, nstglobalcomm_, fplog, mdlog, cr,
                     inputrec, mdAtoms, nrnb, wcycle, fr,
                     &topologyHolder_->globalTopology(), constr, hasReadEkinState);
         topologyHolder_->registerClient(computeGlobalsElement.get());
@@ -696,7 +697,7 @@ std::unique_ptr<ISimulatorElement> ModularSimulator::buildIntegrator(
         auto computeGlobalsElementAtFullTimeStep =
             std::make_unique< ComputeGlobalsElement<ComputeGlobalsAlgorithm::VelocityVerletAtFullTimeStep> >(
                     statePropagatorDataPtr, energyElementPtr, freeEnergyPerturbationElementPtr,
-                    nstglobalcomm_, fplog, mdlog, cr,
+                    &signals_, nstglobalcomm_, fplog, mdlog, cr,
                     inputrec, mdAtoms, nrnb, wcycle, fr,
                     &topologyHolder_->globalTopology(), constr, hasReadEkinState);
         topologyHolder_->registerClient(computeGlobalsElementAtFullTimeStep.get());
@@ -706,7 +707,7 @@ std::unique_ptr<ISimulatorElement> ModularSimulator::buildIntegrator(
         auto computeGlobalsElementAfterCoordinateUpdate =
             std::make_unique<ComputeGlobalsElement <ComputeGlobalsAlgorithm::VelocityVerletAfterCoordinateUpdate> >(
                     statePropagatorDataPtr, energyElementPtr, freeEnergyPerturbationElementPtr,
-                    nstglobalcomm_, fplog, mdlog, cr,
+                    &signals_, nstglobalcomm_, fplog, mdlog, cr,
                     inputrec, mdAtoms, nrnb, wcycle, fr,
                     &topologyHolder_->globalTopology(), constr, hasReadEkinState);
         topologyHolder_->registerClient(computeGlobalsElementAfterCoordinateUpdate.get());
@@ -895,7 +896,7 @@ bool ModularSimulator::isInputCompatible(
                 "Membrane embedding is not supported by the modular simulator.");
     // TODO: Change this to the boolean passed when we merge the user interface change for the GPU update.
     isInputCompatible = isInputCompatible && conditionalAssert(
-                getenv("GMX_UPDATE_CONSTRAIN_GPU") == nullptr,
+                getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") == nullptr,
                 "Integration on the GPU is not supported by the modular simulator.");
     // Modular simulator is centered around NS updates
     // TODO: think how to handle nstlist == 0

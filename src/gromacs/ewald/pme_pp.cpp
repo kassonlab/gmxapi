@@ -54,13 +54,17 @@
 #include "gromacs/domdec/domdec.h"
 #include "gromacs/domdec/domdec_struct.h"
 #include "gromacs/ewald/pme.h"
+#include "gromacs/ewald/pme_pp_comm_gpu.h"
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/gmx_omp_nthreads.h"
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/forceoutput.h"
+#include "gromacs/mdtypes/forcerec.h"
 #include "gromacs/mdtypes/interaction_const.h"
 #include "gromacs/mdtypes/md_enums.h"
+#include "gromacs/mdtypes/state_propagator_data_gpu.h"
+#include "gromacs/nbnxm/nbnxm.h"
 #include "gromacs/timing/wallcycle.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/gmxmpi.h"
@@ -88,14 +92,16 @@ static void gmx_pme_send_coeffs_coords_wait(gmx_domdec_t *dd)
 }
 
 /*! \brief Send data to PME ranks */
-static void gmx_pme_send_coeffs_coords(const t_commrec *cr, unsigned int flags,
+static void gmx_pme_send_coeffs_coords(t_forcerec *fr, const t_commrec *cr, unsigned int flags,
                                        real gmx_unused *chargeA, real gmx_unused *chargeB,
                                        real gmx_unused *c6A, real gmx_unused *c6B,
                                        real gmx_unused *sigmaA, real gmx_unused *sigmaB,
                                        const matrix box, const rvec gmx_unused *x,
                                        real lambda_q, real lambda_lj,
                                        int maxshift_x, int maxshift_y,
-                                       int64_t step)
+                                       int64_t step, bool useGpuPmePpComms,
+                                       bool reinitGpuPmePpComms,
+                                       bool sendCoordinatesFromGpu)
 {
     gmx_domdec_t         *dd;
     gmx_pme_comm_n_box_t *cnb;
@@ -112,6 +118,11 @@ static void gmx_pme_send_coeffs_coords(const t_commrec *cr, unsigned int flags,
                 (flags & PP_PME_SQRTC6) ? " sqrtC6" : "",
                 (flags & PP_PME_SIGMA)  ? " sigma" : "",
                 (flags & PP_PME_COORD)  ? " coordinates" : "");
+    }
+
+    if (useGpuPmePpComms)
+    {
+        flags |= PP_PME_GPUCOMMS;
     }
 
     if (c_useDelayedWait)
@@ -197,13 +208,29 @@ static void gmx_pme_send_coeffs_coords(const t_commrec *cr, unsigned int flags,
         }
         if (flags & PP_PME_COORD)
         {
+            if (reinitGpuPmePpComms)
+            {
+                fr->pmePpCommGpu->reinit(n);
+            }
+
+
             /* MPI_Isend does not accept a const buffer pointer */
             real *xRealPtr = const_cast<real *>(x[0]);
-            MPI_Isend(xRealPtr, n*sizeof(rvec), MPI_BYTE,
-                      dd->pme_nodeid, eCommType_COORD, cr->mpi_comm_mysim,
-                      &dd->req_pme[dd->nreq_pme++]);
+            if (useGpuPmePpComms && (fr != nullptr))
+            {
+                void *sendPtr = sendCoordinatesFromGpu ? static_cast<void*> (fr->stateGpu->getCoordinates()) :
+                    static_cast<void*> (xRealPtr);
+                fr->pmePpCommGpu->sendCoordinatesToPmeCudaDirect(sendPtr, n, sendCoordinatesFromGpu);
+            }
+            else
+            {
+                MPI_Isend(xRealPtr, n*sizeof(rvec), MPI_BYTE,
+                          dd->pme_nodeid, eCommType_COORD, cr->mpi_comm_mysim,
+                          &dd->req_pme[dd->nreq_pme++]);
+            }
         }
     }
+
 #endif
     if (!c_useDelayedWait)
     {
@@ -240,16 +267,18 @@ void gmx_pme_send_parameters(const t_commrec *cr,
         flags |= (flags << 1);
     }
 
-    gmx_pme_send_coeffs_coords(cr, flags,
+    gmx_pme_send_coeffs_coords(nullptr, cr, flags,
                                chargeA, chargeB,
                                sqrt_c6A, sqrt_c6B, sigmaA, sigmaB,
-                               nullptr, nullptr, 0, 0, maxshift_x, maxshift_y, -1);
+                               nullptr, nullptr, 0, 0, maxshift_x, maxshift_y, -1, false, false, false);
 }
 
-void gmx_pme_send_coordinates(const t_commrec *cr, const matrix box, const rvec *x,
+void gmx_pme_send_coordinates(t_forcerec *fr, const t_commrec *cr, const matrix box, const rvec *x,
                               real lambda_q, real lambda_lj,
                               gmx_bool bEnerVir,
-                              int64_t step, gmx_wallcycle *wcycle)
+                              int64_t step, bool useGpuPmePpComms,
+                              bool receiveCoordinateAddressFromPme,
+                              bool sendCoordinatesFromGpu, gmx_wallcycle *wcycle)
 {
     wallcycle_start(wcycle, ewcPP_PMESENDX);
 
@@ -258,8 +287,9 @@ void gmx_pme_send_coordinates(const t_commrec *cr, const matrix box, const rvec 
     {
         flags |= PP_PME_ENER_VIR;
     }
-    gmx_pme_send_coeffs_coords(cr, flags, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                               box, x, lambda_q, lambda_lj, 0, 0, step);
+    gmx_pme_send_coeffs_coords(fr, cr, flags, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                               box, x, lambda_q, lambda_lj, 0, 0, step, useGpuPmePpComms, receiveCoordinateAddressFromPme,
+                               sendCoordinatesFromGpu);
 
     wallcycle_stop(wcycle, ewcPP_PMESENDX);
 }
@@ -268,7 +298,7 @@ void gmx_pme_send_finish(const t_commrec *cr)
 {
     unsigned int flags = PP_PME_FINISH;
 
-    gmx_pme_send_coeffs_coords(cr, flags, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, 0, 0, -1);
+    gmx_pme_send_coeffs_coords(nullptr, cr, flags, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, 0, 0, -1, false, false, false);
 }
 
 void gmx_pme_send_switchgrid(const t_commrec *cr,
@@ -362,10 +392,38 @@ static void receive_virial_energy(const t_commrec *cr,
     }
 }
 
-void gmx_pme_receive_f(const t_commrec *cr,
+/*! \brief Recieve force data from PME ranks */
+static void recvFFromPme(gmx::PmePpCommGpu *pmePpCommGpu,
+                         void             * recvptr,
+                         int                n,
+                         const t_commrec   *cr,
+                         bool               useGpuPmePpComms,
+                         bool               receivePmeForceToGpu)
+{
+    if (useGpuPmePpComms)
+    {
+        GMX_ASSERT(pmePpCommGpu != nullptr, "Need valid pmePpCommGpu");
+        //Receive directly using CUDA memory copy
+        pmePpCommGpu->receiveForceFromPmeCudaDirect(recvptr, n, receivePmeForceToGpu);
+    }
+    else
+    {
+        //Receive data using MPI
+#if GMX_MPI
+        MPI_Recv(recvptr, n*sizeof(rvec), MPI_BYTE,
+                 cr->dd->pme_nodeid, 0, cr->mpi_comm_mysim,
+                 MPI_STATUS_IGNORE);
+#endif
+    }
+}
+
+
+void gmx_pme_receive_f(gmx::PmePpCommGpu *pmePpCommGpu,
+                       const t_commrec *cr,
                        gmx::ForceWithVirial *forceWithVirial,
                        real *energy_q, real *energy_lj,
                        real *dvdlambda_q, real *dvdlambda_lj,
+                       bool useGpuPmePpComms, bool receivePmeForceToGpu,
                        float *pme_cycles)
 {
     if (c_useDelayedWait)
@@ -378,34 +436,33 @@ void gmx_pme_receive_f(const t_commrec *cr,
     std::vector<gmx::RVec> &buffer = cr->dd->pmeForceReceiveBuffer;
     buffer.resize(natoms);
 
-#if GMX_MPI
-    MPI_Recv(buffer.data(),
-             natoms*sizeof(rvec), MPI_BYTE,
-             cr->dd->pme_nodeid, 0, cr->mpi_comm_mysim,
-             MPI_STATUS_IGNORE);
-#endif
+    void *recvptr = reinterpret_cast<void*>(buffer.data());
+    recvFFromPme(pmePpCommGpu, recvptr, natoms, cr, useGpuPmePpComms, receivePmeForceToGpu);
 
     int nt = gmx_omp_nthreads_get_simple_rvec_task(emntDefault, natoms);
 
     gmx::ArrayRef<gmx::RVec> f = forceWithVirial->force_;
 
-    /* Note that we would like to avoid this conditional by putting it
-     * into the omp pragma instead, but then we still take the full
-     * omp parallel for overhead (at least with gcc5).
-     */
-    if (nt == 1)
+    if (!receivePmeForceToGpu)
     {
-        for (int i = 0; i < natoms; i++)
+        /* Note that we would like to avoid this conditional by putting it
+         * into the omp pragma instead, but then we still take the full
+         * omp parallel for overhead (at least with gcc5).
+         */
+        if (nt == 1)
         {
-            f[i] += buffer[i];
+            for (int i = 0; i < natoms; i++)
+            {
+                f[i] += buffer[i];
+            }
         }
-    }
-    else
-    {
-#pragma omp parallel for num_threads(nt) schedule(static)
-        for (int i = 0; i < natoms; i++)
+        else
         {
-            f[i] += buffer[i];
+#pragma omp parallel for num_threads(nt) schedule(static)
+            for (int i = 0; i < natoms; i++)
+            {
+                f[i] += buffer[i];
+            }
         }
     }
 
