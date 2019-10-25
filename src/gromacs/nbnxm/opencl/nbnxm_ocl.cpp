@@ -606,6 +606,10 @@ static inline int calc_shmem_required_prune(const int num_threads_z)
     return shmem;
 }
 
+/*! \brief
+ * Launch the pairlist prune only kernel for the given locality.
+ * \p numParts tells in how many parts, i.e. calls the list will be pruned.
+ */
 void gpu_launch_kernel_pruneonly(gmx_nbnxn_gpu_t           *nb,
                                  const InteractionLocality  iloc,
                                  const int                  numParts)
@@ -735,8 +739,7 @@ void gpu_launch_kernel_pruneonly(gmx_nbnxn_gpu_t           *nb,
 void gpu_launch_cpyback(gmx_nbnxn_ocl_t                          *nb,
                         struct nbnxn_atomdata_t                  *nbatom,
                         const gmx::StepWorkload                  &stepWork,
-                        const AtomLocality                        aloc,
-                        const bool                     gmx_unused copyBackNbForce)
+                        const AtomLocality                        aloc)
 {
     GMX_ASSERT(nb, "Need a valid nbnxn_gpu object");
 

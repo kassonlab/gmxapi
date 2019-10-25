@@ -66,7 +66,8 @@ UpdateConstrainCuda::UpdateConstrainCuda(gmx_unused const t_inputrec     &ir,
 
 UpdateConstrainCuda::~UpdateConstrainCuda() = default;
 
-void UpdateConstrainCuda::integrate(gmx_unused const real                        dt,
+void UpdateConstrainCuda::integrate(gmx_unused GpuEventSynchronizer             *fReadyOnDevice,
+                                    gmx_unused const real                        dt,
                                     gmx_unused const bool                        updateVelocities,
                                     gmx_unused const bool                        computeVirial,
                                     gmx_unused tensor                            virialScaled,
@@ -90,11 +91,6 @@ void UpdateConstrainCuda::set(gmx_unused DeviceBuffer<float>        d_x,
 }
 
 void UpdateConstrainCuda::setPbc(gmx_unused const t_pbc *pbc)
-{
-    GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
-}
-
-void UpdateConstrainCuda::waitCoordinatesReadyOnDevice()
 {
     GMX_ASSERT(false, "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
 }

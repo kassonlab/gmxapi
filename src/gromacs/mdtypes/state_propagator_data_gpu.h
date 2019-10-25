@@ -57,6 +57,8 @@
 #include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/classhelpers.h"
 
+#include "locality.h"
+
 class GpuEventSynchronizer;
 
 namespace gmx
@@ -65,19 +67,6 @@ namespace gmx
 class StatePropagatorDataGpu
 {
     public:
-
-        /*! \brief Atom locality indicator: local, non-local, all.
-         *
-         * \todo This should be managed by a separate object, since the localities
-         *       are used here and in buffer ops.
-         */
-        enum class AtomLocality : int
-        {
-            Local    = 0, //!< Local atoms
-            NonLocal = 1, //!< Non-local atoms
-            All      = 2, //!< Both local and non-local atoms
-            Count    = 3  //!< The number of atom locality types
-        };
 
         /*! \brief Constructor
          *
@@ -127,6 +116,27 @@ class StatePropagatorDataGpu
                                const void        *deviceContext,
                                GpuApiCallBehavior transferKind,
                                int                paddingSize);
+
+        /*! \brief Constructor to use in PME-only rank and in tests.
+         *
+         *  This constructor should be used if only a coordinate device buffer should be managed
+         *  using a single stream. Any operation on force or velocity buffer as well as copy of
+         *  non-local coordinates will exit with assertion failure. Note, that the pmeStream can
+         *  not be a nullptr and the constructor will exit with an assertion failure.
+         *
+         *  \todo Currently, unsupported copy operations are blocked by assertion that the stream
+         *        not nullptr. This should be improved.
+         *
+         *  \param[in] pmeStream       Device PME stream, nullptr is not allowed.
+         *  \param[in] deviceContext   Device context, nullptr allowed for non-OpenCL builds.
+         *  \param[in] transferKind    H2D/D2H transfer call behavior (synchronous or not).
+         *  \param[in] paddingSize     Padding size for coordinates buffer.
+         */
+        StatePropagatorDataGpu(const void        *pmeStream,
+                               const void        *deviceContext,
+                               GpuApiCallBehavior transferKind,
+                               int                paddingSize);
+
         //! Move constructor
         StatePropagatorDataGpu(StatePropagatorDataGpu &&other) noexcept;
         //! Move assignment
@@ -193,6 +203,14 @@ class StatePropagatorDataGpu
         GpuEventSynchronizer* getCoordinatesReadyOnDeviceEvent(AtomLocality              atomLocality,
                                                                const SimulationWorkload &simulationWork,
                                                                const StepWorkload       &stepWork);
+
+        /*! \brief Blocking wait until coordinates are copied to the device.
+         *
+         * Synchronizes the stream in which the copy was executed.
+         *
+         *  \param[in] atomLocality  Locality of the particles to wait for.
+         */
+        void waitCoordinatesCopiedToDevice(AtomLocality  atomLocality);
 
         /*! \brief Getter for the event synchronizer for the update is done on th GPU
          *

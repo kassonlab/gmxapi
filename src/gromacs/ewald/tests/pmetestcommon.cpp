@@ -172,7 +172,9 @@ std::unique_ptr<StatePropagatorDataGpu>
 makeStatePropagatorDataGpu(const gmx_pme_t &pme)
 {
     // TODO: Pin the host buffer and use async memory copies
-    return std::make_unique<StatePropagatorDataGpu>(pme_gpu_get_device_stream(&pme), nullptr, nullptr,
+    // TODO: Special constructor for PME-only rank / PME-tests is used here. There should be a mechanism to
+    //       restrict one from using other constructor here.
+    return std::make_unique<StatePropagatorDataGpu>(pme_gpu_get_device_stream(&pme),
                                                     pme_gpu_get_device_context(&pme),
                                                     GpuApiCallBehavior::Sync,
                                                     pme_gpu_get_padding_size(&pme));
@@ -207,7 +209,7 @@ void pmeInitAtoms(gmx_pme_t               *pme,
             gmx_pme_reinit_atoms(pme, atomCount, charges.data());
 
             stateGpu->reinit(atomCount, atomCount);
-            stateGpu->copyCoordinatesToGpu(arrayRefFromArray(coordinates.data(), coordinates.size()), gmx::StatePropagatorDataGpu::AtomLocality::All);
+            stateGpu->copyCoordinatesToGpu(arrayRefFromArray(coordinates.data(), coordinates.size()), gmx::AtomLocality::All);
             pme_gpu_set_kernelparam_coordinates(pme->gpu, stateGpu->getCoordinates());
 
             break;
@@ -309,8 +311,12 @@ void pmePerformSplineAndSpread(gmx_pme_t *pme, CodePath mode, // TODO const qual
             break;
 
         case CodePath::GPU:
-            pme_gpu_spread(pme->gpu, gridIndex, fftgrid, computeSplines, spreadCharges);
-            break;
+        {
+            // no synchronization needed as x is transferred in the PME stream
+            GpuEventSynchronizer *xReadyOnDevice = nullptr;
+            pme_gpu_spread(pme->gpu, xReadyOnDevice, gridIndex, fftgrid, computeSplines, spreadCharges);
+        }
+        break;
 
         default:
             GMX_THROW(InternalError("Test not implemented for this mode"));

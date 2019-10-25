@@ -128,7 +128,7 @@ gpuAtomToInteractionLocality(const AtomLocality atomLocality)
 //NOLINTNEXTLINE(misc-definitions-in-headers)
 void setupGpuShortRangeWork(gmx_nbnxn_gpu_t                  *nb,
                             const gmx::GpuBonded             *gpuBonded,
-                            const Nbnxm::InteractionLocality  iLocality)
+                            const gmx::InteractionLocality    iLocality)
 {
     GMX_ASSERT(nb, "Need a valid nbnxn_gpu object");
 
@@ -151,14 +151,14 @@ void setupGpuShortRangeWork(gmx_nbnxn_gpu_t                  *nb,
  */
 static bool
 haveGpuShortRangeWork(const gmx_nbnxn_gpu_t            &nb,
-                      const Nbnxm::InteractionLocality  iLocality)
+                      const gmx::InteractionLocality    iLocality)
 {
     return nb.haveWork[iLocality];
 }
 
 //NOLINTNEXTLINE(misc-definitions-in-headers)
 bool haveGpuShortRangeWork(const gmx_nbnxn_gpu_t     *nb,
-                           const Nbnxm::AtomLocality  aLocality)
+                           const gmx::AtomLocality    aLocality)
 {
     GMX_ASSERT(nb, "Need a valid nbnxn_gpu object");
 
@@ -366,7 +366,12 @@ gpu_accumulate_timings(gmx_wallclock_gpu_nbnxn_t *timings,
     }
 }
 
-//TODO: move into shared source file with gmx_compile_cpp_as_cuda
+/*! \brief Attempts to complete nonbonded GPU task.
+ *
+ * See documentation in nbnxm_gpu.h for details.
+ *
+ * \todo Move into shared source file with gmx_compile_cpp_as_cuda
+ */
 //NOLINTNEXTLINE(misc-definitions-in-headers)
 bool gpu_try_finish_task(gmx_nbnxn_gpu_t          *nb,
                          const gmx::StepWorkload  &stepWork,
@@ -381,6 +386,17 @@ bool gpu_try_finish_task(gmx_nbnxn_gpu_t          *nb,
 
     /* determine interaction locality from atom locality */
     const InteractionLocality iLocality = gpuAtomToInteractionLocality(aloc);
+
+
+    // Transfers are launched and therefore need to be waited on if:
+    // - buffer ops is not offloaded
+    // - energies or virials are needed (on the local stream)
+    //
+    // (Note that useGpuFBufferOps and computeVirial are mutually exclusive
+    // in current code as virial steps do CPU reduction.)
+    const bool haveResultToWaitFor =
+        (!stepWork.useGpuFBufferOps ||
+         (aloc == AtomLocality::Local && (stepWork.computeEnergy || stepWork.computeVirial)));
 
     //  We skip when during the non-local phase there was actually no work to do.
     //  This is consistent with nbnxn_gpu_launch_kernel but it also considers possible
@@ -407,16 +423,22 @@ bool gpu_try_finish_task(gmx_nbnxn_gpu_t          *nb,
 
             wallcycle_increment_event_count(wcycle, ewcWAIT_GPU_NB_L);
         }
-        else
+        else if (haveResultToWaitFor)
         {
             gpuStreamSynchronize(nb->stream[iLocality]);
         }
 
+        // TODO: this needs to be moved later because conditional wait could brake timing
+        // with a future OpenCL implementation, but with CUDA timing is anyway disabled
+        // in all cases where we skip the wait.
         gpu_accumulate_timings(nb->timings, nb->timers, nb->plist[iLocality], aloc, stepWork,
                                nb->bDoTime != 0);
 
-        gpu_reduce_staged_outputs(nb->nbst, iLocality, stepWork.computeEnergy, stepWork.computeVirial,
-                                  e_lj, e_el, as_rvec_array(shiftForces.data()));
+        if (stepWork.computeEnergy || stepWork.computeVirial)
+        {
+            gpu_reduce_staged_outputs(nb->nbst, iLocality, stepWork.computeEnergy, stepWork.computeVirial,
+                                      e_lj, e_el, as_rvec_array(shiftForces.data()));
+        }
     }
 
     /* Always reset both pruning flags (doesn't hurt doing it even when timing is off). */

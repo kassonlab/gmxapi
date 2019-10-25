@@ -230,11 +230,11 @@ setupNbnxmForBenchInstance(const KernelBenchOptions   &options,
 
     nbnxn_put_on_grid(nbv.get(),
                       system.box, 0, lowerCorner, upperCorner,
-                      nullptr, 0, system.coordinates.size(), atomDensity,
+                      nullptr, { 0, int(system.coordinates.size()) }, atomDensity,
                       atomInfo, system.coordinates,
                       0, nullptr);
 
-    nbv->constructPairlist(Nbnxm::InteractionLocality::Local,
+    nbv->constructPairlist(gmx::InteractionLocality::Local,
                            &system.excls, 0, &nrnb);
 
     t_mdatoms mdatoms;
@@ -322,20 +322,20 @@ static void setupAndRunInstance(const gmx::BenchmarkSystem &system,
     // Run pre-iteration to avoid cache misses
     for (int iter = 0; iter < options.numPreIterations; iter++)
     {
-        nbv->dispatchNonbondedKernel(InteractionLocality::Local,
+        nbv->dispatchNonbondedKernel(gmx::InteractionLocality::Local,
                                      ic, stepWork, enbvClearFYes, system.forceRec,
                                      &enerd,
                                      &nrnb);
     }
 
     const int          numIterations = (doWarmup ? options.numWarmupIterations : options.numIterations);
-    const PairlistSet &pairlistSet   = nbv->pairlistSets().pairlistSet(InteractionLocality::Local);
+    const PairlistSet &pairlistSet   = nbv->pairlistSets().pairlistSet(gmx::InteractionLocality::Local);
     const gmx::index   numPairs      = pairlistSet.natpair_ljq_ + pairlistSet.natpair_lj_ + pairlistSet.natpair_q_;
     gmx_cycles_t       cycles        = gmx_cycles_read();
     for (int iter = 0; iter < numIterations; iter++)
     {
         // Run the kernel without force clearing
-        nbv->dispatchNonbondedKernel(InteractionLocality::Local,
+        nbv->dispatchNonbondedKernel(gmx::InteractionLocality::Local,
                                      ic, stepWork, enbvClearFNo, system.forceRec,
                                      &enerd,
                                      &nrnb);
