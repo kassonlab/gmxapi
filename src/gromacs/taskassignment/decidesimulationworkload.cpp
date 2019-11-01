@@ -43,32 +43,35 @@
 
 #include "decidesimulationworkload.h"
 
+#include "gromacs/ewald/pme.h"
 #include "gromacs/taskassignment/taskassignment.h"
 #include "gromacs/utility/arrayref.h"
 
 namespace gmx
 {
 
-SimulationWorkload createSimulationWorkload(bool useGpuForNonbonded,
-                                            bool useGpuForPme,
-                                            bool useGpuForPmeFft,
-                                            bool useGpuForBonded,
-                                            bool useGpuForUpdateConstraints,
-                                            bool useGpuForBufferOps,
-                                            bool useGpuHaloExchange,
-                                            bool useGpuPmePpComm)
+SimulationWorkload createSimulationWorkload(bool              useGpuForNonbonded,
+                                            PmeRunMode        pmeRunMode,
+                                            bool              useGpuForBonded,
+                                            bool              useGpuForUpdate,
+                                            bool              useGpuForBufferOps,
+                                            bool              useGpuHaloExchange,
+                                            bool              useGpuPmePpComm,
+                                            bool              haveEwaldSurfaceContribution)
 {
-    SimulationWorkload simulationWorkload {
-        useGpuForNonbonded,
-        useGpuForPme,
-        useGpuForPmeFft,
-        useGpuForBonded,
-        useGpuForUpdateConstraints,
-        useGpuForBufferOps,
-        useGpuHaloExchange,
-        useGpuPmePpComm,
-        useGpuHaloExchange || useGpuPmePpComm
-    };
+    SimulationWorkload simulationWorkload;
+    simulationWorkload.useCpuNonbonded              = !useGpuForNonbonded;
+    simulationWorkload.useGpuNonbonded              = useGpuForNonbonded;
+    simulationWorkload.useCpuPme                    = (pmeRunMode == PmeRunMode::CPU);
+    simulationWorkload.useGpuPme                    = (pmeRunMode == PmeRunMode::GPU || pmeRunMode == PmeRunMode::Mixed);
+    simulationWorkload.useGpuPmeFft                 = (pmeRunMode == PmeRunMode::Mixed);
+    simulationWorkload.useGpuBonded                 = useGpuForBonded;
+    simulationWorkload.useGpuUpdate                 = useGpuForUpdate;
+    simulationWorkload.useGpuBufferOps              = useGpuForBufferOps || useGpuForUpdate;
+    simulationWorkload.useGpuHaloExchange           = useGpuHaloExchange;
+    simulationWorkload.useGpuPmePpCommunication     = useGpuPmePpComm;
+    simulationWorkload.useGpuDirectCommunication    = useGpuHaloExchange || useGpuPmePpComm;
+    simulationWorkload.haveEwaldSurfaceContribution = haveEwaldSurfaceContribution;
 
     return simulationWorkload;
 }

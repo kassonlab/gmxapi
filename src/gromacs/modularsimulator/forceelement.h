@@ -32,7 +32,7 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \libinternal
+/*! \libinternal \file
  * \brief Declares the force element for the modular simulator
  *
  * \author Pascal Merz <pascal.merz@me.com>
@@ -51,6 +51,7 @@
 #include "modularsimulatorinterfaces.h"
 #include "topologyholder.h"
 
+struct gmx_enfrot;
 struct gmx_wallcycle;
 struct pull_t;
 struct t_fcdata;
@@ -66,10 +67,8 @@ class MDAtoms;
 class MdrunScheduleWorkload;
 class StatePropagatorData;
 
-//! \addtogroup module_modularsimulator
-//! \{
-
 /*! \libinternal
+ * \ingroup module_modularsimulator
  * \brief Force element
  *
  * The force element manages the call to do_force(...)
@@ -98,7 +97,8 @@ class ForceElement final :
             MdrunScheduleWorkload         *runScheduleWork,
             gmx_vsite_t                   *vsite,
             ImdSession                    *imdSession,
-            pull_t                        *pull_work);
+            pull_t                        *pull_work,
+            gmx_enfrot                    *enforcedRotation);
 
         /*! \brief Register force calculation for step / time
          *
@@ -182,9 +182,10 @@ class ForceElement final :
         t_fcdata              *fcd_;
         //! Schedule of work for each MD step for this task.
         MdrunScheduleWorkload *runScheduleWork_;
+        //! Handles enforced rotation.
+        gmx_enfrot            *enforcedRotation_;
 };
 
-//! \}
 }      // namespace gmx
 
 #endif // GMX_MODULARSIMULATOR_FORCEELEMENT_H
