@@ -32,11 +32,11 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \internal
+/*! \internal \file
  * \brief Defines the modular simulator
  *
  * \author Pascal Merz <pascal.merz@me.com>
- * \ingroup module_mdrun
+ * \ingroup module_modularsimulator
  */
 
 #include "gmxpre.h"
@@ -49,6 +49,7 @@
 #include "gromacs/ewald/pme_load_balancing.h"
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/gmxlib/nrnb.h"
+#include "gromacs/math/vec.h"
 #include "gromacs/mdlib/checkpointhandler.h"
 #include "gromacs/mdlib/constr.h"
 #include "gromacs/mdlib/energyoutput.h"
@@ -572,7 +573,7 @@ std::unique_ptr<ISimulatorElement> ModularSimulator::buildForces(
                     statePropagatorDataPtr, energyElementPtr, freeEnergyPerturbationElement,
                     isVerbose, isDynamicBox, fplog,
                     cr, inputrec, mdAtoms, nrnb, fr, fcd, wcycle, runScheduleWork,
-                    vsite, imdSession, pull_work, constr, &topologyHolder_->globalTopology());
+                    vsite, imdSession, pull_work, constr, &topologyHolder_->globalTopology(), enforcedRotation);
         topologyHolder_->registerClient(shellFCElement.get());
         neighborSearchSignallerBuilder->registerSignallerClient(compat::make_not_null(shellFCElement.get()));
         energySignallerBuilder->registerSignallerClient(compat::make_not_null(shellFCElement.get()));
@@ -586,7 +587,7 @@ std::unique_ptr<ISimulatorElement> ModularSimulator::buildForces(
                     statePropagatorDataPtr, energyElementPtr, freeEnergyPerturbationElement,
                     isDynamicBox, fplog,
                     cr, inputrec, mdAtoms, nrnb, fr, fcd, wcycle,
-                    runScheduleWork, vsite, imdSession, pull_work);
+                    runScheduleWork, vsite, imdSession, pull_work, enforcedRotation);
         topologyHolder_->registerClient(forceElement.get());
         neighborSearchSignallerBuilder->registerSignallerClient(compat::make_not_null(forceElement.get()));
         energySignallerBuilder->registerSignallerClient(compat::make_not_null(forceElement.get()));
@@ -832,6 +833,12 @@ bool ModularSimulator::isInputCompatible(
         (getenv("GMX_DISABLE_MODULAR_SIMULATOR") != nullptr);
 
     GMX_RELEASE_ASSERT(
+            !(modularSimulatorExplicitlyTurnedOn && modularSimulatorExplicitlyTurnedOff),
+            "Cannot have both GMX_USE_MODULAR_SIMULATOR=ON and GMX_DISABLE_MODULAR_SIMULATOR=ON. "
+            "Unset one of the two environment variables to explicitly chose which simulator to use, "
+            "or unset both to recover default behavior.");
+
+    GMX_RELEASE_ASSERT(
             !(modularSimulatorExplicitlyTurnedOff && inputrec->eI == eiVV && inputrec->epc == epcPARRINELLORAHMAN),
             "Cannot use a Parrinello-Rahman barostat with md-vv and GMX_DISABLE_MODULAR_SIMULATOR=ON, "
             "as the Parrinello-Rahman barostat is not implemented in the legacy simulator. Unset "
@@ -858,6 +865,22 @@ bool ModularSimulator::isInputCompatible(
     isInputCompatible = isInputCompatible && conditionalAssert(
                 inputrec->efep == efepNO || inputrec->efep == efepYES || inputrec->efep == efepSLOWGROWTH,
                 "Expanded ensemble free energy calculation is not supported by the modular simulator.");
+    isInputCompatible = isInputCompatible && conditionalAssert(
+                !inputrec->bPull,
+                "Pulling is not supported by the modular simulator.");
+    isInputCompatible = isInputCompatible && conditionalAssert(
+                inputrec->opts.ngacc == 1 && inputrec->opts.acc[0][XX] == 0.0 && inputrec->opts.acc[0][YY] == 0.0 &&
+                inputrec->opts.acc[0][ZZ] == 0.0 && inputrec->cos_accel == 0.0,
+                "Acceleration is not supported by the modular simulator.");
+    isInputCompatible = isInputCompatible && conditionalAssert(
+                inputrec->opts.ngfrz == 1 && inputrec->opts.nFreeze[0][XX] == 0 &&
+                inputrec->opts.nFreeze[0][YY] == 0 && inputrec->opts.nFreeze[0][ZZ] == 0,
+                "Freeze groups are not supported by the modular simulator.");
+    isInputCompatible = isInputCompatible && conditionalAssert(
+                inputrec->deform[XX][XX] == 0.0 && inputrec->deform[XX][YY] == 0.0 && inputrec->deform[XX][ZZ] == 0.0 &&
+                inputrec->deform[YY][XX] == 0.0 && inputrec->deform[YY][YY] == 0.0 && inputrec->deform[YY][ZZ] == 0.0 &&
+                inputrec->deform[ZZ][XX] == 0.0 && inputrec->deform[ZZ][YY] == 0.0 && inputrec->deform[ZZ][ZZ] == 0.0,
+                "Deformation is not supported by the modular simulator.");
     isInputCompatible = isInputCompatible && conditionalAssert(
                 vsite == nullptr,
                 "Virtual sites are not supported by the modular simulator.");

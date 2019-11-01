@@ -32,7 +32,7 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \libinternal
+/*! \libinternal \file
  * \brief Declares the shell / flex constraints element for the modular simulator
  *
  * \author Pascal Merz <pascal.merz@me.com>
@@ -51,6 +51,7 @@
 #include "modularsimulatorinterfaces.h"
 #include "topologyholder.h"
 
+struct gmx_enfrot;
 struct gmx_shellfc_t;
 struct gmx_wallcycle;
 struct pull_t;
@@ -67,10 +68,8 @@ class MDAtoms;
 class MdrunScheduleWorkload;
 class StatePropagatorData;
 
-//! \addtogroup module_modularsimulator
-//! \{
-
 /*! \libinternal
+ * \ingroup module_modularsimulator
  * \brief Shell & flex constraints element
  *
  * The ShellFCElement manages the call to relax_shell_flexcon(...)
@@ -102,7 +101,8 @@ class ShellFCElement final :
             ImdSession                    *imdSession,
             pull_t                        *pull_work,
             Constraints                   *constr,
-            const gmx_mtop_t              *globalTopology);
+            const gmx_mtop_t              *globalTopology,
+            gmx_enfrot                    *enforcedRotation);
 
         /*! \brief Register shell / flex constraint calculation for step / time
          *
@@ -198,9 +198,10 @@ class ShellFCElement final :
         MdrunScheduleWorkload *runScheduleWork_;
         //! Handles constraints.
         Constraints           *constr_;
+        //! Handles enforced rotation.
+        gmx_enfrot            *enforcedRotation_;
 };
 
-//! \}
 }      // namespace gmx
 
 #endif // GMX_MODULARSIMULATOR_SHELLFCELEMENT_H

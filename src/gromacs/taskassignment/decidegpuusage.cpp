@@ -494,14 +494,12 @@ bool decideWhetherToUseGpuForUpdate(const bool        forceGpuUpdateDefaultOn,
                                     const bool        isDomainDecomposition,
                                     const bool        useGpuForPme,
                                     const bool        useGpuForNonbonded,
-                                    const bool        useGpuForBufferOps,
                                     const TaskTarget  updateTarget,
                                     const bool        gpusWereDetected,
                                     const t_inputrec &inputrec,
                                     const bool        haveVSites,
                                     const bool        useEssentialDynamics,
                                     const bool        doOrientationRestraints,
-                                    const bool        doDistanceRestraints,
                                     const bool        useReplicaExchange)
 {
 
@@ -516,10 +514,10 @@ bool decideWhetherToUseGpuForUpdate(const bool        forceGpuUpdateDefaultOn,
     {
         errorMessage += "Domain decomposition is not supported.\n";
     }
-    // Using the GPU-version of update makes sense if forces are already on the GPU, i.e. if at least:
-    // 1. PME is on the GPU (there should be a copy of coordinates on a GPU in rvec format for PME spread).
-    // 2. Non-bonded interactions and buffer ops are on the GPU.
-    if (!(useGpuForPme || (useGpuForNonbonded && useGpuForBufferOps)))
+    // Using the GPU-version of update if:
+    // 1. PME is on the GPU (there should be a copy of coordinates on GPU for PME spread), or
+    // 2. Non-bonded interactions are on the GPU.
+    if (!(useGpuForPme || useGpuForNonbonded))
     {
         errorMessage += "Either PME or short-ranged non-bonded interaction tasks must run on the GPU.\n";
     }
@@ -539,9 +537,15 @@ bool decideWhetherToUseGpuForUpdate(const bool        forceGpuUpdateDefaultOn,
     {
         errorMessage += "Nose-Hoover temperature coupling is not supported.\n";
     }
-    if (inputrec.epc != epcNO && inputrec.epc != epcPARRINELLORAHMAN)
+    if (inputrec.epc != epcNO)
     {
-        errorMessage += "Only Parrinello-Rahman pressure control is supported.\n";
+        // Coordinate D2H and H2d are missing as well as PBC reinitialization
+        errorMessage += "Pressure coupling is not supported.\n";
+    }
+    if (EEL_PME_EWALD(inputrec.coulombtype) && inputrec.epsilon_surface != 0)
+    {
+        // The graph is needed, but not supported
+        errorMessage += "Ewald surface correction is not supported.\n";
     }
     if (haveVSites)
     {
@@ -553,23 +557,26 @@ bool decideWhetherToUseGpuForUpdate(const bool        forceGpuUpdateDefaultOn,
     }
     if (inputrec.bPull || inputrec.pull)
     {
+        // Pull potentials are actually supported, but constraint pulling is not
         errorMessage += "Pulling is not supported.\n";
     }
     if (doOrientationRestraints)
     {
+        // The graph is needed, but not supported
         errorMessage += "Orientation restraints are not supported.\n";
-    }
-    if (doDistanceRestraints)
-    {
-        errorMessage += "Distance restraints are not supported.\n";
     }
     if (inputrec.efep != efepNO)
     {
+        // Actually all free-energy options except for mass and constraint perturbation are supported
         errorMessage += "Free energy perturbations are not supported.\n";
     }
     if (useReplicaExchange)
     {
         errorMessage += "Replica exchange simulations are not supported.\n";
+    }
+    if (inputrec.eSwapCoords != eswapNO)
+    {
+        errorMessage += "Swapping the coordinates is not supported.\n";
     }
     if (!errorMessage.empty())
     {

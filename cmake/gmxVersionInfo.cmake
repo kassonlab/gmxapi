@@ -201,7 +201,7 @@ set(GMX_VERSION_PATCH 0)
 # candidates, where it signifies the most recent such release from
 # this branch; it will be empty before the first such release, as well
 # as after the final release is out.
-set(GMX_VERSION_SUFFIX "-beta1")
+set(GMX_VERSION_SUFFIX "-beta2")
 
 # Conventionally with libtool, any ABI change must change the major
 # version number, the minor version number should change if it's just
@@ -260,13 +260,13 @@ if (NOT SOURCE_IS_SOURCE_DISTRIBUTION AND
 endif()
 
 set(REGRESSIONTEST_VERSION "${GMX_VERSION_STRING}")
-set(REGRESSIONTEST_BRANCH "refs/heads/master") # TODO change to release-2020
+set(REGRESSIONTEST_BRANCH "refs/heads/release-2020")
 # Run the regressiontests packaging job with the correct pakage
 # version string, and the release box checked, in order to have it
 # build the regressiontests tarball with all the right naming. The
 # naming affects the md5sum that has to go here, and if it isn't right
 # release workflow will report a failure.
-set(REGRESSIONTEST_MD5SUM "79df37f5563fb8f913890a0abf6f6298" CACHE INTERNAL "MD5 sum of the regressiontests tarball for this GROMACS version")
+set(REGRESSIONTEST_MD5SUM "162edf7d9d520672f5fa5888aae60989" CACHE INTERNAL "MD5 sum of the regressiontests tarball for this GROMACS version")
 
 math(EXPR GMX_VERSION_NUMERIC
      "${GMX_VERSION_MAJOR}*10000 + ${GMX_VERSION_PATCH}")
@@ -336,6 +336,12 @@ set(VERSION_INFO_DEPS         ${VERSION_INFO_CMAKE_FILE})
 # the function below.
 set(VERSION_INFO_CMAKEIN_FILE     ${CMAKE_CURRENT_LIST_DIR}/VersionInfo.cmake.cmakein)
 set(VERSION_INFO_CONFIGURE_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/gmxConfigureVersionInfo.cmake)
+# A set of directories to scan for calculating the hash of source files.
+set(SET_OF_DIRECTORIES_TO_CHECKSUM  "${PROJECT_SOURCE_DIR}/src")
+list(APPEND SET_OF_DIRECTORIES_TO_CHECKSUM "${PROJECT_SOURCE_DIR}/python_packaging")
+# Try to find python for the checksumming script
+set(PythonInterp_FIND_QUIETLY ON)
+find_package(PythonInterp 3.5)
 
 # Rules to create the VersionInfo.cmake file.
 # For git info, the sequence is:
@@ -400,11 +406,80 @@ else()
     set(GMX_VERSION_STRING_FULL       ${GMX_VERSION_STRING})
     set(GMX_VERSION_FULL_HASH         "")
     set(GMX_VERSION_CENTRAL_BASE_HASH "")
+    # To notify the user during compilation and at runtime that the build source
+    # has not been modified after unpacking the source tarball, the contents are hashed
+    # to be compared to a hash computed during the release process. If the hash matches
+    # all is fine and the user gets a message in the log file indicating that.
+    # If either the release hash file is missing, or if the hash does not match
+    # a different message is printed to indicate that the source has been changed
+    # compared to the version actually released. This is not needed in case a build
+    # is done in git, as we have the information there already.
+    # This is not done if the user has explicitly set an additional custom version string with
+    # -DGMX_VERSION_STRING_OF_FORK, as this indicates that they are knowing that a custom
+    # version of GROMACS is in use.
+    set(RELEASE_CHECKSUM_FILE "${PROJECT_SOURCE_DIR}/src/reference_checksum")
+    if(NOT GMX_VERSION_STRING_OF_FORK OR "${GMX_VERSION_STRING_OF_FORK}" STREQUAL "")
+        if(EXISTS ${RELEASE_CHECKSUM_FILE} AND PythonInterp_FOUND)
+            file(READ ${RELEASE_CHECKSUM_FILE} GMX_RELEASE_SOURCE_FILE_CHECKSUM)
+            string(STRIP ${GMX_RELEASE_SOURCE_FILE_CHECKSUM} GMX_RELEASE_SOURCE_FILE_CHECKSUM)
+            set(CHECKSUM_RESULT_FILE "${CMAKE_CURRENT_BINARY_DIR}/computed_checksum")
+            execute_process(COMMAND ${PYTHON_EXECUTABLE} 
+                                    ${PROJECT_SOURCE_DIR}/admin/createFileHash.py
+                                    -s ${SET_OF_DIRECTORIES_TO_CHECKSUM}
+                                    -o ${CHECKSUM_RESULT_FILE}
+                            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                            OUTPUT_QUIET)
+                        file(READ ${CHECKSUM_RESULT_FILE} GMX_CURRENT_SOURCE_FILE_CHECKSUM)
+            string(STRIP ${GMX_CURRENT_SOURCE_FILE_CHECKSUM} GMX_CURRENT_SOURCE_FILE_CHECKSUM)
+            if(NOT ${GMX_RELEASE_SOURCE_FILE_CHECKSUM} STREQUAL ${GMX_CURRENT_SOURCE_FILE_CHECKSUM})
+                set(GMX_VERSION_STRING_FULL "${GMX_VERSION_STRING_FULL}-MODIFIED")
+                message(STATUS "The source code for this GROMACS installation is different from the officially released version.")
+            endif()
+        elseif(PythonInterp_FOUND)
+            set(GMX_VERSION_STRING_FULL "${GMX_VERSION_STRING_FULL}-UNCHECKED")
+            set(GMX_RELEASE_SOURCE_FILE_CHECKSUM "NoChecksumFile")
+            set(GMX_CURRENT_SOURCE_FILE_CHECKSUM "NoChecksumFile")
+            message(WARNING "Could not valdiate the GROMACS source due to missing reference checksum file.")
+        else()
+            set(GMX_VERSION_STRING_FULL "${GMX_VERSION_STRING_FULL}-UNCHECKED")
+            set(GMX_RELEASE_SOURCE_FILE_CHECKSUM "NoPythonAvailable")
+            set(GMX_CURRENT_SOURCE_FILE_CHECKSUM "NoPythonAvailable")
+            message(STATUS "Could not calculate checksum of source files without Python")
+        endif()
+    endif()
     configure_file(${VERSION_INFO_CMAKEIN_FILE} ${VERSION_INFO_CMAKE_FILE})
 endif()
 unset(GMX_VERSION_STRING_FULL)
 unset(GMX_VERSION_FULL_HASH)
 unset(GMX_VERSION_CENTRAL_BASE_HASH)
+unset(GMX_RELEASE_SOURCE_FILE_CHECKSUM)
+unset(GMX_CURRENT_SOURCE_FILE_CHECKSUM)
+
+
+# What file the checksum should be written to
+set(CHECKSUM_FILE "${PROJECT_SOURCE_DIR}/src/reference_checksum")
+
+# Target that allows checksumming a source tree when producing a tarball.
+# Allows verification of builds from the tarball to make sure the source had
+# not been tampered with.
+# Note: The RUN_ALWAYS here is to regenerate the hash file only, it does not
+# mean that the target is run in all builds
+if (PYTHONINTERP_FOUND)
+    gmx_add_custom_output_target(reference_checksum RUN_ALWAYS
+        OUTPUT ${CHECKSUM_FILE}
+        COMMAND ${PYTHON_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/admin/createFileHash.py
+            -s ${SET_OF_DIRECTORIES_TO_CHECKSUM}
+            -o ${CHECKSUM_FILE}
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMENT "Generating reference checksum of source files")
+else()
+    add_custom_target(reference_checksum
+        COMMAND ${CMAKE_COMMAND} -E echo
+        "Can not checksum files without python being available"
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMENT "Generating reference checksum of source files")
+endif()
 
 # The main user-visible interface to the machinery.
 # See documentation at the top of the script.

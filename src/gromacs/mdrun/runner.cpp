@@ -885,6 +885,26 @@ int Mdrunner::mdrunner()
     // and report those features that are enabled.
     const DevelopmentFeatureFlags devFlags = manageDevelopmentFeatures(mdlog, useGpuForNonbonded, useGpuForPme);
 
+    // NOTE: The devFlags need decideWhetherToUseGpusForNonbonded(...) and decideWhetherToUseGpusForPme(...) for overrides,
+    //       decideWhetherToUseGpuForUpdate() needs devFlags for the '-update auto' override, hence the interleaving.
+    // NOTE: When the simulationWork is constructed, the useGpuForUpdate overrides the devFlags.enableGpuBufferOps.
+    try
+    {
+        useGpuForUpdate = decideWhetherToUseGpuForUpdate(devFlags.forceGpuUpdateDefaultOn,
+                                                         useDomainDecomposition,
+                                                         useGpuForPme,
+                                                         useGpuForNonbonded,
+                                                         updateTarget,
+                                                         gpusWereDetected,
+                                                         *inputrec,
+                                                         gmx_mtop_interaction_count(mtop, IF_VSITE) > 0,
+                                                         doEssentialDynamics,
+                                                         gmx_mtop_ftype_count(mtop, F_ORIRES) > 0,
+                                                         replExParams.exchangeInterval > 0);
+    }
+    GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR;
+
+
     // Build restraints.
     // TODO: hide restraint implementation details from Mdrunner.
     // There is nothing unique about restraints at this point as far as the
@@ -1333,14 +1353,13 @@ int Mdrunner::mdrunner()
         // TODO remove need to pass local stream into GPU halo exchange - Redmine #3093
         if (havePPDomainDecomposition(cr) && prefer1DAnd1PulseDD && is1DAnd1PulseDD(*cr->dd))
         {
-            GMX_RELEASE_ASSERT(devFlags.enableGpuBufferOps, "Must use GMX_GPU_BUFFER_OPS=1 to use GMX_GPU_DD_COMMS=1");
+            GMX_RELEASE_ASSERT(devFlags.enableGpuBufferOps, "Must use GMX_USE_GPU_BUFFER_OPS=1 to use GMX_GPU_DD_COMMS=1");
             void *streamLocal              = Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::Local);
             void *streamNonLocal           = Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::NonLocal);
-            void *coordinatesOnDeviceEvent = fr->nbv->get_x_on_device_event();
             GMX_LOG(mdlog.warning).asParagraph().appendTextFormatted(
                     "NOTE: This run uses the 'GPU halo exchange' feature, enabled by the GMX_GPU_DD_COMMS environment variable.");
             cr->dd->gpuHaloExchange = std::make_unique<GpuHaloExchange>(cr->dd, cr->mpi_comm_mysim, streamLocal,
-                                                                        streamNonLocal, coordinatesOnDeviceEvent);
+                                                                        streamNonLocal);
         }
 
         /* Initialize the mdAtoms structure.
@@ -1545,30 +1564,6 @@ int Mdrunner::mdrunner()
                             fr->cginfo_mb);
         }
 
-        if (updateTarget == TaskTarget::Gpu)
-        {
-            if (SIMMASTER(cr))
-            {
-                gmx_fatal(FARGS, "It is currently not possible to redirect the calculation "
-                          "of update and constraints to the GPU!");
-            }
-        }
-
-        // Before we start the actual simulator, try if we can run the update task on the GPU.
-        useGpuForUpdate = decideWhetherToUseGpuForUpdate(devFlags.forceGpuUpdateDefaultOn,
-                                                         DOMAINDECOMP(cr),
-                                                         useGpuForPme,
-                                                         useGpuForNonbonded,
-                                                         devFlags.enableGpuBufferOps,
-                                                         updateTarget,
-                                                         gpusWereDetected,
-                                                         *inputrec,
-                                                         mdAtoms->mdatoms()->haveVsites,
-                                                         doEssentialDynamics,
-                                                         gmx_mtop_ftype_count(mtop, F_ORIRES) > 0,
-                                                         gmx_mtop_ftype_count(mtop, F_DISRES) > 0,
-                                                         replExParams.exchangeInterval > 0);
-
         const bool inputIsCompatibleWithModularSimulator = ModularSimulator::isInputCompatible(
                     false,
                     inputrec, doRerun, vsite.get(), ms, replExParams,
@@ -1577,8 +1572,22 @@ int Mdrunner::mdrunner()
 
         const bool useModularSimulator = inputIsCompatibleWithModularSimulator && !(getenv("GMX_DISABLE_MODULAR_SIMULATOR") != nullptr);
 
+        // TODO This is not the right place to manage the lifetime of
+        // this data structure, but currently it's the easiest way to
+        // make it work.
+        MdrunScheduleWorkload runScheduleWork;
+        // Also populates the simulation constant workload description.
+        runScheduleWork.simulationWork = createSimulationWorkload(useGpuForNonbonded,
+                                                                  pmeRunMode,
+                                                                  useGpuForBonded,
+                                                                  useGpuForUpdate,
+                                                                  devFlags.enableGpuBufferOps,
+                                                                  devFlags.enableGpuHaloExchange,
+                                                                  devFlags.enableGpuPmePPComm,
+                                                                  haveEwaldSurfaceContribution(*inputrec));
+
         std::unique_ptr<gmx::StatePropagatorDataGpu> stateGpu;
-        if (gpusWereDetected && ((useGpuForPme && thisRankHasDuty(cr, DUTY_PME)) || devFlags.enableGpuBufferOps))
+        if (gpusWereDetected && ((useGpuForPme && thisRankHasDuty(cr, DUTY_PME)) || runScheduleWork.simulationWork.useGpuBufferOps))
         {
             const void         *pmeStream      = pme_gpu_get_device_stream(fr->pmedata);
             const void         *localStream    = fr->nbv->gpu_nbv != nullptr ? Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::Local) : nullptr;
@@ -1595,21 +1604,6 @@ int Mdrunner::mdrunner()
                                                                      paddingSize);
             fr->stateGpu = stateGpu.get();
         }
-
-        // TODO This is not the right place to manage the lifetime of
-        // this data structure, but currently it's the easiest way to
-        // make it work.
-        MdrunScheduleWorkload runScheduleWork;
-        // Also populates the simulation constant workload description.
-        runScheduleWork.simulationWork = createSimulationWorkload(useGpuForNonbonded,
-                                                                  useGpuForPme,
-                                                                  (pmeRunMode == PmeRunMode::GPU),
-                                                                  useGpuForBonded,
-                                                                  useGpuForUpdate,
-                                                                  devFlags.enableGpuBufferOps,
-                                                                  devFlags.enableGpuHaloExchange,
-                                                                  devFlags.enableGpuPmePPComm);
-
 
         GMX_ASSERT(stopHandlerBuilder_, "Runner must provide StopHandlerBuilder to simulator.");
         SimulatorBuilder simulatorBuilder;

@@ -32,7 +32,7 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \libinternal
+/*! \libinternal \file
  * \brief Declares the v-rescale thermostat for the modular simulator
  *
  * \author Pascal Merz <pascal.merz@me.com>
@@ -52,9 +52,14 @@ struct t_commrec;
 
 namespace gmx
 {
-//! \addtogroup module_modularsimulator
-//! \{
 
+/*! \libinternal
+ * \ingroup module_modularsimulator
+ * \brief Element implementing the v-rescale thermostat
+ *
+ * This element takes a callback to the propagator and updates the velocity
+ * scaling factor according to the v-rescale thermostat.
+ */
 class VRescaleThermostat final :
     public               ISimulatorElement,
     public               ICheckpointHelperClient
@@ -134,8 +139,6 @@ class VRescaleThermostat final :
         void writeCheckpoint(t_state *localState, t_state *globalState) override;
 
 };
-
-//! \}
 
 }      // namespace gmx
 
