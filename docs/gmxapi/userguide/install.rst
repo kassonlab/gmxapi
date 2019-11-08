@@ -421,8 +421,8 @@ determined by the local environment or by additional arguments to ``setup.py``.
     `creating a source distribution
     <https://docs.python.org/3/distutils/sourcedist.html#creating-a-source-distribution>`_
 
-Package maintainers may update the the online respository by uploading a freshly
-built ``sdist`` with ``python -n twine upload dist/*``
+Package maintainers may update the online respository by uploading a freshly
+built ``sdist`` with ``python -m twine upload dist/*``
 
 .. _gmxapi_package_documentation:
 
@@ -446,26 +446,17 @@ Build with GROMACS
 To build the full gmxapi documentation with GROMACS, configure GROMACS with
 ``-DGMX_PYTHON_PACKAGE=ON`` and build the GROMACS documentation normally.
 
-Separate gmxapi docs
---------------------
-
-Developers wishing to build just the ``gmxapi`` Python package documentation
-may do so from the ``python_packaging`` subdirectory in the GROMACS repo::
-
-    cd python_packaging
-    pip install -r requirements-docs.txt
-    sphinx-build -b html documentation docs
-
 Docker web server
 -----------------
 
-Alternatively, build the ``docs`` Docker image from ``python_packaging/docker/docs.dockerfile``.
+Alternatively, build the ``docs`` Docker image from ``python_packaging/docker/docs.dockerfile``
+or pull a prebuilt image from DockerHub. Refer to the dockerfile or to
+https://hub.docker.com/r/gmxapi/docs for more information.
 
 .. todo::
 
     Document sample_restraint package. Reference issue
-    `2893 <https://redmine.gromacs.org/issues/2893>`_ and change
-    `11483 <https://gerrit.gromacs.org/c/gromacs/+/11483>`_
+    `3027 <https://redmine.gromacs.org/issues/3027>`_
 
 Troubleshooting
 ===============

@@ -64,7 +64,7 @@ Run control
       of motion.  For constant NVE simulations started from
       corresponding points in the same trajectory, the trajectories
       are analytically, but not binary, identical to the
-      :mdp-value:`integrator=md` leap-frog integrator. The the kinetic
+      :mdp-value:`integrator=md` leap-frog integrator. The kinetic
       energy, which is determined from the whole step velocities and
       is therefore slightly too high. The advantage of this integrator
       is more accurate, reversible Nose-Hoover and Parrinello-Rahman
@@ -94,8 +94,8 @@ Run control
       significant part of the simulation time. The temperature for one
       or more groups of atoms (:mdp:`tc-grps`) is set with
       :mdp:`ref-t`, the inverse friction constant for each group is
-      set with :mdp:`tau-t`.  The parameter :mdp:`tcoupl` is
-      ignored. The random generator is initialized with
+      set with :mdp:`tau-t`.  The parameters :mdp:`tcoupl` and :mdp:`nsttcouple`
+      are ignored. The random generator is initialized with
       :mdp:`ld-seed`. When used as a thermostat, an appropriate value
       for :mdp:`tau-t` is 2 ps, since this results in a friction that
       is lower than the internal friction of water, while it is high
@@ -2444,10 +2444,11 @@ Free energy calculations
 .. mdp:: sc-r-power
 
    (6)
-   the power of the radial term in the soft-core equation. Possible
-   values are 6 and 48. 6 is more standard, and is the default. When
-   48 is used, then sc-alpha should generally be much lower (between
-   0.001 and 0.003).
+   power 6 for the radial term in the soft-core equation.
+
+   (48)
+   (deprecated) power 48 for the radial term in the soft-core equation. 
+   Note that sc-alpha should generally be much lower (between 0.001 and 0.003).
 
 .. mdp:: sc-coul
 
