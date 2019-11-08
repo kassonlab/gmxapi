@@ -1,188 +1,48 @@
 
-
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
-<head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>Full installation instructions &mdash; GROMACS External Interfaces</title>
-  
 
-  
-  
-  
-  
-
-  
-  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
-  
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Full installation instructions &#8212; GROMACS External Interfaces</title>
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     
-      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../_static/jquery.js"></script>
-        <script type="text/javascript" src="../_static/underscore.js"></script>
-        <script type="text/javascript" src="../_static/doctools.js"></script>
-        <script type="text/javascript" src="../_static/language_data.js"></script>
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
     
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
-
-    
-
-  
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Using the Python package" href="usage.html" />
     <link rel="prev" title="Python User Guide" href="userguide.html" /> 
-</head>
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="usage.html" title="Using the Python package"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="userguide.html" title="Python User Guide"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="userguide.html" accesskey="U">Python User Guide</a> &#187;</li> 
+      </ul>
+    </div>  
 
-<body class="wy-body-for-nav">
-
-   
-  <div class="wy-grid-for-nav">
-    
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
-          
-
-          
-            <a href="../index.html" class="icon icon-home"> GROMACS scripting and extension API
-          
-
-          
-          </a>
-
-          
-            
-            
-              <div class="version">
-                0.0
-              </div>
-            
-          
-
-          
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
-</div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Documentation sections</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="userguide.html">Python User Guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Full installation instructions</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#requirements">Requirements</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#build-system-requirements">Build system requirements</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#python-environment-requirements">Python environment requirements</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#documentation-build-requirements">Documentation build requirements</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#testing-requirements">Testing requirements</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#mpi-requirements">MPI requirements</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="#installing-the-python-package">Installing the Python package</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#recommended-installation">Recommended installation</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#install-from-source">Install from source</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#offline-install">Offline install</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#building-a-source-archive">Building a source archive</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="#accessing-gmxapi-documentation">Accessing gmxapi documentation</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#build-with-gromacs">Build with GROMACS</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#separate-gmxapi-docs">Separate gmxapi docs</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#docker-web-server">Docker web server</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="usage.html">Using the Python package</a></li>
-<li class="toctree-l2"><a class="reference internal" href="pythonreference.html">gmxapi Python module reference</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="../reference/reference.html">Developer Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
-</ul>
-
-            
-          
-        </div>
-      </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">GROMACS scripting and extension API</a>
-        
-      </nav>
-
-
-      <div class="wy-nav-content">
-        
-        <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="../index.html">Docs</a> &raquo;</li>
-        
-          <li><a href="userguide.html">Python User Guide</a> &raquo;</li>
-        
-      <li>Full installation instructions</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-            
-            <a href="../_sources/userguide/install.rst.txt" rel="nofollow"> View page source</a>
-          
-        
-      </li>
-    
-  </ul>
-
-  
-  <hr/>
-</div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
             
   <div class="section" id="full-installation-instructions">
 <h1>Full installation instructions<a class="headerlink" href="#full-installation-instructions" title="Permalink to this headline">¶</a></h1>
@@ -214,31 +74,30 @@ same GROMACS installation.</p>
 <div class="contents local topic" id="contents">
 <p class="topic-title first">Contents</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="#requirements" id="id6">Requirements</a></p>
+<li><p><a class="reference internal" href="#requirements" id="id5">Requirements</a></p>
 <ul>
-<li><p><a class="reference internal" href="#build-system-requirements" id="id7">Build system requirements</a></p></li>
-<li><p><a class="reference internal" href="#python-environment-requirements" id="id8">Python environment requirements</a></p></li>
-<li><p><a class="reference internal" href="#documentation-build-requirements" id="id9">Documentation build requirements</a></p></li>
-<li><p><a class="reference internal" href="#testing-requirements" id="id10">Testing requirements</a></p></li>
-<li><p><a class="reference internal" href="#mpi-requirements" id="id11">MPI requirements</a></p></li>
+<li><p><a class="reference internal" href="#build-system-requirements" id="id6">Build system requirements</a></p></li>
+<li><p><a class="reference internal" href="#python-environment-requirements" id="id7">Python environment requirements</a></p></li>
+<li><p><a class="reference internal" href="#documentation-build-requirements" id="id8">Documentation build requirements</a></p></li>
+<li><p><a class="reference internal" href="#testing-requirements" id="id9">Testing requirements</a></p></li>
+<li><p><a class="reference internal" href="#mpi-requirements" id="id10">MPI requirements</a></p></li>
 </ul>
 </li>
-<li><p><a class="reference internal" href="#installing-the-python-package" id="id12">Installing the Python package</a></p>
+<li><p><a class="reference internal" href="#installing-the-python-package" id="id11">Installing the Python package</a></p>
 <ul>
-<li><p><a class="reference internal" href="#recommended-installation" id="id13">Recommended installation</a></p></li>
-<li><p><a class="reference internal" href="#install-from-source" id="id14">Install from source</a></p></li>
-<li><p><a class="reference internal" href="#offline-install" id="id15">Offline install</a></p></li>
-<li><p><a class="reference internal" href="#building-a-source-archive" id="id16">Building a source archive</a></p></li>
+<li><p><a class="reference internal" href="#recommended-installation" id="id12">Recommended installation</a></p></li>
+<li><p><a class="reference internal" href="#install-from-source" id="id13">Install from source</a></p></li>
+<li><p><a class="reference internal" href="#offline-install" id="id14">Offline install</a></p></li>
+<li><p><a class="reference internal" href="#building-a-source-archive" id="id15">Building a source archive</a></p></li>
 </ul>
 </li>
-<li><p><a class="reference internal" href="#accessing-gmxapi-documentation" id="id17">Accessing gmxapi documentation</a></p>
+<li><p><a class="reference internal" href="#accessing-gmxapi-documentation" id="id16">Accessing gmxapi documentation</a></p>
 <ul>
-<li><p><a class="reference internal" href="#build-with-gromacs" id="id18">Build with GROMACS</a></p></li>
-<li><p><a class="reference internal" href="#separate-gmxapi-docs" id="id19">Separate gmxapi docs</a></p></li>
-<li><p><a class="reference internal" href="#docker-web-server" id="id20">Docker web server</a></p></li>
+<li><p><a class="reference internal" href="#build-with-gromacs" id="id17">Build with GROMACS</a></p></li>
+<li><p><a class="reference internal" href="#docker-web-server" id="id18">Docker web server</a></p></li>
 </ul>
 </li>
-<li><p><a class="reference internal" href="#troubleshooting" id="id21">Troubleshooting</a></p></li>
+<li><p><a class="reference internal" href="#troubleshooting" id="id19">Troubleshooting</a></p></li>
 </ul>
 </div>
 <div class="admonition note">
@@ -260,7 +119,7 @@ suffix, but it is usually not necessary if you have already activated a Python
 virtual environment (recommended).</p>
 </div>
 <div class="section" id="requirements">
-<h2><a class="toc-backref" href="#id6">Requirements</a><a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
+<h2><a class="toc-backref" href="#id5">Requirements</a><a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> comes in three parts:</p>
 <ul class="simple">
 <li><p>GROMACS gmxapi library for C++.</p></li>
@@ -268,7 +127,7 @@ virtual environment (recommended).</p>
 <li><p>MD restraint plugins and sample gmxapi client code</p></li>
 </ul>
 <div class="section" id="build-system-requirements">
-<h3><a class="toc-backref" href="#id7">Build system requirements</a><a class="headerlink" href="#build-system-requirements" title="Permalink to this headline">¶</a></h3>
+<h3><a class="toc-backref" href="#id6">Build system requirements</a><a class="headerlink" href="#build-system-requirements" title="Permalink to this headline">¶</a></h3>
 <p>gmxapi can be built for Python 3.5 and higher.</p>
 <p>You will need a C++ 14 compatible compiler and a reasonably up-to-date version
 of CMake.
@@ -293,7 +152,14 @@ answer is to just try to build the Python package using these instructions, and
 if gmxapi is unable to find the Python tools it needs, try a different Python
 installation or install the additional development packages.</p>
 <p>On a Linux system, this may require installing packages such as <code class="docutils literal notranslate"><span class="pre">python-dev</span></code>
-and/or <code class="docutils literal notranslate"><span class="pre">python3-dev</span></code>. Alternatively, various Python distributions provide a
+and/or <code class="docutils literal notranslate"><span class="pre">python3-dev</span></code>.
+If you are building Python, either from scratch or with a tool like
+<code class="docutils literal notranslate"><span class="pre">pyenv</span> <span class="pre">install</span></code> (see
+<a class="reference external" href="https://github.com/pyenv/pyenv/wiki#how-to-build-cpython-with---enable-shared">wiki entry</a>
+),
+be sure to enable installation of the Python C library with the
+<code class="docutils literal notranslate"><span class="pre">--enable-shared</span></code> flag.
+Alternatively, various Python distributions provide a
 sufficient build environment while only requiring installation into a user
 home directory. (Some examples below.)</p>
 <p>If you are using an HPC system with software available through modules you may
@@ -301,7 +167,7 @@ be able to just <code class="docutils literal notranslate"><span class="pre">mod
 that works.</p>
 </div>
 <div class="section" id="python-environment-requirements">
-<h3><a class="toc-backref" href="#id8">Python environment requirements</a><a class="headerlink" href="#python-environment-requirements" title="Permalink to this headline">¶</a></h3>
+<h3><a class="toc-backref" href="#id7">Python environment requirements</a><a class="headerlink" href="#python-environment-requirements" title="Permalink to this headline">¶</a></h3>
 <p>gmxapi requires Python 3.5 or higher. Check your version with
 <code class="docutils literal notranslate"><span class="pre">python3</span> <span class="pre">--version</span></code> or <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">--version</span></code>.</p>
 <div class="admonition note">
@@ -345,11 +211,11 @@ respectively, or see below.</p>
 </div>
 </div>
 <div class="section" id="documentation-build-requirements">
-<h3><a class="toc-backref" href="#id9">Documentation build requirements</a><a class="headerlink" href="#documentation-build-requirements" title="Permalink to this headline">¶</a></h3>
+<h3><a class="toc-backref" href="#id8">Documentation build requirements</a><a class="headerlink" href="#documentation-build-requirements" title="Permalink to this headline">¶</a></h3>
 <p>See <a class="reference internal" href="#gmxapi-package-documentation"><span class="std std-ref">Accessing gmxapi documentation</span></a></p>
 </div>
 <div class="section" id="testing-requirements">
-<span id="id1"></span><h3><a class="toc-backref" href="#id10">Testing requirements</a><a class="headerlink" href="#testing-requirements" title="Permalink to this headline">¶</a></h3>
+<span id="id1"></span><h3><a class="toc-backref" href="#id9">Testing requirements</a><a class="headerlink" href="#testing-requirements" title="Permalink to this headline">¶</a></h3>
 <p>Testing is performed with <a class="reference external" href="https://docs.pytest.org/en/latest/">pytest</a>.
 Tests also require <code class="docutils literal notranslate"><span class="pre">numpy</span></code>.
 You can probably install both with <code class="docutils literal notranslate"><span class="pre">pip</span></code>:</p>
@@ -362,7 +228,7 @@ You will need the <code class="docutils literal notranslate"><span class="pre">m
 or whatever is provided by your favorite MPI package for your operating system).</p>
 </div>
 <div class="section" id="mpi-requirements">
-<span id="id2"></span><h3><a class="toc-backref" href="#id11">MPI requirements</a><a class="headerlink" href="#mpi-requirements" title="Permalink to this headline">¶</a></h3>
+<span id="id2"></span><h3><a class="toc-backref" href="#id10">MPI requirements</a><a class="headerlink" href="#mpi-requirements" title="Permalink to this headline">¶</a></h3>
 <p>For the ensemble simulations features, you will need an MPI installation. On an HPC system, this means you will
 probably have to use <code class="docutils literal notranslate"><span class="pre">module</span> <span class="pre">load</span></code> to load a compatible set of MPI tools and compilers. Check your HPC
 documentation or try <code class="docutils literal notranslate"><span class="pre">module</span> <span class="pre">avail</span></code> to look for an <code class="docutils literal notranslate"><span class="pre">openmpi</span></code>, <code class="docutils literal notranslate"><span class="pre">mpich</span></code>, or <code class="docutils literal notranslate"><span class="pre">mvapich</span></code> module and matching compiler
@@ -389,7 +255,7 @@ pip install --no-cache-dir --upgrade --no-binary <span class="se">\&quot;</span>
 </div>
 </div>
 <div class="section" id="installing-the-python-package">
-<h2><a class="toc-backref" href="#id12">Installing the Python package</a><a class="headerlink" href="#installing-the-python-package" title="Permalink to this headline">¶</a></h2>
+<h2><a class="toc-backref" href="#id11">Installing the Python package</a><a class="headerlink" href="#installing-the-python-package" title="Permalink to this headline">¶</a></h2>
 <p>We recommend you install the gmxapi package in a Python virtual environment
 (<code class="docutils literal notranslate"><span class="pre">virtualenv</span></code> or <code class="docutils literal notranslate"><span class="pre">venv</span></code>). There are several ways to do this, and it is also
 possible to install without a virtual environment. If installing without a
@@ -402,7 +268,7 @@ You can set the <code class="docutils literal notranslate"><span class="pre">PYT
 Python interpreter for your chosen installation.
 For example: <code class="docutils literal notranslate"><span class="pre">-DPYTHON_EXECUTABLE=\`which</span> <span class="pre">python\`</span></code></p>
 <div class="section" id="recommended-installation">
-<span id="installation"></span><h3><a class="toc-backref" href="#id13">Recommended installation</a><a class="headerlink" href="#recommended-installation" title="Permalink to this headline">¶</a></h3>
+<span id="installation"></span><h3><a class="toc-backref" href="#id12">Recommended installation</a><a class="headerlink" href="#recommended-installation" title="Permalink to this headline">¶</a></h3>
 <p>We recommend using Python’s <a class="reference external" href="https://pip.pypa.io/en/stable/">pip</a>
 package installer to automatically download, build, and install the latest
 version of the gmxapi package into a Python
@@ -514,7 +380,7 @@ instructions for more information.) <code class="docutils literal notranslate"><
 </div>
 </div>
 <div class="section" id="install-from-source">
-<h3><a class="toc-backref" href="#id14">Install from source</a><a class="headerlink" href="#install-from-source" title="Permalink to this headline">¶</a></h3>
+<h3><a class="toc-backref" href="#id13">Install from source</a><a class="headerlink" href="#install-from-source" title="Permalink to this headline">¶</a></h3>
 <p>You can also install the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python package from within a local copy of
 the GROMACS source repository. Assuming you have already obtained the GROMACS
 source code and you are in the root directory of the source tree, you will find
@@ -526,7 +392,7 @@ pip install .
 </div>
 </div>
 <div class="section" id="offline-install">
-<h3><a class="toc-backref" href="#id15">Offline install</a><a class="headerlink" href="#offline-install" title="Permalink to this headline">¶</a></h3>
+<h3><a class="toc-backref" href="#id14">Offline install</a><a class="headerlink" href="#offline-install" title="Permalink to this headline">¶</a></h3>
 <p>If the required dependencies are already installed, you can do a quick installation
 without internet access, either from the source directory or from a source archive.</p>
 <p>For example, the last line of the previous example could be replaced with:</p>
@@ -544,7 +410,7 @@ the archive file to <code class="docutils literal notranslate"><span class="pre"
 according to the following instructions.</p>
 </div>
 <div class="section" id="building-a-source-archive">
-<h3><a class="toc-backref" href="#id16">Building a source archive</a><a class="headerlink" href="#building-a-source-archive" title="Permalink to this headline">¶</a></h3>
+<h3><a class="toc-backref" href="#id15">Building a source archive</a><a class="headerlink" href="#building-a-source-archive" title="Permalink to this headline">¶</a></h3>
 <p>A source archive for the gmxapi python package can be built from the GROMACS
 source repository using Python <code class="docutils literal notranslate"><span class="pre">setuptools</span></code> and <code class="docutils literal notranslate"><span class="pre">scikit-build</span></code>.</p>
 <p>Example:</p>
@@ -562,12 +428,12 @@ determined by the local environment or by additional arguments to <code class="d
 <p>Python documentation for
 <a class="reference external" href="https://docs.python.org/3/distutils/sourcedist.html#creating-a-source-distribution">creating a source distribution</a></p>
 </div>
-<p>Package maintainers may update the the online respository by uploading a freshly
-built <code class="docutils literal notranslate"><span class="pre">sdist</span></code> with <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-n</span> <span class="pre">twine</span> <span class="pre">upload</span> <span class="pre">dist/*</span></code></p>
+<p>Package maintainers may update the online respository by uploading a freshly
+built <code class="docutils literal notranslate"><span class="pre">sdist</span></code> with <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">twine</span> <span class="pre">upload</span> <span class="pre">dist/*</span></code></p>
 </div>
 </div>
 <div class="section" id="accessing-gmxapi-documentation">
-<span id="gmxapi-package-documentation"></span><h2><a class="toc-backref" href="#id17">Accessing gmxapi documentation</a><a class="headerlink" href="#accessing-gmxapi-documentation" title="Permalink to this headline">¶</a></h2>
+<span id="gmxapi-package-documentation"></span><h2><a class="toc-backref" href="#id16">Accessing gmxapi documentation</a><a class="headerlink" href="#accessing-gmxapi-documentation" title="Permalink to this headline">¶</a></h2>
 <p>Documentation for the Python classes and functions in the gmx module can
 be accessed in the usual ways, using <code class="docutils literal notranslate"><span class="pre">pydoc</span></code> from the command line or
 <code class="docutils literal notranslate"><span class="pre">help()</span></code> in an interactive Python session.</p>
@@ -577,33 +443,24 @@ or built from a copy of the GROMACS source repository.</p>
 <p>Documentation is built from a combination of Python module documentation and
 static content, and requires a local copy of the GROMACS source repository.</p>
 <div class="section" id="build-with-gromacs">
-<h3><a class="toc-backref" href="#id18">Build with GROMACS</a><a class="headerlink" href="#build-with-gromacs" title="Permalink to this headline">¶</a></h3>
+<h3><a class="toc-backref" href="#id17">Build with GROMACS</a><a class="headerlink" href="#build-with-gromacs" title="Permalink to this headline">¶</a></h3>
 <p>To build the full gmxapi documentation with GROMACS, configure GROMACS with
 <code class="docutils literal notranslate"><span class="pre">-DGMX_PYTHON_PACKAGE=ON</span></code> and build the GROMACS documentation normally.</p>
 </div>
-<div class="section" id="separate-gmxapi-docs">
-<h3><a class="toc-backref" href="#id19">Separate gmxapi docs</a><a class="headerlink" href="#separate-gmxapi-docs" title="Permalink to this headline">¶</a></h3>
-<p>Developers wishing to build just the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python package documentation
-may do so from the <code class="docutils literal notranslate"><span class="pre">python_packaging</span></code> subdirectory in the GROMACS repo:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> python_packaging
-pip install -r requirements-docs.txt
-sphinx-build -b html documentation docs
-</pre></div>
-</div>
-</div>
 <div class="section" id="docker-web-server">
-<h3><a class="toc-backref" href="#id20">Docker web server</a><a class="headerlink" href="#docker-web-server" title="Permalink to this headline">¶</a></h3>
-<p>Alternatively, build the <code class="docutils literal notranslate"><span class="pre">docs</span></code> Docker image from <code class="docutils literal notranslate"><span class="pre">python_packaging/docker/docs.dockerfile</span></code>.</p>
-<div class="admonition-todo admonition" id="id5">
+<h3><a class="toc-backref" href="#id18">Docker web server</a><a class="headerlink" href="#docker-web-server" title="Permalink to this headline">¶</a></h3>
+<p>Alternatively, build the <code class="docutils literal notranslate"><span class="pre">docs</span></code> Docker image from <code class="docutils literal notranslate"><span class="pre">python_packaging/docker/docs.dockerfile</span></code>
+or pull a prebuilt image from DockerHub. Refer to the dockerfile or to
+<a class="reference external" href="https://hub.docker.com/r/gmxapi/docs">https://hub.docker.com/r/gmxapi/docs</a> for more information.</p>
+<div class="admonition-todo admonition" id="id4">
 <p class="admonition-title">Todo</p>
 <p>Document sample_restraint package. Reference issue
-<a class="reference external" href="https://redmine.gromacs.org/issues/2893">2893</a> and change
-<a class="reference external" href="https://gerrit.gromacs.org/c/gromacs/+/11483">11483</a></p>
+<a class="reference external" href="https://redmine.gromacs.org/issues/3027">3027</a></p>
 </div>
 </div>
 </div>
 <div class="section" id="troubleshooting">
-<h2><a class="toc-backref" href="#id21">Troubleshooting</a><a class="headerlink" href="#troubleshooting" title="Permalink to this headline">¶</a></h2>
+<h2><a class="toc-backref" href="#id19">Troubleshooting</a><a class="headerlink" href="#troubleshooting" title="Permalink to this headline">¶</a></h2>
 <p>Couldn’t find the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> support library?
 If you don’t want to “source” your <code class="docutils literal notranslate"><span class="pre">GMXRC</span></code> file, you
 can tell the package where to find a gmxapi compatible GROMACS installation with
@@ -694,52 +551,101 @@ rebase your feature branches for the new development cycle.</p>
 </div>
 
 
-           </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="usage.html" class="btn btn-neutral float-right" title="Using the Python package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="userguide.html" class="btn btn-neutral float-left" title="Python User Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
-    </div>
-  
-
-  <hr/>
-
-  <div role="contentinfo">
-    <p>
-        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
-
-    </p>
-  </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
-
-</footer>
-
         </div>
       </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Full installation instructions</a><ul>
+<li><a class="reference internal" href="#requirements">Requirements</a><ul>
+<li><a class="reference internal" href="#build-system-requirements">Build system requirements</a></li>
+<li><a class="reference internal" href="#python-environment-requirements">Python environment requirements</a><ul>
+<li><a class="reference internal" href="#requirements-files-in-gromacs-source-tree">“requirements” files in GROMACS source tree</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#documentation-build-requirements">Documentation build requirements</a></li>
+<li><a class="reference internal" href="#testing-requirements">Testing requirements</a></li>
+<li><a class="reference internal" href="#mpi-requirements">MPI requirements</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#installing-the-python-package">Installing the Python package</a><ul>
+<li><a class="reference internal" href="#recommended-installation">Recommended installation</a><ul>
+<li><a class="reference internal" href="#locate-or-install-gromacs">Locate or install GROMACS</a></li>
+<li><a class="reference internal" href="#set-up-a-python-virtual-environment">Set up a Python virtual environment</a></li>
+<li><a class="reference internal" href="#install-dependencies">Install dependencies</a></li>
+<li><a class="reference internal" href="#install-the-latest-version-of-gmxapi">Install the latest version of gmxapi</a><ul>
+<li><a class="reference internal" href="#gmxapi-dir">gmxapi_DIR</a></li>
+<li><a class="reference internal" href="#gmxtoolchaindir">GMXTOOLCHAINDIR</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#install-from-source">Install from source</a></li>
+<li><a class="reference internal" href="#offline-install">Offline install</a></li>
+<li><a class="reference internal" href="#building-a-source-archive">Building a source archive</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#accessing-gmxapi-documentation">Accessing gmxapi documentation</a><ul>
+<li><a class="reference internal" href="#build-with-gromacs">Build with GROMACS</a></li>
+<li><a class="reference internal" href="#docker-web-server">Docker web server</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
+</ul>
 
-    </section>
-
-  </div>
-  
-
-
-  <script type="text/javascript">
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script>
-
-  
-  
-    
-   
-
-</body>
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="userguide.html"
+                        title="previous chapter">Python User Guide</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="usage.html"
+                        title="next chapter">Using the Python package</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/userguide/install.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="usage.html" title="Using the Python package"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="userguide.html" title="Python User Guide"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="userguide.html" >Python User Guide</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.1.
+    </div>
+  </body>
 </html>

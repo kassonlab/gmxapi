@@ -1,177 +1,48 @@
 
-
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
-<head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>gmxapi Python module reference &mdash; GROMACS External Interfaces</title>
-  
 
-  
-  
-  
-  
-
-  
-  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
-  
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>gmxapi Python module reference &#8212; GROMACS External Interfaces</title>
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     
-      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../_static/jquery.js"></script>
-        <script type="text/javascript" src="../_static/underscore.js"></script>
-        <script type="text/javascript" src="../_static/doctools.js"></script>
-        <script type="text/javascript" src="../_static/language_data.js"></script>
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
     
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
-
-    
-
-  
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Developer Guide" href="../reference/reference.html" />
     <link rel="prev" title="Using the Python package" href="usage.html" /> 
-</head>
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../reference/reference.html" title="Developer Guide"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="usage.html" title="Using the Python package"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="userguide.html" accesskey="U">Python User Guide</a> &#187;</li> 
+      </ul>
+    </div>  
 
-<body class="wy-body-for-nav">
-
-   
-  <div class="wy-grid-for-nav">
-    
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
-          
-
-          
-            <a href="../index.html" class="icon icon-home"> GROMACS scripting and extension API
-          
-
-          
-          </a>
-
-          
-            
-            
-              <div class="version">
-                0.0
-              </div>
-            
-          
-
-          
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
-</div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Documentation sections</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="userguide.html">Python User Guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="install.html">Full installation instructions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage.html">Using the Python package</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">gmxapi Python module reference</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#gmxapi-basic-package">gmxapi basic package</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#module-gmxapi._logging">Status messages and Logging</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#module-gmxapi.exceptions">Exceptions module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#module-gmxapi.version">gmx.version module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#module-gmxapi._gmxapi">Core API</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#gmxapi-core-module">gmxapi core module</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#exceptions">Exceptions</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#functions">Functions</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#classes">Classes</a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="../reference/reference.html">Developer Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
-</ul>
-
-            
-          
-        </div>
-      </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">GROMACS scripting and extension API</a>
-        
-      </nav>
-
-
-      <div class="wy-nav-content">
-        
-        <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="../index.html">Docs</a> &raquo;</li>
-        
-          <li><a href="userguide.html">Python User Guide</a> &raquo;</li>
-        
-      <li>gmxapi Python module reference</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-            
-            <a href="../_sources/userguide/pythonreference.rst.txt" rel="nofollow"> View page source</a>
-          
-        
-      </li>
-    
-  </ul>
-
-  
-  <hr/>
-</div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
             
   <div class="section" id="gmxapi-python-module-reference">
 <h1>gmxapi Python module reference<a class="headerlink" href="#gmxapi-python-module-reference" title="Permalink to this headline">¶</a></h1>
@@ -200,7 +71,7 @@ separation also serves as a reminder that different execution contexts may be
 implemented quite diffently, though Python scripts using only the high-level
 interface should execute on all.</p>
 <p>Package documentation is extracted from the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> Python module and is also available
-directly, using either <code class="docutils literal notranslate"><span class="pre">pydoc</span></code> from the command line or <a class="reference external" href="https://docs.python.org/3/library/functions.html#help" title="(in Python v3.7)"><code class="xref py py-func docutils literal notranslate"><span class="pre">help()</span></code></a> from within Python, such
+directly, using either <code class="docutils literal notranslate"><span class="pre">pydoc</span></code> from the command line or <a class="reference external" href="https://docs.python.org/3/library/functions.html#help" title="(in Python v3.8)"><code class="xref py py-func docutils literal notranslate"><span class="pre">help()</span></code></a> from within Python, such
 as during an interactive session.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
@@ -305,7 +176,7 @@ See <a class="reference external" href="https://redmine.gromacs.org/issues/2961"
 
 <dl class="function">
 <dt id="gmxapi.concatenate_lists">
-<code class="sig-prename descclassname">gmxapi.</code><code class="sig-name descname">concatenate_lists</code><span class="sig-paren">(</span><em class="sig-param">sublists: list = ()</em><span class="sig-paren">)</span> &#x2192; gmxapi.operation.Future[gmxapi.datamodel.NDArray]<a class="reference internal" href="../_modules/gmxapi/operation.html#concatenate_lists"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gmxapi.concatenate_lists" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">gmxapi.</code><code class="sig-name descname">concatenate_lists</code><span class="sig-paren">(</span><em class="sig-param">sublists: list = ()</em><span class="sig-paren">)</span> &#x2192; gmxapi.typing.Future[gmxapi.datamodel.NDArray]<a class="reference internal" href="../_modules/gmxapi/operation.html#concatenate_lists"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gmxapi.concatenate_lists" title="Permalink to this definition">¶</a></dt>
 <dd><p>Combine data sources into a single list.</p>
 <p>A trivial data flow restructuring operation.</p>
 </dd></dl>
@@ -361,7 +232,7 @@ dispatching work and data before instantiating.
 
 <dl class="function">
 <dt id="gmxapi.logical_not">
-<code class="sig-prename descclassname">gmxapi.</code><code class="sig-name descname">logical_not</code><span class="sig-paren">(</span><em class="sig-param">value: bool</em><span class="sig-paren">)</span> &#x2192; gmxapi.operation.Future<a class="reference internal" href="../_modules/gmxapi/operation.html#logical_not"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gmxapi.logical_not" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">gmxapi.</code><code class="sig-name descname">logical_not</code><span class="sig-paren">(</span><em class="sig-param">value: bool</em><span class="sig-paren">)</span> &#x2192; gmxapi.typing.Future<a class="reference internal" href="../_modules/gmxapi/operation.html#logical_not"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gmxapi.logical_not" title="Permalink to this definition">¶</a></dt>
 <dd><p>Boolean negation.</p>
 <p>If the argument is a gmxapi compatible Data or Future object, a new View or
 Future is created that proxies the boolean opposite of the input.</p>
@@ -371,7 +242,7 @@ returns a Future for the logical opposite of the callable’s result.</p>
 
 <dl class="function">
 <dt id="gmxapi.make_constant">
-<code class="sig-prename descclassname">gmxapi.</code><code class="sig-name descname">make_constant</code><span class="sig-paren">(</span><em class="sig-param">value: Scalar</em><span class="sig-paren">)</span> &#x2192; gmxapi.operation.Future<a class="reference internal" href="../_modules/gmxapi/operation.html#make_constant"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gmxapi.make_constant" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">gmxapi.</code><code class="sig-name descname">make_constant</code><span class="sig-paren">(</span><em class="sig-param">value: Scalar</em><span class="sig-paren">)</span> &#x2192; gmxapi.typing.Future<a class="reference internal" href="../_modules/gmxapi/operation.html#make_constant"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gmxapi.make_constant" title="Permalink to this definition">¶</a></dt>
 <dd><p>Provide a predetermined value at run time.</p>
 <p>This is a trivial operation that provides a (typed) value, primarily for
 internally use to manage gmxapi data flow.</p>
@@ -537,7 +408,7 @@ imported when gmxapi is imported, this has no effect. However, we set the root
 log level to DEBUG, which could increase the output from other modules.</p>
 <p>Each module in the gmxapi package uses its own hierarchical logger to allow
 granular control of log handling (e.g. <cite>logging.getLogger(‘gmxapi.operation’)</cite>).
-Refer to the Python <a class="reference external" href="https://docs.python.org/3/library/logging.html#module-logging" title="(in Python v3.7)"><code class="xref py py-mod docutils literal notranslate"><span class="pre">logging</span></code></a> module for information on connecting to and handling
+Refer to the Python <a class="reference external" href="https://docs.python.org/3/library/logging.html#module-logging" title="(in Python v3.8)"><code class="xref py py-mod docutils literal notranslate"><span class="pre">logging</span></code></a> module for information on connecting to and handling
 logger output.</p>
 </div>
 <div class="section" id="module-gmxapi.exceptions">
@@ -633,7 +504,7 @@ occur through incorrect assumptions or misuse of API implementation internals.</
 <dd><p>gmxapi major version number.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.7)">int</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)">int</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -644,7 +515,7 @@ occur through incorrect assumptions or misuse of API implementation internals.</
 <dd><p>gmxapi minor version number.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.7)">int</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)">int</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -655,7 +526,7 @@ occur through incorrect assumptions or misuse of API implementation internals.</
 <dd><p>gmxapi patch level number.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.7)">int</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)">int</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -666,15 +537,9 @@ occur through incorrect assumptions or misuse of API implementation internals.</
 <dd><p>True if imported gmx module is an officially tagged release, else False.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.7)">bool</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)">bool</a></p>
 </dd>
 </dl>
-</dd></dl>
-
-<dl class="exception">
-<dt id="gmxapi.version.FeatureError">
-<em class="property">exception </em><code class="sig-prename descclassname">gmxapi.version.</code><code class="sig-name descname">FeatureError</code><a class="reference internal" href="../_modules/gmxapi/version.html#FeatureError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gmxapi.version.FeatureError" title="Permalink to this definition">¶</a></dt>
-<dd><p>Module exception to indicate missing features.</p>
 </dd></dl>
 
 <dl class="function">
@@ -684,9 +549,9 @@ occur through incorrect assumptions or misuse of API implementation internals.</
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>major_version</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.7)"><em>int</em></a>) – gmxapi major version number.</p></li>
-<li><p><strong>minor_version</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.7)"><em>int</em></a>) – optional gmxapi minor version number (default: 0).</p></li>
-<li><p><strong>patch_version</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.7)"><em>int</em></a>) – optional gmxapi patch level number (default: 0).</p></li>
+<li><p><strong>major_version</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – gmxapi major version number.</p></li>
+<li><p><strong>minor_version</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – optional gmxapi minor version number (default: 0).</p></li>
+<li><p><strong>patch_version</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – optional gmxapi patch level number (default: 0).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -706,14 +571,27 @@ may be introduced into the package and need to be detectable. This function
 is intended to facilitate code testing and resolving differences between
 development branches. Users should refer to the documentation for the package
 modules and API level.</p>
-<p>The function can be used to get a boolean result or can be used to raise an
-exception in code block by setting <cite>enable_exception=True</cite></p>
+<p>The primary use case is, in conjunction with api_is_at_least(), to allow
+client code to robustly identify expected behavior and API support through
+conditional execution and branching. Note that behavior is strongly
+specified by the API major version number. Features that have become part of
+the specification and bug-fixes referring to previous major versions should
+not be checked with <em>has_feature()</em>. Using <em>has_feature()</em> with old feature
+names will produce a DeprecationWarning for at least one major version, and
+client code should be updated to avoid logic errors in future versions.</p>
+<p>For convenience, setting <em>enable_exception=True</em> causes the function to
+instead raise a gmxapi.exceptions.FeatureNotAvailableError for unrecognized feature names.
+This allows extension code to cleanly produce a gmxapi exception instead of
+first performing a boolean check. Also, some code may be unexecutable for
+more than one reason, and sometimes it is cleaner to catch all
+gmxapi.exceptions.Error exceptions for a code block, rather than to
+construct complex conditionals.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns</dt>
 <dd class="field-odd"><p>True if named feature is recognized by the installed package, else False.</p>
 </dd>
 <dt class="field-even">Raises</dt>
-<dd class="field-even"><p><strong>gmxapi.version.FeatureError if enable_exception == True and feature is not found.</strong> – </p>
+<dd class="field-even"><p><strong>gmxapi.exceptions.FeatureNotAvailableError if enable_exception == True and feature is not found.</strong> – </p>
 </dd>
 </dl>
 </dd></dl>
@@ -875,11 +753,11 @@ code and developer documentation for more details.</p>
 <code class="sig-name descname">set</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#gmxapi._gmxapi.SimulationParameters.set" title="Permalink to this definition">¶</a></dt>
 <dd><p>Overloaded function.</p>
 <ol class="arabic simple">
-<li><p>set(self: gmxapi._gmxapi.SimulationParameters, key: str, value: <a href="#id11"><span class="problematic" id="id12">int_</span></a>) -&gt; None</p></li>
+<li><p>set(self: gmxapi._gmxapi.SimulationParameters, key: str, value: int) -&gt; None</p></li>
 </ol>
 <p>Use a dictionary to update simulation parameters.</p>
 <ol class="arabic simple" start="2">
-<li><p>set(self: gmxapi._gmxapi.SimulationParameters, key: str, value: <a href="#id13"><span class="problematic" id="id14">float_</span></a>) -&gt; None</p></li>
+<li><p>set(self: gmxapi._gmxapi.SimulationParameters, key: str, value: float) -&gt; None</p></li>
 </ol>
 <p>Use a dictionary to update simulation parameters.</p>
 <ol class="arabic simple" start="3">
@@ -905,52 +783,82 @@ code and developer documentation for more details.</p>
 </div>
 
 
-           </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="../reference/reference.html" class="btn btn-neutral float-right" title="Developer Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="usage.html" class="btn btn-neutral float-left" title="Using the Python package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
-    </div>
-  
-
-  <hr/>
-
-  <div role="contentinfo">
-    <p>
-        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
-
-    </p>
-  </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
-
-</footer>
-
         </div>
       </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">gmxapi Python module reference</a><ul>
+<li><a class="reference internal" href="#gmxapi-basic-package">gmxapi basic package</a></li>
+<li><a class="reference internal" href="#module-gmxapi._logging">Status messages and Logging</a></li>
+<li><a class="reference internal" href="#module-gmxapi.exceptions">Exceptions module</a></li>
+<li><a class="reference internal" href="#module-gmxapi.version">gmx.version module</a></li>
+<li><a class="reference internal" href="#module-gmxapi._gmxapi">Core API</a><ul>
+<li><a class="reference internal" href="#gmxapi-core-module">gmxapi core module</a></li>
+<li><a class="reference internal" href="#exceptions">Exceptions</a></li>
+<li><a class="reference internal" href="#functions">Functions</a><ul>
+<li><a class="reference internal" href="#tools-for-launching-simulations">Tools for launching simulations</a></li>
+<li><a class="reference internal" href="#tools-to-manipulate-tpr-input-files">Tools to manipulate TPR input files</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#classes">Classes</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
 
-    </section>
-
-  </div>
-  
-
-
-  <script type="text/javascript">
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script>
-
-  
-  
-    
-   
-
-</body>
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="usage.html"
+                        title="previous chapter">Using the Python package</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="../reference/reference.html"
+                        title="next chapter">Developer Guide</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/userguide/pythonreference.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../reference/reference.html" title="Developer Guide"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="usage.html" title="Using the Python package"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="userguide.html" >Python User Guide</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.1.
+    </div>
+  </body>
 </html>

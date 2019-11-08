@@ -1,175 +1,48 @@
 
-
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
-<head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>Contributing &mdash; GROMACS External Interfaces</title>
-  
 
-  
-  
-  
-  
-
-  
-  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
-  
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Contributing &#8212; GROMACS External Interfaces</title>
+    <link rel="stylesheet" href="../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     
-      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../_static/jquery.js"></script>
-        <script type="text/javascript" src="../_static/underscore.js"></script>
-        <script type="text/javascript" src="../_static/doctools.js"></script>
-        <script type="text/javascript" src="../_static/language_data.js"></script>
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
     
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
-
-    
-
-  
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="gmxapi data model" href="datamodel.html" />
     <link rel="prev" title="Extending" href="extending.html" /> 
-</head>
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="datamodel.html" title="gmxapi data model"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="extending.html" title="Extending"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="reference.html" accesskey="U">Developer Guide</a> &#187;</li> 
+      </ul>
+    </div>  
 
-<body class="wy-body-for-nav">
-
-   
-  <div class="wy-grid-for-nav">
-    
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
-          
-
-          
-            <a href="../index.html" class="icon icon-home"> GROMACS scripting and extension API
-          
-
-          
-          </a>
-
-          
-            
-            
-              <div class="version">
-                0.0
-              </div>
-            
-          
-
-          
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
-</div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Documentation sections</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../userguide/userguide.html">Python User Guide</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="reference.html">Developer Guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="projectstructure.html">Implementation overview</a></li>
-<li class="toctree-l2"><a class="reference internal" href="extending.html">Extending</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Contributing</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#gmxapi-0-1-design-notes">gmxapi 0.1 Design notes</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#open-questions">Open questions</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#output-node"><code class="docutils literal notranslate"><span class="pre">output</span></code> node</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#placeholders-for-type-and-shape">Placeholders for type and shape</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#python-style-preferences">Python style preferences</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="datamodel.html">gmxapi data model</a></li>
-<li class="toctree-l2"><a class="reference internal" href="executionmodel.html">Execution model</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Change Log</a></li>
-</ul>
-
-            
-          
-        </div>
-      </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">GROMACS scripting and extension API</a>
-        
-      </nav>
-
-
-      <div class="wy-nav-content">
-        
-        <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="../index.html">Docs</a> &raquo;</li>
-        
-          <li><a href="reference.html">Developer Guide</a> &raquo;</li>
-        
-      <li>Contributing</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-            
-            <a href="../_sources/reference/contributing.rst.txt" rel="nofollow"> View page source</a>
-          
-        
-      </li>
-    
-  </ul>
-
-  
-  <hr/>
-</div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
             
   <div class="section" id="contributing">
 <h1>Contributing<a class="headerlink" href="#contributing" title="Permalink to this headline">¶</a></h1>
@@ -195,52 +68,77 @@
 </div>
 
 
-           </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="datamodel.html" class="btn btn-neutral float-right" title="gmxapi data model" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="extending.html" class="btn btn-neutral float-left" title="Extending" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
-    </div>
-  
-
-  <hr/>
-
-  <div role="contentinfo">
-    <p>
-        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
-
-    </p>
-  </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
-
-</footer>
-
         </div>
       </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Contributing</a><ul>
+<li><a class="reference internal" href="#gmxapi-0-1-design-notes">gmxapi 0.1 Design notes</a></li>
+<li><a class="reference internal" href="#open-questions">Open questions</a><ul>
+<li><a class="reference internal" href="#output-node"><code class="docutils literal notranslate"><span class="pre">output</span></code> node</a></li>
+<li><a class="reference internal" href="#placeholders-for-type-and-shape">Placeholders for type and shape</a></li>
+<li><a class="reference internal" href="#python-style-preferences">Python style preferences</a><ul>
+<li><a class="reference internal" href="#subgraph">Subgraph</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
 
-    </section>
-
-  </div>
-  
-
-
-  <script type="text/javascript">
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script>
-
-  
-  
-    
-   
-
-</body>
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="extending.html"
+                        title="previous chapter">Extending</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="datamodel.html"
+                        title="next chapter">gmxapi data model</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/reference/contributing.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="datamodel.html" title="gmxapi data model"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="extending.html" title="Extending"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="reference.html" >Developer Guide</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.1.
+    </div>
+  </body>
 </html>

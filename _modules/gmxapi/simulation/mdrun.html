@@ -1,153 +1,40 @@
 
-
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
-<head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>gmxapi.simulation.mdrun &mdash; GROMACS External Interfaces</title>
-  
 
-  
-  
-  
-  
-
-  
-  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
-  
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>gmxapi.simulation.mdrun &#8212; GROMACS External Interfaces</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     
-      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../../../_static/jquery.js"></script>
-        <script type="text/javascript" src="../../../_static/underscore.js"></script>
-        <script type="text/javascript" src="../../../_static/doctools.js"></script>
-        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
     
-    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
-
-    
-
-  
-  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" /> 
-</head>
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
 
-<body class="wy-body-for-nav">
-
-   
-  <div class="wy-grid-for-nav">
-    
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
-          
-
-          
-            <a href="../../../index.html" class="icon icon-home"> GROMACS scripting and extension API
-          
-
-          
-          </a>
-
-          
-            
-            
-              <div class="version">
-                0.0
-              </div>
-            
-          
-
-          
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
-</div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Documentation sections</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../userguide/userguide.html">Python User Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../reference/reference.html">Developer Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Change Log</a></li>
-</ul>
-
-            
-          
-        </div>
-      </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../../../index.html">GROMACS scripting and extension API</a>
-        
-      </nav>
-
-
-      <div class="wy-nav-content">
-        
-        <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="../../../index.html">Docs</a> &raquo;</li>
-        
-          <li><a href="../../index.html">Module code</a> &raquo;</li>
-        
-      <li>gmxapi.simulation.mdrun</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-      </li>
-    
-  </ul>
-
-  
-  <hr/>
-</div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
             
   <h1>Source code for gmxapi.simulation.mdrun</h1><div class="highlight"><pre>
 <span></span><span class="c1">#</span>
@@ -216,32 +103,35 @@
 <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Importing </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="vm">__name__</span><span class="p">))</span>
 
 
+<span class="c1"># Output in the gmxapi.operation Context.</span>
+<span class="c1"># TODO: Consider using a single base class for the DataProxy, but have distinct</span>
+<span class="c1">#  data descriptor behavior (or different descriptor implementations in different</span>
+<span class="c1">#  subclasses) so that static code inspection can more easily determine the</span>
+<span class="c1">#  attributes of the data proxies.</span>
+<span class="n">_output_descriptors</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">_op</span><span class="o">.</span><span class="n">OutputDataDescriptor</span><span class="p">(</span><span class="s1">&#39;_work_dir&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span>
+    <span class="n">_op</span><span class="o">.</span><span class="n">OutputDataDescriptor</span><span class="p">(</span><span class="s1">&#39;trajectory&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="n">_publishing_descriptors</span> <span class="o">=</span> <span class="p">{</span><span class="n">desc</span><span class="o">.</span><span class="n">_name</span><span class="p">:</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">operation</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="n">desc</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">desc</span><span class="o">.</span><span class="n">_dtype</span><span class="p">)</span> <span class="k">for</span> <span class="n">desc</span> <span class="ow">in</span>
+                           <span class="n">_output_descriptors</span><span class="p">}</span>
+<span class="n">_output</span> <span class="o">=</span> <span class="n">_op</span><span class="o">.</span><span class="n">OutputCollectionDescription</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">descriptor</span><span class="o">.</span><span class="n">_name</span><span class="p">:</span> <span class="n">descriptor</span><span class="o">.</span><span class="n">_dtype</span> <span class="k">for</span> <span class="n">descriptor</span> <span class="ow">in</span>
+                                             <span class="n">_output_descriptors</span><span class="p">})</span>
+
+
 <span class="k">class</span> <span class="nc">OutputDataProxy</span><span class="p">(</span><span class="n">_op</span><span class="o">.</span><span class="n">DataProxyBase</span><span class="p">,</span>
-                      <span class="n">descriptors</span><span class="o">=</span><span class="p">{</span>
-                          <span class="s1">&#39;_work_dir&#39;</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">OutputDataDescriptor</span><span class="p">(</span><span class="s1">&#39;_work_dir&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">)}):</span>
+                      <span class="n">descriptors</span><span class="o">=</span><span class="n">_output_descriptors</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Implement the &#39;output&#39; attribute of MDRun operations.&quot;&quot;&quot;</span>
 
 
-<span class="k">class</span> <span class="nc">Publisher</span><span class="p">(</span><span class="n">gmxapi</span><span class="o">.</span><span class="n">operation</span><span class="o">.</span><span class="n">Publisher</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Implement the publishing data descriptor for MDRun output.&quot;&quot;&quot;</span>
-
-    <span class="k">def</span> <span class="nf">__set__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instance</span><span class="p">:</span> <span class="s1">&#39;PublishingDataProxy&#39;</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__set__</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-
-
 <span class="k">class</span> <span class="nc">PublishingDataProxy</span><span class="p">(</span><span class="n">_op</span><span class="o">.</span><span class="n">DataProxyBase</span><span class="p">,</span>
-                          <span class="n">descriptors</span><span class="o">=</span><span class="p">{</span>
-                              <span class="s1">&#39;_work_dir&#39;</span><span class="p">:</span> <span class="n">Publisher</span><span class="p">(</span><span class="s1">&#39;_work_dir&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">)}</span>
-                          <span class="p">):</span>
+                          <span class="n">descriptors</span><span class="o">=</span><span class="n">_publishing_descriptors</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Manage output resource updates for MDRun operation.&quot;&quot;&quot;</span>
 
 
-<span class="c1">#</span>
-<span class="c1"># Helpers</span>
-<span class="c1">#</span>
+<span class="n">_output_factory</span> <span class="o">=</span> <span class="n">_op</span><span class="o">.</span><span class="n">OutputFactory</span><span class="p">(</span><span class="n">output_proxy</span><span class="o">=</span><span class="n">OutputDataProxy</span><span class="p">,</span>
+                                    <span class="n">output_description</span><span class="o">=</span><span class="n">_output</span><span class="p">,</span>
+                                    <span class="n">publishing_data_proxy</span><span class="o">=</span><span class="n">PublishingDataProxy</span><span class="p">)</span>
 
-<span class="c1"># Output in the gmxapi.operation Context.</span>
-<span class="n">_output</span> <span class="o">=</span> <span class="n">_op</span><span class="o">.</span><span class="n">OutputCollectionDescription</span><span class="p">(</span><span class="n">_work_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
 
 <span class="c1"># Input in the gmxapi.operation Context for the dispatching runner.</span>
 <span class="c1"># The default empty dictionary for parameters just means that there are no overrides</span>
@@ -262,11 +152,6 @@
     <span class="n">source_collection</span> <span class="o">=</span> <span class="n">_input</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;mdrun input bound as source collection </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">source_collection</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">source_collection</span>
-
-
-<span class="n">_output_factory</span> <span class="o">=</span> <span class="n">_op</span><span class="o">.</span><span class="n">OutputFactory</span><span class="p">(</span><span class="n">output_proxy</span><span class="o">=</span><span class="n">OutputDataProxy</span><span class="p">,</span>
-                                    <span class="n">output_description</span><span class="o">=</span><span class="n">_output</span><span class="p">,</span>
-                                    <span class="n">publishing_data_proxy</span><span class="o">=</span><span class="n">PublishingDataProxy</span><span class="p">)</span>
 
 
 <span class="nd">@contextmanager</span>
@@ -410,6 +295,7 @@
                                                                       <span class="n">ensemble_rank</span><span class="p">,</span>
                                                                       <span class="bp">self</span><span class="o">.</span><span class="n">workdir</span>
                                                                       <span class="p">))</span>
+                    <span class="c1"># TODO: We have not exposed the ability to pass any run time parameters to mdrun.</span>
                     <span class="n">work</span> <span class="o">=</span> <span class="n">workflow</span><span class="o">.</span><span class="n">from_tpr</span><span class="p">(</span><span class="n">tpr_filenames</span><span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">workspec</span> <span class="o">=</span> <span class="n">work</span><span class="o">.</span><span class="n">workspec</span>
                     <span class="n">context</span> <span class="o">=</span> <span class="n">LegacyContext</span><span class="p">(</span><span class="n">work</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">workspec</span><span class="p">,</span> <span class="n">workdir_list</span><span class="o">=</span><span class="n">workdir_list</span><span class="p">,</span> <span class="n">communicator</span><span class="o">=</span><span class="n">ensemble_comm</span><span class="p">)</span>
@@ -448,18 +334,6 @@
         <span class="c1">#     member_id = 0</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">workdir</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">workdir</span><span class="p">[</span><span class="n">member_id</span><span class="p">]</span>
 
-    <span class="c1"># @staticmethod</span>
-    <span class="c1"># def create(input: LegacyImplementationSubscription,</span>
-    <span class="c1">#  output: PublishingDataProxy) -&gt; &#39;SubscriptionSessionResources&#39;:</span>
-    <span class="c1">#     &quot;&quot;&quot;Factory function to create new resource instances.</span>
-    <span class="c1">#</span>
-    <span class="c1">#     It is better to overload a factory member than to write a fancy __init__.</span>
-    <span class="c1">#     An alternative to overloading is to make this a classmethod for polymorphic</span>
-    <span class="c1">#     creation. Note that Python classes (can) know what their subclasses are.</span>
-    <span class="c1">#     &quot;&quot;&quot;</span>
-    <span class="c1">#     if isinstance(input, LegacyImplementationSubscription):</span>
-    <span class="c1">#         return _session_resource_factory(input, output)</span>
-
 
 <span class="k">class</span> <span class="nc">SubscriptionPublishingRunner</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Handle execution in the gmxapi.operation context as a subscription to the gmxapi.simulation.context.&quot;&quot;&quot;</span>
@@ -474,6 +348,13 @@
         <span class="sd">&quot;&quot;&quot;Operation implementation in the gmxapi.operation module context.&quot;&quot;&quot;</span>
         <span class="n">publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">output</span>
         <span class="n">publisher</span><span class="o">.</span><span class="n">_work_dir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">workdir</span>
+        <span class="c1"># TODO: Make the return value a trajectory handle rather than a file path.</span>
+        <span class="c1"># TODO: Decide how to handle append vs. noappend output.</span>
+        <span class="c1"># TODO: More rigorous handling of the trajectory file(s)</span>
+        <span class="c1"># We have no way to query the name of the trajectory produced, and we</span>
+        <span class="c1"># have avoided exposing the ability to specify it, so we have to assume</span>
+        <span class="c1"># GROMACS default behavior.</span>
+        <span class="n">publisher</span><span class="o">.</span><span class="n">trajectory</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">workdir</span><span class="p">,</span> <span class="s1">&#39;traj.trr&#39;</span><span class="p">)</span>
 
 
 <span class="n">_next_uid</span> <span class="o">=</span> <span class="mi">0</span>
@@ -731,43 +612,41 @@
     <span class="k">return</span> <span class="n">handle</span></div>
 </pre></div>
 
-           </div>
-           
           </div>
-          <footer>
-  
-
-  <hr/>
-
-  <div role="contentinfo">
-    <p>
-        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
-
-    </p>
-  </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
-
-</footer>
-
         </div>
       </div>
-
-    </section>
-
-  </div>
-  
-
-
-  <script type="text/javascript">
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script>
-
-  
-  
-    
-   
-
-</body>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.1.
+    </div>
+  </body>
 </html>

@@ -1,153 +1,40 @@
 
-
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
-<head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>gmxapi.version &mdash; GROMACS External Interfaces</title>
-  
 
-  
-  
-  
-  
-
-  
-  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
-  
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>gmxapi.version &#8212; GROMACS External Interfaces</title>
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     
-      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../../_static/jquery.js"></script>
-        <script type="text/javascript" src="../../_static/underscore.js"></script>
-        <script type="text/javascript" src="../../_static/doctools.js"></script>
-        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
     
-    <script type="text/javascript" src="../../_static/js/theme.js"></script>
-
-    
-
-  
-  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" /> 
-</head>
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
 
-<body class="wy-body-for-nav">
-
-   
-  <div class="wy-grid-for-nav">
-    
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
-          
-
-          
-            <a href="../../index.html" class="icon icon-home"> GROMACS scripting and extension API
-          
-
-          
-          </a>
-
-          
-            
-            
-              <div class="version">
-                0.0
-              </div>
-            
-          
-
-          
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
-</div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Documentation sections</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../userguide/userguide.html">Python User Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../reference/reference.html">Developer Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Change Log</a></li>
-</ul>
-
-            
-          
-        </div>
-      </div>
-    </nav>
-
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../../index.html">GROMACS scripting and extension API</a>
-        
-      </nav>
-
-
-      <div class="wy-nav-content">
-        
-        <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="../../index.html">Docs</a> &raquo;</li>
-        
-          <li><a href="../index.html">Module code</a> &raquo;</li>
-        
-      <li>gmxapi.version</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-      </li>
-    
-  </ul>
-
-  
-  <hr/>
-</div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
             
   <h1>Source code for gmxapi.version</h1><div class="highlight"><pre>
 <span></span><span class="c1">#</span>
@@ -194,6 +81,7 @@
 <span class="sd">    release (bool): True if imported gmx module is an officially tagged release, else False.</span>
 
 <span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
 
 <span class="n">__version__</span> <span class="o">=</span> <span class="s2">&quot;0.0.8&quot;</span>
 
@@ -203,7 +91,7 @@
 <span class="c1"># minor = @PROJECT_VERSION_MINOR@</span>
 <span class="c1"># patch = @PROJECT_VERSION_PATCH@</span>
 
-<span class="kn">from</span> <span class="nn">gmxapi.exceptions</span> <span class="k">import</span> <span class="n">Error</span> <span class="k">as</span> <span class="n">GmxapiError</span>
+<span class="kn">from</span> <span class="nn">gmxapi.exceptions</span> <span class="k">import</span> <span class="n">FeatureNotAvailableError</span>
 
 <span class="n">major</span> <span class="o">=</span> <span class="mi">0</span>
 <span class="n">minor</span> <span class="o">=</span> <span class="mi">0</span>
@@ -212,11 +100,23 @@
 <span class="c1"># Note: this is not automatically updated. See RELEASE.txt and https://github.com/kassonlab/gmxapi/issues/152</span>
 <span class="n">release</span> <span class="o">=</span> <span class="kc">False</span>
 
-<span class="n">_named_features</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;fr1&#39;</span><span class="p">,</span> <span class="s1">&#39;fr3&#39;</span><span class="p">]</span>
-
-
-<div class="viewcode-block" id="FeatureError"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.version.FeatureError">[docs]</a><span class="k">class</span> <span class="nc">FeatureError</span><span class="p">(</span><span class="n">GmxapiError</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Module exception to indicate missing features.&quot;&quot;&quot;</span></div>
+<span class="c1"># Features added since the initial gmxapi prototype, targeted for version 0.1.</span>
+<span class="n">_named_features_0_0</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;fr1&#39;</span><span class="p">,</span> <span class="s1">&#39;fr3&#39;</span><span class="p">]</span>
+<span class="c1"># Features named since the finalization of the 0.1 specification with GROMACS 2020.</span>
+<span class="n">_named_features_0_1</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="c1"># Named features describe functionality or behavior introduced since the last</span>
+<span class="c1"># major release, and should be described in gmxapi documentation or issue</span>
+<span class="c1"># tracking system. Note that, as features become part of the specification,</span>
+<span class="c1"># conditionals depending on them should be phased out of the package source. At</span>
+<span class="c1"># major releases, the named feature list should be reset to empty. Optionally,</span>
+<span class="c1"># we could raise a DeprecationWarning for calls to has_feature() for features</span>
+<span class="c1"># that have become part of the specification, at least for a few minor release or</span>
+<span class="c1"># a few years, to avoid introducing errors to client code.</span>
+<span class="c1">#</span>
+<span class="c1"># Features consisting of &#39;fr&#39; and a numeric suffix are the functional requirements</span>
+<span class="c1"># described in roadmap.rst, as described at https://redmine.gromacs.org/issues/2893</span>
+<span class="c1">#</span>
+<span class="c1"># Bugs and bug fixes may be indicated with names consisting of tracked issue URLs.</span>
 
 
 <div class="viewcode-block" id="api_is_at_least"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.version.api_is_at_least">[docs]</a><span class="k">def</span> <span class="nf">api_is_at_least</span><span class="p">(</span><span class="n">major_version</span><span class="p">,</span> <span class="n">minor_version</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">patch_version</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
@@ -235,7 +135,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">major_version</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">minor_version</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">patch_version</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Version levels must be provided as integers.&#39;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">major</span> <span class="o">&gt;=</span> <span class="n">major_version</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">major</span> <span class="o">&gt;</span> <span class="n">major_version</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">True</span>
     <span class="k">elif</span> <span class="n">major</span> <span class="o">==</span> <span class="n">major_version</span> <span class="ow">and</span> <span class="n">minor</span> <span class="o">&gt;=</span> <span class="n">minor_version</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">True</span>
@@ -254,61 +154,87 @@
 <span class="sd">    development branches. Users should refer to the documentation for the package</span>
 <span class="sd">    modules and API level.</span>
 
-<span class="sd">    The function can be used to get a boolean result or can be used to raise an</span>
-<span class="sd">    exception in code block by setting `enable_exception=True`</span>
+<span class="sd">    The primary use case is, in conjunction with api_is_at_least(), to allow</span>
+<span class="sd">    client code to robustly identify expected behavior and API support through</span>
+<span class="sd">    conditional execution and branching. Note that behavior is strongly</span>
+<span class="sd">    specified by the API major version number. Features that have become part of</span>
+<span class="sd">    the specification and bug-fixes referring to previous major versions should</span>
+<span class="sd">    not be checked with *has_feature()*. Using *has_feature()* with old feature</span>
+<span class="sd">    names will produce a DeprecationWarning for at least one major version, and</span>
+<span class="sd">    client code should be updated to avoid logic errors in future versions.</span>
+
+<span class="sd">    For convenience, setting *enable_exception=True* causes the function to</span>
+<span class="sd">    instead raise a gmxapi.exceptions.FeatureNotAvailableError for unrecognized feature names.</span>
+<span class="sd">    This allows extension code to cleanly produce a gmxapi exception instead of</span>
+<span class="sd">    first performing a boolean check. Also, some code may be unexecutable for</span>
+<span class="sd">    more than one reason, and sometimes it is cleaner to catch all</span>
+<span class="sd">    gmxapi.exceptions.Error exceptions for a code block, rather than to</span>
+<span class="sd">    construct complex conditionals.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        True if named feature is recognized by the installed package, else False.</span>
 
 <span class="sd">    Raises:</span>
-<span class="sd">        gmxapi.version.FeatureError if `enable_exception == True` and feature is not found.</span>
+<span class="sd">        gmxapi.exceptions.FeatureNotAvailableError if `enable_exception == True` and feature is not found.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_named_features</span><span class="p">:</span>
+    <span class="c1"># First, issue a warning if the feature name is subject to removal because</span>
+    <span class="c1"># of the history of the API specification.</span>
+    <span class="k">if</span> <span class="n">api_is_at_least</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span>
+        <span class="c1"># For sufficiently advanced API versions, we want to warn that old</span>
+        <span class="c1"># feature checks lose meaning and should no longer be checked.</span>
+        <span class="c1"># We provide a suggestion with the API version that absorbed their</span>
+        <span class="c1"># specification.</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_named_features_0_0</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s1">&#39;Old feature name. Use `api_is_at_least(0, 1)` instead of `has_feature(</span><span class="si">{}</span><span class="s1">)`.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">),</span>
+                <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Check whether the feature is listed in the API specification amendments.</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_named_features_0_0</span> <span class="o">+</span> <span class="n">_named_features_0_1</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">True</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">enable_exception</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">FeatureError</span><span class="p">(</span><span class="s1">&#39;Feature </span><span class="si">{}</span><span class="s1"> not available.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">)))</span>
+            <span class="k">raise</span> <span class="n">FeatureNotAvailableError</span><span class="p">(</span><span class="s1">&#39;Feature </span><span class="si">{}</span><span class="s1"> not available.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">)))</span>
         <span class="k">return</span> <span class="kc">False</span></div>
 </pre></div>
 
-           </div>
-           
           </div>
-          <footer>
-  
-
-  <hr/>
-
-  <div role="contentinfo">
-    <p>
-        &copy; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team
-
-    </p>
-  </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
-
-</footer>
-
         </div>
       </div>
-
-    </section>
-
-  </div>
-  
-
-
-  <script type="text/javascript">
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script>
-
-  
-  
-    
-   
-
-</body>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">gmxapi</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.1.
+    </div>
+  </body>
 </html>

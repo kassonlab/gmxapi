@@ -17,56 +17,15 @@ separation also serves as a reminder that different execution contexts may be
 implemented quite diffently, though Python scripts using only the high-level
 interface should execute on all.
 
-The following documentation is extracted from the ``gmxapi`` Python module and is also available
+Package documentation is extracted from the ``gmxapi`` Python module and is also available
 directly, using either ``pydoc`` from the command line or :py:func:`help` from within Python, such
 as during an interactive session.
 
-This documentation was build without the python module, and is thus missing the complete
-source code documentation.
+.. seealso:: :ref:`gmxapi_package_documentation`
 
 Refer to the Python source code itself for additional clarification.
 
-.. Configuration for doctest: automated syntax checking in documentation code snippets
-.. testsetup::
-
-    import gmxapi as gmx
-    from gmxapi.data import tpr_filename
-
 .. _python-procedural:
 
-gmxapi basic pacakage
-=====================
-
-::
-
-    import gmxapi as gmx
-
-
-Status messages and Logging
-===========================
-
-Python API
-==========
-
-.. contents:: :local:
-
-Python Classes
---------------
-
-Python context managers
------------------------
-
-gmx.exceptions module
----------------------
-
-gmx.version module
-------------------
-
-Core API
-========
-
-Functions
----------
-
-Classes
--------
+This copy of the documentation was built without the gmxapi package,
+and therefore lacks the full module reference.
