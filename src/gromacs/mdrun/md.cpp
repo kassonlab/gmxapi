@@ -63,7 +63,6 @@
 #include "gromacs/essentialdynamics/edsam.h"
 #include "gromacs/ewald/pme.h"
 #include "gromacs/ewald/pme_load_balancing.h"
-#include "gromacs/ewald/pme_pp_comm_gpu.h"
 #include "gromacs/fileio/trxio.h"
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/gmxlib/nrnb.h"
@@ -173,7 +172,7 @@ void gmx::LegacySimulator::do_md()
            pres = { { 0 } };
     int                         i, m;
     rvec                        mu_tot;
-    matrix                      parrinellorahmanMu, M;
+    matrix                      pressureCouplingMu, M;
     gmx_repl_ex_t               repl_ex = nullptr;
     gmx_localtop_t              top;
     PaddedHostVector<gmx::RVec> f{};
@@ -345,8 +344,9 @@ void gmx::LegacySimulator::do_md()
         GMX_RELEASE_ASSERT(
                 ir->etc != etcNOSEHOOVER,
                 "Nose-Hoover temperature coupling is not supported with the GPU update.\n");
-        GMX_RELEASE_ASSERT(ir->epc == epcNO,
-                           "Pressure coupling is not supported with the GPU update.\n");
+        GMX_RELEASE_ASSERT(ir->epc == epcNO || ir->epc == epcPARRINELLORAHMAN || ir->epc == epcBERENDSEN,
+                           "Only Parrinello-Rahman and Berendsen pressure coupling are supported "
+                           "with the GPU update.\n");
         GMX_RELEASE_ASSERT(!mdatoms->haveVsites,
                            "Virtual sites are not supported with the GPU update.\n");
         GMX_RELEASE_ASSERT(ed == nullptr,
@@ -371,6 +371,10 @@ void gmx::LegacySimulator::do_md()
         }
         integrator = std::make_unique<UpdateConstrainCuda>(
                 *ir, *top_global, stateGpu->getUpdateStream(), stateGpu->xUpdatedOnDevice());
+
+        t_pbc pbc;
+        set_pbc(&pbc, epbcXYZ, state->box);
+        integrator->setPbc(&pbc);
     }
 
     if (useGpuForPme || (useGpuForNonbonded && useGpuForBufferOps) || useGpuForUpdate)
@@ -800,25 +804,16 @@ void gmx::LegacySimulator::do_md()
         do_verbose = mdrunOptions.verbose
                      && (step % mdrunOptions.verboseStepPrintInterval == 0 || bFirstStep || bLastStep);
 
-        if (useGpuForUpdate && !bFirstStep)
+        if (useGpuForUpdate && !bFirstStep && bNS)
         {
-            // Copy velocities from the GPU when needed:
-            // - On search steps to keep copy on host (device buffers are reinitialized).
-            // - When needed for the output.
-            if (bNS || do_per_step(step, ir->nstvout))
-            {
-                stateGpu->copyVelocitiesFromGpu(state->v, AtomLocality::Local);
-                stateGpu->waitVelocitiesReadyOnHost(AtomLocality::Local);
-            }
-
+            // Copy velocities from the GPU on search steps to keep a copy on host (device buffers are reinitialized).
+            stateGpu->copyVelocitiesFromGpu(state->v, AtomLocality::Local);
+            stateGpu->waitVelocitiesReadyOnHost(AtomLocality::Local);
             // Copy coordinate from the GPU when needed at the search step.
             // NOTE: The cases when coordinates needed on CPU for force evaluation are handled in sim_utils.
             // NOTE: If the coordinates are to be written into output file they are also copied separately before the output.
-            if (bNS)
-            {
-                stateGpu->copyCoordinatesFromGpu(state->x, AtomLocality::Local);
-                stateGpu->waitCoordinatesReadyOnHost(AtomLocality::Local);
-            }
+            stateGpu->copyCoordinatesFromGpu(state->x, AtomLocality::Local);
+            stateGpu->waitCoordinatesReadyOnHost(AtomLocality::Local);
         }
 
         if (bNS && !(bFirstStep && ir->bContinuation))
@@ -830,6 +825,13 @@ void gmx::LegacySimulator::do_md()
                 if (correct_box(fplog, step, state->box, graph))
                 {
                     bMasterState = TRUE;
+                    // If update is offloaded, it should be informed about the box size change
+                    if (useGpuForUpdate)
+                    {
+                        t_pbc pbc;
+                        set_pbc(&pbc, epbcXYZ, state->box);
+                        integrator->setPbc(&pbc);
+                    }
                 }
             }
             if (DOMAINDECOMP(cr) && bMasterState)
@@ -1117,15 +1119,23 @@ void gmx::LegacySimulator::do_md()
             }
         }
 
-        // Copy coordinate from the GPU for the output if the update is offloaded and
+        // Copy coordinate from the GPU for the output/checkpointing if the update is offloaded and
         // coordinates have not already been copied for i) search or ii) CPU force tasks.
         if (useGpuForUpdate && !bNS && !runScheduleWork->domainWork.haveCpuLocalForceWork
-            && (do_per_step(step, ir->nstxout) || do_per_step(step, ir->nstxout_compressed)))
+            && (do_per_step(step, ir->nstxout) || do_per_step(step, ir->nstxout_compressed)
+                || checkpointHandler->isCheckpointingStep()))
         {
             stateGpu->copyCoordinatesFromGpu(state->x, AtomLocality::Local);
             stateGpu->waitCoordinatesReadyOnHost(AtomLocality::Local);
         }
-
+        // Copy velocities if needed for the output/checkpointing.
+        // NOTE: Copy on the search steps is done at the beginning of the step.
+        if (useGpuForUpdate && !bNS
+            && (do_per_step(step, ir->nstvout) || checkpointHandler->isCheckpointingStep()))
+        {
+            stateGpu->copyVelocitiesFromGpu(state->v, AtomLocality::Local);
+            stateGpu->waitVelocitiesReadyOnHost(AtomLocality::Local);
+        }
         // Copy forces for the output if the forces were reduced on the GPU (not the case on virial steps)
         // and update is offloaded hence forces are kept on the GPU for update and have not been
         // already transferred in do_force().
@@ -1211,7 +1221,7 @@ void gmx::LegacySimulator::do_md()
         else
         {
             update_tcouple(step, ir, state, ekind, &MassQ, mdatoms);
-            update_pcouple_before_coordinates(fplog, step, ir, state, parrinellorahmanMu, M, bInitStep);
+            update_pcouple_before_coordinates(fplog, step, ir, state, pressureCouplingMu, M, bInitStep);
         }
 
         if (EI_VV(ir->eI))
@@ -1237,7 +1247,13 @@ void gmx::LegacySimulator::do_md()
          * energies of two subsequent steps. Therefore we need to compute the
          * half step kinetic energy also if we need energies at the next step.
          */
-        const bool needHalfStepKineticEnergy = (!EI_VV(ir->eI) && do_per_step(step + 1, nstglobalcomm));
+        const bool needHalfStepKineticEnergy =
+                (!EI_VV(ir->eI) && (do_per_step(step + 1, nstglobalcomm) || step_rel + 1 == ir->nsteps));
+
+        // Parrinello-Rahman requires the pressure to be availible before the update to compute
+        // the velocity scaling matrix. Hence, it runs one step after the nstpcouple step.
+        const bool doParrinelloRahman = (ir->epc == epcPARRINELLORAHMAN
+                                         && do_per_step(step + ir->nstpcouple - 1, ir->nstpcouple));
 
         if (useGpuForUpdate)
         {
@@ -1245,9 +1261,6 @@ void gmx::LegacySimulator::do_md()
             {
                 integrator->set(stateGpu->getCoordinates(), stateGpu->getVelocities(),
                                 stateGpu->getForces(), top.idef, *mdatoms, ekind->ngtc);
-                t_pbc pbc;
-                set_pbc(&pbc, epbcXYZ, state->box);
-                integrator->setPbc(&pbc);
 
                 // Copy data to the GPU after buffers might have being reinitialized
                 stateGpu->copyVelocitiesToGpu(state->v, AtomLocality::Local);
@@ -1260,15 +1273,13 @@ void gmx::LegacySimulator::do_md()
                 stateGpu->copyForcesToGpu(ArrayRef<RVec>(f), AtomLocality::Local);
             }
 
-            bool doTempCouple =
+            const bool doTemperatureScaling =
                     (ir->etc != etcNO && do_per_step(step + ir->nsttcouple - 1, ir->nsttcouple));
-            bool doParrinelloRahman = (ir->epc == epcPARRINELLORAHMAN
-                                       && do_per_step(step + ir->nstpcouple - 1, ir->nstpcouple));
 
             // This applies Leap-Frog, LINCS and SETTLE in succession
             integrator->integrate(stateGpu->getForcesReadyOnDeviceEvent(
                                           AtomLocality::Local, runScheduleWork->stepWork.useGpuFBufferOps),
-                                  ir->delta_t, true, bCalcVir, shake_vir, doTempCouple,
+                                  ir->delta_t, true, bCalcVir, shake_vir, doTemperatureScaling,
                                   ekind->tcstat, doParrinelloRahman, ir->nstpcouple * ir->delta_t, M);
 
             // Copy velocities D2H after update if:
@@ -1374,13 +1385,7 @@ void gmx::LegacySimulator::do_md()
             // and when algorithms require it.
             const bool doInterSimSignal = (simulationsShareState && do_per_step(step, nstSignalComm));
 
-            // With leap-frog we also need to compute the half-step
-            // kinetic energy at the step before we need to write
-            // the full-step kinetic energy
-            const bool needEkinAtNextStep =
-                    (!EI_VV(ir->eI) && (do_per_step(step + 1, nstglobalcomm) || step_rel + 1 == ir->nsteps));
-
-            if (bGStat || needEkinAtNextStep || doInterSimSignal)
+            if (bGStat || needHalfStepKineticEnergy || doInterSimSignal)
             {
                 // Copy coordinates when needed to stop the CM motion.
                 if (useGpuForUpdate && !EI_VV(ir->eI) && bStopCM)
@@ -1443,7 +1448,17 @@ void gmx::LegacySimulator::do_md()
         }
 
         update_pcouple_after_coordinates(fplog, step, ir, mdatoms, pres, force_vir, shake_vir,
-                                         parrinellorahmanMu, state, nrnb, &upd);
+                                         pressureCouplingMu, state, nrnb, &upd, !useGpuForUpdate);
+
+        const bool doBerendsenPressureCoupling =
+                (inputrec->epc == epcBERENDSEN && do_per_step(step, inputrec->nstpcouple));
+        if (useGpuForUpdate && (doBerendsenPressureCoupling || doParrinelloRahman))
+        {
+            integrator->scaleCoordinates(pressureCouplingMu);
+            t_pbc pbc;
+            set_pbc(&pbc, epbcXYZ, state->box);
+            integrator->setPbc(&pbc);
+        }
 
         /* ################# END UPDATE STEP 2 ################# */
         /* #### We now have r(t+dt) and v(t+dt/2)  ############# */
@@ -1654,12 +1669,6 @@ void gmx::LegacySimulator::do_md()
     }
 
     walltime_accounting_set_nsteps_done(walltime_accounting, step_rel);
-
-    if (fr->pmePpCommGpu)
-    {
-        // destroy object since it is no longer required. (This needs to be done while the GPU context still exists.)
-        fr->pmePpCommGpu.reset();
-    }
 
     global_stat_destroy(gstat);
 }

@@ -32,18 +32,25 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 
-"""Test gmxapi functionality described in roadmap.rst."""
+def do_build(context):
+    context.env.set_env_var('CLANG_FORMAT', context.env.get_clang_format_command('7'))
+    clangformat_log = context.workspace.get_path_for_logfile('clang-format.log', category='clang-format')
+    cmd = ['admin/clang-format.sh', 'update', '--rev=HEAD^', '--warnings=' + clangformat_log]
+    ret = context.run_cmd(cmd, use_return_code=True)
+    if ret == 1:
+        with open(clangformat_log, 'r') as f:
+            warnings = f.readlines()
+        if len(warnings) <= 5:
+            details = [x.rstrip() for x in warnings]
+        else:
+            format_count = 0
+            for w in warnings:
+                if 'clang-format performed' in w:
+                    format_count += 1
+            details = []
+            if format_count > 0:
+                details.append('fixed formatting issues in {0} files'.format(format_count))
+    elif ret != 0:
+        raise BuildError('clang-format.sh failed to run')
 
-import pytest
-
-import gmxapi as gmx
-from gmxapi.version import has_feature
-
-# Ref https://redmine.gromacs.org/issues/3192
-@pytest.mark.skipif(not has_feature('fr8'),
-                   reason="Feature level not met.")
-def test_fr8(spc_water_box):
-    """FR8: gmx.mdrun understands ensemble work."""
-    md = gmx.mdrun([spc_water_box, spc_water_box])
-    md.run()
-    # Maybe assert that two trajectory files with unique filesystem locations are produced?
+    context.workspace.upload_revision(project=Project.GROMACS, file_glob='*')

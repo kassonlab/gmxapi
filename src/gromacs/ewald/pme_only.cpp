@@ -451,7 +451,8 @@ static int gmx_pme_recv_coeffs_coords(struct gmx_pme_t*            pme,
                 {
                     if (pme_pp->useGpuDirectComm)
                     {
-                        pme_pp->pmeCoordinateReceiverGpu->receiveCoordinatesFromPpCudaDirect(sender.rankId);
+                        pme_pp->pmeCoordinateReceiverGpu->launchReceiveCoordinatesFromPpCudaDirect(
+                                sender.rankId);
                     }
                     else
                     {
@@ -469,6 +470,11 @@ static int gmx_pme_recv_coeffs_coords(struct gmx_pme_t*            pme,
                 }
             }
 
+            if (pme_pp->useGpuDirectComm)
+            {
+                pme_pp->pmeCoordinateReceiverGpu->enqueueWaitReceiveCoordinatesFromPpCudaDirect();
+            }
+
             status = pmerecvqxX;
         }
 
@@ -477,6 +483,7 @@ static int gmx_pme_recv_coeffs_coords(struct gmx_pme_t*            pme,
         messages = 0;
     } while (status == -1);
 #else
+    GMX_UNUSED_VALUE(pme);
     GMX_UNUSED_VALUE(pme_pp);
     GMX_UNUSED_VALUE(box);
     GMX_UNUSED_VALUE(maxshift_x);
@@ -488,6 +495,8 @@ static int gmx_pme_recv_coeffs_coords(struct gmx_pme_t*            pme,
     GMX_UNUSED_VALUE(grid_size);
     GMX_UNUSED_VALUE(ewaldcoeff_q);
     GMX_UNUSED_VALUE(ewaldcoeff_lj);
+    GMX_UNUSED_VALUE(useGpuForPme);
+    GMX_UNUSED_VALUE(stateGpu);
 
     status = pmerecvqxX;
 #endif
@@ -500,6 +509,7 @@ static int gmx_pme_recv_coeffs_coords(struct gmx_pme_t*            pme,
     return status;
 }
 
+#if GMX_MPI
 /*! \brief Send force data to PP ranks */
 static void sendFToPP(void* sendbuf, PpRanks receiver, gmx_pme_pp* pme_pp, int* messages)
 {
@@ -514,14 +524,13 @@ static void sendFToPP(void* sendbuf, PpRanks receiver, gmx_pme_pp* pme_pp, int* 
     }
     else
     {
-#if GMX_MPI
         // Send using MPI
         MPI_Isend(sendbuf, receiver.numAtoms * sizeof(rvec), MPI_BYTE, receiver.rankId, 0,
                   pme_pp->mpi_comm_mysim, &pme_pp->req[*messages]);
         *messages = *messages + 1;
-#endif
     }
 }
+#endif
 
 /*! \brief Send the PME mesh force, virial and energy to the PP-only ranks. */
 static void gmx_pme_send_force_vir_ener(const gmx_pme_t& pme,
@@ -576,6 +585,7 @@ static void gmx_pme_send_force_vir_ener(const gmx_pme_t& pme,
     MPI_Waitall(messages, pme_pp->req.data(), pme_pp->stat.data());
 #else
     gmx_call("MPI not enabled");
+    GMX_UNUSED_VALUE(pme);
     GMX_UNUSED_VALUE(pme_pp);
     GMX_UNUSED_VALUE(output);
     GMX_UNUSED_VALUE(dvdlambda_q);
