@@ -193,6 +193,163 @@ dictionary passed with the <code class="docutils literal notranslate"><span clas
 </pre></div>
 </div>
 </div>
+<div class="section" id="using-arbitrary-python-functions">
+<h2>Using arbitrary Python functions<a class="headerlink" href="#using-arbitrary-python-functions" title="Permalink to this headline">¶</a></h2>
+<p>Generally, a function in the <em>gmxapi</em> package returns an object that references
+a node in a work graph,
+representing an operation that will be run when the graph executes.
+The object has an <code class="docutils literal notranslate"><span class="pre">output</span></code> attribute providing access to data Futures that
+can be provided as inputs to other operations before computation has actually
+been performed.</p>
+<p>You can also provide native Python data as input to operations,
+or you can operate on native results retrieved from a Future’s <code class="docutils literal notranslate"><span class="pre">result()</span></code>
+method.
+However, it is trivial to convert most Python functions into <em>gmxapi</em> compatible
+operations with <a class="reference internal" href="pythonreference.html#gmxapi.function_wrapper" title="gmxapi.function_wrapper"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.function_wrapper()</span></code></a>.
+All function inputs and outputs must have a name and type.
+Additionally, functions should be stateless and importable
+(e.g. via Python <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">some.module</span> <span class="pre">import</span> <span class="pre">myfunction</span></code>)
+for future compatibility.</p>
+<p>Simple functions can just use <code class="xref py py-func docutils literal notranslate"><span class="pre">return()</span></code> to publish their output,
+as long as they are defined with a return value type annotation.
+Functions with multiple outputs can accept an <code class="docutils literal notranslate"><span class="pre">output</span></code> key word argument and
+assign values to named attributes on the received argument.</p>
+<p>Examples:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">gmxapi</span> <span class="kn">import</span> <span class="n">function_wrapper</span>
+
+<span class="nd">@function_wrapper</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">})</span>
+<span class="k">def</span> <span class="nf">add_float</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+
+
+<span class="nd">@function_wrapper</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="nb">bool</span><span class="p">})</span>
+<span class="k">def</span> <span class="nf">less_than</span><span class="p">(</span><span class="n">lhs</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">rhs</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">lhs</span> <span class="o">&lt;</span> <span class="n">rhs</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p>For more on Python type hinting with function annotations,
+check out <span class="target" id="index-1"></span><a class="pep reference external" href="https://www.python.org/dev/peps/pep-3107"><strong>PEP 3107</strong></a>.</p>
+</div>
+</div>
+<div class="section" id="subgraphs">
+<h2>Subgraphs<a class="headerlink" href="#subgraphs" title="Permalink to this headline">¶</a></h2>
+<p>Basic <em>gmxapi</em> work consists of a flow of data from operation outputs to
+operation inputs, forming a directed acyclic graph (DAG).
+In many cases, it can be useful to repeat execution of a subgraph with updated
+inputs.
+You may want a data reference that is not tied to the immutable result
+of a single node in the work graph, but which instead refers to the most recent
+result of a repeated operation.</p>
+<p>One or more operations can be staged in a <code class="xref py py-class docutils literal notranslate"><span class="pre">gmxapi.operation.Subgraph</span></code>,
+a sort of meta-operation factory that can store input binding behavior so that
+instances can be created without providing input arguments.</p>
+<p>The subgraph <em>variables</em> serve as input, output, and mutable internal data
+references which can be updated by operations in the subgraph.
+Variables also allow state to be propagated between iterations when a subgraph
+is used in a <em>while</em> loop.</p>
+<p>Use <a class="reference internal" href="pythonreference.html#gmxapi.subgraph" title="gmxapi.subgraph"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.subgraph()</span></code></a> to create a new empty subgraph.
+The <code class="docutils literal notranslate"><span class="pre">variables</span></code> argument declares data handles that define the state of the
+subgraph when it is run.
+To initialize input to the subgraph, give each variable a name and a value.</p>
+<p>To populate a subgraph, enter a SubgraphContext by using a <code class="xref py py-func docutils literal notranslate"><span class="pre">with()</span></code> statement.
+Operations created in the <em>with</em> block will be captued by the SubgraphContext.
+Define the subgraph outputs by assigning operation outputs to subgraph variables
+within the <em>with</em> block.</p>
+<p>After exiting the <em>with</em> block, the subgraph may be used to create operation
+instances or may be executed repeatedly in a <em>while</em> loop.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The object returned by <a class="reference internal" href="pythonreference.html#gmxapi.subgraph" title="gmxapi.subgraph"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.subgraph()</span></code></a> is atypical of <em>gmxapi</em>
+operations, and has some special behaviors. When used as a Python
+<a class="reference external" href="https://docs.python.org/3/reference/datamodel.html#context-managers">context manager</a>,
+it enters a “builder” state that changes the behavior of its attribute
+variables and of operaton instantiation. After exiting the <code class="xref py py-func docutils literal notranslate"><span class="pre">with()</span></code>
+block, the subgraph variables are no longer assignable, and operation
+references obtained within the block are no longer valid.</p>
+</div>
+</div>
+<div class="section" id="looping">
+<h2>Looping<a class="headerlink" href="#looping" title="Permalink to this headline">¶</a></h2>
+<p>An operation can be executed an arbitrary number of times with a
+<a class="reference internal" href="pythonreference.html#gmxapi.while_loop" title="gmxapi.while_loop"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.while_loop()</span></code></a> by providing a factory function as the
+<em>operation</em> argument.
+When the loop operation is run, the <em>operation</em> is instantiated and run repeatedly
+until <em>condition</em> evaluates <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><a class="reference internal" href="pythonreference.html#gmxapi.while_loop" title="gmxapi.while_loop"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.while_loop()</span></code></a> does not provide a direct way to provide <em>operation</em>
+arguments. Use a <em>subgraph</em> to define the data flow for iterative operations.</p>
+<p>When a <em>condition</em> is a subgraph variable, the variable is evaluated in the
+running subgraph instance at the beginning of an iteration.</p>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">subgraph</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">subgraph</span><span class="p">(</span><span class="n">variables</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;float_with_default&#39;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">&#39;bool_data&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<span class="k">with</span> <span class="n">subgraph</span><span class="p">:</span>
+    <span class="c1"># Define the update for float_with_default to come from an add_float operation.</span>
+    <span class="n">subgraph</span><span class="o">.</span><span class="n">float_with_default</span> <span class="o">=</span> <span class="n">add_float</span><span class="p">(</span><span class="n">subgraph</span><span class="o">.</span><span class="n">float_with_default</span><span class="p">,</span> <span class="mf">1.</span><span class="p">)</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">data</span>
+    <span class="n">subgraph</span><span class="o">.</span><span class="n">bool_data</span> <span class="o">=</span> <span class="n">less_than</span><span class="p">(</span><span class="n">lhs</span><span class="o">=</span><span class="n">subgraph</span><span class="o">.</span><span class="n">float_with_default</span><span class="p">,</span> <span class="n">rhs</span><span class="o">=</span><span class="mf">6.</span><span class="p">)</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">data</span>
+<span class="n">operation_instance</span> <span class="o">=</span> <span class="n">subgraph</span><span class="p">()</span>
+<span class="n">operation_instance</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="k">assert</span> <span class="n">operation_instance</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="s1">&#39;float_with_default&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mf">2.</span>
+
+<span class="n">loop</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">while_loop</span><span class="p">(</span><span class="n">operation</span><span class="o">=</span><span class="n">subgraph</span><span class="p">,</span> <span class="n">condition</span><span class="o">=</span><span class="n">subgraph</span><span class="o">.</span><span class="n">bool_data</span><span class="p">)</span>
+<span class="n">handle</span> <span class="o">=</span> <span class="n">loop</span><span class="p">()</span>
+<span class="k">assert</span> <span class="n">handle</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">float_with_default</span><span class="o">.</span><span class="n">result</span><span class="p">()</span> <span class="o">==</span> <span class="mi">6</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="logging">
+<h2>Logging<a class="headerlink" href="#logging" title="Permalink to this headline">¶</a></h2>
+<p><em>gmxapi</em> uses the Python <a class="reference external" href="https://docs.python.org/3/library/logging.html#module-logging" title="(in Python v3.8)"><code class="xref py py-mod docutils literal notranslate"><span class="pre">logging</span></code></a> module to provide hierarchical
+logging, organized by submodule.
+You can access the logger at <code class="docutils literal notranslate"><span class="pre">gmxapi.logger</span></code> or, after importing <em>gmxapi</em>,
+through the Python logging framework:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">gmxapi</span> <span class="k">as</span> <span class="nn">gmx</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="c1"># Get the root gmxapi logger.</span>
+<span class="n">gmx_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;gmxapi&#39;</span><span class="p">)</span>
+<span class="c1"># Set a low default logging level</span>
+<span class="n">gmx_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+<span class="c1"># Make some tools very verbose</span>
+<span class="c1">#  by descending the hierarchy</span>
+<span class="n">gmx_logger</span><span class="o">.</span><span class="n">getChild</span><span class="p">(</span><span class="s1">&#39;commandline&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+<span class="c1">#  or by direct reference</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;gmxapi.mdrun&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You may prefer to adjust the log format or manipulate the log handlers.
+For example, tag the log output with MPI rank:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">mpi4py</span> <span class="kn">import</span> <span class="n">MPI</span>
+    <span class="n">rank_number</span> <span class="o">=</span> <span class="n">MPI</span><span class="o">.</span><span class="n">COMM_WORLD</span><span class="o">.</span><span class="n">Get_rank</span><span class="p">()</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">rank_number</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">rank_tag</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">MPI</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">rank_tag</span> <span class="o">=</span> <span class="s1">&#39;rank</span><span class="si">{}</span><span class="s1">:&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">rank_number</span><span class="p">)</span>
+
+<span class="n">formatter</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="n">rank_tag</span> <span class="o">+</span> <span class="s1">&#39;</span><span class="si">%(name)s</span><span class="s1">:</span><span class="si">%(levelname)s</span><span class="s1">: </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">)</span>
+
+<span class="c1"># For additional console logging, create and attach a stream handler.</span>
+<span class="n">ch</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+<span class="n">ch</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">formatter</span><span class="p">)</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">ch</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For more information, refer to the Python <a class="reference external" href="https://docs.python.org/3/library/logging.html">logging documentation</a>.</p>
+</div>
+<div class="section" id="more">
+<h2>More<a class="headerlink" href="#more" title="Permalink to this headline">¶</a></h2>
+<p>Refer to the <span class="xref std std-doc">gmxapi Python module reference</span> for complete and granular documentation.</p>
+<p>For more information on writing or using pluggable simulation extension code,
+refer to <a class="reference external" href="https://redmine.gromacs.org/issues/3133">https://redmine.gromacs.org/issues/3133</a>.
+(For gmxapi 0.0.7 and GROMACS 2019, see <a class="reference external" href="https://github.com/kassonlab/sample_restraint">https://github.com/kassonlab/sample_restraint</a>)</p>
+<div class="admonition-todo admonition" id="id4">
+<p class="admonition-title">Todo</p>
+<p><a href="#id2"><span class="problematic" id="id3">:issue:`3133`</span></a>: Replace these links as resources for pluggable extension code become available.</p>
+</div>
+</div>
 </div>
 
 
@@ -209,6 +366,11 @@ dictionary passed with the <code class="docutils literal notranslate"><span clas
 <li><a class="reference internal" href="#running-ensemble-simulations">Running ensemble simulations</a></li>
 <li><a class="reference internal" href="#accessing-command-line-tools">Accessing command line tools</a></li>
 <li><a class="reference internal" href="#preparing-simulations">Preparing simulations</a></li>
+<li><a class="reference internal" href="#using-arbitrary-python-functions">Using arbitrary Python functions</a></li>
+<li><a class="reference internal" href="#subgraphs">Subgraphs</a></li>
+<li><a class="reference internal" href="#looping">Looping</a></li>
+<li><a class="reference internal" href="#logging">Logging</a></li>
+<li><a class="reference internal" href="#more">More</a></li>
 </ul>
 </li>
 </ul>
