@@ -83,21 +83,21 @@
 <span class="kn">import</span> <span class="nn">inspect</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">typing</span>
-<span class="kn">from</span> <span class="nn">contextlib</span> <span class="k">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
 
 <span class="kn">import</span> <span class="nn">gmxapi</span>
 <span class="kn">import</span> <span class="nn">gmxapi.abc</span>
 <span class="kn">import</span> <span class="nn">gmxapi.operation</span> <span class="k">as</span> <span class="nn">_op</span>
-<span class="kn">from</span> <span class="nn">gmxapi</span> <span class="k">import</span> <span class="n">exceptions</span>
+<span class="kn">from</span> <span class="nn">gmxapi</span> <span class="kn">import</span> <span class="n">exceptions</span>
 
 <span class="c1"># The following imports are not marked as public API.</span>
-<span class="kn">from</span> <span class="nn">.abc</span> <span class="k">import</span> <span class="n">ModuleObject</span>
+<span class="kn">from</span> <span class="nn">.abc</span> <span class="kn">import</span> <span class="n">ModuleObject</span>
 
-<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">fileio</span>
-<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">workflow</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">fileio</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">workflow</span>
 
 <span class="c1"># Initialize module-level logger</span>
-<span class="kn">from</span> <span class="nn">gmxapi</span> <span class="k">import</span> <span class="n">logger</span> <span class="k">as</span> <span class="n">root_logger</span>
+<span class="kn">from</span> <span class="nn">gmxapi</span> <span class="kn">import</span> <span class="n">logger</span> <span class="k">as</span> <span class="n">root_logger</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">root_logger</span><span class="o">.</span><span class="n">getChild</span><span class="p">(</span><span class="s1">&#39;mdrun&#39;</span><span class="p">)</span>
 <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Importing </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="vm">__name__</span><span class="p">))</span>
@@ -110,7 +110,8 @@
 <span class="c1">#  attributes of the data proxies.</span>
 <span class="n">_output_descriptors</span> <span class="o">=</span> <span class="p">(</span>
     <span class="n">_op</span><span class="o">.</span><span class="n">OutputDataDescriptor</span><span class="p">(</span><span class="s1">&#39;_work_dir&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span>
-    <span class="n">_op</span><span class="o">.</span><span class="n">OutputDataDescriptor</span><span class="p">(</span><span class="s1">&#39;trajectory&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+    <span class="n">_op</span><span class="o">.</span><span class="n">OutputDataDescriptor</span><span class="p">(</span><span class="s1">&#39;trajectory&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span>
+    <span class="n">_op</span><span class="o">.</span><span class="n">OutputDataDescriptor</span><span class="p">(</span><span class="s1">&#39;parameters&#39;</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
 <span class="p">)</span>
 <span class="n">_publishing_descriptors</span> <span class="o">=</span> <span class="p">{</span><span class="n">desc</span><span class="o">.</span><span class="n">_name</span><span class="p">:</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">operation</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="n">desc</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">desc</span><span class="o">.</span><span class="n">_dtype</span><span class="p">)</span> <span class="k">for</span> <span class="n">desc</span> <span class="ow">in</span>
                            <span class="n">_output_descriptors</span><span class="p">}</span>
@@ -156,7 +157,7 @@
 
 <span class="nd">@contextmanager</span>
 <span class="k">def</span> <span class="nf">scoped_communicator</span><span class="p">(</span><span class="n">original_comm</span><span class="p">,</span> <span class="n">requested_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-    <span class="kn">from</span> <span class="nn">gmxapi.simulation.context</span> <span class="k">import</span> <span class="n">_acquire_communicator</span><span class="p">,</span> <span class="n">_get_ensemble_communicator</span>
+    <span class="kn">from</span> <span class="nn">gmxapi.simulation.context</span> <span class="kn">import</span> <span class="n">_acquire_communicator</span><span class="p">,</span> <span class="n">_get_ensemble_communicator</span>
 
     <span class="k">if</span> <span class="n">requested_size</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">communicator</span> <span class="o">=</span> <span class="n">_acquire_communicator</span><span class="p">(</span><span class="n">communicator</span><span class="o">=</span><span class="n">original_comm</span><span class="p">)</span>
@@ -187,8 +188,8 @@
 <span class="sd">    The resource can be created from the standard data of the simulation module.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resource_manager</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">ResourceManager</span><span class="p">):</span>
-        <span class="kn">from</span> <span class="nn">.context</span> <span class="k">import</span> <span class="n">Context</span> <span class="k">as</span> <span class="n">LegacyContext</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resource_manager</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">ResourceManager</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">.context</span> <span class="kn">import</span> <span class="n">Context</span> <span class="k">as</span> <span class="n">LegacyContext</span>
         <span class="kn">import</span> <span class="nn">gmxapi._gmxapi</span> <span class="k">as</span> <span class="nn">_gmxapi</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_gmxapi</span> <span class="o">=</span> <span class="n">_gmxapi</span>
 
@@ -215,6 +216,7 @@
         <span class="n">workdir_list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;</span><span class="si">{node}</span><span class="s1">_</span><span class="si">{member}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node</span><span class="o">=</span><span class="n">resource_manager</span><span class="o">.</span><span class="n">operation_id</span><span class="p">,</span>
                                                  <span class="n">member</span><span class="o">=</span><span class="n">member</span><span class="p">)</span>
                         <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ensemble_width</span><span class="p">)]</span>
+        <span class="n">parameters_dict_list</span> <span class="o">=</span> <span class="p">[{}]</span> <span class="o">*</span> <span class="n">ensemble_width</span>
 
         <span class="c1"># This is a reasonable place to start using MPI ensemble implementation details.</span>
         <span class="c1"># We will want better abstraction in the future, but it is best if related filesystem</span>
@@ -279,15 +281,18 @@
                         <span class="n">fileio</span><span class="o">.</span><span class="n">write_tpr_file</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="n">tprfile</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="n">sim_input</span><span class="p">)</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Created </span><span class="si">{}</span><span class="s1"> on rank </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tprfile</span><span class="p">,</span> <span class="n">context_rank</span><span class="p">))</span>
 
-                    <span class="c1"># Gather the actual working directories from the ensemble members.</span>
+                    <span class="c1"># Gather the actual outputs from the ensemble members.</span>
                     <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">ensemble_comm</span><span class="p">,</span> <span class="s1">&#39;allgather&#39;</span><span class="p">):</span>
                         <span class="c1"># We should not assume that abspath expands the same on different MPI ranks.</span>
                         <span class="n">workdir_list</span> <span class="o">=</span> <span class="n">ensemble_comm</span><span class="o">.</span><span class="n">allgather</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">workdir</span><span class="p">)</span>
                         <span class="n">tpr_filenames</span> <span class="o">=</span> <span class="n">ensemble_comm</span><span class="o">.</span><span class="n">allgather</span><span class="p">(</span><span class="n">tprfile</span><span class="p">)</span>
+                        <span class="n">parameters</span> <span class="o">=</span> <span class="n">fileio</span><span class="o">.</span><span class="n">read_tpr</span><span class="p">(</span><span class="n">tprfile</span><span class="p">)</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">extract</span><span class="p">()</span>
+                        <span class="n">parameters_dict_list</span> <span class="o">=</span> <span class="n">ensemble_comm</span><span class="o">.</span><span class="n">allgather</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
                     <span class="k">else</span><span class="p">:</span>
                         <span class="n">workdir_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">workdir</span><span class="p">)</span> <span class="k">for</span> <span class="n">workdir</span> <span class="ow">in</span> <span class="n">workdir_list</span><span class="p">]</span>
                         <span class="c1"># TODO: If we use better input file names, they need to be updated in multiple places.</span>
                         <span class="n">tpr_filenames</span> <span class="o">=</span> <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="s1">&#39;topol.tpr&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">workdir</span> <span class="ow">in</span> <span class="n">workdir_list</span><span class="p">]</span>
+                        <span class="n">parameters_dict_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">fileio</span><span class="o">.</span><span class="n">read_tpr</span><span class="p">(</span><span class="n">tprfile</span><span class="p">)</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">extract</span><span class="p">()</span> <span class="k">for</span> <span class="n">tprfile</span> <span class="ow">in</span> <span class="n">tpr_filenames</span><span class="p">]</span>
 
                     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Context rank </span><span class="si">{}</span><span class="s1"> acknowledges working directories </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">context_rank</span><span class="p">,</span>
                                                                                              <span class="n">workdir_list</span><span class="p">))</span>
@@ -313,6 +318,7 @@
             <span class="c1"># end scoped_communicator: context_comm</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">workdir</span> <span class="o">=</span> <span class="n">workdir_list</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="n">parameters_dict_list</span>
 
 
 <span class="k">class</span> <span class="nc">SubscriptionSessionResources</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
@@ -324,7 +330,7 @@
 <span class="sd">    .. todo:: Better factoring of SessionResources, ResourceFactory, Director.resource_factory.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">LegacyImplementationSubscription</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="n">PublishingDataProxy</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">LegacyImplementationSubscription</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="n">PublishingDataProxy</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">LegacyImplementationSubscription</span><span class="p">)</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">PublishingDataProxy</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="n">output</span>
@@ -333,13 +339,14 @@
         <span class="c1"># if member_id is None:</span>
         <span class="c1">#     member_id = 0</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">workdir</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">workdir</span><span class="p">[</span><span class="n">member_id</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="n">member_id</span><span class="p">]</span>
 
 
 <span class="k">class</span> <span class="nc">SubscriptionPublishingRunner</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Handle execution in the gmxapi.operation context as a subscription to the gmxapi.simulation.context.&quot;&quot;&quot;</span>
     <span class="n">input_resource_factory</span> <span class="o">=</span> <span class="n">LegacyImplementationSubscription</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resources</span><span class="p">:</span> <span class="n">SubscriptionSessionResources</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resources</span><span class="p">:</span> <span class="n">SubscriptionSessionResources</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">resources</span><span class="p">,</span> <span class="n">SubscriptionSessionResources</span><span class="p">)</span>
         <span class="c1"># Note that the resources contain a reference to a simulation ensemble that has already run.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">resources</span> <span class="o">=</span> <span class="n">resources</span>
@@ -348,6 +355,7 @@
         <span class="sd">&quot;&quot;&quot;Operation implementation in the gmxapi.operation module context.&quot;&quot;&quot;</span>
         <span class="n">publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">output</span>
         <span class="n">publisher</span><span class="o">.</span><span class="n">_work_dir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">workdir</span>
+        <span class="n">publisher</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">parameters</span>
         <span class="c1"># TODO: Make the return value a trajectory handle rather than a file path.</span>
         <span class="c1"># TODO: Decide how to handle append vs. noappend output.</span>
         <span class="c1"># TODO: More rigorous handling of the trajectory file(s)</span>
@@ -457,7 +465,7 @@
 <span class="k">class</span> <span class="nc">StandardOperationHandle</span><span class="p">(</span><span class="n">_op</span><span class="o">.</span><span class="n">AbstractOperation</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Handle used in Python UI or gmxapi.operation Contexts.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resource_manager</span><span class="p">:</span> <span class="n">ResourceManager</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resource_manager</span><span class="p">:</span> <span class="n">ResourceManager</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">__resource_manager</span> <span class="o">=</span> <span class="n">resource_manager</span>
 
     <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -476,12 +484,12 @@
 <span class="sd">    .. todo:: Describe where instances live.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
             <span class="k">raise</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ValueError</span><span class="p">(</span><span class="s1">&#39;StandardDirector requires a gmxapi.operation Context.&#39;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">context</span>
 
-    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resources</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">DataSourceCollection</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StandardOperationHandle</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resources</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">DataSourceCollection</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StandardOperationHandle</span><span class="p">:</span>
         <span class="n">builder</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">node_builder</span><span class="p">(</span><span class="n">operation</span><span class="o">=</span><span class="n">RegisteredOperation</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
 
         <span class="n">builder</span><span class="o">.</span><span class="n">set_resource_factory</span><span class="p">(</span><span class="n">SubscriptionSessionResources</span><span class="p">)</span>
@@ -646,7 +654,7 @@
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.1.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
     </div>
   </body>
 </html>

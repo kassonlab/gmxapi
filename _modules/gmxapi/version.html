@@ -91,7 +91,7 @@
 <span class="c1"># minor = @PROJECT_VERSION_MINOR@</span>
 <span class="c1"># patch = @PROJECT_VERSION_PATCH@</span>
 
-<span class="kn">from</span> <span class="nn">gmxapi.exceptions</span> <span class="k">import</span> <span class="n">FeatureNotAvailableError</span>
+<span class="kn">from</span> <span class="nn">gmxapi.exceptions</span> <span class="kn">import</span> <span class="n">FeatureNotAvailableError</span>
 
 <span class="n">major</span> <span class="o">=</span> <span class="mi">0</span>
 <span class="n">minor</span> <span class="o">=</span> <span class="mi">0</span>
@@ -101,7 +101,7 @@
 <span class="n">release</span> <span class="o">=</span> <span class="kc">False</span>
 
 <span class="c1"># Features added since the initial gmxapi prototype, targeted for version 0.1.</span>
-<span class="n">_named_features_0_0</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;fr1&#39;</span><span class="p">,</span> <span class="s1">&#39;fr3&#39;</span><span class="p">]</span>
+<span class="n">_named_features_0_0</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;fr1&#39;</span><span class="p">,</span> <span class="s1">&#39;fr3&#39;</span><span class="p">,</span> <span class="s1">&#39;fr7&#39;</span><span class="p">,</span> <span class="s1">&#39;fr15&#39;</span><span class="p">]</span>
 <span class="c1"># Features named since the finalization of the 0.1 specification with GROMACS 2020.</span>
 <span class="n">_named_features_0_1</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="c1"># Named features describe functionality or behavior introduced since the last</span>
@@ -113,10 +113,33 @@
 <span class="c1"># that have become part of the specification, at least for a few minor release or</span>
 <span class="c1"># a few years, to avoid introducing errors to client code.</span>
 <span class="c1">#</span>
+<span class="c1"># Bugs and bug fixes may be indicated with names consisting of tracked issue URLs.</span>
+<span class="c1">#</span>
 <span class="c1"># Features consisting of &#39;fr&#39; and a numeric suffix are the functional requirements</span>
 <span class="c1"># described in roadmap.rst, as described at https://redmine.gromacs.org/issues/2893</span>
 <span class="c1">#</span>
-<span class="c1"># Bugs and bug fixes may be indicated with names consisting of tracked issue URLs.</span>
+<span class="c1"># fr1: wrap importable Python code.</span>
+<span class="c1"># fr2: output proxy establishes execution dependency (superseded by fr3)</span>
+<span class="c1"># fr3: output proxy can be used as input</span>
+<span class="c1"># fr4: dimensionality and typing of named data causes generation of correct work topologies</span>
+<span class="c1"># fr5: explicit many-to-one or many-to-many data flow</span>
+<span class="c1"># fr7: Python bindings for launching simulations</span>
+<span class="c1"># fr8: gmx.mdrun understands ensemble work</span>
+<span class="c1"># fr9: MD plugins</span>
+<span class="c1"># fr10: fused operations for use in looping constructs</span>
+<span class="c1"># fr11: Python access to TPR file contents</span>
+<span class="c1"># fr12: Simulation checkpoint handling</span>
+<span class="c1"># fr13: ``run`` module function simplifies user experience</span>
+<span class="c1"># fr14: Easy access to GROMACS run time parameters</span>
+<span class="c1"># fr15: Simulation input modification</span>
+<span class="c1"># fr16: Create simulation input from simulation output</span>
+<span class="c1"># fr17: Prepare simulation input from multiple sources</span>
+<span class="c1"># fr18: GROMACS CLI tools receive improved Python-level support over generic commandline_operations</span>
+<span class="c1"># fr19: GROMACS CLI tools receive improved C++-level support over generic commandline_operations</span>
+<span class="c1"># fr20: Python bindings use C++ API for expressing user interface</span>
+<span class="c1"># fr21 User insulated from filesystem paths</span>
+<span class="c1"># fr22 MPI-based ensemble management from Python</span>
+<span class="c1"># fr23 Ensemble simulations can themselves use MPI</span>
 
 
 <div class="viewcode-block" id="api_is_at_least"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.version.api_is_at_least">[docs]</a><span class="k">def</span> <span class="nf">api_is_at_least</span><span class="p">(</span><span class="n">major_version</span><span class="p">,</span> <span class="n">minor_version</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">patch_version</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
@@ -234,7 +257,7 @@
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.1.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
     </div>
   </body>
 </html>

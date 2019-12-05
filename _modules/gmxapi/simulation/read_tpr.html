@@ -84,13 +84,13 @@
 <span class="kn">import</span> <span class="nn">gmxapi.exceptions</span>
 <span class="kn">import</span> <span class="nn">gmxapi.operation</span> <span class="k">as</span> <span class="nn">_op</span>
 <span class="kn">import</span> <span class="nn">gmxapi.typing</span>
-<span class="kn">from</span> <span class="nn">gmxapi.operation</span> <span class="k">import</span> <span class="n">InputCollectionDescription</span>
-<span class="kn">from</span> <span class="nn">gmxapi.simulation.abc</span> <span class="k">import</span> <span class="n">ModuleObject</span>
+<span class="kn">from</span> <span class="nn">gmxapi.operation</span> <span class="kn">import</span> <span class="n">InputCollectionDescription</span>
+<span class="kn">from</span> <span class="nn">gmxapi.simulation.abc</span> <span class="kn">import</span> <span class="n">ModuleObject</span>
 
-<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">fileio</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">fileio</span>
 
 <span class="c1"># Initialize module-level logger</span>
-<span class="kn">from</span> <span class="nn">gmxapi</span> <span class="k">import</span> <span class="n">logger</span> <span class="k">as</span> <span class="n">root_logger</span>
+<span class="kn">from</span> <span class="nn">gmxapi</span> <span class="kn">import</span> <span class="n">logger</span> <span class="k">as</span> <span class="n">root_logger</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">root_logger</span><span class="o">.</span><span class="n">getChild</span><span class="p">(</span><span class="s1">&#39;read_tpr&#39;</span><span class="p">)</span>
 <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Importing </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="vm">__name__</span><span class="p">))</span>
@@ -118,7 +118,7 @@
                       <span class="n">_op</span><span class="o">.</span><span class="n">DataProxyBase</span><span class="p">,</span>
                       <span class="n">descriptors</span><span class="o">=</span><span class="n">_output_descriptors</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Implement the &#39;output&#39; attribute of ReadTpr operations.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="n">_op</span><span class="o">.</span><span class="n">DataProxyBase</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
 
@@ -135,7 +135,7 @@
 
 <span class="k">class</span> <span class="nc">SessionResources</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Input and output run-time resources for a ReadTpr operation.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tpr_filename</span><span class="p">,</span> <span class="n">publisher</span><span class="p">:</span> <span class="n">PublishingDataProxy</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tpr_filename</span><span class="p">,</span> <span class="n">publisher</span><span class="p">:</span> <span class="n">PublishingDataProxy</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">tpr_object</span> <span class="o">=</span> <span class="n">fileio</span><span class="o">.</span><span class="n">TprFile</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">tpr_filename</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="n">publisher</span>
 
@@ -213,7 +213,7 @@
 <span class="sd">    Generic class for creating resources passed to read_tpr implementation details.</span>
 <span class="sd">    Dispatching may occur based on the source and target Context of factory action.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_context</span><span class="p">,</span> <span class="n">source_context</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_context</span><span class="p">,</span> <span class="n">source_context</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Initialize an instance to support read_tpr action.</span>
 
 <span class="sd">        Arguments:</span>
@@ -226,7 +226,7 @@
 
     <span class="c1"># TODO: clean up the dispatching. What to do when input comes from multiple sources?</span>
     <span class="c1"># Use a typing overload or a single-dispatch functor for clearer input/result typing.</span>
-    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Create the resource product.</span>
 
 <span class="sd">        Dispatch to appropriate factory functionality based on the *source_context*</span>
@@ -332,7 +332,7 @@
 
 <span class="k">class</span> <span class="nc">StandardOperationHandle</span><span class="p">(</span><span class="n">_op</span><span class="o">.</span><span class="n">AbstractOperation</span><span class="p">,</span> <span class="n">ModuleObject</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Handle used in Python UI or gmxapi.operation Contexts.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resource_manager</span><span class="p">:</span> <span class="n">ResourceManager</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resource_manager</span><span class="p">:</span> <span class="n">ResourceManager</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">__resource_manager</span> <span class="o">=</span> <span class="n">resource_manager</span>
 
     <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -350,12 +350,12 @@
 
 <span class="sd">    .. todo:: Describe where instances live.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">_op</span><span class="o">.</span><span class="n">Context</span><span class="p">):</span>
             <span class="k">raise</span> <span class="n">gmxapi</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ValueError</span><span class="p">(</span><span class="s1">&#39;StandardDirector requires a gmxapi.operation Context.&#39;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">context</span>
 
-    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resources</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">DataSourceCollection</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StandardOperationHandle</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resources</span><span class="p">:</span> <span class="n">_op</span><span class="o">.</span><span class="n">DataSourceCollection</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StandardOperationHandle</span><span class="p">:</span>
         <span class="n">builder</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">node_builder</span><span class="p">(</span><span class="n">operation</span><span class="o">=</span><span class="n">RegisteredOperation</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
 
         <span class="n">builder</span><span class="o">.</span><span class="n">set_resource_factory</span><span class="p">(</span><span class="n">_session_resource_factory</span><span class="p">)</span>
@@ -499,7 +499,7 @@
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.1.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
     </div>
   </body>
 </html>

@@ -61,7 +61,138 @@ there shouldn’t be any additional configuration necessary, and any errors that
 occur should be caught at the Python level. Any Python <em>exception</em> raised by gmxapi
 should be descended from (and catchable as) <a class="reference internal" href="pythonreference.html#gmxapi.exceptions.Error" title="gmxapi.exceptions.Error"><code class="xref py py-class docutils literal notranslate"><span class="pre">gmxapi.exceptions.Error</span></code></a>.</p>
 <p>As an exception to the preceding paragraph, we have a tool specifically for
-wrapping arbitrary (unintegrated) command line tools: See <a class="reference internal" href="pythonreference.html#gmxapi.commandline_operation" title="gmxapi.commandline_operation"><code class="xref py py-class docutils literal notranslate"><span class="pre">gmxapi.commandline_operation</span></code></a>.</p>
+wrapping arbitrary (unintegrated) command line tools.
+See <a class="reference internal" href="#commandline"><span class="std std-ref">Accessing command line tools</span></a>.</p>
+<div class="admonition-todo admonition" id="id1">
+<p class="admonition-title">Todo</p>
+<p>Get relevant GROMACS paths in Python environment.</p>
+<p><a class="reference internal" href="pythonreference.html#gmxapi.commandline_operation" title="gmxapi.commandline_operation"><code class="xref py py-class docutils literal notranslate"><span class="pre">gmxapi.commandline_operation</span></code></a> relies on the environment <span class="target" id="index-0"></span><code class="xref std std-envvar docutils literal notranslate"><span class="pre">PATH</span></code>
+to locate executables, including the <strong class="command">gmx</strong> wrapper binary.
+Relates to <a class="reference external" href="https://redmine.gromacs.org/issues/2961">#2961</a>.</p>
+</div>
+<div class="section" id="notes-on-parallelism-and-mpi">
+<span id="parallelism"></span><h2>Notes on parallelism and MPI<a class="headerlink" href="#notes-on-parallelism-and-mpi" title="Permalink to this headline">¶</a></h2>
+<p>When launching a <em>gmxapi</em> script in an MPI environment,
+such as with <strong class="command">mpiexec</strong> or <strong class="command">srun</strong>,
+you must help <em>gmxapi</em> detect the MPI environment by ensuring that <code class="xref py py-mod docutils literal notranslate"><span class="pre">mpi4py</span></code>
+is loaded.
+Refer to <a class="reference internal" href="install.html#mpi-requirements"><span class="std std-ref">MPI requirements</span></a> for more on installing <code class="xref py py-mod docutils literal notranslate"><span class="pre">mpi4py</span></code>.</p>
+<p>Assuming you use <strong class="command">mpiexec</strong> to launch MPI jobs in your environment,
+run a <em>gmxapi</em> script on two ranks with something like the following.
+Note that it can be helpful to provide <strong class="command">mpiexec</strong> with the full path to
+the intended Python interpreter since new process environments are being created.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>mpiexec -n 2 `which python` -m mpi4py myscript.py
+</pre></div>
+</div>
+<p><em>gmxapi</em> 0.1 has limited parallelism, but future versions will include seemless
+acceleration as integration improves with the GROMACS library and computing
+environment runtime resources.
+Currently, <em>gmxapi</em> and the GROMACS library do not have an effective way to
+share an MPI environment.
+Therefore, if you intend to run more than one simulation at a time, in parallel,
+in a <em>gmxapi</em> script, you should build GROMACS with <em>thread-MPI</em> instead of a
+standard MPI library.
+I.e. configure GROMACS with the CMake flag <code class="docutils literal notranslate"><span class="pre">-DGMX_THREAD_MPI=ON</span></code>.
+Then, launch your <em>gmxapi</em> script with one MPI rank per node, and <em>gmxapi</em> will
+assign each (non-MPI) simulation to its own node, while keeping the full MPI
+environment available for use via <code class="xref py py-mod docutils literal notranslate"><span class="pre">mpi4py</span></code>.</p>
+</div>
+<div class="section" id="running-simple-simulations">
+<h2>Running simple simulations<a class="headerlink" href="#running-simple-simulations" title="Permalink to this headline">¶</a></h2>
+<p>Once the <code class="docutils literal notranslate"><span class="pre">gmxapi</span></code> package is installed, running simulations is easy with
+<a class="reference internal" href="pythonreference.html#gmxapi.read_tpr" title="gmxapi.read_tpr"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.read_tpr()</span></code></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">gmxapi</span> <span class="k">as</span> <span class="nn">gmx</span>
+<span class="n">simulation_input</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">read_tpr</span><span class="p">(</span><span class="n">tpr_filename</span><span class="p">)</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">mdrun</span><span class="p">(</span><span class="n">simulation_input</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note that this sets up the work you want to perform, but does not immediately
+trigger execution. You can explicitly trigger execution with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">md</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>or you can let gmxapi automatically launch work in response to the data you
+request.</p>
+<p>The <a class="reference internal" href="pythonreference.html#gmxapi.mdrun" title="gmxapi.mdrun"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.mdrun()</span></code></a> operation produces a simulation trajectory output.
+You can use <code class="docutils literal notranslate"><span class="pre">md.output.trajectory</span></code> as input to other operations,
+or you can get the output directly by calling <code class="docutils literal notranslate"><span class="pre">md.output.trajectory.result()</span></code>.
+If the simulation has not been run yet when <code class="docutils literal notranslate"><span class="pre">result()</span></code> is called,
+the simulation will be run before the function returns.</p>
+</div>
+<div class="section" id="running-ensemble-simulations">
+<h2>Running ensemble simulations<a class="headerlink" href="#running-ensemble-simulations" title="Permalink to this headline">¶</a></h2>
+<p>To run a batch of simulations, just pass an array of inputs.:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">md</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">read_tpr</span><span class="p">([</span><span class="n">tpr_filename1</span><span class="p">,</span> <span class="n">tpr_filename2</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span>
+<span class="n">md</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Make sure to launch the script in an MPI environment with a sufficient number
+of ranks to allow one rank per simulation.</p>
+<p>For <em>gmxapi</em> 0.1, we recommend configuring the GROMACS build with
+<code class="docutils literal notranslate"><span class="pre">GMX_THREAD_MPI=ON</span></code> and allowing one rank per node in order to allow each
+simulation ensemble member to run on a separate node.</p>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="#parallelism"><span class="std std-ref">Notes on parallelism and MPI</span></a></p>
+</div>
+</div>
+<div class="section" id="accessing-command-line-tools">
+<span id="commandline"></span><h2>Accessing command line tools<a class="headerlink" href="#accessing-command-line-tools" title="Permalink to this headline">¶</a></h2>
+<p>In <em>gmxapi</em> 0.1, most GROMACS tools are not yet exposed as <em>gmxapi</em> Python operations.
+<a class="reference internal" href="pythonreference.html#gmxapi.commandline_operation" title="gmxapi.commandline_operation"><code class="xref py py-class docutils literal notranslate"><span class="pre">gmxapi.commandline_operation</span></code></a> provides a way to convert a <strong class="command">gmx</strong>
+(or other) command line tool into an operation that can be used in a <em>gmxapi</em>
+script.</p>
+<p>In order to establish data dependencies, input and output files need to be
+indicated with the <code class="docutils literal notranslate"><span class="pre">input_files</span></code> and <code class="docutils literal notranslate"><span class="pre">output_files</span></code> parameters.
+<code class="docutils literal notranslate"><span class="pre">input_files</span></code> and <code class="docutils literal notranslate"><span class="pre">output_files</span></code> key word arguments are dictionaries
+consisting of files keyed by command line flags.</p>
+<p>For example, you might create a <strong class="command">gmx solvate</strong> operation as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">solvate</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">commandline_operation</span><span class="p">(</span><span class="s1">&#39;gmx&#39;</span><span class="p">,</span>
+                                    <span class="n">arguments</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;solvate&#39;</span><span class="p">,</span> <span class="s1">&#39;-box&#39;</span><span class="p">,</span> <span class="s1">&#39;5&#39;</span><span class="p">,</span> <span class="s1">&#39;5&#39;</span><span class="p">,</span> <span class="s1">&#39;5&#39;</span><span class="p">],</span>
+                                    <span class="n">input_files</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;-cs&#39;</span><span class="p">:</span> <span class="n">structurefile</span><span class="p">},</span>
+                                    <span class="n">output_files</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;-p&#39;</span><span class="p">:</span> <span class="n">topfile</span><span class="p">,</span>
+                                                  <span class="s1">&#39;-o&#39;</span><span class="p">:</span> <span class="n">structurefile</span><span class="p">,</span>
+                                                  <span class="p">}</span>
+</pre></div>
+</div>
+<p>To check the status or error output of a command line operation, refer to the
+<code class="docutils literal notranslate"><span class="pre">returncode</span></code> and <code class="docutils literal notranslate"><span class="pre">erroroutput</span></code> outputs.
+To access the results from the output file arguments, use the command line flags
+as keys in the <code class="docutils literal notranslate"><span class="pre">file</span></code> dictionary output.</p>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">structurefile</span> <span class="o">=</span> <span class="n">solvate</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="s1">&#39;-o&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+<span class="k">if</span> <span class="n">solvate</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">returncode</span><span class="o">.</span><span class="n">result</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">solvate</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">erroroutput</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="preparing-simulations">
+<h2>Preparing simulations<a class="headerlink" href="#preparing-simulations" title="Permalink to this headline">¶</a></h2>
+<p>Continuing the previous example, the output of <code class="docutils literal notranslate"><span class="pre">solvate</span></code> may be used as the
+input for <code class="docutils literal notranslate"><span class="pre">grompp</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">grompp</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">commandline_operation</span><span class="p">(</span><span class="s1">&#39;gmx&#39;</span><span class="p">,</span> <span class="s1">&#39;grompp&#39;</span><span class="p">,</span>
+                                   <span class="n">input_files</span><span class="o">=</span><span class="p">{</span>
+                                       <span class="s1">&#39;-f&#39;</span><span class="p">:</span> <span class="n">mdpfile</span><span class="p">,</span>
+                                       <span class="s1">&#39;-p&#39;</span><span class="p">:</span> <span class="n">solvate</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="s1">&#39;-p&#39;</span><span class="p">],</span>
+                                       <span class="s1">&#39;-c&#39;</span><span class="p">:</span> <span class="n">solvate</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="s1">&#39;-o&#39;</span><span class="p">],</span>
+                                       <span class="s1">&#39;-po&#39;</span><span class="p">:</span> <span class="n">mdout_mdp</span><span class="p">,</span>
+                                   <span class="p">},</span>
+                                   <span class="n">output_files</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;-o&#39;</span><span class="p">:</span> <span class="n">tprfile</span><span class="p">})</span>
+</pre></div>
+</div>
+<p>Then, <code class="docutils literal notranslate"><span class="pre">grompp.output.file['-o']</span></code> can be used as the input for <a class="reference internal" href="pythonreference.html#gmxapi.read_tpr" title="gmxapi.read_tpr"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.read_tpr()</span></code></a>.</p>
+<p>Simulation input can be modified with the <a class="reference internal" href="pythonreference.html#gmxapi.modify_input" title="gmxapi.modify_input"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.modify_input()</span></code></a> operation
+before being passed to <a class="reference internal" href="pythonreference.html#gmxapi.mdrun" title="gmxapi.mdrun"><code class="xref py py-func docutils literal notranslate"><span class="pre">gmxapi.mdrun()</span></code></a>.
+For <em>gmxapi</em> 0.1, a subset of MDP parameters may be overridden using the
+dictionary passed with the <code class="docutils literal notranslate"><span class="pre">parameters</span></code> key word argument.</p>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">simulation_input</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">read_tpr</span><span class="p">(</span><span class="n">grompp</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="s1">&#39;-o&#39;</span><span class="p">])</span>
+<span class="n">modified_input</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">modify_input</span><span class="p">(</span><span class="nb">input</span><span class="o">=</span><span class="n">simulation_input</span><span class="p">,</span> <span class="n">parameters</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;nsteps&#39;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">})</span>
+<span class="n">md</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">mdrun</span><span class="p">(</span><span class="nb">input</span><span class="o">=</span><span class="n">modified_input</span><span class="p">)</span>
+<span class="n">md</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
 </div>
 
 
@@ -70,6 +201,18 @@ wrapping arbitrary (unintegrated) command line tools: See <a class="reference in
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Using the Python package</a><ul>
+<li><a class="reference internal" href="#notes-on-parallelism-and-mpi">Notes on parallelism and MPI</a></li>
+<li><a class="reference internal" href="#running-simple-simulations">Running simple simulations</a></li>
+<li><a class="reference internal" href="#running-ensemble-simulations">Running ensemble simulations</a></li>
+<li><a class="reference internal" href="#accessing-command-line-tools">Accessing command line tools</a></li>
+<li><a class="reference internal" href="#preparing-simulations">Preparing simulations</a></li>
+</ul>
+</li>
+</ul>
+
   <h4>Previous topic</h4>
   <p class="topless"><a href="install.html"
                         title="previous chapter">Full installation instructions</a></p>
@@ -118,7 +261,7 @@ wrapping arbitrary (unintegrated) command line tools: See <a class="reference in
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.1.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
     </div>
   </body>
 </html>
