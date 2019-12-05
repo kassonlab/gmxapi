@@ -52,65 +52,75 @@
 namespace gmx
 {
 
+//! Specify endian swapping behvaior
+enum class EndianSwapBehavior : int
+{
+    DoSwap,    //!< Swap the bytes
+    DoNotSwap, //!< Do not swap the bytes
+    Count      //!< Number of possible behaviors
+};
+
 class InMemorySerializer : public ISerializer
 {
-    public:
-        InMemorySerializer();
-        ~InMemorySerializer() override;
+public:
+    explicit InMemorySerializer(EndianSwapBehavior endianSwapBehavior = EndianSwapBehavior::DoNotSwap);
+    ~InMemorySerializer() override;
 
-        std::vector<char> finishAndGetBuffer();
+    std::vector<char> finishAndGetBuffer();
 
-        // From ISerializer
-        bool reading() const override { return false; }
-        void doBool(bool *value) override;
-        void doUChar(unsigned char *value) override;
-        void doChar(char *value) override;
-        void doUShort(unsigned short *value) override;
-        void doInt(int *value) override;
-        void doInt32(int32_t *value) override;
-        void doInt64(int64_t *value) override;
-        void doFloat(float *value) override;
-        void doDouble(double *value) override;
-        void doReal(real *value) override;
-        void doIvec(ivec *value) override;
-        void doRvec(rvec *value) override;
-        void doString(std::string *value) override;
+    // From ISerializer
+    bool reading() const override { return false; }
+    void doBool(bool* value) override;
+    void doUChar(unsigned char* value) override;
+    void doChar(char* value) override;
+    void doUShort(unsigned short* value) override;
+    void doInt(int* value) override;
+    void doInt32(int32_t* value) override;
+    void doInt64(int64_t* value) override;
+    void doFloat(float* value) override;
+    void doDouble(double* value) override;
+    void doReal(real* value) override;
+    void doIvec(ivec* value) override;
+    void doRvec(rvec* value) override;
+    void doString(std::string* value) override;
 
-    private:
-        class Impl;
+private:
+    class Impl;
 
-        PrivateImplPointer<Impl> impl_;
+    PrivateImplPointer<Impl> impl_;
 };
 
 class InMemoryDeserializer : public ISerializer
 {
-    public:
-        explicit InMemoryDeserializer(ArrayRef<const char> buffer, bool sourceIsDouble);
-        ~InMemoryDeserializer() override;
+public:
+    InMemoryDeserializer(ArrayRef<const char> buffer,
+                         bool                 sourceIsDouble,
+                         EndianSwapBehavior   endianSwapBehavior = EndianSwapBehavior::DoNotSwap);
+    ~InMemoryDeserializer() override;
 
-        //! Get if the source data was written in double precsion
-        bool sourceIsDouble() const;
+    //! Get if the source data was written in double precsion
+    bool sourceIsDouble() const;
 
-        // From ISerializer
-        bool reading() const override { return true; }
-        void doBool(bool *value) override;
-        void doUChar(unsigned char *value) override;
-        void doChar(char *value) override;
-        void doUShort(unsigned short *value) override;
-        void doInt(int *value) override;
-        void doInt32(int32_t *value) override;
-        void doInt64(int64_t *value) override;
-        void doFloat(float *value) override;
-        void doDouble(double *value) override;
-        void doReal(real *value) override;
-        void doIvec(ivec *value) override;
-        void doRvec(rvec *value) override;
-        void doString(std::string *value) override;
+    // From ISerializer
+    bool reading() const override { return true; }
+    void doBool(bool* value) override;
+    void doUChar(unsigned char* value) override;
+    void doChar(char* value) override;
+    void doUShort(unsigned short* value) override;
+    void doInt(int* value) override;
+    void doInt32(int32_t* value) override;
+    void doInt64(int64_t* value) override;
+    void doFloat(float* value) override;
+    void doDouble(double* value) override;
+    void doReal(real* value) override;
+    void doIvec(ivec* value) override;
+    void doRvec(rvec* value) override;
+    void doString(std::string* value) override;
 
-    private:
-        class Impl;
+private:
+    class Impl;
 
-        PrivateImplPointer<Impl> impl_;
+    PrivateImplPointer<Impl> impl_;
 };
 
 } // namespace gmx

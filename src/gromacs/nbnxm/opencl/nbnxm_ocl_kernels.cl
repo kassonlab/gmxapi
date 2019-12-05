@@ -35,18 +35,17 @@
 /* Auxiliary kernels */
 
 /* Very few data */
-__kernel void
-zero_e_fshift(__global float *fshift, __global float *e_lj, __global float *e_el, const unsigned int Nbuf)
+__kernel void zero_e_fshift(__global float* fshift, __global float* e_lj, __global float* e_el, const unsigned int Nbuf)
 {
     unsigned int tidx = get_global_id(0);
     if (tidx < Nbuf)
     {
-        fshift[tidx] = 0.0f;
+        fshift[tidx] = 0.0F;
     }
     if (tidx == 0)
     {
-        *e_lj     = 0.0f;
-        *e_el     = 0.0f;
+        *e_lj = 0.0F;
+        *e_el = 0.0F;
     }
 }
 
@@ -57,11 +56,11 @@ zero_e_fshift(__global float *fshift, __global float *e_lj, __global float *e_el
 #include "nbnxm_ocl_kernel_pruneonly.clh"
 
 #if defined GMX_OCL_FASTGEN
-    #define FLAVOR_LEVEL_GENERATOR "nbnxm_ocl_kernels_fastgen.clh"
+#    define FLAVOR_LEVEL_GENERATOR "nbnxm_ocl_kernels_fastgen.clh"
 #elif defined GMX_OCL_FASTGEN_ADD_TWINCUT
-    #define FLAVOR_LEVEL_GENERATOR "nbnxm_ocl_kernels_fastgen_add_twincut.clh"
+#    define FLAVOR_LEVEL_GENERATOR "nbnxm_ocl_kernels_fastgen_add_twincut.clh"
 #else
-    #define FLAVOR_LEVEL_GENERATOR "nbnxm_ocl_kernels.clh"
+#    define FLAVOR_LEVEL_GENERATOR "nbnxm_ocl_kernels.clh"
 #endif
 
 /* Top-level kernel generation: will generate through multiple inclusion the
