@@ -15,14 +15,28 @@ For full documentation of the Python-level interface and API, use the ``pydoc``
 command line tool or the :py:func:`help` interactive Python function, or refer to
 the :doc:`pythonreference`.
 
-Python does not wrap any command-line tool, so once installation is complete,
-there shouldn't be any additional configuration necessary, and any errors that
-occur should be caught at the Python level. Any Python *exception* raised by gmxapi
+Any Python *exception* raised by gmxapi
 should be descended from (and catchable as) :class:`gmxapi.exceptions.Error`.
+Additional status messages can be acquired through the :ref:`gmxapi logging`
+facility.
+Unfortunately, some errors occurring in the GROMACS library are not yet
+recoverable at the Python level, and much of the standard GROMACS terminal
+output is not yet accessible through Python.
+If you find a particularly problematic scenario, please file a GROMACS bug report.
 
-As an exception to the preceding paragraph, we have a tool specifically for
-wrapping arbitrary (unintegrated) command line tools.
-See :ref:`commandline`.
+During installation, the *gmxapi* Python package becomes tied to a specific
+GROMACS installation.
+If you would like to access multiple GROMACS installations
+from Python, build and install *gmxapi* in separate
+:ref:`virtual environments <gmxapi venv>`.
+
+In some cases *gmxapi* still needs help finding infrastructure from the
+GROMACS installation.
+For instance, :py:func:`gmxapi.commandline_operation` is not a pure API utility,
+but a wrapper for command line tools.
+Make sure that the command line tools you intend to use are discoverable in
+your :envvar:`PATH`, such as by "source"ing your :file:`GMXRC` before launching
+a *gmxapi* script.
 
 .. todo:: Get relevant GROMACS paths in Python environment.
 
@@ -286,6 +300,8 @@ Example::
     handle = loop()
     assert handle.output.float_with_default.result() == 6
 
+.. _gmxapi logging:
+
 Logging
 =======
 
@@ -332,7 +348,7 @@ For more information, refer to the Python `logging documentation <https://docs.p
 More
 ====
 
-Refer to the :doc:`gmxapi Python module reference` for complete and granular documentation.
+Refer to the :doc:`pythonreference` for complete and granular documentation.
 
 For more information on writing or using pluggable simulation extension code,
 refer to https://redmine.gromacs.org/issues/3133.
