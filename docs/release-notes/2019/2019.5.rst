@@ -42,7 +42,41 @@ We don't expect this to have caused incorrect results, but
 a memory checker would complain.
 
 :issue:`3173`
- 
+
+Work around broken Apple Clang compiler in Mac OS Catalina
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+In Mac OS Catalina, the default XCode compilers checks and
+enforces stack alignment. This would have been a good idea
+if Apple itself did not ship a C library that violates the
+stack alignment with AVX instructions are enabled.
+
+:issue:`3199`
+
+Fix error with intermolecular interactions and domain decomposition
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With intermolecular interactions at distances longer than the cutoff
+and domain decomposition, mdrun could exit with an error message
+about missing interactions.
+
+:issue:`3204`
+
+Fix issues with AWH with pull-geometry 'direction' to be periodic
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Removed fatal error with AWH with periodic pull-geometry 'direction'
+when the distance was within 2% of half the box size.
+Changed an assertion failure when the AWH interval was larger than
+the box size to a fatal error.
+Clarified the documentation for pull geometry 'direction-periodic'.
+
+:issue:`2946`
+
+Remove assertion failure with AWH when not using the initial stage
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+:issue:`3217`
+
 Fixes for ``gmx`` tools
 ^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -51,4 +85,26 @@ Fixes that affect portability
 
 Miscellaneous
 ^^^^^^^^^^^^^
+
+Fix .gro file formatting with large boxes
+"""""""""""""""""""""""""""""""""""""""""
+
+The |Gromacs| manual says the box components in the .gro file
+format are separated by spaces. But no space was printed when
+a box component, except for the first, was 1000 nm or larger
+or an off-diagonal component was -100 nm or smaller.
+Now at least one space is always printed. Content that was written
+in a way that already had at least one space between components
+is unchanged. Existing parsers that conform to the documentation
+and expect whitespace separation will continue to work in all cases.
+
+:issue:`3176`
+
+Fix duplicate PDB CONECT record output
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+PDB "CONECT" record output was duplicated in some instances. Since |Gromacs| does
+not use these anywhere, analysis was not affected. The behavior is now fixed.
+
+:issue:`3206`
 

@@ -39,44 +39,56 @@
 #include <algorithm>
 #include <vector>
 
-#include "gromacs/utility/gmxassert.h"
-
 namespace gmx
 {
 
 namespace
 {
 
-template <typename T>
+template<typename T>
 class CharBuffer
 {
-    public:
-        static const size_t ValueSize = sizeof(T);
+public:
+    static constexpr size_t ValueSize = sizeof(T);
 
-        explicit CharBuffer(T value)
-        {
-            u.v = value;
-        }
-        explicit CharBuffer(const char buffer[])
-        {
-            std::copy(buffer, buffer + ValueSize, u.c);
-        }
+    explicit CharBuffer(T value) { u.v = value; }
+    explicit CharBuffer(const char buffer[]) { std::copy(buffer, buffer + ValueSize, u.c); }
 
-        T value() const { return u.v; }
+    T value() const { return u.v; }
 
-        void appendTo(std::vector<char> *buffer)
-        {
-            buffer->insert(buffer->end(), u.c, u.c + ValueSize);
-        }
+    void appendTo(std::vector<char>* buffer)
+    {
+        buffer->insert(buffer->end(), u.c, u.c + ValueSize);
+    }
 
-    private:
-        union {
-            char c[ValueSize];
-            T    v;
-        } u;
+private:
+    union {
+        char c[ValueSize];
+        T    v;
+    } u;
 };
 
-}   // namespace
+//! Return \c value with the byte order swapped.
+template<typename T>
+T swapEndian(const T& value)
+{
+    union {
+        T                           value_;
+        std::array<char, sizeof(T)> valueAsCharArray_;
+    } endianessSwappedValue;
+
+    endianessSwappedValue.value_ = value;
+    int hiByte                   = sizeof(T) - 1;
+    for (int loByte = 0; hiByte > loByte; loByte++, hiByte--)
+    {
+        std::swap(endianessSwappedValue.valueAsCharArray_[loByte],
+                  endianessSwappedValue.valueAsCharArray_[hiByte]);
+    }
+
+    return endianessSwappedValue.value_;
+}
+
+} // namespace
 
 /********************************************************************
  * InMemorySerializer
@@ -84,86 +96,93 @@ class CharBuffer
 
 class InMemorySerializer::Impl
 {
-    public:
-        template <typename T>
-        void doValue(T value)
+public:
+    Impl(EndianSwapBehavior endianSwapBehavior) : endianSwapBehavior_(endianSwapBehavior) {}
+    template<typename T>
+    void doValue(T value)
+    {
+        if (endianSwapBehavior_ == EndianSwapBehavior::DoSwap)
+        {
+            CharBuffer<T>(swapEndian(value)).appendTo(&buffer_);
+        }
+        else
         {
             CharBuffer<T>(value).appendTo(&buffer_);
         }
-        void doString(const std::string &value)
-        {
-            doValue<uint64_t>(value.size());
-            buffer_.insert(buffer_.end(), value.begin(), value.end());
-        }
+    }
+    void doString(const std::string& value)
+    {
+        doValue<uint64_t>(value.size());
+        buffer_.insert(buffer_.end(), value.begin(), value.end());
+    }
 
-        std::vector<char> buffer_;
+    std::vector<char>  buffer_;
+    EndianSwapBehavior endianSwapBehavior_;
 };
 
-InMemorySerializer::InMemorySerializer()
-    : impl_(new Impl)
+InMemorySerializer::InMemorySerializer(EndianSwapBehavior endianSwapBehavior) :
+    impl_(new Impl(endianSwapBehavior))
 {
 }
 
-InMemorySerializer::~InMemorySerializer()
-{
-}
+InMemorySerializer::~InMemorySerializer() = default;
 
 std::vector<char> InMemorySerializer::finishAndGetBuffer()
 {
     return std::move(impl_->buffer_);
 }
 
-void InMemorySerializer::doBool(bool *value)
+void InMemorySerializer::doBool(bool* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doUChar(unsigned char *value)
+void InMemorySerializer::doUChar(unsigned char* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doChar(char *value)
+void InMemorySerializer::doChar(char* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doUShort(unsigned short *value)
+void InMemorySerializer::doUShort(unsigned short* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doInt(int *value)
+void InMemorySerializer::doInt(int* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doInt32(int32_t *value)
+void InMemorySerializer::doInt32(int32_t* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doInt64(int64_t *value)
+void InMemorySerializer::doInt64(int64_t* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doFloat(float *value)
+void InMemorySerializer::doFloat(float* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doDouble(double *value)
+void InMemorySerializer::doDouble(double* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doReal(real *value)
+void InMemorySerializer::doReal(real* value)
 {
     impl_->doValue(*value);
 }
 
-void InMemorySerializer::doRvec(rvec *value)
+void InMemorySerializer::doRvec(rvec* value)
 {
     for (int d = 0; d < DIM; d++)
     {
@@ -171,7 +190,7 @@ void InMemorySerializer::doRvec(rvec *value)
     }
 }
 
-void InMemorySerializer::doIvec(ivec *value)
+void InMemorySerializer::doIvec(ivec* value)
 {
     for (int d = 0; d < DIM; d++)
     {
@@ -179,7 +198,7 @@ void InMemorySerializer::doIvec(ivec *value)
     }
 }
 
-void InMemorySerializer::doString(std::string *value)
+void InMemorySerializer::doString(std::string* value)
 {
     impl_->doString(*value);
 }
@@ -190,91 +209,102 @@ void InMemorySerializer::doString(std::string *value)
 
 class InMemoryDeserializer::Impl
 {
-    public:
-        explicit Impl(ArrayRef<const char> buffer, bool sourceIsDouble)
-            : buffer_(buffer), sourceIsDouble_(sourceIsDouble), pos_(0)
-        {
-        }
+public:
+    explicit Impl(ArrayRef<const char> buffer, bool sourceIsDouble, EndianSwapBehavior endianSwapBehavior) :
+        buffer_(buffer),
+        sourceIsDouble_(sourceIsDouble),
+        pos_(0),
+        endianSwapBehavior_(endianSwapBehavior)
+    {
+    }
 
-        template <typename T>
-        void doValue(T *value)
+    template<typename T>
+    void doValue(T* value)
+    {
+        if (endianSwapBehavior_ == EndianSwapBehavior::DoSwap)
+        {
+            *value = swapEndian(CharBuffer<T>(&buffer_[pos_]).value());
+        }
+        else
         {
             *value = CharBuffer<T>(&buffer_[pos_]).value();
-            pos_  += CharBuffer<T>::ValueSize;
         }
-        void doString(std::string *value)
-        {
-            uint64_t size;
-            doValue<uint64_t>(&size);
-            *value = std::string(&buffer_[pos_], size);
-            pos_  += size;
-        }
+        pos_ += CharBuffer<T>::ValueSize;
+    }
+    void doString(std::string* value)
+    {
+        uint64_t size;
+        doValue<uint64_t>(&size);
+        *value = std::string(&buffer_[pos_], size);
+        pos_ += size;
+    }
 
-        ArrayRef<const char>     buffer_;
-        bool                     sourceIsDouble_;
-        size_t                   pos_;
+    ArrayRef<const char> buffer_;
+    bool                 sourceIsDouble_;
+    size_t               pos_;
+    EndianSwapBehavior   endianSwapBehavior_;
 };
 
-InMemoryDeserializer::InMemoryDeserializer(ArrayRef<const char> buffer, bool sourceIsDouble)
-    : impl_(new Impl(buffer, sourceIsDouble))
+InMemoryDeserializer::InMemoryDeserializer(ArrayRef<const char> buffer,
+                                           bool                 sourceIsDouble,
+                                           EndianSwapBehavior   endianSwapBehavior) :
+    impl_(new Impl(buffer, sourceIsDouble, endianSwapBehavior))
 {
 }
 
-InMemoryDeserializer::~InMemoryDeserializer()
-{
-}
+InMemoryDeserializer::~InMemoryDeserializer() = default;
 
 bool InMemoryDeserializer::sourceIsDouble() const
 {
     return impl_->sourceIsDouble_;
 }
 
-void InMemoryDeserializer::doBool(bool *value)
+void InMemoryDeserializer::doBool(bool* value)
 {
     impl_->doValue(value);
 }
 
-void InMemoryDeserializer::doUChar(unsigned char *value)
+void InMemoryDeserializer::doUChar(unsigned char* value)
 {
     impl_->doValue(value);
 }
 
-void InMemoryDeserializer::doChar(char *value)
+void InMemoryDeserializer::doChar(char* value)
 {
     impl_->doValue(value);
 }
 
-void InMemoryDeserializer::doUShort(unsigned short *value)
+void InMemoryDeserializer::doUShort(unsigned short* value)
 {
     impl_->doValue(value);
 }
 
-void InMemoryDeserializer::doInt(int *value)
+void InMemoryDeserializer::doInt(int* value)
 {
     impl_->doValue(value);
 }
 
-void InMemoryDeserializer::doInt32(int32_t *value)
+void InMemoryDeserializer::doInt32(int32_t* value)
 {
     impl_->doValue(value);
 }
 
-void InMemoryDeserializer::doInt64(int64_t *value)
+void InMemoryDeserializer::doInt64(int64_t* value)
 {
     impl_->doValue(value);
 }
 
-void InMemoryDeserializer::doFloat(float *value)
+void InMemoryDeserializer::doFloat(float* value)
 {
     impl_->doValue(value);
 }
 
-void InMemoryDeserializer::doDouble(double *value)
+void InMemoryDeserializer::doDouble(double* value)
 {
     impl_->doValue(value);
 }
 
-void InMemoryDeserializer::doReal(real *value)
+void InMemoryDeserializer::doReal(real* value)
 {
     if (sourceIsDouble())
     {
@@ -290,7 +320,7 @@ void InMemoryDeserializer::doReal(real *value)
     }
 }
 
-void InMemoryDeserializer::doRvec(rvec *value)
+void InMemoryDeserializer::doRvec(rvec* value)
 {
     for (int d = 0; d < DIM; d++)
     {
@@ -298,7 +328,7 @@ void InMemoryDeserializer::doRvec(rvec *value)
     }
 }
 
-void InMemoryDeserializer::doIvec(ivec *value)
+void InMemoryDeserializer::doIvec(ivec* value)
 {
     for (int d = 0; d < DIM; d++)
     {
@@ -306,7 +336,7 @@ void InMemoryDeserializer::doIvec(ivec *value)
     }
 }
 
-void InMemoryDeserializer::doString(std::string *value)
+void InMemoryDeserializer::doString(std::string* value)
 {
     impl_->doString(value);
 }
