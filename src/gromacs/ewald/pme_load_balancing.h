@@ -72,7 +72,6 @@ bool pme_loadbal_is_active(const pme_load_balancing_t* pme_lb);
  *
  * Initialize the PP-PME load balacing data and infrastructure.
  * The actual load balancing might start right away, later or never.
- * Returns in bPrinting whether the load balancing is printing to fp_err.
  * The PME grid in pmedata is reused for smaller grids to lower the memory
  * usage.
  */
@@ -84,8 +83,7 @@ void pme_loadbal_init(pme_load_balancing_t**     pme_lb_p,
                       const interaction_const_t& ic,
                       const nonbonded_verlet_t&  nbv,
                       gmx_pme_t*                 pmedata,
-                      gmx_bool                   bUseGPU,
-                      gmx_bool*                  bPrinting);
+                      gmx_bool                   bUseGPU);
 
 /*! \brief Process cycles and PME load balance when necessary
  *
@@ -106,7 +104,8 @@ void pme_loadbal_do(pme_load_balancing_t*          pme_lb,
                     gmx_wallcycle_t                wcycle,
                     int64_t                        step,
                     int64_t                        step_rel,
-                    gmx_bool*                      bPrinting);
+                    gmx_bool*                      bPrinting,
+                    bool                           useGpuPmePpCommunication);
 
 /*! \brief Finish the PME load balancing and print the settings when fplog!=NULL */
 void pme_loadbal_done(pme_load_balancing_t* pme_lb, FILE* fplog, const gmx::MDLogger& mdlog, gmx_bool bNonBondedOnGPU);

@@ -2496,7 +2496,8 @@ void get_ir(const char*     mdparin,
             }
             if (ir->eI == eiMD && (opts->couple_lam0 == ecouplamNONE || opts->couple_lam1 == ecouplamNONE))
             {
-                warning(wi,
+                warning_note(
+                        wi,
                         "For proper sampling of the (nearly) decoupled state, stochastic dynamics "
                         "should be used");
             }
@@ -3863,12 +3864,12 @@ static void check_disre(const gmx_mtop_t* mtop)
     }
 }
 
-static bool absolute_reference(t_inputrec* ir, gmx_mtop_t* sys, bool posres_only, ivec AbsRef)
+static bool absolute_reference(const t_inputrec* ir, const gmx_mtop_t* sys, const bool posres_only, ivec AbsRef)
 {
     int                  d, g, i;
     gmx_mtop_ilistloop_t iloop;
     int                  nmol;
-    t_iparams*           pr;
+    const t_iparams*     pr;
 
     clear_ivec(AbsRef);
 
@@ -4085,6 +4086,13 @@ void triple_check(const char* mdparin, t_inputrec* ir, gmx_mtop_t* sys, warninp_
     char                      warn_buf[STRLEN];
 
     set_warning_line(wi, mdparin, -1);
+
+    if (absolute_reference(ir, sys, false, AbsRef))
+    {
+        warning_note(wi,
+                     "Removing center of mass motion in the presence of position restraints might "
+                     "cause artifacts");
+    }
 
     if (ir->cutoff_scheme == ecutsVERLET && ir->verletbuf_tol > 0 && ir->nstlist > 1
         && ((EI_MD(ir->eI) || EI_SD(ir->eI)) && (ir->etc == etcVRESCALE || ir->etc == etcBERENDSEN)))
