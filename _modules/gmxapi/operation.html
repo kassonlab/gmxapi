@@ -1428,8 +1428,6 @@
             <span class="k">return</span> <span class="n">handle</span><span class="o">.</span><span class="n">data</span><span class="p">(</span><span class="n">member</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">handle</span><span class="o">.</span><span class="n">data</span><span class="p">()</span>
-        <span class="c1"># TODO: Richer output behavior.</span>
-        <span class="c1"># return self._Result(self)</span>
 
     <span class="k">def</span> <span class="nf">_reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Mark the Future &quot;not done&quot; to allow reexecution.</span>
@@ -2659,7 +2657,7 @@
 <span class="sd">    New function accepts the same arguments, with additional arguments required by</span>
 <span class="sd">    the API.</span>
 
-<span class="sd">    The new function returns an object with an `output` attribute containing the named outputs.</span>
+<span class="sd">    The new function returns an object with an ``output`` attribute containing the named outputs.</span>
 
 <span class="sd">    Example:</span>
 
@@ -2672,9 +2670,12 @@
 <span class="sd">        &gt;&gt;&gt; assert operation1.output.spam.result() == &#39;spam spam&#39;</span>
 <span class="sd">        &gt;&gt;&gt; assert operation1.output.foo.result() == &#39;spam spam spam spam&#39;</span>
 
-<span class="sd">    If &#39;output&#39; is provided to the wrapper, a data structure will be passed to</span>
+<span class="sd">    Arguments:</span>
+<span class="sd">        output (dict): output names and types</span>
+
+<span class="sd">    If ``output`` is provided to the wrapper, a data structure will be passed to</span>
 <span class="sd">    the wrapped functions with the named attributes so that the function can easily</span>
-<span class="sd">    publish multiple named results. Otherwise, the `output` of the generated operation</span>
+<span class="sd">    publish multiple named results. Otherwise, the ``output`` of the generated operation</span>
 <span class="sd">    will just capture the return value of the wrapped function.</span>
 
 <span class="sd">    .. todo:: gmxapi typing stub file(s).</span>
@@ -3556,7 +3557,7 @@
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
     </div>
   </body>
 </html>

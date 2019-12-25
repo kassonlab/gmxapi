@@ -101,73 +101,19 @@ input/output data dependencies.</p>
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>executable</strong> – name of an executable on the path</p></li>
-<li><p><strong>arguments</strong> – list of positional arguments to insert at argv[1]</p></li>
+<li><p><strong>arguments</strong> – list of positional arguments to insert at <code class="docutils literal notranslate"><span class="pre">argv[1]</span></code></p></li>
 <li><p><strong>input_files</strong> – mapping of command-line flags to input file names</p></li>
 <li><p><strong>output_files</strong> – mapping of command-line flags to output file names</p></li>
 </ul>
 </dd>
 </dl>
 <dl class="simple">
-<dt>Output:</dt><dd><p>The output node of the resulting operation handle contains</p>
-<ul class="simple">
-<li><p>file: the mapping of CLI flags to filename strings resulting from the <code class="docutils literal notranslate"><span class="pre">output</span></code> kwarg.</p></li>
-<li><p>erroroutput: A string of error output (if any) if the process failed.</p></li>
-<li><p>returncode: return code of the subprocess.</p></li>
-</ul>
+<dt>Output:</dt><dd><p>The output node of the resulting operation handle contains
+* <code class="docutils literal notranslate"><span class="pre">file</span></code>: the mapping of CLI flags to filename strings resulting from the <code class="docutils literal notranslate"><span class="pre">output_files</span></code> kwarg
+* <code class="docutils literal notranslate"><span class="pre">erroroutput</span></code>: A string of error output (if any) if the process failed.
+* <code class="docutils literal notranslate"><span class="pre">returncode</span></code>: return code of the subprocess.</p>
 </dd>
 </dl>
-<p class="rubric">Example</p>
-<p>Terminal I/O is managed by the gmxapi execution Context. Standard input
-and output are not yet accessible to the user.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">operation</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">commandline_operation</span><span class="p">(</span><span class="n">executable</span><span class="o">=</span><span class="s1">&#39;echo&#39;</span><span class="p">,</span>
-<span class="gp">... </span>                                      <span class="n">arguments</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;hi there&#39;</span><span class="p">])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">operation</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">returncode</span><span class="o">.</span><span class="n">result</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span>
-</pre></div>
-</div>
-<p>The main utility of commandline_operation is to establish data flow constraints
-on command line programs such as the
-<a class="reference external" href="http://manual.gromacs.org/current/user-guide/cmdline.html">GROMACS tools</a>.</p>
-<p>The key words can be omitted when there is no ambiguity. If you have already
-“sourced” your GMXRC (or the <code class="docutils literal notranslate"><span class="pre">gmx</span></code> executable is already on your PATH),
-then consider the following.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">trjcat</span> <span class="o">=</span> <span class="n">gmx</span><span class="o">.</span><span class="n">commandline_operation</span><span class="p">(</span>
-<span class="gp">... </span>    <span class="s1">&#39;gmx&#39;</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;trjcat&#39;</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="n">input_files</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;-f&#39;</span><span class="p">:</span> <span class="s1">&#39;traj_comp.part0001.xtc&#39;</span><span class="p">},</span>
-<span class="gp">... </span>    <span class="n">output_files</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;-o&#39;</span><span class="p">:</span> <span class="s1">&#39;trjcat.xtc&#39;</span><span class="p">})</span>
-</pre></div>
-</div>
-<p>The above snippet defines an operation and produces a reference named <code class="docutils literal notranslate"><span class="pre">trjcat</span></code>.
-When executed, this operation will run a command that looks like</p>
-<blockquote>
-<div><p>$ gmx trjcat -f traj_comp.part0001.xtc -o trjcat.xtc</p>
-</div></blockquote>
-<p>in a subprocess. Execution does not occur immediately, and nothing is executed
-at all if nothing forces it to. As with all gmxapi operations, execution is
-handled internally on an as-needed basis (1) when output data from one operation
-is needed by another, (2) when the caller (script or interactive user) requests
-a <em>result</em>, or (3) when explicitly requested with <em>run</em>.</p>
-<p class="rubric">Example</p>
-<p>Assume the above assingment to <code class="docutils literal notranslate"><span class="pre">trjcat</span></code>. Then,</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">os</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">outfile</span> <span class="o">=</span> <span class="n">trjcat</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">file</span><span class="p">[</span><span class="s1">&#39;-o&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">outfile</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">trjcat</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-</pre></div>
-</div>
-<p>The command line is run when <em>result()</em> is called, producing the intended
-output file. If <em>result()</em> had not been called, the call to <em>run()</em> would
-have forced execution. But since the operation has already been performed,
-it is not re-executed.</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>commandline_operation can only find executables on your PATH. In other
-words, if you couldn’t execute it before starting Python, gmxapi cannot
-execute it either. This includes GROMACS command line tools, so don’t
-forget to “source” your
-<a class="reference external" href="http://manual.gromacs.org/documentation/current/install-guide/index.html?highlight=gmxrc">GMXRC</a>
-See <a class="reference external" href="https://redmine.gromacs.org/issues/2961">issue 2961</a></p>
-</div>
 </dd></dl>
 
 <dl class="function">
@@ -183,9 +129,9 @@ See <a class="reference external" href="https://redmine.gromacs.org/issues/2961"
 <dd><p>Generate a decorator for wrapped functions with signature manipulation.</p>
 <p>New function accepts the same arguments, with additional arguments required by
 the API.</p>
-<p>The new function returns an object with an <cite>output</cite> attribute containing the named outputs.</p>
+<p>The new function returns an object with an <code class="docutils literal notranslate"><span class="pre">output</span></code> attribute containing the named outputs.</p>
 <p class="rubric">Example</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@function_wrapper</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;spam&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">})</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@function_wrapper</span><span class="p">(</span><span class="n">output</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;spam&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="s1">&#39;foo&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">})</span>
 <span class="gp">... </span><span class="k">def</span> <span class="nf">myfunc</span><span class="p">(</span><span class="n">parameter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="gp">... </span>   <span class="n">output</span><span class="o">.</span><span class="n">spam</span> <span class="o">=</span> <span class="n">parameter</span>
 <span class="gp">... </span>   <span class="n">output</span><span class="o">.</span><span class="n">foo</span> <span class="o">=</span> <span class="n">parameter</span> <span class="o">+</span> <span class="s1">&#39; &#39;</span> <span class="o">+</span> <span class="n">parameter</span>
@@ -195,9 +141,14 @@ the API.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">operation1</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">foo</span><span class="o">.</span><span class="n">result</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;spam spam spam spam&#39;</span>
 </pre></div>
 </div>
-<p>If ‘output’ is provided to the wrapper, a data structure will be passed to
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>output</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.8)"><em>dict</em></a>) – output names and types</p>
+</dd>
+</dl>
+<p>If <code class="docutils literal notranslate"><span class="pre">output</span></code> is provided to the wrapper, a data structure will be passed to
 the wrapped functions with the named attributes so that the function can easily
-publish multiple named results. Otherwise, the <cite>output</cite> of the generated operation
+publish multiple named results. Otherwise, the <code class="docutils literal notranslate"><span class="pre">output</span></code> of the generated operation
 will just capture the return value of the wrapped function.</p>
 <div class="admonition-todo admonition" id="id1">
 <p class="admonition-title">Todo</p>
@@ -261,7 +212,7 @@ guarantees on data type may appear in future versions.</p>
 </dl>
 <p>The <em>output</em> attribute of the returned operation handle contains dynamically
 determined outputs from the operation.</p>
-<p><cite>input</cite> may be a TPR file name or a an object providing the SimulationInput interface.</p>
+<p><a class="reference external" href="https://docs.python.org/3/library/functions.html#input" title="(in Python v3.8)"><code class="xref any docutils literal notranslate"><span class="pre">input</span></code></a> may be a TPR file name or a an object providing the SimulationInput interface.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>New function names will be appearing to handle tasks that are separate</p>
@@ -292,14 +243,14 @@ additional arguments, such as <em>parameters</em>.</p>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.1: </span><em>shape</em> and <em>dtype</em> parameters</p>
 </div>
-<p>If <cite>data</cite> is provided, <cite>shape</cite> and <cite>dtype</cite> are optional. If <cite>data</cite> is not
-provided, both <cite>shape</cite> and <cite>dtype</cite> are required.</p>
-<p>If <cite>data</cite> is provided and shape is provided, <cite>data</cite> must be compatible with
-or convertible to <cite>shape</cite>. See Broadcast Rules in <cite>datamodel</cite> documentation.</p>
-<p>If <cite>data</cite> is provided and <cite>dtype</cite> is not provided, data type is inferred
-as the narrowest scalar type necessary to hold any element in <cite>data</cite>.
-<cite>dtype</cite>, whether inferred or explicit, must be compatible with all elements
-of <cite>data</cite>.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">data</span></code> is provided, <code class="docutils literal notranslate"><span class="pre">shape</span></code> and <code class="docutils literal notranslate"><span class="pre">dtype</span></code> are optional. If <code class="docutils literal notranslate"><span class="pre">data</span></code> is not
+provided, both <code class="docutils literal notranslate"><span class="pre">shape</span></code> and <code class="docutils literal notranslate"><span class="pre">dtype</span></code> are required.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">data</span></code> is provided and shape is provided, <code class="docutils literal notranslate"><span class="pre">data</span></code> must be compatible with
+or convertible to <code class="docutils literal notranslate"><span class="pre">shape</span></code>. See Broadcast Rules in <a class="reference external" href="https://docs.python.org/3/reference/datamodel.html#datamodel" title="(in Python v3.8)"><code class="docutils literal notranslate"><span class="pre">Data</span> <span class="pre">model</span></code></a> documentation.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">data</span></code> is provided and <code class="docutils literal notranslate"><span class="pre">dtype</span></code> is not provided, data type is inferred
+as the narrowest scalar type necessary to hold any element in <code class="docutils literal notranslate"><span class="pre">data</span></code>.
+<code class="docutils literal notranslate"><span class="pre">dtype</span></code>, whether inferred or explicit, must be compatible with all elements
+of <code class="docutils literal notranslate"><span class="pre">data</span></code>.</p>
 <p>The returned object implements the gmxapi N-dimensional Array Interface.</p>
 </dd></dl>
 
@@ -403,7 +354,7 @@ placeholder “NullHandler” to reduce default output. If logging has already b
 imported when gmxapi is imported, this has no effect. However, we set the root
 log level to DEBUG, which could increase the output from other modules.</p>
 <p>Each module in the gmxapi package uses its own hierarchical logger to allow
-granular control of log handling (e.g. <cite>logging.getLogger(‘gmxapi.operation’)</cite>).
+granular control of log handling (e.g. <code class="docutils literal notranslate"><span class="pre">logging.getLogger('gmxapi.operation')</span></code>).
 Refer to the Python <a class="reference external" href="https://docs.python.org/3/library/logging.html#module-logging" title="(in Python v3.8)"><code class="xref py py-mod docutils literal notranslate"><span class="pre">logging</span></code></a> module for information on connecting to and handling
 logger output.</p>
 </div>
@@ -411,7 +362,7 @@ logger output.</p>
 <span id="exceptions-module"></span><h2><a class="toc-backref" href="#id4">Exceptions module</a><a class="headerlink" href="#module-gmxapi.exceptions" title="Permalink to this headline">¶</a></h2>
 <p>Exceptions and Warnings raised by gmxapi module operations.</p>
 <p>Errors, warnings, and other exceptions used in the GROMACS
-Python package are defined in the <cite>exceptions</cite> submodule.</p>
+Python package are defined in the <a class="reference internal" href="#module-gmxapi.exceptions" title="gmxapi.exceptions"><code class="xref any py py-mod docutils literal notranslate"><span class="pre">exceptions</span></code></a> submodule.</p>
 <p>The gmxapi Python package defines a root exception,
 exceptions.Error, from which all Exceptions thrown from
 within the module should derive. If a published component of
@@ -560,14 +511,14 @@ fully support the reported API level.</p>
 
 <dl class="function">
 <dt id="gmxapi.version.has_feature">
-<code class="sig-prename descclassname">gmxapi.version.</code><code class="sig-name descname">has_feature</code><span class="sig-paren">(</span><em class="sig-param">name=''</em>, <em class="sig-param">enable_exception=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gmxapi/version.html#has_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gmxapi.version.has_feature" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">gmxapi.version.</code><code class="sig-name descname">has_feature</code><span class="sig-paren">(</span><em class="sig-param">name=''</em>, <em class="sig-param">enable_exception=False</em><span class="sig-paren">)</span> &#x2192; bool<a class="reference internal" href="../_modules/gmxapi/version.html#has_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gmxapi.version.has_feature" title="Permalink to this definition">¶</a></dt>
 <dd><p>Query whether a named feature is available in the installed package.</p>
 <p>Between updates to the API specification, new features or experimental aspects
 may be introduced into the package and need to be detectable. This function
 is intended to facilitate code testing and resolving differences between
 development branches. Users should refer to the documentation for the package
 modules and API level.</p>
-<p>The primary use case is, in conjunction with api_is_at_least(), to allow
+<p>The primary use case is, in conjunction with <a class="reference internal" href="#gmxapi.version.api_is_at_least" title="gmxapi.version.api_is_at_least"><code class="xref any py py-func docutils literal notranslate"><span class="pre">api_is_at_least()</span></code></a>, to allow
 client code to robustly identify expected behavior and API support through
 conditional execution and branching. Note that behavior is strongly
 specified by the API major version number. Features that have become part of
@@ -575,19 +526,19 @@ the specification and bug-fixes referring to previous major versions should
 not be checked with <em>has_feature()</em>. Using <em>has_feature()</em> with old feature
 names will produce a DeprecationWarning for at least one major version, and
 client code should be updated to avoid logic errors in future versions.</p>
-<p>For convenience, setting <em>enable_exception=True</em> causes the function to
+<p>For convenience, setting <code class="docutils literal notranslate"><span class="pre">enable_exception</span> <span class="pre">=</span> <span class="pre">True</span></code> causes the function to
 instead raise a gmxapi.exceptions.FeatureNotAvailableError for unrecognized feature names.
 This allows extension code to cleanly produce a gmxapi exception instead of
 first performing a boolean check. Also, some code may be unexecutable for
 more than one reason, and sometimes it is cleaner to catch all
-gmxapi.exceptions.Error exceptions for a code block, rather than to
+<a class="reference internal" href="#gmxapi.exceptions.Error" title="gmxapi.exceptions.Error"><code class="xref any py py-exc docutils literal notranslate"><span class="pre">gmxapi.exceptions.Error</span></code></a> exceptions for a code block, rather than to
 construct complex conditionals.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns</dt>
 <dd class="field-odd"><p>True if named feature is recognized by the installed package, else False.</p>
 </dd>
 <dt class="field-even">Raises</dt>
-<dd class="field-even"><p><strong>gmxapi.exceptions.FeatureNotAvailableError if enable_exception == True and feature is not found.</strong> – </p>
+<dd class="field-even"><p><a class="reference internal" href="#gmxapi.exceptions.FeatureNotAvailableError" title="gmxapi.exceptions.FeatureNotAvailableError"><strong>gmxapi.exceptions.FeatureNotAvailableError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">enable_exception</span> <span class="pre">==</span> <span class="pre">True</span></code> and feature is not found.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -608,7 +559,7 @@ code and developer documentation for more details.</p>
 <dl class="exception">
 <dt id="gmxapi._gmxapi.Exception">
 <em class="property">exception </em><code class="sig-prename descclassname">gmxapi._gmxapi.</code><code class="sig-name descname">Exception</code><a class="headerlink" href="#gmxapi._gmxapi.Exception" title="Permalink to this definition">¶</a></dt>
-<dd><p>Root exception for the C++ extension module. Derives from <cite>gmxapi.exceptions.Error</cite>.</p>
+<dd><p>Root exception for the C++ extension module. Derives from <a class="reference internal" href="#gmxapi.exceptions.Error" title="gmxapi.exceptions.Error"><code class="xref any py py-exc docutils literal notranslate"><span class="pre">gmxapi.exceptions.Error</span></code></a>.</p>
 </dd></dl>
 
 <dl class="exception">
@@ -652,7 +603,7 @@ code and developer documentation for more details.</p>
 <dl class="function">
 <dt id="gmxapi._gmxapi.copy_tprfile">
 <code class="sig-prename descclassname">gmxapi._gmxapi.</code><code class="sig-name descname">copy_tprfile</code><span class="sig-paren">(</span><em class="sig-param">source: gmxapi._gmxapi.TprFile</em>, <em class="sig-param">destination: str</em><span class="sig-paren">)</span> &#x2192; bool<a class="headerlink" href="#gmxapi._gmxapi.copy_tprfile" title="Permalink to this definition">¶</a></dt>
-<dd><p>Copy a TPR file from <cite>source</cite> to <cite>destination</cite>.</p>
+<dd><p>Copy a TPR file from <code class="docutils literal notranslate"><span class="pre">source</span></code> to <code class="docutils literal notranslate"><span class="pre">destination</span></code>.</p>
 </dd></dl>
 
 <dl class="function">
@@ -670,7 +621,7 @@ code and developer documentation for more details.</p>
 <dl class="function">
 <dt id="gmxapi._gmxapi.rewrite_tprfile">
 <code class="sig-prename descclassname">gmxapi._gmxapi.</code><code class="sig-name descname">rewrite_tprfile</code><span class="sig-paren">(</span><em class="sig-param">source: str</em>, <em class="sig-param">destination: str</em>, <em class="sig-param">end_time: float</em><span class="sig-paren">)</span> &#x2192; bool<a class="headerlink" href="#gmxapi._gmxapi.rewrite_tprfile" title="Permalink to this definition">¶</a></dt>
-<dd><p>Copy a TPR file from <cite>source</cite> to <cite>destination</cite>, replacing <cite>nsteps</cite> with <cite>end_time</cite>.</p>
+<dd><p>Copy a TPR file from <code class="docutils literal notranslate"><span class="pre">source</span></code> to <code class="docutils literal notranslate"><span class="pre">destination</span></code>, replacing <code class="xref any docutils literal notranslate"><span class="pre">nsteps</span></code> with <code class="docutils literal notranslate"><span class="pre">end_time</span></code>.</p>
 </dd></dl>
 
 </div>
@@ -848,7 +799,7 @@ code and developer documentation for more details.</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
     </div>
   </body>
 </html>

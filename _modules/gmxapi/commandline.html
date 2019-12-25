@@ -262,70 +262,15 @@
 
 <span class="sd">    Arguments:</span>
 <span class="sd">        executable : name of an executable on the path</span>
-<span class="sd">        arguments : list of positional arguments to insert at argv[1]</span>
+<span class="sd">        arguments : list of positional arguments to insert at ``argv[1]``</span>
 <span class="sd">        input_files : mapping of command-line flags to input file names</span>
 <span class="sd">        output_files : mapping of command-line flags to output file names</span>
 
 <span class="sd">    Output:</span>
 <span class="sd">        The output node of the resulting operation handle contains</span>
-
-<span class="sd">        - file: the mapping of CLI flags to filename strings resulting from the ``output`` kwarg.</span>
-<span class="sd">        - erroroutput: A string of error output (if any) if the process failed.</span>
-<span class="sd">        - returncode: return code of the subprocess.</span>
-
-<span class="sd">    Example:</span>
-<span class="sd">        Terminal I/O is managed by the gmxapi execution Context. Standard input</span>
-<span class="sd">        and output are not yet accessible to the user.</span>
-
-<span class="sd">        &gt;&gt;&gt; operation = gmx.commandline_operation(executable=&#39;echo&#39;,</span>
-<span class="sd">        ...                                       arguments=[&#39;hi there&#39;])</span>
-<span class="sd">        &gt;&gt;&gt; assert operation.output.returncode.result() == 0</span>
-
-<span class="sd">    The main utility of commandline_operation is to establish data flow constraints</span>
-<span class="sd">    on command line programs such as the</span>
-<span class="sd">    `GROMACS tools &lt;http://manual.gromacs.org/current/user-guide/cmdline.html&gt;`_.</span>
-
-<span class="sd">    The key words can be omitted when there is no ambiguity. If you have already</span>
-<span class="sd">    &quot;sourced&quot; your GMXRC (or the ``gmx`` executable is already on your PATH),</span>
-<span class="sd">    then consider the following.</span>
-
-<span class="sd">        &gt;&gt;&gt; trjcat = gmx.commandline_operation(</span>
-<span class="sd">        ...     &#39;gmx&#39;,</span>
-<span class="sd">        ...     &#39;trjcat&#39;,</span>
-<span class="sd">        ...     input_files={&#39;-f&#39;: &#39;traj_comp.part0001.xtc&#39;},</span>
-<span class="sd">        ...     output_files={&#39;-o&#39;: &#39;trjcat.xtc&#39;})</span>
-
-<span class="sd">    The above snippet defines an operation and produces a reference named ``trjcat``.</span>
-<span class="sd">    When executed, this operation will run a command that looks like</span>
-
-<span class="sd">        $ gmx trjcat -f traj_comp.part0001.xtc -o trjcat.xtc</span>
-
-<span class="sd">    in a subprocess. Execution does not occur immediately, and nothing is executed</span>
-<span class="sd">    at all if nothing forces it to. As with all gmxapi operations, execution is</span>
-<span class="sd">    handled internally on an as-needed basis (1) when output data from one operation</span>
-<span class="sd">    is needed by another, (2) when the caller (script or interactive user) requests</span>
-<span class="sd">    a *result*, or (3) when explicitly requested with *run*.</span>
-
-<span class="sd">    Example:</span>
-<span class="sd">        Assume the above assingment to ``trjcat``. Then,</span>
-
-<span class="sd">        &gt;&gt;&gt; import os</span>
-<span class="sd">        &gt;&gt;&gt; outfile = trjcat.output.file[&#39;-o&#39;].result()</span>
-<span class="sd">        &gt;&gt;&gt; assert os.path.exists(outfile)</span>
-<span class="sd">        &gt;&gt;&gt; trjcat.run()</span>
-
-<span class="sd">        The command line is run when *result()* is called, producing the intended</span>
-<span class="sd">        output file. If *result()* had not been called, the call to *run()* would</span>
-<span class="sd">        have forced execution. But since the operation has already been performed,</span>
-<span class="sd">        it is not re-executed.</span>
-
-<span class="sd">    Warning:</span>
-<span class="sd">        commandline_operation can only find executables on your PATH. In other</span>
-<span class="sd">        words, if you couldn&#39;t execute it before starting Python, gmxapi cannot</span>
-<span class="sd">        execute it either. This includes GROMACS command line tools, so don&#39;t</span>
-<span class="sd">        forget to &quot;source&quot; your</span>
-<span class="sd">        `GMXRC &lt;http://manual.gromacs.org/documentation/current/install-guide/index.html?highlight=gmxrc&gt;`_</span>
-<span class="sd">        See `issue 2961 &lt;https://redmine.gromacs.org/issues/2961&gt;`_</span>
+<span class="sd">        * ``file``: the mapping of CLI flags to filename strings resulting from the ``output_files`` kwarg</span>
+<span class="sd">        * ``erroroutput``: A string of error output (if any) if the process failed.</span>
+<span class="sd">        * ``returncode``: return code of the subprocess.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
@@ -388,10 +333,9 @@
     <span class="c1"># 3. Merge operations</span>
     <span class="c1">#</span>
     <span class="c1"># Note: Without a `label` argument, repeated calls to cli(**cli_args) should</span>
-    <span class="c1"># produce references to the same unique resource (but currently do not).</span>
-    <span class="c1"># Creating this handle separately should not be necessary,</span>
-    <span class="c1"># but we&#39;ve got a way to go until we have the fingerprinting and Context</span>
-    <span class="c1"># resource management we need for that.</span>
+    <span class="c1"># produce references to the same unique resource. Creating this handle</span>
+    <span class="c1"># separately should not be necessary, but we&#39;ve got a way to go until we have the</span>
+    <span class="c1"># fingerprinting and Context resource management we need for that.</span>
     <span class="c1"># TODO: ``label`` kwarg</span>
     <span class="c1"># TODO: input fingerprinting</span>
     <span class="n">cli_result</span> <span class="o">=</span> <span class="n">cli</span><span class="p">(</span><span class="o">**</span><span class="n">cli_args</span><span class="p">)</span>
@@ -439,7 +383,7 @@
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
     </div>
   </body>
 </html>

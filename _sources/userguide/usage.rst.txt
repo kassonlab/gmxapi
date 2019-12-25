@@ -64,7 +64,7 @@ the intended Python interpreter since new process environments are being created
 
     mpiexec -n 2 `which python` -m mpi4py myscript.py
 
-*gmxapi* 0.1 has limited parallelism, but future versions will include seemless
+*gmxapi* 0.1 has limited parallelism, but future versions will include seamless
 acceleration as integration improves with the GROMACS library and computing
 environment runtime resources.
 Currently, *gmxapi* and the GROMACS library do not have an effective way to

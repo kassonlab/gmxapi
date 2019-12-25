@@ -83,7 +83,7 @@
 <span class="sd">&quot;&quot;&quot;</span>
 <span class="kn">import</span> <span class="nn">warnings</span>
 
-<span class="n">__version__</span> <span class="o">=</span> <span class="s2">&quot;0.0.8&quot;</span>
+<span class="n">__version__</span> <span class="o">=</span> <span class="s2">&quot;0.1.0&quot;</span>
 
 <span class="c1"># TODO: (pending infrastructure and further discussion) Configure with CMake.</span>
 <span class="c1"># __version__ = &quot;@PROJECT_VERSION@&quot;</span>
@@ -94,11 +94,11 @@
 <span class="kn">from</span> <span class="nn">gmxapi.exceptions</span> <span class="kn">import</span> <span class="n">FeatureNotAvailableError</span>
 
 <span class="n">major</span> <span class="o">=</span> <span class="mi">0</span>
-<span class="n">minor</span> <span class="o">=</span> <span class="mi">0</span>
-<span class="n">patch</span> <span class="o">=</span> <span class="mi">8</span>
+<span class="n">minor</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">patch</span> <span class="o">=</span> <span class="mi">0</span>
 
 <span class="c1"># Note: this is not automatically updated. See RELEASE.txt and https://github.com/kassonlab/gmxapi/issues/152</span>
-<span class="n">release</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">release</span> <span class="o">=</span> <span class="kc">True</span>
 
 <span class="c1"># Features added since the initial gmxapi prototype, targeted for version 0.1.</span>
 <span class="n">_named_features_0_0</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;fr1&#39;</span><span class="p">,</span> <span class="s1">&#39;fr3&#39;</span><span class="p">,</span> <span class="s1">&#39;fr7&#39;</span><span class="p">,</span> <span class="s1">&#39;fr15&#39;</span><span class="p">]</span>
@@ -168,7 +168,7 @@
         <span class="k">return</span> <span class="kc">False</span></div>
 
 
-<div class="viewcode-block" id="has_feature"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.version.has_feature">[docs]</a><span class="k">def</span> <span class="nf">has_feature</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">enable_exception</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<div class="viewcode-block" id="has_feature"><a class="viewcode-back" href="../../userguide/pythonreference.html#gmxapi.version.has_feature">[docs]</a><span class="k">def</span> <span class="nf">has_feature</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">enable_exception</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Query whether a named feature is available in the installed package.</span>
 
 <span class="sd">    Between updates to the API specification, new features or experimental aspects</span>
@@ -177,7 +177,7 @@
 <span class="sd">    development branches. Users should refer to the documentation for the package</span>
 <span class="sd">    modules and API level.</span>
 
-<span class="sd">    The primary use case is, in conjunction with api_is_at_least(), to allow</span>
+<span class="sd">    The primary use case is, in conjunction with `api_is_at_least()`, to allow</span>
 <span class="sd">    client code to robustly identify expected behavior and API support through</span>
 <span class="sd">    conditional execution and branching. Note that behavior is strongly</span>
 <span class="sd">    specified by the API major version number. Features that have become part of</span>
@@ -186,19 +186,19 @@
 <span class="sd">    names will produce a DeprecationWarning for at least one major version, and</span>
 <span class="sd">    client code should be updated to avoid logic errors in future versions.</span>
 
-<span class="sd">    For convenience, setting *enable_exception=True* causes the function to</span>
+<span class="sd">    For convenience, setting ``enable_exception = True`` causes the function to</span>
 <span class="sd">    instead raise a gmxapi.exceptions.FeatureNotAvailableError for unrecognized feature names.</span>
 <span class="sd">    This allows extension code to cleanly produce a gmxapi exception instead of</span>
 <span class="sd">    first performing a boolean check. Also, some code may be unexecutable for</span>
 <span class="sd">    more than one reason, and sometimes it is cleaner to catch all</span>
-<span class="sd">    gmxapi.exceptions.Error exceptions for a code block, rather than to</span>
+<span class="sd">    `gmxapi.exceptions.Error` exceptions for a code block, rather than to</span>
 <span class="sd">    construct complex conditionals.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        True if named feature is recognized by the installed package, else False.</span>
 
 <span class="sd">    Raises:</span>
-<span class="sd">        gmxapi.exceptions.FeatureNotAvailableError if `enable_exception == True` and feature is not found.</span>
+<span class="sd">        gmxapi.exceptions.FeatureNotAvailableError: If ``enable_exception == True`` and feature is not found.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># First, issue a warning if the feature name is subject to removal because</span>
@@ -257,7 +257,7 @@
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2017, M. Eric Irrgang and Peter Kasson; 2019, GROMACS development team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
     </div>
   </body>
 </html>
