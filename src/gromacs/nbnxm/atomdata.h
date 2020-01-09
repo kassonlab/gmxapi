@@ -1,7 +1,8 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015,2016 by the GROMACS development team.
+ * Copyright (c) 2017,2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -288,14 +289,14 @@ enum
  * to the atom data structure.
  * enbnxninitcombrule sets what combination rule data gets stored in nbat.
  */
-void nbnxn_atomdata_init(const gmx::MDLogger& mdlog,
-                         nbnxn_atomdata_t*    nbat,
-                         Nbnxm::KernelType    kernelType,
-                         int                  enbnxninitcombrule,
-                         int                  ntype,
-                         const real*          nbfp,
-                         int                  n_energygroups,
-                         int                  nout);
+void nbnxn_atomdata_init(const gmx::MDLogger&      mdlog,
+                         nbnxn_atomdata_t*         nbat,
+                         Nbnxm::KernelType         kernelType,
+                         int                       enbnxninitcombrule,
+                         int                       ntype,
+                         gmx::ArrayRef<const real> nbfp,
+                         int                       n_energygroups,
+                         int                       nout);
 
 void nbnxn_atomdata_set(nbnxn_atomdata_t*     nbat,
                         const Nbnxm::GridSet& gridSet,

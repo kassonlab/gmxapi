@@ -75,6 +75,7 @@
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/gmxassert.h"
+#include "gromacs/utility/listoflists.h"
 #include "gromacs/utility/logger.h"
 #include "gromacs/utility/smalloc.h"
 #include "gromacs/utility/strconvert.h"
@@ -86,6 +87,8 @@
 #include "domdec_internal.h"
 #include "domdec_vsite.h"
 #include "dump.h"
+
+using gmx::ListOfLists;
 
 /*! \brief The number of integer item in the local state, used for broadcasting of the state */
 #define NITEM_DD_INIT_LOCAL_STATE 5
@@ -111,7 +114,7 @@ struct thread_work_t
     t_idef                    idef;       /**< Partial local topology */
     std::unique_ptr<VsitePbc> vsitePbc;   /**< vsite PBC structure */
     int                       nbonded;    /**< The number of bondeds in this struct */
-    t_blocka                  excl;       /**< List of exclusions */
+    ListOfLists<int>          excl;       /**< List of exclusions */
     int                       excl_count; /**< The total exclusion count for \p excl */
 };
 
@@ -119,8 +122,6 @@ struct thread_work_t
 struct gmx_reverse_top_t
 {
     //! @cond Doxygen_Suppress
-    //! \brief The maximum number of exclusions one atom can have
-    int n_excl_at_max = 0;
     //! \brief Are there constraints in this revserse top?
     bool bConstr = false;
     //! \brief Are there settles in this revserse top?
@@ -453,14 +454,15 @@ static void global_atomnr_to_moltype_ind(const gmx_reverse_top_t* rt, int i_gl, 
 }
 
 /*! \brief Returns the maximum number of exclusions per atom */
-static int getMaxNumExclusionsPerAtom(const t_blocka& excls)
+static int getMaxNumExclusionsPerAtom(const ListOfLists<int>& excls)
 {
     int maxNumExcls = 0;
-    for (int at = 0; at < excls.nr; at++)
+    for (gmx::index at = 0; at < excls.ssize(); at++)
     {
-        const int numExcls = excls.index[at + 1] - excls.index[at];
+        const auto list     = excls[at];
+        const int  numExcls = list.ssize();
 
-        GMX_RELEASE_ASSERT(numExcls != 1 || excls.a[excls.index[at]] == at,
+        GMX_RELEASE_ASSERT(numExcls != 1 || list[0] == at,
                            "With 1 exclusion we expect a self-exclusion");
 
         maxNumExcls = std::max(maxNumExcls, numExcls);
@@ -717,10 +719,7 @@ void dd_make_reverse_top(FILE*              fplog,
             make_reverse_top(mtop, ir->efep != efepNO, !dd->comm->systemInfo.haveSplitConstraints,
                              !dd->comm->systemInfo.haveSplitSettles, bBCheck, &dd->nbonded_global);
 
-    gmx_reverse_top_t* rt = dd->reverse_top;
-
     dd->haveExclusions = false;
-    rt->n_excl_at_max  = 0;
     for (const gmx_molblock_t& molb : mtop->molblock)
     {
         const int maxNumExclusionsPerAtom = getMaxNumExclusionsPerAtom(mtop->moltype[molb.type].excls);
@@ -729,7 +728,6 @@ void dd_make_reverse_top(FILE*              fplog,
         {
             dd->haveExclusions = true;
         }
-        rt->n_excl_at_max = std::max(rt->n_excl_at_max, maxNumExclusionsPerAtom);
     }
 
     if (vsite && vsite->numInterUpdategroupVsites > 0)
@@ -993,40 +991,6 @@ static real dd_dist2(t_pbc* pbc_null, const rvec* x, const int i, int j)
     }
 
     return norm2(dx);
-}
-
-/*! \brief Append t_blocka block structures 1 to nsrc in src to *dest */
-static void combine_blocka(t_blocka* dest, gmx::ArrayRef<const thread_work_t> src)
-{
-    int ni = src.back().excl.nr;
-    int na = 0;
-    for (const thread_work_t& th_work : src)
-    {
-        na += th_work.excl.nra;
-    }
-    if (ni + 1 > dest->nalloc_index)
-    {
-        dest->nalloc_index = over_alloc_large(ni + 1);
-        srenew(dest->index, dest->nalloc_index);
-    }
-    if (dest->nra + na > dest->nalloc_a)
-    {
-        dest->nalloc_a = over_alloc_large(dest->nra + na);
-        srenew(dest->a, dest->nalloc_a);
-    }
-    for (gmx::index s = 1; s < src.ssize(); s++)
-    {
-        for (int i = dest->nr + 1; i < src[s].excl.nr + 1; i++)
-        {
-            dest->index[i] = dest->nra + src[s].excl.index[i];
-        }
-        for (int i = 0; i < src[s].excl.nra; i++)
-        {
-            dest->a[dest->nra + i] = src[s].excl.a[i];
-        }
-        dest->nr = src[s].excl.nr;
-        dest->nra += src[s].excl.nra;
-    }
 }
 
 /*! \brief Append t_idef structures 1 to nsrc in src to *dest */
@@ -1377,11 +1341,11 @@ static int make_bondeds_zone(gmx_domdec_t*                      dd,
 }
 
 /*! \brief Set the exclusion data for i-zone \p iz for the case of no exclusions */
-static void set_no_exclusions_zone(const gmx_domdec_zones_t* zones, int iz, t_blocka* lexcls)
+static void set_no_exclusions_zone(const gmx_domdec_zones_t* zones, int iz, ListOfLists<int>* lexcls)
 {
     for (int a = zones->cg_range[iz]; a < zones->cg_range[iz + 1]; a++)
     {
-        lexcls->index[a + 1] = lexcls->nra;
+        lexcls->pushBack({});
     }
 }
 
@@ -1390,52 +1354,33 @@ static void make_exclusions_zone(gmx_domdec_t*                     dd,
                                  gmx_domdec_zones_t*               zones,
                                  const std::vector<gmx_moltype_t>& moltype,
                                  const int*                        cginfo,
-                                 t_blocka*                         lexcls,
+                                 ListOfLists<int>*                 lexcls,
                                  int                               iz,
                                  int                               at_start,
                                  int                               at_end,
                                  const gmx::ArrayRef<const int>    intermolecularExclusionGroup)
 {
-    int n_excl_at_max, n, at;
-
     const gmx_ga2la_t& ga2la = *dd->ga2la;
 
     const auto& jAtomRange = zones->iZones[iz].jAtomRange;
 
-    n_excl_at_max = dd->reverse_top->n_excl_at_max;
+    const gmx::index oldNumLists = lexcls->ssize();
 
-    /* We set the end index, but note that we might not start at zero here */
-    lexcls->nr = at_end;
-
-    n = lexcls->nra;
-    for (at = at_start; at < at_end; at++)
+    std::vector<int> exclusionsForAtom;
+    for (int at = at_start; at < at_end; at++)
     {
-        if (n + 1000 > lexcls->nalloc_a)
-        {
-            lexcls->nalloc_a = over_alloc_large(n + 1000);
-            srenew(lexcls->a, lexcls->nalloc_a);
-        }
+        exclusionsForAtom.clear();
 
         if (GET_CGINFO_EXCL_INTER(cginfo[at]))
         {
-            int             a_gl, mb, mt, mol, a_mol, j;
-            const t_blocka* excls;
-
-            if (n + n_excl_at_max > lexcls->nalloc_a)
-            {
-                lexcls->nalloc_a = over_alloc_large(n + n_excl_at_max);
-                srenew(lexcls->a, lexcls->nalloc_a);
-            }
+            int a_gl, mb, mt, mol, a_mol;
 
             /* Copy the exclusions from the global top */
-            lexcls->index[at] = n;
-            a_gl              = dd->globalAtomIndices[at];
+            a_gl = dd->globalAtomIndices[at];
             global_atomnr_to_moltype_ind(dd->reverse_top, a_gl, &mb, &mt, &mol, &a_mol);
-            excls = &moltype[mt].excls;
-            for (j = excls->index[a_mol]; j < excls->index[a_mol + 1]; j++)
+            const auto excls = moltype[mt].excls[a_mol];
+            for (const int aj_mol : excls)
             {
-                const int aj_mol = excls->a[j];
-
                 if (const auto* jEntry = ga2la.find(a_gl + aj_mol - a_mol))
                 {
                     /* This check is not necessary, but it can reduce
@@ -1444,15 +1389,10 @@ static void make_exclusions_zone(gmx_domdec_t*                     dd,
                      */
                     if (jAtomRange.isInRange(jEntry->la))
                     {
-                        lexcls->a[n++] = jEntry->la;
+                        exclusionsForAtom.push_back(jEntry->la);
                     }
                 }
             }
-        }
-        else
-        {
-            /* We don't need exclusions for this atom */
-            lexcls->index[at] = n;
         }
 
         bool isExcludedAtom = !intermolecularExclusionGroup.empty()
@@ -1462,51 +1402,26 @@ static void make_exclusions_zone(gmx_domdec_t*                     dd,
 
         if (isExcludedAtom)
         {
-            if (n + intermolecularExclusionGroup.ssize() > lexcls->nalloc_a)
-            {
-                lexcls->nalloc_a = over_alloc_large(n + intermolecularExclusionGroup.size());
-                srenew(lexcls->a, lexcls->nalloc_a);
-            }
             for (int qmAtomGlobalIndex : intermolecularExclusionGroup)
             {
                 if (const auto* entry = dd->ga2la->find(qmAtomGlobalIndex))
                 {
-                    lexcls->a[n++] = entry->la;
+                    exclusionsForAtom.push_back(entry->la);
                 }
             }
         }
+
+        /* Append the exclusions for this atom to the topology */
+        lexcls->pushBack(exclusionsForAtom);
     }
 
-    lexcls->index[lexcls->nr] = n;
-    lexcls->nra               = n;
-}
-
-
-/*! \brief Ensure we have enough space in \p ba for \p nindex_max indices */
-static void check_alloc_index(t_blocka* ba, int nindex_max)
-{
-    if (nindex_max + 1 > ba->nalloc_index)
-    {
-        ba->nalloc_index = over_alloc_dd(nindex_max + 1);
-        srenew(ba->index, ba->nalloc_index);
-    }
-}
-
-/*! \brief Ensure that we have enough space for exclusion storate in \p lexcls */
-static void check_exclusions_alloc(const gmx_domdec_t* dd, const gmx_domdec_zones_t* zones, t_blocka* lexcls)
-{
-    const int nr = zones->iZones.back().iAtomRange.end();
-
-    check_alloc_index(lexcls, nr);
-
-    for (size_t thread = 1; thread < dd->reverse_top->th_work.size(); thread++)
-    {
-        check_alloc_index(&dd->reverse_top->th_work[thread].excl, nr);
-    }
+    GMX_RELEASE_ASSERT(
+            lexcls->ssize() - oldNumLists == at_end - at_start,
+            "The number of exclusion list should match the number of atoms in the range");
 }
 
 /*! \brief Set the total count indexes for the local exclusions, needed by several functions */
-static void finish_local_exclusions(gmx_domdec_t* dd, gmx_domdec_zones_t* zones, t_blocka* lexcls)
+static void finish_local_exclusions(gmx_domdec_t* dd, gmx_domdec_zones_t* zones, ListOfLists<int>* lexcls)
 {
     const gmx::Range<int> nonhomeIzonesAtomRange(zones->iZones[0].iAtomRange.end(),
                                                  zones->iZones.back().iAtomRange.end());
@@ -1516,19 +1431,10 @@ static void finish_local_exclusions(gmx_domdec_t* dd, gmx_domdec_zones_t* zones,
         /* There are no exclusions involving non-home charge groups,
          * but we need to set the indices for neighborsearching.
          */
-        for (int la : nonhomeIzonesAtomRange)
+        for (int gmx_unused la : nonhomeIzonesAtomRange)
         {
-            lexcls->index[la] = lexcls->nra;
+            lexcls->pushBack({});
         }
-
-        /* nr is only used to loop over the exclusions for Ewald and RF,
-         * so we can set it to the number of home atoms for efficiency.
-         */
-        lexcls->nr = nonhomeIzonesAtomRange.begin();
-    }
-    else
-    {
-        lexcls->nr = nonhomeIzonesAtomRange.end();
     }
 }
 
@@ -1556,7 +1462,7 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
                                     t_pbc*              pbc_null,
                                     rvec*               cg_cm,
                                     t_idef*             idef,
-                                    t_blocka*           lexcls,
+                                    ListOfLists<int>*   lexcls,
                                     int*                excl_count)
 {
     int                nzone_bondeds, nzone_excl;
@@ -1588,8 +1494,6 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
         nzone_excl = 1;
     }
 
-    check_exclusions_alloc(dd, zones, lexcls);
-
     rt = dd->reverse_top;
 
     rc2 = rc * rc;
@@ -1598,8 +1502,7 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
     clear_idef(idef);
     nbonded_local = 0;
 
-    lexcls->nr  = 0;
-    lexcls->nra = 0;
+    lexcls->clear();
     *excl_count = 0;
 
     for (int izone = 0; izone < nzone_bondeds; izone++)
@@ -1613,9 +1516,8 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
         {
             try
             {
-                int       cg0t, cg1t;
-                t_idef*   idef_t;
-                t_blocka* excl_t;
+                int     cg0t, cg1t;
+                t_idef* idef_t;
 
                 cg0t = cg0 + ((cg1 - cg0) * thread) / numThreads;
                 cg1t = cg0 + ((cg1 - cg0) * (thread + 1)) / numThreads;
@@ -1636,15 +1538,17 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
 
                 if (izone < nzone_excl)
                 {
+                    ListOfLists<int>* excl_t;
                     if (thread == 0)
                     {
+                        // Thread 0 stores exclusions directly in the final storage
                         excl_t = lexcls;
                     }
                     else
                     {
-                        excl_t      = &rt->th_work[thread].excl;
-                        excl_t->nr  = 0;
-                        excl_t->nra = 0;
+                        // Threads > 0 store in temporary storage, starting at list index 0
+                        excl_t = &rt->th_work[thread].excl;
+                        excl_t->clear();
                     }
 
                     /* No charge groups and no distance check required */
@@ -1667,11 +1571,10 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
 
         if (izone < nzone_excl)
         {
-            if (rt->th_work.size() > 1)
+            for (std::size_t th = 1; th < rt->th_work.size(); th++)
             {
-                combine_blocka(lexcls, rt->th_work);
+                lexcls->appendListOfLists(rt->th_work[th].excl);
             }
-
             for (const thread_work_t& th_work : rt->th_work)
             {
                 *excl_count += th_work.excl_count;
@@ -1690,7 +1593,7 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
     finish_local_exclusions(dd, zones, lexcls);
     if (debug)
     {
-        fprintf(debug, "We have %d exclusions, check count %d\n", lexcls->nra, *excl_count);
+        fprintf(debug, "We have %d exclusions, check count %d\n", lexcls->numElements(), *excl_count);
     }
 
     return nbonded_local;
@@ -1737,9 +1640,10 @@ void dd_make_local_top(gmx_domdec_t*       dd,
             /* Only need to check for dimensions where the part of the box
              * that is not communicated is smaller than the cut-off.
              */
-            if (d < npbcdim && dd->nc[d] > 1 && (dd->nc[d] - npulse[d]) * cellsize_min[d] < 2 * rc)
+            if (d < npbcdim && dd->numCells[d] > 1
+                && (dd->numCells[d] - npulse[d]) * cellsize_min[d] < 2 * rc)
             {
-                if (dd->nc[d] == 2)
+                if (dd->numCells[d] == 2)
                 {
                     rcheck[d] = TRUE;
                     bRCheckMB = TRUE;
@@ -1760,7 +1664,7 @@ void dd_make_local_top(gmx_domdec_t*       dd,
         {
             if (fr->bMolPBC)
             {
-                pbc_null = set_pbc_dd(&pbc, fr->ePBC, dd->nc, TRUE, box);
+                pbc_null = set_pbc_dd(&pbc, fr->ePBC, dd->numCells, TRUE, box);
             }
             else
             {
@@ -1857,7 +1761,7 @@ static void check_link(t_blocka* link, int cg_gl, int cg_gl_j)
     }
 }
 
-t_blocka* makeBondedLinks(const gmx_mtop_t* mtop, cginfo_mb_t* cginfo_mb)
+t_blocka* makeBondedLinks(const gmx_mtop_t& mtop, gmx::ArrayRef<cginfo_mb_t> cginfo_mb)
 {
     t_blocka*    link;
     cginfo_mb_t* cgi_mb;
@@ -1868,35 +1772,35 @@ t_blocka* makeBondedLinks(const gmx_mtop_t* mtop, cginfo_mb_t* cginfo_mb)
      */
 
     reverse_ilist_t ril_intermol;
-    if (mtop->bIntermolecularInteractions)
+    if (mtop.bIntermolecularInteractions)
     {
         t_atoms atoms;
 
-        atoms.nr   = mtop->natoms;
+        atoms.nr   = mtop.natoms;
         atoms.atom = nullptr;
 
-        GMX_RELEASE_ASSERT(mtop->intermolecular_ilist,
+        GMX_RELEASE_ASSERT(mtop.intermolecular_ilist,
                            "We should have an ilist when intermolecular interactions are on");
 
-        make_reverse_ilist(*mtop->intermolecular_ilist, &atoms, FALSE, FALSE, FALSE, TRUE, &ril_intermol);
+        make_reverse_ilist(*mtop.intermolecular_ilist, &atoms, FALSE, FALSE, FALSE, TRUE, &ril_intermol);
     }
 
     snew(link, 1);
-    snew(link->index, mtop->natoms + 1);
+    snew(link->index, mtop.natoms + 1);
     link->nalloc_a = 0;
     link->a        = nullptr;
 
     link->index[0] = 0;
     int cg_offset  = 0;
     int ncgi       = 0;
-    for (size_t mb = 0; mb < mtop->molblock.size(); mb++)
+    for (size_t mb = 0; mb < mtop.molblock.size(); mb++)
     {
-        const gmx_molblock_t& molb = mtop->molblock[mb];
+        const gmx_molblock_t& molb = mtop.molblock[mb];
         if (molb.nmol == 0)
         {
             continue;
         }
-        const gmx_moltype_t& molt = mtop->moltype[molb.type];
+        const gmx_moltype_t& molt = mtop.moltype[molb.type];
         /* Make a reverse ilist in which the interactions are linked
          * to all atoms, not only the first atom as in gmx_reverse_top.
          * The constraints are discarded here.
@@ -1907,7 +1811,7 @@ t_blocka* makeBondedLinks(const gmx_mtop_t* mtop, cginfo_mb_t* cginfo_mb)
         cgi_mb = &cginfo_mb[mb];
 
         int mol;
-        for (mol = 0; mol < (mtop->bIntermolecularInteractions ? molb.nmol : 1); mol++)
+        for (mol = 0; mol < (mtop.bIntermolecularInteractions ? molb.nmol : 1); mol++)
         {
             for (int a = 0; a < molt.atoms.nr; a++)
             {
@@ -1931,7 +1835,7 @@ t_blocka* makeBondedLinks(const gmx_mtop_t* mtop, cginfo_mb_t* cginfo_mb)
                     i += nral_rt(ftype);
                 }
 
-                if (mtop->bIntermolecularInteractions)
+                if (mtop.bIntermolecularInteractions)
                 {
                     int i = ril_intermol.index[cg_gl];
                     while (i < ril_intermol.index[cg_gl + 1])
@@ -1997,7 +1901,7 @@ t_blocka* makeBondedLinks(const gmx_mtop_t* mtop, cginfo_mb_t* cginfo_mb)
 
     if (debug)
     {
-        fprintf(debug, "Of the %d atoms %d are linked via bonded interactions\n", mtop->natoms, ncgi);
+        fprintf(debug, "Of the %d atoms %d are linked via bonded interactions\n", mtop.natoms, ncgi);
     }
 
     return link;
@@ -2062,12 +1966,11 @@ static void bonded_cg_distance_mol(const gmx_moltype_t* molt,
     }
     if (bExcl)
     {
-        const t_blocka* excls = &molt->excls;
-        for (int ai = 0; ai < excls->nr; ai++)
+        const auto& excls = molt->excls;
+        for (gmx::index ai = 0; ai < excls.ssize(); ai++)
         {
-            for (int j = excls->index[ai]; j < excls->index[ai + 1]; j++)
+            for (const int aj : excls[ai])
             {
-                int aj = excls->a[j];
                 if (ai != aj)
                 {
                     real rij2 = distance2(cg_cm[ai], cg_cm[aj]);

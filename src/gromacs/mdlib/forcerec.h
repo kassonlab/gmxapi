@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -58,9 +59,6 @@ namespace gmx
 class MDLogger;
 class PhysicalNodeCommunicator;
 } // namespace gmx
-
-//! Destroy a forcerec.
-void done_forcerec(t_forcerec* fr, int numMolBlocks);
 
 /*! \brief Print the contents of the forcerec to a file
  *
@@ -134,9 +132,5 @@ void init_forcerec(FILE*                            fplog,
  * \param[in]  top The topology
  */
 void forcerec_set_excl_load(t_forcerec* fr, const gmx_localtop_t* top);
-
-void free_gpu_resources(t_forcerec*                          fr,
-                        const gmx::PhysicalNodeCommunicator& physicalNodeCommunicator,
-                        const gmx_gpu_info_t&                gpu_info);
 
 #endif

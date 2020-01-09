@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -257,8 +257,12 @@ void StatePropagatorDataGpu::Impl::copyToDevice(DeviceBuffer<float>             
 {
     GMX_UNUSED_VALUE(dataSize);
 
+    GMX_ASSERT(atomLocality < AtomLocality::Count, "Wrong atom locality.");
+
     GMX_ASSERT(dataSize >= 0, "Trying to copy to device buffer before it was allocated.");
 
+    GMX_ASSERT(commandStream != nullptr,
+               "No stream is valid for copying with given atom locality.");
     wallcycle_start_nocount(wcycle_, ewcLAUNCH_GPU);
     wallcycle_sub_start(wcycle_, ewcsLAUNCH_STATE_PROPAGATOR_DATA);
 
@@ -291,8 +295,12 @@ void StatePropagatorDataGpu::Impl::copyFromDevice(gmx::ArrayRef<gmx::RVec> h_dat
 {
     GMX_UNUSED_VALUE(dataSize);
 
+    GMX_ASSERT(atomLocality < AtomLocality::Count, "Wrong atom locality.");
+
     GMX_ASSERT(dataSize >= 0, "Trying to copy from device buffer before it was allocated.");
 
+    GMX_ASSERT(commandStream != nullptr,
+               "No stream is valid for copying with given atom locality.");
     wallcycle_start_nocount(wcycle_, ewcLAUNCH_GPU);
     wallcycle_sub_start(wcycle_, ewcsLAUNCH_STATE_PROPAGATOR_DATA);
 
@@ -341,7 +349,7 @@ void StatePropagatorDataGpu::Impl::copyCoordinatesToGpu(const gmx::ArrayRef<cons
     // TODO: remove this by adding an event-mark free flavor of this function
     if (GMX_GPU == GMX_GPU_CUDA)
     {
-        xReadyOnDevice_[atomLocality].markEvent(commandStream);
+        xReadyOnDevice_[atomLocality].markEvent(xCopyStreams_[atomLocality]);
     }
 
     wallcycle_sub_stop(wcycle_, ewcsLAUNCH_STATE_PROPAGATOR_DATA);

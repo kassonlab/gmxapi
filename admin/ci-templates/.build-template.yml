@@ -26,11 +26,10 @@
     - echo $CMAKE_BUILD_TYPE_OPTIONS
     - echo $CMAKE_GMXAPI_OPTIONS
     - if [[ -d $BUILD_DIR ]] ; then
-      echo "Cleaning up build directory" ;
-      rm -rf $BUILD_DIR && mkdir $BUILD_DIR ;
+        rm -rf $BUILD_DIR && mkdir $BUILD_DIR ;
       else
-      echo "Preparing new build directory" ;
-      mkdir $BUILD_DIR ;
+        echo "Preparing new build directory" ;
+        mkdir $BUILD_DIR ;
       fi
     - cd $BUILD_DIR
     - cmake ..
@@ -70,8 +69,9 @@
     CMAKE_BUILD_TYPE_OPTIONS: "-DCMAKE_BUILD_TYPE=RelWithAssert"
     CMAKE_GPU_OPTIONS: "-DGMX_GPU=OFF"
     CMAKE_GMXAPI_OPTIONS: "-DGMX_PYTHON_PACKAGE=OFF"
-    RELEASE_FILE_DIR: release-files
     RELEASE_BUILD_DIR: release-builds
+    RELEASE_SOURCE: release-source-from-tarball
+    RELEASE_REGRESSIONTESTS: release-regressiontests-from-tarball
 
   only:
     refs:
@@ -92,12 +92,17 @@
     - REGTESTTARBALL=$REGTESTNAME.tar.gz
     - echo "$SOURCETARBALL"
     - echo "$REGTESTTARBALL"
-    - rm -rf $RELEASE_FILE_DIR && mkdir $RELEASE_FILE_DIR
-    - mv $SOURCETARBALL $RELEASE_FILE_DIR
-    - mv $REGTESTTARBALL $RELEASE_FILE_DIR
-    - cd $RELEASE_FILE_DIR
+    - RELEASE_TARBALLS=release-tarballs
+    - rm -rf $RELEASE_TARBALLS $RELEASE_SOURCE $RELEASE_REGRESSIONTESTS && mkdir $RELEASE_TARBALLS
+    - mv $SOURCETARBALL $RELEASE_TARBALLS
+    - mv $REGTESTTARBALL $RELEASE_TARBALLS
+    - cd $RELEASE_TARBALLS
+# We rename the source and regressiontest directories
+# to have names for them that don't change for different versions.
     - tar -xf $SOURCETARBALL
+    - mv $SOURCENAME ../$RELEASE_SOURCE
     - tar -xf $REGTESTTARBALL
+    - mv $REGTESTNAME ../$RELEASE_REGRESSIONTESTS
     - rm $SOURCETARBALL $REGTESTTARBALL
     - cd ..
     - echo $CMAKE_COMPILER_SCRIPT
@@ -109,14 +114,14 @@
     - echo $CMAKE_BUILD_TYPE_OPTIONS
     - echo $CMAKE_GMXAPI_OPTIONS
     - if [[ -d $RELEASE_BUILD_DIR ]] ; then
-      echo "Cleaning up build directory" ;
-      rm -rf $RELEASE_BUILD_DIR && mkdir $RELEASE_BUILD_DIR ;
+        echo "Cleaning up build directory" ;
+        rm -rf $RELEASE_BUILD_DIR && mkdir $RELEASE_BUILD_DIR ;
       else
-      echo "Preparing new build directory" ;
-      mkdir $RELEASE_BUILD_DIR ;
+        echo "Preparing new build directory" ;
+        mkdir $RELEASE_BUILD_DIR ;
       fi
     - cd $RELEASE_BUILD_DIR
-    - cmake ../$RELEASE_FILE_DIR/$SOURCENAME
+    - cmake ../$RELEASE_SOURCE/
         -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         $CMAKE_COMPILER_SCRIPT
         $CMAKE_EXTRA_OPTIONS
@@ -126,7 +131,7 @@
         $CMAKE_BUILD_TYPE_OPTIONS
         $CMAKE_GPU_OPTIONS
         $CMAKE_GMXAPI_OPTIONS
-        "-DREGRESSIONTEST_PATH=../$RELEASE_FILE_DIR/$REGTESTNAME"
+        "-DREGRESSIONTEST_PATH=../$RELEASE_REGRESSIONTESTS"
         -DCMAKE_INSTALL_PREFIX=../$INSTALL_DIR -DGMX_COMPILER_WARNINGS=ON
         2>&1 | tee cmakeLog.log
     - awk '/CMake Warning/,/^--|^$/' cmakeLog.log | tee cmakeErrors.log
@@ -136,7 +141,8 @@
     when: always
     paths:
       - $RELEASE_BUILD_DIR
-      - $RELEASE_FILE_DIR
+      - $RELEASE_REGRESSIONTESTS
+      - $RELEASE_SOURCE
 
 .binary-build-template:
   # Dockerfiles are from dockerhub, user eriklindahl
@@ -158,7 +164,7 @@
   artifacts:
     when: always
     paths:
-      - $BUILD_DIR/
+      - $BUILD_DIR
       - $INSTALL_DIR/
 
 .archive-build-template:
@@ -170,6 +176,7 @@
     KUBERNETES_CPU_REQUEST: 2
     KUBERNETES_MEMORY_LIMIT: 4Gi
   script:
+    - rm -rf gromacs*tar.gz
     - cd $BUILD_DIR
     - cmake --build . --target gmx -- -j4 2>&1 | tee buildLogFile.log
     - cmake --build . --target man -- -j4 2>&1 | tee manBuildLogFile.log
@@ -221,11 +228,11 @@
     - echo $CMAKE_BUILD_TYPE_OPTIONS
     - echo $CMAKE_GMXAPI_OPTIONS
     - if [[ -d $BUILD_DIR ]] ; then
-      echo "Cleaning up build directory" ;
-      rm -rf $BUILD_DIR && mkdir $BUILD_DIR ;
+        echo "Cleaning up build directory" ;
+        rm -rf $BUILD_DIR && mkdir $BUILD_DIR ;
       else
-      echo "Preparing new build directory" ;
-      mkdir $BUILD_DIR ;
+        echo "Preparing new build directory" ;
+        mkdir $BUILD_DIR ;
       fi
     - cd $BUILD_DIR
     - cmake ..
@@ -249,7 +256,7 @@
     - grep "cannot be built" buildLogFile.log testBuildLogFile.log | tee -a buildErrors.log || true
     - cmake --build . --target install 2>&1 | tee installBuildLogFile.log
     - if [ -s buildErrors.log ] ; then echo "Found compiler warning during build"; cat buildErrors.log; exit 1; fi
-    - ctest -D ExperimentalTest --output-on-failure -j2 | tee ctestLog.log || true
+    - ctest -D ExperimentalTest --output-on-failure | tee ctestLog.log || true
     - awk '/The following tests FAILED/,/^Errors while running CTest|^$/'
          ctestLog.log | tee ctestErrors.log
     - xsltproc scripts/CTest2JUnit.xsl Testing/`head -n 1 < Testing/TAG`/Test.xml > JUnitTestResults.xml

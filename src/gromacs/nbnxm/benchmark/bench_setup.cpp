@@ -199,7 +199,7 @@ static std::unique_ptr<nonbonded_verlet_t> setupNbnxmForBenchInstance(const Kern
                                                     std::move(atomData), kernelSetup, nullptr, nullptr);
 
     nbnxn_atomdata_init(gmx::MDLogger(), nbv->nbat.get(), kernelSetup.kernelType, combinationRule,
-                        system.numAtomTypes, system.nonbondedParameters.data(), 1, numThreads);
+                        system.numAtomTypes, system.nonbondedParameters, 1, numThreads);
 
     t_nrnb nrnb;
 
@@ -223,7 +223,7 @@ static std::unique_ptr<nonbonded_verlet_t> setupNbnxmForBenchInstance(const Kern
                       { 0, int(system.coordinates.size()) }, atomDensity, atomInfo,
                       system.coordinates, 0, nullptr);
 
-    nbv->constructPairlist(gmx::InteractionLocality::Local, &system.excls, 0, &nrnb);
+    nbv->constructPairlist(gmx::InteractionLocality::Local, system.excls, 0, &nrnb);
 
     t_mdatoms mdatoms;
     // We only use (read) the atom type and charge from mdatoms

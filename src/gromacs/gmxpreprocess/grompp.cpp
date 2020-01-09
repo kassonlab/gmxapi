@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -102,6 +103,7 @@
 #include "gromacs/utility/futil.h"
 #include "gromacs/utility/gmxassert.h"
 #include "gromacs/utility/keyvaluetreebuilder.h"
+#include "gromacs/utility/listoflists.h"
 #include "gromacs/utility/mdmodulenotification.h"
 #include "gromacs/utility/smalloc.h"
 #include "gromacs/utility/snprintf.h"
@@ -234,7 +236,7 @@ void InteractionOfType::setForceParameter(int pos, real value)
 void MoleculeInformation::initMolInfo()
 {
     init_block(&mols);
-    init_blocka(&excls);
+    excls.clear();
     init_t_atoms(&atoms, 0, FALSE);
 }
 
@@ -1426,7 +1428,7 @@ static bool haveDecoupledModeInMol(const gmx_moltype_t&           molt,
 
     const t_atom* atom = molt.atoms.atom;
 
-    t_blocka atomToConstraints =
+    const auto atomToConstraints =
             gmx::make_at2con(molt, iparams, gmx::FlexibleConstraintTreatment::Exclude);
 
     bool haveDecoupledMode = false;
@@ -1456,23 +1458,21 @@ static bool haveDecoupledModeInMol(const gmx_moltype_t&           molt,
                 int a1 = il.iatoms[1 + i + 1];
                 int a2 = il.iatoms[1 + i + 2];
                 if ((atom[a0].m > atom[a2].m * massFactorThreshold || atom[a2].m > atom[a0].m * massFactorThreshold)
-                    && atomToConstraints.index[a0 + 1] - atomToConstraints.index[a0] == 1
-                    && atomToConstraints.index[a2 + 1] - atomToConstraints.index[a2] == 1
-                    && atomToConstraints.index[a1 + 1] - atomToConstraints.index[a1] >= 3)
+                    && atomToConstraints[a0].ssize() == 1 && atomToConstraints[a2].ssize() == 1
+                    && atomToConstraints[a1].ssize() >= 3)
                 {
-                    int constraint0 = atomToConstraints.a[atomToConstraints.index[a0]];
-                    int constraint2 = atomToConstraints.a[atomToConstraints.index[a2]];
+                    int constraint0 = atomToConstraints[a0][0];
+                    int constraint2 = atomToConstraints[a2][0];
 
                     bool foundAtom0 = false;
                     bool foundAtom2 = false;
-                    for (int conIndex = atomToConstraints.index[a1];
-                         conIndex < atomToConstraints.index[a1 + 1]; conIndex++)
+                    for (const int constraint : atomToConstraints[a1])
                     {
-                        if (atomToConstraints.a[conIndex] == constraint0)
+                        if (constraint == constraint0)
                         {
                             foundAtom0 = true;
                         }
-                        if (atomToConstraints.a[conIndex] == constraint2)
+                        if (constraint == constraint2)
                         {
                             foundAtom2 = true;
                         }
@@ -1485,8 +1485,6 @@ static bool haveDecoupledModeInMol(const gmx_moltype_t&           molt,
             }
         }
     }
-
-    done_blocka(&atomToConstraints);
 
     return haveDecoupledMode;
 }

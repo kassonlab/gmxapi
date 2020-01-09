@@ -3,7 +3,7 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2011-2019, by the GROMACS development team, led by
+ * Copyright (c) 2011-2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -176,8 +176,8 @@ struct DevelopmentFeatureFlags
     //! True if the Buffer ops development feature is enabled
     // TODO: when the trigger of the buffer ops offload is fully automated this should go away
     bool enableGpuBufferOps = false;
-    //! If true, forces 'mdrun -update auto' default to 'gpu' when running with DD
-    bool forceGpuUpdateDefaultWithDD = false;
+    //! If true, forces 'mdrun -update auto' default to 'gpu'
+    bool forceGpuUpdateDefault = false;
     //! True if the GPU halo exchange development feature is enabled
     bool enableGpuHaloExchange = false;
     //! True if the PME PP direct communication GPU development feature is enabled
@@ -212,7 +212,7 @@ static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger& md
 #pragma GCC diagnostic ignored "-Wunused-result"
     devFlags.enableGpuBufferOps = (getenv("GMX_USE_GPU_BUFFER_OPS") != nullptr)
                                   && (GMX_GPU == GMX_GPU_CUDA) && useGpuForNonbonded;
-    devFlags.forceGpuUpdateDefaultWithDD = (getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") != nullptr);
+    devFlags.forceGpuUpdateDefault = (getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") != nullptr);
     devFlags.enableGpuHaloExchange =
             (getenv("GMX_GPU_DD_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
     devFlags.enableGpuPmePPComm =
@@ -228,13 +228,14 @@ static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger& md
                         "GMX_USE_GPU_BUFFER_OPS environment variable.");
     }
 
-    if (devFlags.forceGpuUpdateDefaultWithDD)
+    if (devFlags.forceGpuUpdateDefault)
     {
         GMX_LOG(mdlog.warning)
                 .asParagraph()
                 .appendTextFormatted(
                         "This run will default to '-update gpu' as requested by the "
-                        "GMX_FORCE_UPDATE_DEFAULT_GPU environment variable.");
+                        "GMX_FORCE_UPDATE_DEFAULT_GPU environment variable. GPU update with domain "
+                        "decomposition lacks substantial testing and should be used with caution.");
     }
 
     if (devFlags.enableGpuHaloExchange)
@@ -849,9 +850,6 @@ int Mdrunner::mdrunner()
     // the inputrec read by the master rank. The ranks can now all run
     // the task-deciding functions and will agree on the result
     // without needing to communicate.
-    //
-    // TODO Should we do the communication in debug mode to support
-    // having an assertion?
     const bool useDomainDecomposition = (PAR(cr) && !(EI_TPI(inputrec->eI) || inputrec->eI == eiNM));
 
     // Note that these variables describe only their own node.
@@ -1190,10 +1188,10 @@ int Mdrunner::mdrunner()
         const bool useUpdateGroups = cr->dd ? ddUsesUpdateGroups(*cr->dd) : false;
 
         useGpuForUpdate = decideWhetherToUseGpuForUpdate(
-                devFlags.forceGpuUpdateDefaultWithDD, useDomainDecomposition, useUpdateGroups,
-                useGpuForPme, useGpuForNonbonded, updateTarget, gpusWereDetected, *inputrec, mtop,
-                doEssentialDynamics, gmx_mtop_ftype_count(mtop, F_ORIRES) > 0,
-                replExParams.exchangeInterval > 0, doRerun);
+                devFlags.forceGpuUpdateDefault, useDomainDecomposition, useUpdateGroups, pmeRunMode,
+                domdecOptions.numPmeRanks > 0, useGpuForNonbonded, updateTarget, gpusWereDetected,
+                *inputrec, mtop, doEssentialDynamics, gmx_mtop_ftype_count(mtop, F_ORIRES) > 0,
+                replExParams.exchangeInterval > 0, doRerun, mdlog);
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
 
@@ -1550,7 +1548,7 @@ int Mdrunner::mdrunner()
             /* This call is not included in init_domain_decomposition mainly
              * because fr->cginfo_mb is set later.
              */
-            dd_init_bondeds(fplog, cr->dd, &mtop, vsite.get(), inputrec,
+            dd_init_bondeds(fplog, cr->dd, mtop, vsite.get(), inputrec,
                             domdecOptions.checkBondedInteractions, fr->cginfo_mb);
         }
 
@@ -1650,18 +1648,45 @@ int Mdrunner::mdrunner()
     }
 
     // FIXME: this is only here to manually unpin mdAtoms->chargeA_ and state->x,
-    // before we destroy the GPU context(s) in free_gpu_resources().
+    // before we destroy the GPU context(s) in free_gpu().
     // Pinned buffers are associated with contexts in CUDA.
     // As soon as we destroy GPU contexts after mdrunner() exits, these lines should go.
     mdAtoms.reset(nullptr);
     globalState.reset(nullptr);
     mdModules_.reset(nullptr); // destruct force providers here as they might also use the GPU
+    /* Free pinned buffers in *fr */
+    delete fr;
+    fr = nullptr;
 
-    /* Free GPU memory and set a physical node tMPI barrier (which should eventually go away) */
-    free_gpu_resources(fr, physicalNodeComm, hwinfo->gpu_info);
+    if (hwinfo->gpu_info.n_dev > 0)
+    {
+        /* stop the GPU profiler (only CUDA) */
+        stopGpuProfiler();
+    }
+
+    /* With tMPI we need to wait for all ranks to finish deallocation before
+     * destroying the CUDA context in free_gpu() as some tMPI ranks may be sharing
+     * GPU and context.
+     *
+     * This is not a concern in OpenCL where we use one context per rank which
+     * is freed in nbnxn_gpu_free().
+     *
+     * Note: it is safe to not call the barrier on the ranks which do not use GPU,
+     * but it is easier and more futureproof to call it on the whole node.
+     *
+     * Note that this function needs to be called even if GPUs are not used
+     * in this run because the PME ranks have no knowledge of whether GPUs
+     * are used or not, but all ranks need to enter the barrier below.
+     * \todo Remove this physical node barrier after making sure
+     * that it's not needed anymore (with a shared GPU run).
+     */
+    if (GMX_THREAD_MPI)
+    {
+        physicalNodeComm.barrier();
+    }
+
     free_gpu(nonbondedDeviceInfo);
     free_gpu(pmeDeviceInfo);
-    done_forcerec(fr, mtop.molblock.size());
     sfree(fcd);
 
     if (doMembed)

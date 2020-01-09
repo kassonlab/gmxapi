@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2018 by the GROMACS development team.
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -411,15 +412,15 @@ void init_idef(t_idef* idef)
     idef->iparams_fbposres = nullptr;
     for (int f = 0; f < F_NRE; ++f)
     {
-        idef->il[f].iatoms          = nullptr;
-        idef->il[f].nalloc          = 0;
-        idef->il[f].nr              = 0;
-        idef->il[f].nr_nonperturbed = 0;
+        idef->il[f].iatoms                   = nullptr;
+        idef->il[f].nalloc                   = 0;
+        idef->il[f].nr                       = 0;
+        idef->numNonperturbedInteractions[f] = 0;
     }
     idef->cmap_grid               = nullptr;
     idef->iparams_posres_nalloc   = 0;
     idef->iparams_fbposres_nalloc = 0;
-    idef->ilsort                  = 0;
+    idef->ilsort                  = ilsortUNKNOWN;
 }
 
 void done_idef(t_idef* idef)
@@ -439,11 +440,10 @@ void done_idef(t_idef* idef)
 
 void copy_ilist(const t_ilist* src, t_ilist* dst)
 {
-    dst->nr              = src->nr;
-    dst->nr_nonperturbed = src->nr_nonperturbed;
-    dst->nalloc          = src->nalloc;
+    dst->nr     = src->nr;
+    dst->nalloc = src->nr;
 
-    snew(dst->iatoms, dst->nr);
+    snew(dst->iatoms, dst->nalloc);
     for (int i = 0; i < dst->nr; ++i)
     {
         dst->iatoms[i] = src->iatoms[i];

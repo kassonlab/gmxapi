@@ -15,9 +15,9 @@
   except:
     variables:
       - $GROMACS_RELEASE
-# Always clone the default version for this branch, release-2020 in this case
+# Always clone the default version for this branch, master in this case
   script:
-    - export REGTESTBRANCH=release-2020
+    - export REGTESTBRANCH=master
     - if [ ! -z $CI_MERGE_REQUEST_TARGET_BRANCH_NAME ] ; then
         if [[ ! -d regressiontests ]] ; then
           mkdir regressiontests ;
@@ -63,7 +63,7 @@
     - if [[ $GROMACS_RELEASE != "true" ]] ; then
           REGTESTNAME=$REGTESTNAME-dev ;
       fi
-    - export REGTESTBRANCH=release-2020
+    - export REGTESTBRANCH=master
     - if [[ $CI_COMMIT_REF_NAME == "master" || $CI_COMMIT_REF_NAME == "release-20"[1-2][0-9] ]] ; then
          export REGTESTBRANCH=$CI_COMMIT_REF_NAME ;
       fi

@@ -1,7 +1,8 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014,2015,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015,2017 by the GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -133,7 +134,6 @@ struct interaction_const_t;
 struct nonbonded_verlet_t;
 class PairSearch;
 class PairlistSets;
-struct t_blocka;
 struct t_commrec;
 struct t_lambda;
 struct t_mdatoms;
@@ -153,6 +153,8 @@ class GpuEventSynchronizer;
 namespace gmx
 {
 class ForceWithShiftForces;
+template<typename>
+class ListOfLists;
 class MDLogger;
 class UpdateGroupsCog;
 } // namespace gmx
@@ -251,7 +253,10 @@ public:
     gmx::ArrayRef<const int> getGridIndices() const;
 
     //! Constructs the pairlist for the given locality
-    void constructPairlist(gmx::InteractionLocality iLocality, const t_blocka* excl, int64_t step, t_nrnb* nrnb);
+    void constructPairlist(gmx::InteractionLocality     iLocality,
+                           const gmx::ListOfLists<int>& exclusions,
+                           int64_t                      step,
+                           t_nrnb*                      nrnb);
 
     //! Updates all the atom properties in Nbnxm
     void setAtomProperties(const t_mdatoms& mdatoms, gmx::ArrayRef<const int> atomInfo);

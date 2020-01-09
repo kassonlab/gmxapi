@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2008, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2017,2018 by the GROMACS development team.
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -139,7 +140,7 @@ void update_QMMMrec(const t_commrec* cr, const t_forcerec* fr, const rvec* x, co
  * routine should be called at every step, since it updates the MM
  * elements of the t_QMMMrec struct.
  */
-real calculate_QMMM(const t_commrec* cr, gmx::ForceWithShiftForces* forceWithShiftForces, const t_forcerec* fr);
+real calculate_QMMM(const t_commrec* cr, gmx::ForceWithShiftForces* forceWithShiftForces, const t_QMMMrec* qmmm);
 
 /* QMMM computes the QM forces. This routine makes either function
  * calls to gmx QM routines (derived from MOPAC7 (semi-emp.) and MPQC

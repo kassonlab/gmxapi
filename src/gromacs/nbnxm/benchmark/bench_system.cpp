@@ -45,6 +45,7 @@
 
 #include "bench_system.h"
 
+#include <numeric>
 #include <vector>
 
 #include "gromacs/math/vec.h"
@@ -167,9 +168,6 @@ BenchmarkSystem::BenchmarkSystem(const int multiplicationFactor)
     charges.resize(numAtoms);
     atomInfoAllVdw.resize(numAtoms);
     atomInfoOxygenVdw.resize(numAtoms);
-    snew(excls.index, numAtoms + 1);
-    snew(excls.a, numAtoms * numAtomsInMolecule);
-    excls.index[0] = 0;
 
     for (int a = 0; a < numAtoms; a++)
     {
@@ -191,16 +189,14 @@ BenchmarkSystem::BenchmarkSystem(const int multiplicationFactor)
         SET_CGINFO_HAS_Q(atomInfoAllVdw[a]);
         SET_CGINFO_HAS_Q(atomInfoOxygenVdw[a]);
 
-        const int firstAtomInMolecule = a - (a % numAtomsInMolecule);
-        for (int aj = 0; aj < numAtomsInMolecule; aj++)
-        {
-            excls.a[a * numAtomsInMolecule + aj] = firstAtomInMolecule + aj;
-        }
-        excls.index[a + 1] = (a + 1) * numAtomsInMolecule;
+        excls.pushBackListOfSize(numAtomsInMolecule);
+        gmx::ArrayRef<int> exclusionsForAtom   = excls.back();
+        const int          firstAtomInMolecule = a - (a % numAtomsInMolecule);
+        std::iota(exclusionsForAtom.begin(), exclusionsForAtom.end(), firstAtomInMolecule);
     }
 
     forceRec.ntype = numAtomTypes;
-    forceRec.nbfp  = nonbondedParameters.data();
+    forceRec.nbfp  = nonbondedParameters;
     snew(forceRec.shift_vec, SHIFTS);
     calc_shifts(box, forceRec.shift_vec);
 }

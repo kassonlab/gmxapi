@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -52,7 +53,6 @@
 #include "gromacs/math/units.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/force.h"
-#include "gromacs/mdlib/forcerec.h"
 #include "gromacs/mdlib/qmmm.h"
 #include "gromacs/mdtypes/md_enums.h"
 #include "gromacs/utility/cstringutil.h"
@@ -216,16 +216,11 @@ void init_gaussian(t_QMrec* qm)
 }
 
 
-static void write_gaussian_SH_input(int step, gmx_bool swap, const t_forcerec* fr, t_QMrec* qm, t_MMrec* mm)
+static void write_gaussian_SH_input(int step, gmx_bool swap, const t_QMMMrec* QMMMrec, t_QMrec* qm, t_MMrec* mm)
 {
-    int        i;
-    gmx_bool   bSA;
-    FILE*      out;
-    t_QMMMrec* QMMMrec;
-    QMMMrec = fr->qr;
-    bSA     = (qm->SAstep > 0);
-
-    out = fopen("input.com", "w");
+    int   i;
+    bool  bSA = (qm->SAstep > 0);
+    FILE* out = fopen("input.com", "w");
     /* write the route */
     fprintf(out, "%s", "%scr=input\n");
     fprintf(out, "%s", "%rwf=input\n");
@@ -380,14 +375,11 @@ static void write_gaussian_SH_input(int step, gmx_bool swap, const t_forcerec* f
     fclose(out);
 } /* write_gaussian_SH_input */
 
-static void write_gaussian_input(int step, const t_forcerec* fr, t_QMrec* qm, t_MMrec* mm)
+static void write_gaussian_input(int step, const t_QMMMrec* QMMMrec, t_QMrec* qm, t_MMrec* mm)
 {
-    int        i;
-    t_QMMMrec* QMMMrec;
-    FILE*      out;
+    int i;
 
-    QMMMrec = fr->qr;
-    out     = fopen("input.com", "w");
+    FILE* out = fopen("input.com", "w");
     /* write the route */
 
     if (qm->QMmethod >= eQMmethodRHF)
@@ -758,7 +750,7 @@ static void do_gaussian(int step, char* exe)
     }
 }
 
-real call_gaussian(const t_forcerec* fr, t_QMrec* qm, t_MMrec* mm, rvec f[], rvec fshift[])
+real call_gaussian(const t_QMMMrec* qmmm, t_QMrec* qm, t_MMrec* mm, rvec f[], rvec fshift[])
 {
     /* normal gaussian jobs */
     static int step = 0;
@@ -772,7 +764,7 @@ real call_gaussian(const t_forcerec* fr, t_QMrec* qm, t_MMrec* mm, rvec f[], rve
     snew(QMgrad, qm->nrQMatoms);
     snew(MMgrad, mm->nrMMatoms);
 
-    write_gaussian_input(step, fr, qm, mm);
+    write_gaussian_input(step, qmmm, qm, mm);
     do_gaussian(step, exe);
     QMener = read_gaussian_output(QMgrad, MMgrad, qm, mm);
     /* put the QMMM forces in the force array and to the fshift
@@ -800,7 +792,7 @@ real call_gaussian(const t_forcerec* fr, t_QMrec* qm, t_MMrec* mm, rvec f[], rve
 
 } /* call_gaussian */
 
-real call_gaussian_SH(const t_forcerec* fr, t_QMrec* qm, t_MMrec* mm, rvec f[], rvec fshift[])
+real call_gaussian_SH(const t_QMMMrec* qmmm, t_QMrec* qm, t_MMrec* mm, rvec f[], rvec fshift[])
 {
     /* a gaussian call routine intended for doing diabatic surface
      * "sliding". See the manual for the theoretical background of this
@@ -845,7 +837,7 @@ real call_gaussian_SH(const t_forcerec* fr, t_QMrec* qm, t_MMrec* mm, rvec f[], 
     /*  if(!step)
      * qr->bSA=FALSE;*/
     /* temporray set to step + 1, since there is a chk start */
-    write_gaussian_SH_input(step, swapped, fr, qm, mm);
+    write_gaussian_SH_input(step, swapped, qmmm, qm, mm);
 
     do_gaussian(step, exe);
     QMener = read_gaussian_SH_output(QMgrad, MMgrad, step, qm, mm);
@@ -867,7 +859,7 @@ real call_gaussian_SH(const t_forcerec* fr, t_QMrec* qm, t_MMrec* mm, rvec f[], 
         }
         if (swap) /* change surface, so do another call */
         {
-            write_gaussian_SH_input(step, swapped, fr, qm, mm);
+            write_gaussian_SH_input(step, swapped, qmmm, qm, mm);
             do_gaussian(step, exe);
             QMener = read_gaussian_SH_output(QMgrad, MMgrad, step, qm, mm);
         }

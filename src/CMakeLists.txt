@@ -1,7 +1,9 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+# Copyright (c) 2009,2010,2011,2012,2013 by the GROMACS development team.
+# Copyright (c) 2014,2015,2016,2017,2018 by the GROMACS development team.
+# Copyright (c) 2019,2020, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -103,15 +105,26 @@ set(IGNORED_CLANG_ALL_WARNINGS
     "-Wno-double-promotion")
 string(REPLACE " " ";" IGNORED_CLANG_ALL_WARNINGS "${IGNORED_CLANG_ALL_WARNINGS}")
 
+option(GMX_CLANG_TIDY "Use clang-tidy" OFF)
 if (GMX_CLANG_TIDY)
+   if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+   elseif("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithAssert")
+   elseif("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+   elseif("${CMAKE_BUILD_TYPE}" STREQUAL "ASAN")
+   else()
+       message(FATAL_ERROR "Can only use clang-tidy with build type containing asserts: Debug, RelWithAssert, RelWithDebInfo, ASAN.")
+   endif()
+   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+   mark_as_advanced(CMAKE_EXPORT_COMPILE_COMMANDS)
    set(CLANG_TIDY "clang-tidy" CACHE STRING "Name of clang-tidy executable")
    find_program(CLANG_TIDY_EXE NAMES "${CLANG_TIDY}"
        DOC "Path to clang-tidy executable")
    if(NOT CLANG_TIDY_EXE)
        message(FATAL_ERROR "clang-tidy not found.")
    endif()
+   mark_as_advanced(CLANG_TIDY)
+   mark_as_advanced(CLANG_TIDY_EXE)
 endif()
-#####
 
 add_subdirectory(external)
 

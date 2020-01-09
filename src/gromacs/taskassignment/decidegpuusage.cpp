@@ -1,7 +1,8 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2015,2016,2017,2018,2019 by the GROMACS development team.
+ * Copyright (c) 2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -489,22 +490,25 @@ bool decideWhetherToUseGpusForBonded(const bool       useGpuForNonbonded,
     return gpusWereDetected && usingOurCpuForPmeOrEwald;
 }
 
-bool decideWhetherToUseGpuForUpdate(const bool        forceGpuUpdateDefaultWithDD,
-                                    const bool        isDomainDecomposition,
-                                    const bool        useUpdateGroups,
-                                    const bool        useGpuForPme,
-                                    const bool        useGpuForNonbonded,
-                                    const TaskTarget  updateTarget,
-                                    const bool        gpusWereDetected,
-                                    const t_inputrec& inputrec,
-                                    const gmx_mtop_t& mtop,
-                                    const bool        useEssentialDynamics,
-                                    const bool        doOrientationRestraints,
-                                    const bool        useReplicaExchange,
-                                    const bool        doRerun)
+bool decideWhetherToUseGpuForUpdate(const bool           forceGpuUpdateDefault,
+                                    const bool           isDomainDecomposition,
+                                    const bool           useUpdateGroups,
+                                    const PmeRunMode     pmeRunMode,
+                                    const bool           havePmeOnlyRank,
+                                    const bool           useGpuForNonbonded,
+                                    const TaskTarget     updateTarget,
+                                    const bool           gpusWereDetected,
+                                    const t_inputrec&    inputrec,
+                                    const gmx_mtop_t&    mtop,
+                                    const bool           useEssentialDynamics,
+                                    const bool           doOrientationRestraints,
+                                    const bool           useReplicaExchange,
+                                    const bool           doRerun,
+                                    const gmx::MDLogger& mdlog)
 {
 
-    if (updateTarget == TaskTarget::Cpu)
+    // '-update cpu' overrides the environment variable, '-update auto' does not
+    if (updateTarget == TaskTarget::Cpu || (updateTarget == TaskTarget::Auto && !forceGpuUpdateDefault))
     {
         return false;
     }
@@ -513,12 +517,20 @@ bool decideWhetherToUseGpuForUpdate(const bool        forceGpuUpdateDefaultWithD
 
     std::string errorMessage;
 
-    if (isDomainDecomposition && hasAnyConstraints && !useUpdateGroups)
+    if (isDomainDecomposition)
     {
-        errorMessage +=
-                "Domain decomposition is only supported with constraints when update groups are "
-                "used. This means constraining all bonds is not supported, except for small "
-                "molecules, and box sizes close to half the pair-list cutoff are not supported.\n ";
+        if (!forceGpuUpdateDefault)
+        {
+            errorMessage += "Domain decomposition is not supported.\n ";
+        }
+        else if (hasAnyConstraints && !useUpdateGroups)
+        {
+            errorMessage +=
+                    "Domain decomposition is only supported with constraints when update groups "
+                    "are used. This means constraining all bonds is not supported, except for "
+                    "small molecules, and box sizes close to half the pair-list cutoff are not "
+                    "supported.\n ";
+        }
     }
     if (inputrec.eConstrAlg == econtSHAKE && hasAnyConstraints && gmx_mtop_ftype_count(mtop, F_CONSTR) > 0)
     {
@@ -527,10 +539,15 @@ bool decideWhetherToUseGpuForUpdate(const bool        forceGpuUpdateDefaultWithD
     // Using the GPU-version of update if:
     // 1. PME is on the GPU (there should be a copy of coordinates on GPU for PME spread), or
     // 2. Non-bonded interactions are on the GPU.
-    if (!(useGpuForPme || useGpuForNonbonded))
+    if (pmeRunMode == PmeRunMode::CPU && !useGpuForNonbonded)
     {
         errorMessage +=
                 "Either PME or short-ranged non-bonded interaction tasks must run on the GPU.\n";
+    }
+    // Since only direct GPU communications are supported with GPU update, PME should be fully offloaded in DD and PME only cases.
+    if (pmeRunMode != PmeRunMode::GPU && (isDomainDecomposition || havePmeOnlyRank))
+    {
+        errorMessage += "PME should run on GPU.\n";
     }
     if (!gpusWereDetected)
     {
@@ -607,7 +624,18 @@ bool decideWhetherToUseGpuForUpdate(const bool        forceGpuUpdateDefaultWithD
 
     if (!errorMessage.empty())
     {
-        if (updateTarget == TaskTarget::Gpu)
+        if (updateTarget != TaskTarget::Gpu && forceGpuUpdateDefault)
+        {
+            GMX_LOG(mdlog.warning)
+                    .asParagraph()
+                    .appendText(
+                            "Update task on the GPU was required, by the "
+                            "GMX_FORCE_UPDATE_DEFAULT_GPU environment variable, but the following "
+                            "condition(s) were not satisfied:");
+            GMX_LOG(mdlog.warning).asParagraph().appendText(errorMessage.c_str());
+            GMX_LOG(mdlog.warning).asParagraph().appendText("Will use CPU version of update.");
+        }
+        else if (updateTarget == TaskTarget::Gpu)
         {
             std::string prefix = gmx::formatString(
                     "Update task on the GPU was required,\n"
@@ -619,10 +647,12 @@ bool decideWhetherToUseGpuForUpdate(const bool        forceGpuUpdateDefaultWithD
 
     if (isDomainDecomposition)
     {
-        return forceGpuUpdateDefaultWithDD;
+        return forceGpuUpdateDefault;
     }
-
-    return true;
+    else
+    {
+        return (updateTarget == TaskTarget::Gpu || forceGpuUpdateDefault);
+    }
 }
 
 } // namespace gmx

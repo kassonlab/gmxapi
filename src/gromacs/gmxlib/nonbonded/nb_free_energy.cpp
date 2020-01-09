@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -265,7 +266,7 @@ static void nb_free_energy_kernel(const t_nblist* gmx_restrict nlist,
     const int*  typeA         = mdatoms->typeA;
     const int*  typeB         = mdatoms->typeB;
     const int   ntype         = fr->ntype;
-    const real* nbfp          = fr->nbfp;
+    const real* nbfp          = fr->nbfp.data();
     const real* nbfp_grid     = fr->ljpme_c6grid;
     real*       Vv            = kernel_data->energygrp_vdw;
     const real  lambda_coul   = kernel_data->lambda[efptCOUL];

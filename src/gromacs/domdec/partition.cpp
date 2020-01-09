@@ -209,7 +209,7 @@ static void dd_move_cellx(gmx_domdec_t* dd, const gmx_ddbox_t* ddbox, rvec cell_
         if (applyPbc)
         {
             /* Take the minimum to avoid double communication */
-            numPulsesMin = std::min(numPulses, dd->nc[dim] - 1 - numPulses);
+            numPulsesMin = std::min(numPulses, dd->numCells[dim] - 1 - numPulses);
         }
         else
         {
@@ -243,7 +243,7 @@ static void dd_move_cellx(gmx_domdec_t* dd, const gmx_ddbox_t* ddbox, rvec cell_
         for (int pulse = 0; pulse < numPulses; pulse++)
         {
             /* Communicate all the zone information backward */
-            bool receiveValidData = (applyPbc || dd->ci[dim] < dd->nc[dim] - 1);
+            bool receiveValidData = (applyPbc || dd->ci[dim] < dd->numCells[dim] - 1);
 
             static_assert(
                     sizeof(gmx_ddzone_t) == c_ddzoneNumReals * sizeof(real),
@@ -325,8 +325,8 @@ static void dd_move_cellx(gmx_domdec_t* dd, const gmx_ddbox_t* ddbox, rvec cell_
                  */
                 buf_s[i] = buf_r[i];
             }
-            if (((applyPbc || dd->ci[dim] + numPulses < dd->nc[dim]) && pulse == numPulses - 1)
-                || (!applyPbc && dd->ci[dim] + 1 + pulse == dd->nc[dim] - 1))
+            if (((applyPbc || dd->ci[dim] + numPulses < dd->numCells[dim]) && pulse == numPulses - 1)
+                || (!applyPbc && dd->ci[dim] + 1 + pulse == dd->numCells[dim] - 1))
             {
                 /* Store the extremes */
                 int pos = 0;
@@ -462,8 +462,8 @@ static void dd_set_cginfo(gmx::ArrayRef<const int> index_gl, int cg0, int cg1, t
 {
     if (fr != nullptr)
     {
-        const cginfo_mb_t* cginfo_mb = fr->cginfo_mb;
-        gmx::ArrayRef<int> cginfo    = fr->cginfo;
+        gmx::ArrayRef<cginfo_mb_t> cginfo_mb = fr->cginfo_mb;
+        gmx::ArrayRef<int>         cginfo    = fr->cginfo;
 
         for (int cg = cg0; cg < cg1; cg++)
         {
@@ -732,7 +732,7 @@ static void comm_dd_ns_cell_sizes(gmx_domdec_t* dd, gmx_ddbox_t* ddbox, rvec cel
         dim = dd->dim[dim_ind];
 
         /* Without PBC we don't have restrictions on the outer cells */
-        if (!(dim >= ddbox->npbcdim && (dd->ci[dim] == 0 || dd->ci[dim] == dd->nc[dim] - 1))
+        if (!(dim >= ddbox->npbcdim && (dd->ci[dim] == 0 || dd->ci[dim] == dd->numCells[dim] - 1))
             && isDlbOn(comm)
             && (comm->cell_x1[dim] - comm->cell_x0[dim]) * ddbox->skew_fac[dim] < comm->cellsize_min[dim])
         {
@@ -863,7 +863,7 @@ static void get_load_distribution(gmx_domdec_t* dd, gmx_wallcycle_t wcycle)
                 load->mdf      = 0;
                 load->pme      = 0;
                 int pos        = 0;
-                for (int i = 0; i < dd->nc[dim]; i++)
+                for (int i = 0; i < dd->numCells[dim]; i++)
                 {
                     load->sum += load->load[pos++];
                     load->max = std::max(load->max, load->load[pos]);
@@ -904,7 +904,7 @@ static void get_load_distribution(gmx_domdec_t* dd, gmx_wallcycle_t wcycle)
                 }
                 if (isDlbOn(comm) && rowMaster->dlbIsLimited)
                 {
-                    load->sum_m *= dd->nc[dim];
+                    load->sum_m *= dd->numCells[dim];
                     load->flags |= (1 << d);
                 }
             }
@@ -1258,7 +1258,7 @@ static void turn_on_dlb(const gmx::MDLogger& mdlog, gmx_domdec_t* dd, int64_t st
         {
             comm->load[d].sum_m = comm->load[d].sum;
 
-            int nc = dd->nc[dd->dim[d]];
+            int nc = dd->numCells[dd->dim[d]];
             for (int i = 0; i < nc; i++)
             {
                 rowMaster->cellFrac[i] = i / static_cast<real>(nc);
@@ -1327,7 +1327,7 @@ static void merge_cg_buffers(int                            ncell,
                              const int*                     recv_i,
                              gmx::ArrayRef<gmx::RVec>       x,
                              gmx::ArrayRef<const gmx::RVec> recv_vr,
-                             cginfo_mb_t*                   cginfo_mb,
+                             gmx::ArrayRef<cginfo_mb_t>     cginfo_mb,
                              gmx::ArrayRef<int>             cginfo)
 {
     gmx_domdec_ind_t *ind, *ind_p;
@@ -1820,7 +1820,6 @@ static void setup_dd_communication(gmx_domdec_t*                dd,
     gmx_domdec_comm_t*     comm;
     gmx_domdec_zones_t*    zones;
     gmx_domdec_comm_dim_t* cd;
-    cginfo_mb_t*           cginfo_mb;
     gmx_bool               bBondComm, bDist2B, bDistMB, bDistBonded;
     dd_corners_t           corners;
     rvec *                 normal, *v_d, *v_0 = nullptr, *v_1 = nullptr;
@@ -1894,8 +1893,8 @@ static void setup_dd_communication(gmx_domdec_t*                dd,
         v_1 = ddbox->v[dim1];
     }
 
-    zone_cg_range = zones->cg_range;
-    cginfo_mb     = fr->cginfo_mb;
+    zone_cg_range                        = zones->cg_range;
+    gmx::ArrayRef<cginfo_mb_t> cginfo_mb = fr->cginfo_mb;
 
     zone_cg_range[0]   = 0;
     zone_cg_range[1]   = dd->ncg_home;

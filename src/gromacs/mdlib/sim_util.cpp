@@ -3,7 +3,7 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013-2019, by the GROMACS development team, led by
+ * Copyright (c) 2013-2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -843,7 +843,7 @@ static StepWorkload setupStepWorkload(const int                 legacyFlags,
 
 /* \brief Launch end-of-step GPU tasks: buffer clearing and rolling pruning.
  *
- * TODO: eliminate the \p useGpuNonbonded and \p useGpuNonbonded when these are
+ * TODO: eliminate \p useGpuPmeOnThisRank when this is
  * incorporated in DomainLifetimeWorkload.
  */
 static void launchGpuEndOfStepTasks(nonbonded_verlet_t*               nbv,
@@ -851,12 +851,11 @@ static void launchGpuEndOfStepTasks(nonbonded_verlet_t*               nbv,
                                     gmx_pme_t*                        pmedata,
                                     gmx_enerdata_t*                   enerd,
                                     const gmx::MdrunScheduleWorkload& runScheduleWork,
-                                    bool                              useGpuNonbonded,
-                                    bool                              useGpuPme,
+                                    bool                              useGpuPmeOnThisRank,
                                     int64_t                           step,
                                     gmx_wallcycle_t                   wcycle)
 {
-    if (useGpuNonbonded)
+    if (runScheduleWork.simulationWork.useGpuNonbonded)
     {
         /* Launch pruning before buffer clearing because the API overhead of the
          * clear kernel launches can leave the GPU idle while it could be running
@@ -875,7 +874,7 @@ static void launchGpuEndOfStepTasks(nonbonded_verlet_t*               nbv,
         wallcycle_stop(wcycle, ewcLAUNCH_GPU);
     }
 
-    if (useGpuPme)
+    if (useGpuPmeOnThisRank)
     {
         pme_gpu_reinit_computation(pmedata, wcycle);
     }
@@ -1167,10 +1166,7 @@ void do_force(FILE*                               fplog,
             }
             wallcycle_stop(wcycle, ewcLAUNCH_GPU);
         }
-    }
 
-    if (stepWork.doNeighborSearch)
-    {
         // Need to run after the GPU-offload bonded interaction lists
         // are set up to be able to determine whether there is bonded work.
         runScheduleWork->domainWork = setupDomainLifetimeWorkload(
@@ -1179,7 +1175,7 @@ void do_force(FILE*                               fplog,
         wallcycle_start_nocount(wcycle, ewcNS);
         wallcycle_sub_start(wcycle, ewcsNBS_SEARCH_LOCAL);
         /* Note that with a GPU the launch overhead of the list transfer is not timed separately */
-        nbv->constructPairlist(InteractionLocality::Local, &top->excls, step, nrnb);
+        nbv->constructPairlist(InteractionLocality::Local, top->excls, step, nrnb);
 
         nbv->setupGpuShortRangeWork(fr->gpuBonded, InteractionLocality::Local);
 
@@ -1272,7 +1268,7 @@ void do_force(FILE*                               fplog,
             wallcycle_start_nocount(wcycle, ewcNS);
             wallcycle_sub_start(wcycle, ewcsNBS_SEARCH_NONLOCAL);
             /* Note that with a GPU the launch overhead of the list transfer is not timed separately */
-            nbv->constructPairlist(InteractionLocality::NonLocal, &top->excls, step, nrnb);
+            nbv->constructPairlist(InteractionLocality::NonLocal, top->excls, step, nrnb);
 
             nbv->setupGpuShortRangeWork(fr->gpuBonded, InteractionLocality::NonLocal);
             wallcycle_sub_stop(wcycle, ewcsNBS_SEARCH_NONLOCAL);
@@ -1301,7 +1297,7 @@ void do_force(FILE*                               fplog,
                 // Note: GPU update + DD without direct communication is not supported,
                 // a waitCoordinatesReadyOnHost() should be issued if it will be.
                 GMX_ASSERT(!simulationWork.useGpuUpdate,
-                           "GPU update is not supported with halo exchange");
+                           "GPU update is not supported with CPU halo exchange");
                 dd_move_x(cr->dd, box, x.unpaddedArrayRef(), wcycle);
             }
 
@@ -1774,7 +1770,7 @@ void do_force(FILE*                               fplog,
     }
 
     launchGpuEndOfStepTasks(nbv, fr->gpuBonded, fr->pmedata, enerd, *runScheduleWork,
-                            simulationWork.useGpuNonbonded, useGpuPmeOnThisRank, step, wcycle);
+                            useGpuPmeOnThisRank, step, wcycle);
 
     if (DOMAINDECOMP(cr))
     {

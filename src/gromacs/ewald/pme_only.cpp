@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -423,14 +424,10 @@ static int gmx_pme_recv_coeffs_coords(struct gmx_pme_t*            pme,
                                "but PME run mode is not PmeRunMode::GPU\n");
 
                     // This rank will have its data accessed directly by PP rank, so needs to send the remote addresses.
-                    rvec* d_x = nullptr;
-                    rvec* d_f = nullptr;
-#    if (GMX_GPU == GMX_GPU_CUDA) // avoid invalid cast for OpenCL
-                    d_x = reinterpret_cast<rvec*>(pme_gpu_get_device_x(pme));
-                    d_f = reinterpret_cast<rvec*>(pme_gpu_get_device_f(pme));
-#    endif
-                    pme_pp->pmeCoordinateReceiverGpu->sendCoordinateBufferAddressToPpRanks(d_x);
-                    pme_pp->pmeForceSenderGpu->sendForceBufferAddressToPpRanks(d_f);
+                    pme_pp->pmeCoordinateReceiverGpu->sendCoordinateBufferAddressToPpRanks(
+                            pme_gpu_get_device_x(pme));
+                    pme_pp->pmeForceSenderGpu->sendForceBufferAddressToPpRanks(
+                            reinterpret_cast<rvec*>(pme_gpu_get_device_f(pme)));
                 }
             }
 

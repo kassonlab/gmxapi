@@ -1,7 +1,8 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+# Copyright (c) 2014,2015,2016,2017,2018 by the GROMACS development team.
+# Copyright (c) 2019,2020, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -361,6 +362,16 @@ if (SPHINX_FOUND)
         how-to/visualize.rst
         install-guide/index.rst
         release-notes/index.rst
+        release-notes/2021/major/highlights.rst
+        release-notes/2021/major/features.rst
+        release-notes/2021/major/performance.rst
+        release-notes/2021/major/tools.rst
+        release-notes/2021/major/bugs-fixed.rst
+        release-notes/2021/major/removed-functionality.rst
+        release-notes/2021/major/deprecated-functionality.rst
+        release-notes/2021/major/portability.rst
+        release-notes/2021/major/miscellaneous.rst
+        release-notes/2020/2020.1.rst
         release-notes/2020/major/highlights.rst
         release-notes/2020/major/features.rst
         release-notes/2020/major/performance.rst
@@ -370,6 +381,7 @@ if (SPHINX_FOUND)
         release-notes/2020/major/deprecated-functionality.rst
         release-notes/2020/major/portability.rst
         release-notes/2020/major/miscellaneous.rst
+        release-notes/2019/2019.6.rst
         release-notes/2019/2019.5.rst
         release-notes/2019/2019.4.rst
         release-notes/2019/2019.3.rst
@@ -597,6 +609,10 @@ if (SPHINX_FOUND)
 
     # Sphinx cache with pickled ReST documents
     set(SPHINX_CACHE_DIR "${CMAKE_CURRENT_BINARY_DIR}/_doctrees")
+    set(SPHINX_CONFIG_OVERRIDES "")
+    if (GMX_DEVELOPER_BUILD)
+        set(SPHINX_CONFIG_OVERRIDES "-D todo_include_todos=1")
+    endif()
     add_custom_target(webpage-sphinx
         DEPENDS sphinx-programs
         DEPENDS sphinx-input
@@ -609,6 +625,7 @@ if (SPHINX_FOUND)
             -q -b html
             -w sphinx-html.log
             -d "${SPHINX_CACHE_DIR}"
+            ${SPHINX_CONFIG_OVERRIDES}
             "${SPHINX_INPUT_DIR}"
             "${HTML_OUTPUT_DIR}"
         WORKING_DIRECTORY

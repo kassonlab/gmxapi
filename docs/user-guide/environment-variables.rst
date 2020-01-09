@@ -4,7 +4,7 @@
 .. Another useful one-liner to find undocumentedvariables:
 ..  ( export INPUT_FILE=docs/user-guide/environment-variables.rst; GIT_PAGER="cat ";   for ss in `for s in $(git grep getenv |  sed 's/.*getenv("\(.*\)".*/\1/' | sort -u  | grep '^[A-Z]'); do [ $(grep $s $INPUT_FILE -c) -eq 0 ] && echo $s; done `; do git grep $ss ; done )
 
-.. TODO: still undocumented GMX_QM_GAUSSIAN_NCPUS
+.. todo:: still undocumented GMX_QM_GAUSSIAN_NCPUS
 
 Environment Variables
 =====================
@@ -230,6 +230,14 @@ Performance and Run Control
 ``GMX_FORCE_UPDATE``
         update forces when invoking ``mdrun -rerun``.
 
+``GMX_FORCE_UPDATE_DEFAULT_GPU``
+        Force update to run on the GPU by default, overriding the ``mdrun -update auto`` option. Works similar to setting
+        ``mdrun -update gpu``, but (1) falls back to the CPU code-path, if set with input that is not supported and
+        (2) can be used to run update on GPUs in multi-rank cases. The latter case should be
+        considered experimental since it lacks substantial testing. Also, GPU update is only supported with the GPU direct
+        communications and ``GMX_FORCE_UPDATE_DEFAULT_GPU`` variable should be set simultaneously with ``GMX_GPU_DD_COMMS``
+        and ``GMX_GPU_PME_PP_COMMS`` environment variables in multi-rank case. Does not override ``mdrun -update cpu``.
+
 ``GMX_GPU_ID``
         set in the same way as ``mdrun -gpu_id``, ``GMX_GPU_ID``
         allows the user to specify different GPU IDs for different ranks, which can be useful for selecting different
@@ -324,7 +332,7 @@ Performance and Run Control
 
 ``GMX_PME_NUM_THREADS``
         set the number of OpenMP or PME threads; overrides the default set by
-        :ref:`gmx mdrun`; can be used instead of the `-npme` command line option,
+        :ref:`gmx mdrun`; can be used instead of the ``-npme`` command line option,
         also useful to set heterogeneous per-process/-node thread count.
 
 ``GMX_PME_P3M``
@@ -333,7 +341,7 @@ Performance and Run Control
 ``GMX_PME_THREAD_DIVISION``
         PME thread division in the format "x y z" for all three dimensions. The
         sum of the threads in each dimension must equal the total number of PME threads (set in
-        `GMX_PME_NTHREADS`).
+        :envvar:`GMX_PME_NTHREADS`).
 
 ``GMX_PMEONEDD``
         if the number of domain decomposition cells is set to 1 for both x and y,
@@ -365,7 +373,7 @@ Performance and Run Control
 ``HWLOC_XMLFILE``
         Not strictly a |Gromacs| environment variable, but on large machines
         the hwloc detection can take a few seconds if you have lots of MPI processes.
-        If you run the hwloc command `lstopo out.xml` and set this environment
+        If you run the hwloc command :command:`lstopo out.xml` and set this environment
         variable to point to the location of this file, the hwloc library will use
         the cached information instead, which can be faster.
 

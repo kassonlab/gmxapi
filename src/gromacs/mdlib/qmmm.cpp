@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -95,7 +96,7 @@ static bool struct_comp(const t_j_particle& a, const t_j_particle& b)
 }
 
 static real call_QMroutine(const t_commrec gmx_unused* cr,
-                           const t_forcerec gmx_unused* fr,
+                           const t_QMMMrec gmx_unused* qmmm,
                            t_QMrec gmx_unused* qm,
                            t_MMrec gmx_unused* mm,
                            rvec gmx_unused f[],
@@ -131,7 +132,7 @@ static real call_QMroutine(const t_commrec gmx_unused* cr,
         {
             if (GMX_QMMM_GAUSSIAN)
             {
-                return call_gaussian_SH(fr, qm, mm, f, fshift);
+                return call_gaussian_SH(qmmm, qm, mm, f, fshift);
             }
             else
             {
@@ -146,11 +147,11 @@ static real call_QMroutine(const t_commrec gmx_unused* cr,
             }
             else if (GMX_QMMM_GAUSSIAN)
             {
-                return call_gaussian(fr, qm, mm, f, fshift);
+                return call_gaussian(qmmm, qm, mm, f, fshift);
             }
             else if (GMX_QMMM_ORCA)
             {
-                return call_orca(fr, qm, mm, f, fshift);
+                return call_orca(qmmm, qm, mm, f, fshift);
             }
             else
             {
@@ -614,7 +615,7 @@ void update_QMMMrec(const t_commrec* cr, const t_forcerec* fr, const rvec* x, co
     /*  init_pbc(box);  needs to be called first, see pbc.h */
     ivec null_ivec;
     clear_ivec(null_ivec);
-    set_pbc_dd(&pbc, fr->ePBC, DOMAINDECOMP(cr) ? cr->dd->nc : null_ivec, FALSE, box);
+    set_pbc_dd(&pbc, fr->ePBC, DOMAINDECOMP(cr) ? cr->dd->numCells : null_ivec, FALSE, box);
     /* only in standard (normal) QMMM we need the neighbouring MM
      * particles to provide a electric field of point charges for the QM
      * atoms.
@@ -827,17 +828,16 @@ void update_QMMMrec(const t_commrec* cr, const t_forcerec* fr, const rvec* x, co
     }
 } /* update_QMMM_rec */
 
-real calculate_QMMM(const t_commrec* cr, gmx::ForceWithShiftForces* forceWithShiftForces, const t_forcerec* fr)
+real calculate_QMMM(const t_commrec* cr, gmx::ForceWithShiftForces* forceWithShiftForces, const t_QMMMrec* qr)
 {
     real QMener = 0.0;
     /* a selection for the QM package depending on which is requested
      * (Gaussian, GAMESS-UK, MOPAC or ORCA) needs to be implemented here. Now
      * it works through defines.... Not so nice yet
      */
-    t_QMMMrec* qr;
-    t_QMrec *  qm, *qm2;
-    t_MMrec*   mm     = nullptr;
-    rvec *     forces = nullptr, *fshift = nullptr, *forces2 = nullptr,
+    t_QMrec *qm, *qm2;
+    t_MMrec* mm     = nullptr;
+    rvec *   forces = nullptr, *fshift = nullptr, *forces2 = nullptr,
          *fshift2 = nullptr; /* needed for multilayer ONIOM */
     int i, j, k;
 
@@ -848,7 +848,6 @@ real calculate_QMMM(const t_commrec* cr, gmx::ForceWithShiftForces* forceWithShi
 
     /* make a local copy the QMMMrec pointer
      */
-    qr = fr->qr;
     mm = qr->mm;
 
     /* now different procedures are carried out for one layer ONION and
@@ -861,7 +860,7 @@ real calculate_QMMM(const t_commrec* cr, gmx::ForceWithShiftForces* forceWithShi
         qm = qr->qm[0];
         snew(forces, (qm->nrQMatoms + mm->nrMMatoms));
         snew(fshift, (qm->nrQMatoms + mm->nrMMatoms));
-        QMener = call_QMroutine(cr, fr, qm, mm, forces, fshift);
+        QMener = call_QMroutine(cr, qr, qm, mm, forces, fshift);
         for (i = 0; i < qm->nrQMatoms; i++)
         {
             for (j = 0; j < DIM; j++)
@@ -907,13 +906,13 @@ real calculate_QMMM(const t_commrec* cr, gmx::ForceWithShiftForces* forceWithShi
             srenew(fshift, qm->nrQMatoms);
             /* we need to re-initialize the QMroutine every step... */
             init_QMroutine(cr, qm, mm);
-            QMener += call_QMroutine(cr, fr, qm, mm, forces, fshift);
+            QMener += call_QMroutine(cr, qr, qm, mm, forces, fshift);
 
             /* this layer at the lower level of theory */
             srenew(forces2, qm->nrQMatoms);
             srenew(fshift2, qm->nrQMatoms);
             init_QMroutine(cr, qm2, mm);
-            QMener -= call_QMroutine(cr, fr, qm2, mm, forces2, fshift2);
+            QMener -= call_QMroutine(cr, qr, qm2, mm, forces2, fshift2);
             /* E = E1high-E1low The next layer includes the current layer at
              * the lower level of theory, which provides + E2low
              * this is similar for gradients
@@ -933,7 +932,7 @@ real calculate_QMMM(const t_commrec* cr, gmx::ForceWithShiftForces* forceWithShi
         init_QMroutine(cr, qm, mm);
         srenew(forces, qm->nrQMatoms);
         srenew(fshift, qm->nrQMatoms);
-        QMener += call_QMroutine(cr, fr, qm, mm, forces, fshift);
+        QMener += call_QMroutine(cr, qr, qm, mm, forces, fshift);
         for (i = 0; i < qm->nrQMatoms; i++)
         {
             for (j = 0; j < DIM; j++)

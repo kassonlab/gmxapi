@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -110,10 +111,10 @@ enum
 
 struct cginfo_mb_t
 {
-    int  cg_start;
-    int  cg_end;
-    int  cg_mod;
-    int* cginfo;
+    int              cg_start = 0;
+    int              cg_end   = 0;
+    int              cg_mod   = 0;
+    std::vector<int> cginfo;
 };
 
 
@@ -192,7 +193,7 @@ struct t_forcerec
     real sc_sigma6_min = 0;
 
     /* Information about atom properties for the molecule blocks in the system */
-    struct cginfo_mb_t* cginfo_mb = nullptr;
+    std::vector<cginfo_mb_t> cginfo_mb;
     /* Information about atom properties for local and non-local atoms */
     std::vector<int> cginfo;
 
@@ -234,10 +235,10 @@ struct t_forcerec
     std::vector<gmx::RVec> shiftForces;
 
     /* Non bonded Parameter lists */
-    int      ntype        = 0; /* Number of atom types */
-    gmx_bool bBHAM        = FALSE;
-    real*    nbfp         = nullptr;
-    real*    ljpme_c6grid = nullptr; /* C6-values used on grid in LJPME */
+    int               ntype = 0; /* Number of atom types */
+    gmx_bool          bBHAM = FALSE;
+    std::vector<real> nbfp;
+    real*             ljpme_c6grid = nullptr; /* C6-values used on grid in LJPME */
 
     /* Energy group pair flags */
     int* egp_flags = nullptr;
