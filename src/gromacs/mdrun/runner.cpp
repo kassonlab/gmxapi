@@ -3,7 +3,7 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2011-2019, by the GROMACS development team, led by
+ * Copyright (c) 2011-2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -176,8 +176,8 @@ struct DevelopmentFeatureFlags
     //! True if the Buffer ops development feature is enabled
     // TODO: when the trigger of the buffer ops offload is fully automated this should go away
     bool enableGpuBufferOps = false;
-    //! If true, forces 'mdrun -update auto' default to 'gpu' when running with DD
-    bool forceGpuUpdateDefaultWithDD = false;
+    //! If true, forces 'mdrun -update auto' default to 'gpu'
+    bool forceGpuUpdateDefault = false;
     //! True if the GPU halo exchange development feature is enabled
     bool enableGpuHaloExchange = false;
     //! True if the PME PP direct communication GPU development feature is enabled
@@ -212,7 +212,7 @@ static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger& md
 #pragma GCC diagnostic ignored "-Wunused-result"
     devFlags.enableGpuBufferOps = (getenv("GMX_USE_GPU_BUFFER_OPS") != nullptr)
                                   && (GMX_GPU == GMX_GPU_CUDA) && useGpuForNonbonded;
-    devFlags.forceGpuUpdateDefaultWithDD = (getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") != nullptr);
+    devFlags.forceGpuUpdateDefault = (getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") != nullptr);
     devFlags.enableGpuHaloExchange =
             (getenv("GMX_GPU_DD_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
     devFlags.enableGpuPmePPComm =
@@ -228,13 +228,14 @@ static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger& md
                         "GMX_USE_GPU_BUFFER_OPS environment variable.");
     }
 
-    if (devFlags.forceGpuUpdateDefaultWithDD)
+    if (devFlags.forceGpuUpdateDefault)
     {
         GMX_LOG(mdlog.warning)
                 .asParagraph()
                 .appendTextFormatted(
                         "This run will default to '-update gpu' as requested by the "
-                        "GMX_FORCE_UPDATE_DEFAULT_GPU environment variable.");
+                        "GMX_FORCE_UPDATE_DEFAULT_GPU environment variable. GPU update with domain "
+                        "decomposition lacks substantial testing and should be used with caution.");
     }
 
     if (devFlags.enableGpuHaloExchange)
@@ -1149,16 +1150,6 @@ int Mdrunner::mdrunner()
             // algorithm is active, but currently does not.
             EEL_PME(inputrec->coulombtype) && thisRankHasDuty(cr, DUTY_PME));
 
-    const bool printHostName = (cr->nnodes > 1);
-    gpuTaskAssignments.reportGpuUsage(mdlog, printHostName, useGpuForBonded, pmeRunMode);
-
-    // If the user chose a task assignment, give them some hints
-    // where appropriate.
-    if (!userGpuTaskAssignment.empty())
-    {
-        gpuTaskAssignments.logPerformanceHints(mdlog, ssize(gpuIdsToUse));
-    }
-
     // Get the device handles for the modules, nullptr when no task is assigned.
     gmx_device_info_t* nonbondedDeviceInfo = gpuTaskAssignments.initNonbondedDevice(cr);
     gmx_device_info_t* pmeDeviceInfo       = gpuTaskAssignments.initPmeDevice();
@@ -1190,12 +1181,22 @@ int Mdrunner::mdrunner()
         const bool useUpdateGroups = cr->dd ? ddUsesUpdateGroups(*cr->dd) : false;
 
         useGpuForUpdate = decideWhetherToUseGpuForUpdate(
-                devFlags.forceGpuUpdateDefaultWithDD, useDomainDecomposition, useUpdateGroups,
-                useGpuForPme, useGpuForNonbonded, updateTarget, gpusWereDetected, *inputrec, mtop,
-                doEssentialDynamics, gmx_mtop_ftype_count(mtop, F_ORIRES) > 0,
-                replExParams.exchangeInterval > 0, doRerun);
+                devFlags.forceGpuUpdateDefault, useDomainDecomposition, useUpdateGroups, pmeRunMode,
+                domdecOptions.numPmeRanks > 0, useGpuForNonbonded, updateTarget, gpusWereDetected,
+                *inputrec, mtop, doEssentialDynamics, gmx_mtop_ftype_count(mtop, F_ORIRES) > 0,
+                replExParams.exchangeInterval > 0, doRerun, mdlog);
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
+
+    const bool printHostName = (cr->nnodes > 1);
+    gpuTaskAssignments.reportGpuUsage(mdlog, printHostName, useGpuForBonded, pmeRunMode, useGpuForUpdate);
+
+    // If the user chose a task assignment, give them some hints
+    // where appropriate.
+    if (!userGpuTaskAssignment.empty())
+    {
+        gpuTaskAssignments.logPerformanceHints(mdlog, ssize(gpuIdsToUse));
+    }
 
     if (PAR(cr))
     {

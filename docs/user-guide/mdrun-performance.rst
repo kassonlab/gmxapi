@@ -528,10 +528,11 @@ behavior.
     Used to set where to execute update and constraints, when present.
     Can be set to "auto", "cpu", "gpu."
     Defaults to "auto," which currently always uses the CPU.
-    Setting "gpu" requires that a compatible CUDA GPU is available.
+    Setting "gpu" requires that a compatible CUDA GPU is available,
+    the simulation uses a single rank.
     Update and constraints on a GPU is currently not supported
-    with free-energy, domain decomposition, virtual sites,
-    Ewald surface correction, replica exchange, the pull code,
+    with domain decomposition, free-energy, virtual sites,
+    Ewald surface correction, replica exchange, constraint pulling,
     orientation restraints and computational electrophysiology.
 
 ``-gpu_id``
@@ -660,7 +661,7 @@ component of the forces are calculated on CPU(s).
 
 ::
 
-    gmx mdrun -ntmpi 1 -nb gpu -pme gpu -bonded gpu
+    gmx mdrun -ntmpi 1 -nb gpu -pme gpu -bonded gpu -update gpu
 
 Starts :ref:`mdrun <gmx mdrun>` using a single thread-MPI rank that
 will use all available CPU cores. All interaction types that can run
@@ -910,7 +911,7 @@ The table contains colums indicating the number of ranks and threads that
 executed the respective part of the run, wall-time and cycle
 count aggregates (across all threads and ranks) averaged over the entire run.
 The last column also shows what precentage of the total runtime each row represents.
-Note that the :ref:`gmx mdrun` timer resetting functionalities (`-resethway` and `-resetstep`)
+Note that the :ref:`gmx mdrun` timer resetting functionalities (``-resethway`` and ``-resetstep``)
 reset the performance counters and therefore are useful to avoid startup overhead and
 performance instability (e.g. due to load balancing) at the beginning of the run.
 
@@ -1012,7 +1013,9 @@ Types of GPU tasks
 ^^^^^^^^^^^^^^^^^^
 
 To better understand the later sections on different GPU use cases for
-calculation of :ref:`short range<gmx-gpu-pp>` and :ref:`PME <gmx-gpu-pme>`,
+calculation of :ref:`short range<gmx-gpu-pp>`, :ref:`PME<gmx-gpu-pme>`,
+:ref:`bonded interactions<gmx-gpu-bonded>` and
+:ref:`update and constraints <gmx-gpu-update>`
 we first introduce the concept of different GPU tasks. When thinking about
 running a simulation, several different kinds of interactions between the atoms
 have to be calculated (for more information please refer to the reference manual).
@@ -1097,6 +1100,8 @@ Known limitations
 
 - LJ PME is not supported on GPUs.
 
+.. _gmx-gpu-bonded:
+
 GPU accelerated calculation of bonded interactions (CUDA only)
 ..............................................................
 
@@ -1105,10 +1110,47 @@ GPU accelerated calculation of bonded interactions (CUDA only)
 |Gromacs| now allows the offloading of the bonded part of the PP
 workload to a CUDA-compatible GPU. This is treated as part of the PP
 work, and requires that the short-ranged non-bonded task also runs on
-a GPU. It is an advantage usually only when the CPU is relatively weak
-compared with the GPU, perhaps because its workload is too large for
-the available cores. This would likely be the case for free-energy
-calculations.
+a GPU. Typically, there is a performance advantage to offloading
+bonded interactions in particular when the amount of CPU resources per GPU
+is relatively little (either because the CPU is weak or there are few CPU
+cores assigned to a GPU in a run) or when there are other computations on the CPU.
+A typical case for the latter is free-energy calculations.
+
+.. _gmx-gpu-update:
+
+GPU accelerated calculation of constraints and coordinate update (CUDA only)
+............................................................................
+
+.. TODO again, extend this and add some actual useful information concerning performance etc...
+
+|Gromacs| makes it possible to also perform the coordinate update and (if requested)
+constraint calculation on a CUDA-compatible GPU. This allows executing all
+(supported) computation of a simulation step on the GPU. 
+This feature is supported in single domain runs (unless using the experimental
+GPU domain decomposition feature), and needs to be explicitly requested by the user. 
+This is a new parallelization mode where all force and coordinate
+data can be "GPU resident" for a number of steps, typically between neighbor searching steps.
+This has the benefit that there is less coupling between CPU host and GPU and
+on typical MD steps data does not need to be transferred between CPU and GPU.
+In this scheme it is however still possible for part of the computation to be 
+executed on the CPU concurrently with GPU calculation.
+This helps supporting the broad range of |Gromacs| features not all of which are 
+ported to GPUs. At the same time, it also allows improving performance by making 
+use of the otherwise mostly idle CPU. It can often be advantageous to move the bonded 
+or PME calculation back to the CPU, but the details of this will depending on the
+relative performance if the CPU cores paired in a simulation with a GPU.
+
+It is possible to change the default behaviour by setting the
+``GMX_FORCE_UPDATE_DEFAULT_GPU`` environment variable to a non-zero value. In this
+case simulations will try to run all parts by default on the GPU, and will only fall
+back to the CPU based calculation if the simulation is not compatible.
+
+Using this parallelization mode is typically advantageous in cases where a fast GPU is
+used with a weak CPU, in particular if there is only single simulation assigned to a GPU.
+However, in typical throughput cases where multiple runs are assigned to each GPU,
+offloading everything, especially without moving back some of the work to the CPU
+can perform worse than the parallelization mode where only force computation is offloaded.
+
 
 Assigning tasks to GPUs
 .......................
@@ -1236,7 +1278,7 @@ Currently supported hardware architectures are:
 Make sure that you have the latest drivers installed. For AMD GPUs,
 the compute-oriented `ROCm <https://rocm.github.io/>`_ stack is recommended;
 alternatively, the AMDGPU-PRO stack is also compatible; using the outdated
-and unsupported `fglrx` proprietary driver and runtime is not recommended (but
+and unsupported ``fglrx`` proprietary driver and runtime is not recommended (but
 for certain older hardware that may be the only way to obtain support).
 In addition Mesa version 17.0 or newer with LLVM 4.0 or newer is also supported.
 For NVIDIA GPUs, using the proprietary driver is

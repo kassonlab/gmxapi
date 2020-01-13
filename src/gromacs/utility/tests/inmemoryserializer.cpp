@@ -198,14 +198,14 @@ TEST_F(InMemorySerializerTest, Roundtrip)
 
 TEST_F(InMemorySerializerTest, RoundtripWithEndianessSwap)
 {
-    InMemorySerializer serializerWithSwap(EndianSwapBehavior::DoSwap);
+    InMemorySerializer serializerWithSwap(EndianSwapBehavior::Swap);
     SerializerValues   values = defaultValues_;
     serialize(&serializerWithSwap, &values);
 
     auto buffer = serializerWithSwap.finishAndGetBuffer();
 
     InMemoryDeserializer deserializerWithSwap(buffer, std::is_same<real, double>::value,
-                                              EndianSwapBehavior::DoSwap);
+                                              EndianSwapBehavior::Swap);
 
     SerializerValues deserialisedValues = deserialize(&deserializerWithSwap);
 
@@ -214,7 +214,7 @@ TEST_F(InMemorySerializerTest, RoundtripWithEndianessSwap)
 
 TEST_F(InMemorySerializerTest, SerializerExplicitEndianessSwap)
 {
-    InMemorySerializer serializerWithSwap(EndianSwapBehavior::DoSwap);
+    InMemorySerializer serializerWithSwap(EndianSwapBehavior::Swap);
     SerializerValues   values = defaultValues_;
     serialize(&serializerWithSwap, &values);
 
@@ -235,10 +235,32 @@ TEST_F(InMemorySerializerTest, DeserializerExplicitEndianessSwap)
     auto buffer = serializer.finishAndGetBuffer();
 
     InMemoryDeserializer deserializerWithSwap(buffer, std::is_same<real, double>::value,
-                                              EndianSwapBehavior::DoSwap);
+                                              EndianSwapBehavior::Swap);
 
     SerializerValues deserialisedValues = deserialize(&deserializerWithSwap);
     checkSerializerValuesforEquality(endianessSwappedValues_, deserialisedValues);
+}
+
+TEST_F(InMemorySerializerTest, SizeIsCorrect)
+{
+    InMemorySerializer serializer;
+    // These types all have well-defined widths in bytes,
+    // which we can test below.
+    serializer.doBool(&defaultValues_.boolValue_);     // 1 bytes
+    serializer.doChar(&defaultValues_.charValue_);     // 1 bytes
+    serializer.doInt32(&defaultValues_.int32Value_);   // 4 bytes
+    serializer.doInt64(&defaultValues_.int64Value_);   // 8 bytes
+    serializer.doFloat(&defaultValues_.floatValue_);   // 4 bytes
+    serializer.doDouble(&defaultValues_.doubleValue_); // 8 bytes
+    std::vector<char> charBuffer = { 'a', 'b', 'c' };
+    serializer.doCharArray(charBuffer.data(), charBuffer.size()); // 3 bytes
+    serializer.doOpaque(charBuffer.data(), charBuffer.size());    // 3 bytes
+    std::vector<int32_t> int32Buffer = { 0x1BCDEF78, 0x654321FE };
+    serializer.doInt32Array(int32Buffer.data(), int32Buffer.size()); // 8 bytes
+    std::vector<int64_t> int64Buffer = { 0x1BCDEF78654321FE, 0x3726ABFEAB34716C };
+    serializer.doInt64Array(int64Buffer.data(), int64Buffer.size()); // 16 bytes
+    auto buffer = serializer.finishAndGetBuffer();
+    EXPECT_EQ(buffer.size(), 56);
 }
 
 } // namespace

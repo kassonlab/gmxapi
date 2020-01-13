@@ -138,7 +138,7 @@ def setup(app):
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
-#default_role = None
+default_role = 'any'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
 #add_function_parentheses = True
@@ -387,3 +387,5 @@ numfig = True
 # -- Options for intersphinx extension ------------------------------------
 
 intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
+intersphinx_cache_limit = -1
+intersphinx_timeout = 10
