@@ -6,6 +6,13 @@ This document provides simple recipes for some specific installation scenarios.
 Refer to :doc:`install` for complete documentation about prerequisites and
 building from source code.
 
+..  warning::
+
+    This documentation is for gmxapi 0.0.7 on GROMACS 2019.
+    For gmxapi 0.1 or later and GROMACS 2020 or later, refer to
+    http://manual.gromacs.org/current/gmxapi/userguide/install.html
+
+
 .. contents:: Quick start recipes
     :local:
     :depth: 2
@@ -19,6 +26,7 @@ In the simplest case, the following should just work::
 
     git clone https://github.com/kassonlab/gmxapi.git
     cd gmxapi
+    git checkout release-0_0_7
     pip install -r requirements.txt
     pip install .
     cd
