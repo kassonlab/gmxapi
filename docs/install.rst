@@ -2,6 +2,16 @@
 Full installation instructions
 ==============================
 
+..  warning::
+
+    This documentation is for gmxapi 0.0.7 on GROMACS 2019.
+    Sources can be downloaded from https://github.com/kassonlab/gmxapi/releases
+    If cloning `the repository <https://github.com/kassonlab/gmxapi>`__ with git,
+    check out the ``release-0_0_7`` branch.
+
+    For gmxapi 0.1 or later and GROMACS 2020 or later, refer to
+    http://manual.gromacs.org/current/gmxapi/userguide/install.html
+
 .. highlight:: bash
 
 This document provides more thorough documentation about building and installing
@@ -317,6 +327,7 @@ system or you may need to load a module for it on an HPC system, which you will 
 
     git clone https://github.com/kassonlab/gmxapi.git
     cd gmxapi
+    git checkout release-0_0_7
 
 You will need to install some additional dependencies. The :file:`requirements.txt`
 file is provided for convenience. Also, note that ``pip`` must be
