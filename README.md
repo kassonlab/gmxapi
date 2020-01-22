@@ -1,6 +1,6 @@
 The gmxapi project provides interfaces for managing and extending molecular
 dynamics simulation workflows. In this repository, a Python package provides the 
-`gmx` module for high-level interaction with GROMACS via gmxapi 0.0.7.
+`gmx` module for high-level interaction with GROMACS 2019 via gmxapi 0.0.7.
 `gmx.core` provides Python bindings to the `gmxapi` C++ GROMACS external API.
 
 The gmxapi 0.0.7 Python project for GROMACS 2019 is hosted at
@@ -16,9 +16,7 @@ to a loosely-coupled ensemble of simulation trajectories.
 
 The whole thing is driven at the highest level by a simple Python interface.
 
-See the [version 0.0.7 documentation](https://gmxapi.readthedocs.io/en/release-0_0_7/)
-or the latest documentation at 
-[http://gmxapi.readthedocs.io/](http://gmxapi.readthedocs.io/en/latest/)
+See the [version 0.0.7 documentation](https://gmxapi.readthedocs.io/en/release-0_0_7/).
 
 Note that gmxapi is now (after 0.0.7) maintained as
 [part of](https://redmine.gromacs.org/projects/gromacs/repository/revisions/master/entry/python_packaging/README.md)
@@ -29,9 +27,10 @@ Irrgang, M. E., Hays, J. M., & Kasson, P. M.
 gmxapi: a high-level interface for advanced control and extension of molecular dynamics simulations.
 _Bioinformatics_ 2018.
 DOI: [10.1093/bioinformatics/bty484](https://doi.org/10.1093/bioinformatics/bty484)
-## Current master branch
-[![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=master)](https://travis-ci.org/kassonlab/gmxapi)
-[![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=latest)](http://gmxapi.readthedocs.io/en/latest/?badge=latest)
+
+## 0.0.7 release branch
+[![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=release-0_0_7)](https://travis-ci.org/kassonlab/gmxapi)
+[![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=release-0_0_7)](http://gmxapi.readthedocs.io/en/latest/?badge=latest)
 
 # Running simulations from Python
 
