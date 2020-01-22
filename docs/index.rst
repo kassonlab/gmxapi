@@ -2,14 +2,16 @@
 gmxapi Python package
 =====================
 
-This project is hosted at https://www.github.com/kassonlab/gmxapi and is
-based on `GROMACS 2019 <http://manual.gromacs.org/documentation/>`_.
+gmxapi 0.0.7 is hosted at https://www.github.com/kassonlab/gmxapi and is
+based on `GROMACS 2019 <http://manual.gromacs.org/2019-current/index.html>`_.
 
-Refer to `ReadTheDocs <https://gmxapi.readthedocs.io/>`_ for documentation for
-each release.
-For the most up-to-date documentation, download the source code from
-`GitHub <https://www.github.com/kassonlab/gmxapi>`_ and
+Refer to `ReadTheDocs <https://gmxapi.readthedocs.io/en/release-0_0_7/>`_
+for documentation, or download the source code from
+`GitHub <https://github.com/kassonlab/gmxapi/tree/release-0_0_7>`_ and
 :ref:`build the docs <build_docs>` locally.
+
+For GROMACS 2020+ and gmxapi 0.1 or higher, refer to the GROMACS project
+`documentation <http://manual.gromacs.org/current/gmxapi/index.html>`__.
 
 ..  toctree::
     :maxdepth: 2
