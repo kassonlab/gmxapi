@@ -30,7 +30,7 @@ DOI: [10.1093/bioinformatics/bty484](https://doi.org/10.1093/bioinformatics/bty4
 
 ## 0.0.7 release branch
 [![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=release-0_0_7)](https://travis-ci.org/kassonlab/gmxapi)
-[![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=release-0_0_7)](http://gmxapi.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/gmxapi/badge/?version=release-0_0_7)](https://gmxapi.readthedocs.io/en/release-0_0_7/?badge=release-0_0_7)
 
 # Running simulations from Python
 
