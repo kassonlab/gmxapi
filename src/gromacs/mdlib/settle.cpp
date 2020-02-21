@@ -52,6 +52,7 @@
 
 #include <algorithm>
 
+#include "gromacs/math/arrayrefwithpadding.h"
 #include "gromacs/math/functions.h"
 #include "gromacs/math/invertmatrix.h"
 #include "gromacs/math/vec.h"
@@ -306,16 +307,16 @@ void settle_set_constraints(settledata* settled, const t_ilist* il_settle, const
     }
 }
 
-void settle_proj(settledata*        settled,
-                 ConstraintVariable econq,
-                 int                nsettle,
-                 const t_iatom      iatoms[],
-                 const t_pbc*       pbc,
-                 const rvec         x[],
-                 rvec*              der,
-                 rvec*              derp,
-                 int                calcvir_atom_end,
-                 tensor             vir_r_m_dder)
+void settle_proj(settledata*          settled,
+                 ConstraintVariable   econq,
+                 int                  nsettle,
+                 const t_iatom        iatoms[],
+                 const t_pbc*         pbc,
+                 ArrayRef<const RVec> x,
+                 ArrayRef<RVec>       der,
+                 ArrayRef<RVec>       derp,
+                 int                  calcvir_atom_end,
+                 tensor               vir_r_m_dder)
 {
     /* Settle for projection out constraint components
      * of derivatives of the coordinates.
@@ -812,18 +813,22 @@ static void settleTemplateWrapper(settledata* settled,
     }
 }
 
-void csettle(settledata*  settled,
-             int          nthread,
-             int          thread,
-             const t_pbc* pbc,
-             const real   x[],
-             real         xprime[],
-             real         invdt,
-             real*        v,
-             bool         bCalcVirial,
-             tensor       vir_r_m_dr,
-             bool*        bErrorHasOccurred)
+void csettle(settledata*                     settled,
+             int                             nthread,
+             int                             thread,
+             const t_pbc*                    pbc,
+             ArrayRefWithPadding<const RVec> x,
+             ArrayRefWithPadding<RVec>       xprime,
+             real                            invdt,
+             ArrayRefWithPadding<RVec>       v,
+             bool                            bCalcVirial,
+             tensor                          vir_r_m_dr,
+             bool*                           bErrorHasOccurred)
 {
+    const real* xPtr      = as_rvec_array(x.paddedArrayRef().data())[0];
+    real*       xprimePtr = as_rvec_array(xprime.paddedArrayRef().data())[0];
+    real*       vPtr      = as_rvec_array(v.paddedArrayRef().data())[0];
+
 #if GMX_SIMD_HAVE_REAL
     if (settled->bUseSimd)
     {
@@ -832,8 +837,8 @@ void csettle(settledata*  settled,
         set_pbc_simd(pbc, pbcSimd);
 
         settleTemplateWrapper<SimdReal, SimdBool, GMX_SIMD_REAL_WIDTH, const real*>(
-                settled, nthread, thread, pbcSimd, x, xprime, invdt, v, bCalcVirial, vir_r_m_dr,
-                bErrorHasOccurred);
+                settled, nthread, thread, pbcSimd, xPtr, xprimePtr, invdt, vPtr, bCalcVirial,
+                vir_r_m_dr, bErrorHasOccurred);
     }
     else
 #endif
@@ -848,13 +853,13 @@ void csettle(settledata*  settled,
         }
         else
         {
-            set_pbc(&pbcNo, epbcNONE, nullptr);
+            set_pbc(&pbcNo, PbcType::No, nullptr);
             pbcNonNull = &pbcNo;
         }
 
-        settleTemplateWrapper<real, bool, 1, const t_pbc*>(settled, nthread, thread, pbcNonNull, x,
-                                                           xprime, invdt, v, bCalcVirial,
-                                                           vir_r_m_dr, bErrorHasOccurred);
+        settleTemplateWrapper<real, bool, 1, const t_pbc*>(settled, nthread, thread, pbcNonNull,
+                                                           &xPtr[0], &xprimePtr[0], invdt, &vPtr[0],
+                                                           bCalcVirial, vir_r_m_dr, bErrorHasOccurred);
     }
 }
 

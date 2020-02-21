@@ -41,10 +41,10 @@ if (BUILD_TESTING)
 endif()
 if(GMX_USE_CUDA)
     gmx_add_libgromacs_sources(
-       lincs_cuda.cu
-       settle_cuda.cu
-       leapfrog_cuda.cu
-       update_constrain_cuda_impl.cu
+       leapfrog_gpu.cu
+       lincs_gpu.cu
+       settle_gpu.cu
+       update_constrain_gpu_impl.cu
        )
 endif()
 

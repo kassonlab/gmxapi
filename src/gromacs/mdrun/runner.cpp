@@ -64,8 +64,8 @@
 #include "gromacs/domdec/localatomsetmanager.h"
 #include "gromacs/domdec/partition.h"
 #include "gromacs/ewald/ewald_utils.h"
-#include "gromacs/ewald/pme.h"
 #include "gromacs/ewald/pme_gpu_program.h"
+#include "gromacs/ewald/pme_only.h"
 #include "gromacs/ewald/pme_pp_comm_gpu.h"
 #include "gromacs/fileio/checkpoint.h"
 #include "gromacs/fileio/gmxfio.h"
@@ -254,7 +254,8 @@ static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger& md
             GMX_LOG(mdlog.warning)
                     .asParagraph()
                     .appendTextFormatted(
-                            "This run uses the 'GPU halo exchange' feature, enabled by the "
+                            "This run has requested the 'GPU halo exchange' feature, enabled by "
+                            "the "
                             "GMX_GPU_DD_COMMS environment variable.");
         }
         else
@@ -411,6 +412,18 @@ static void prepare_verlet_scheme(FILE*               fplog,
                                   bool                makeGpuPairList,
                                   const gmx::CpuInfo& cpuinfo)
 {
+    // We checked the cut-offs in grompp, but double-check here.
+    // We have PME+LJcutoff kernels for rcoulomb>rvdw.
+    if (EEL_PME_EWALD(ir->coulombtype) && ir->vdwtype == eelCUT)
+    {
+        GMX_RELEASE_ASSERT(ir->rcoulomb >= ir->rvdw,
+                           "With Verlet lists and PME we should have rcoulomb>=rvdw");
+    }
+    else
+    {
+        GMX_RELEASE_ASSERT(ir->rcoulomb == ir->rvdw,
+                           "With Verlet lists and no PME rcoulomb and rvdw should be identical");
+    }
     /* For NVE simulations, we will retain the initial list buffer */
     if (EI_DYNAMICS(ir->eI) && ir->verletbuf_tol > 0 && !(EI_MD(ir->eI) && ir->etc == etcNO))
     {
@@ -729,12 +742,11 @@ int Mdrunner::mdrunner()
         userGpuTaskAssignment = parseUserTaskAssignmentString(hw_opt.userGpuTaskAssignment);
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
-    auto       nonbondedTarget = findTaskTarget(nbpu_opt);
-    auto       pmeTarget       = findTaskTarget(pme_opt);
-    auto       pmeFftTarget    = findTaskTarget(pme_fft_opt);
-    auto       bondedTarget    = findTaskTarget(bonded_opt);
-    auto       updateTarget    = findTaskTarget(update_opt);
-    PmeRunMode pmeRunMode      = PmeRunMode::None;
+    auto nonbondedTarget = findTaskTarget(nbpu_opt);
+    auto pmeTarget       = findTaskTarget(pme_opt);
+    auto pmeFftTarget    = findTaskTarget(pme_fft_opt);
+    auto bondedTarget    = findTaskTarget(bonded_opt);
+    auto updateTarget    = findTaskTarget(update_opt);
 
     FILE* fplog = nullptr;
     // If we are appending, we don't write log output because we need
@@ -881,23 +893,10 @@ int Mdrunner::mdrunner()
                 useGpuForNonbonded, useGpuForPme, bondedTarget, canUseGpuForBonded,
                 EVDW_PME(inputrec->vdwtype), EEL_PME_EWALD(inputrec->coulombtype),
                 domdecOptions.numPmeRanks, gpusWereDetected);
-
-        pmeRunMode = (useGpuForPme ? PmeRunMode::GPU : PmeRunMode::CPU);
-        if (pmeRunMode == PmeRunMode::GPU)
-        {
-            if (pmeFftTarget == TaskTarget::Cpu)
-            {
-                pmeRunMode = PmeRunMode::Mixed;
-            }
-        }
-        else if (pmeFftTarget == TaskTarget::Gpu)
-        {
-            gmx_fatal(FARGS,
-                      "Assigning FFTs to GPU requires PME to be assigned to GPU as well. With PME "
-                      "on CPU you should not be using -pmefft.");
-        }
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
+
+    const PmeRunMode pmeRunMode = determinePmeRunMode(useGpuForPme, pmeFftTarget, *inputrec);
 
     // Initialize development feature flags that enabled by environment variable
     // and report those features that are enabled.
@@ -918,7 +917,7 @@ int Mdrunner::mdrunner()
 
     // TODO: Error handling
     mdModules_->assignOptionsToModules(*inputrec->params, nullptr);
-    const auto& mdModulesNotifier = mdModules_->notifier().notifier_;
+    const auto& mdModulesNotifier = mdModules_->notifier().simulationSetupNotifications_;
 
     if (inputrec->internalParameters != nullptr)
     {
@@ -1131,7 +1130,7 @@ int Mdrunner::mdrunner()
         cr->npmenodes = 0;
         cr->duty      = (DUTY_PP | DUTY_PME);
 
-        if (inputrec->ePBC == epbcSCREW)
+        if (inputrec->pbcType == PbcType::Screw)
         {
             gmx_fatal(FARGS, "pbc=screw is only implemented with domain decomposition");
         }
@@ -1140,26 +1139,16 @@ int Mdrunner::mdrunner()
     // Produce the task assignment for this rank.
     GpuTaskAssignmentsBuilder gpuTaskAssignmentsBuilder;
     GpuTaskAssignments        gpuTaskAssignments = gpuTaskAssignmentsBuilder.build(
-            gpuIdsToUse, userGpuTaskAssignment, *hwinfo, cr, ms, physicalNodeComm, nonbondedTarget,
-            pmeTarget, bondedTarget, updateTarget, useGpuForNonbonded, useGpuForPme,
-            thisRankHasDuty(cr, DUTY_PP),
+            gpuIdsToUse, userGpuTaskAssignment, *hwinfo, communicator, physicalNodeComm,
+            nonbondedTarget, pmeTarget, bondedTarget, updateTarget, useGpuForNonbonded,
+            useGpuForPme, thisRankHasDuty(cr, DUTY_PP),
             // TODO cr->duty & DUTY_PME should imply that a PME
             // algorithm is active, but currently does not.
             EEL_PME(inputrec->coulombtype) && thisRankHasDuty(cr, DUTY_PME));
 
-    const bool printHostName = (cr->nnodes > 1);
-    gpuTaskAssignments.reportGpuUsage(mdlog, printHostName, useGpuForBonded, pmeRunMode);
-
-    // If the user chose a task assignment, give them some hints
-    // where appropriate.
-    if (!userGpuTaskAssignment.empty())
-    {
-        gpuTaskAssignments.logPerformanceHints(mdlog, ssize(gpuIdsToUse));
-    }
-
     // Get the device handles for the modules, nullptr when no task is assigned.
-    gmx_device_info_t* nonbondedDeviceInfo = gpuTaskAssignments.initNonbondedDevice(cr);
-    gmx_device_info_t* pmeDeviceInfo       = gpuTaskAssignments.initPmeDevice();
+    DeviceInformation* nonbondedDeviceInfo = gpuTaskAssignments.initNonbondedDevice(cr);
+    DeviceInformation* pmeDeviceInfo       = gpuTaskAssignments.initPmeDevice();
 
     // TODO Initialize GPU streams here.
 
@@ -1194,6 +1183,16 @@ int Mdrunner::mdrunner()
                 replExParams.exchangeInterval > 0, doRerun, mdlog);
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
+
+    const bool printHostName = (cr->nnodes > 1);
+    gpuTaskAssignments.reportGpuUsage(mdlog, printHostName, useGpuForBonded, pmeRunMode, useGpuForUpdate);
+
+    // If the user chose a task assignment, give them some hints
+    // where appropriate.
+    if (!userGpuTaskAssignment.empty())
+    {
+        gpuTaskAssignments.logPerformanceHints(mdlog, ssize(gpuIdsToUse));
+    }
 
     if (PAR(cr))
     {
@@ -1329,13 +1328,14 @@ int Mdrunner::mdrunner()
     const bool                   thisRankHasPmeGpuTask = gpuTaskAssignments.thisRankHasPmeGpuTask();
     std::unique_ptr<MDAtoms>     mdAtoms;
     std::unique_ptr<gmx_vsite_t> vsite;
+    std::unique_ptr<GpuBonded>   gpuBonded;
 
     t_nrnb nrnb;
     if (thisRankHasDuty(cr, DUTY_PP))
     {
         mdModulesNotifier.notify(*cr);
         mdModulesNotifier.notify(&atomSets);
-        mdModulesNotifier.notify(PeriodicBoundaryConditionType{ inputrec->ePBC });
+        mdModulesNotifier.notify(inputrec->pbcType);
         mdModulesNotifier.notify(SimulationTimeStep{ inputrec->delta_t });
         /* Initiate forcerecord */
         fr                 = new t_forcerec;
@@ -1343,28 +1343,20 @@ int Mdrunner::mdrunner()
         init_forcerec(fplog, mdlog, fr, fcd, inputrec, &mtop, cr, box,
                       opt2fn("-table", filenames.size(), filenames.data()),
                       opt2fn("-tablep", filenames.size(), filenames.data()),
-                      opt2fns("-tableb", filenames.size(), filenames.data()), *hwinfo,
-                      nonbondedDeviceInfo, useGpuForBonded,
-                      pmeRunMode == PmeRunMode::GPU && !thisRankHasDuty(cr, DUTY_PME), pforce, wcycle);
+                      opt2fns("-tableb", filenames.size(), filenames.data()),
+                      pmeRunMode == PmeRunMode::GPU && !thisRankHasDuty(cr, DUTY_PME), pforce);
 
-        // TODO Move this to happen during domain decomposition setup,
-        // once stream and event handling works well with that.
-        // TODO remove need to pass local stream into GPU halo exchange - Redmine #3093
-        if (havePPDomainDecomposition(cr) && prefer1DAnd1PulseDD && is1DAnd1PulseDD(*cr->dd))
+        fr->nbv = Nbnxm::init_nb_verlet(mdlog, inputrec, fr, cr, *hwinfo, nonbondedDeviceInfo,
+                                        &mtop, box, wcycle);
+        if (useGpuForBonded)
         {
-            GMX_RELEASE_ASSERT(devFlags.enableGpuBufferOps,
-                               "Must use GMX_USE_GPU_BUFFER_OPS=1 to use GMX_GPU_DD_COMMS=1");
-            void* streamLocal =
-                    Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::Local);
-            void* streamNonLocal =
-                    Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::NonLocal);
-            GMX_LOG(mdlog.warning)
-                    .asParagraph()
-                    .appendTextFormatted(
-                            "NOTE: This run uses the 'GPU halo exchange' feature, enabled by the "
-                            "GMX_GPU_DD_COMMS environment variable.");
-            cr->dd->gpuHaloExchange = std::make_unique<GpuHaloExchange>(
-                    cr->dd, cr->mpi_comm_mysim, streamLocal, streamNonLocal);
+            auto stream = havePPDomainDecomposition(cr)
+                                  ? Nbnxm::gpu_get_command_stream(
+                                            fr->nbv->gpu_nbv, gmx::InteractionLocality::NonLocal)
+                                  : Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv,
+                                                                  gmx::InteractionLocality::Local);
+            gpuBonded     = std::make_unique<GpuBonded>(mtop.ffparams, stream, wcycle);
+            fr->gpuBonded = gpuBonded.get();
         }
 
         /* Initialize the mdAtoms structure.
@@ -1390,12 +1382,13 @@ int Mdrunner::mdrunner()
         /* With periodic molecules the charge groups should be whole at start up
          * and the virtual sites should not be far from their proper positions.
          */
-        if (!inputrec->bContinuation && MASTER(cr) && !(inputrec->ePBC != epbcNONE && inputrec->bPeriodicMols))
+        if (!inputrec->bContinuation && MASTER(cr)
+            && !(inputrec->pbcType != PbcType::No && inputrec->bPeriodicMols))
         {
             /* Make molecules whole at start of run */
-            if (fr->ePBC != epbcNONE)
+            if (fr->pbcType != PbcType::No)
             {
-                do_pbc_first_mtop(fplog, inputrec->ePBC, box, &mtop, globalState->x.rvec_array());
+                do_pbc_first_mtop(fplog, inputrec->pbcType, box, &mtop, globalState->x.rvec_array());
             }
             if (vsite)
             {
@@ -1564,10 +1557,10 @@ int Mdrunner::mdrunner()
         // make it work.
         MdrunScheduleWorkload runScheduleWork;
         // Also populates the simulation constant workload description.
-        runScheduleWork.simulationWork = createSimulationWorkload(
-                useGpuForNonbonded, pmeRunMode, useGpuForBonded, useGpuForUpdate,
-                devFlags.enableGpuBufferOps, devFlags.enableGpuHaloExchange,
-                devFlags.enableGpuPmePPComm, haveEwaldSurfaceContribution(*inputrec));
+        runScheduleWork.simulationWork =
+                createSimulationWorkload(*inputrec, useGpuForNonbonded, pmeRunMode, useGpuForBonded,
+                                         useGpuForUpdate, devFlags.enableGpuBufferOps,
+                                         devFlags.enableGpuHaloExchange, devFlags.enableGpuPmePPComm);
 
         std::unique_ptr<gmx::StatePropagatorDataGpu> stateGpu;
         if (gpusWereDetected
@@ -1654,6 +1647,7 @@ int Mdrunner::mdrunner()
     mdAtoms.reset(nullptr);
     globalState.reset(nullptr);
     mdModules_.reset(nullptr); // destruct force providers here as they might also use the GPU
+    gpuBonded.reset(nullptr);
     /* Free pinned buffers in *fr */
     delete fr;
     fr = nullptr;

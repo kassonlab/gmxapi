@@ -50,6 +50,7 @@
 #include "gromacs/domdec/domdec.h"
 #include "gromacs/ewald/pme_gather.h"
 #include "gromacs/ewald/pme_gpu_internal.h"
+#include "gromacs/ewald/pme_gpu_staging.h"
 #include "gromacs/ewald/pme_grid.h"
 #include "gromacs/ewald/pme_internal.h"
 #include "gromacs/ewald/pme_redistribute.h"
@@ -103,8 +104,8 @@ uint64_t getSplineModuliDoublePrecisionUlps(int splineOrder)
 //! PME initialization
 PmeSafePointer pmeInitWrapper(const t_inputrec*        inputRec,
                               const CodePath           mode,
-                              const gmx_device_info_t* gpuInfo,
-                              PmeGpuProgramHandle      pmeGpuProgram,
+                              const DeviceInformation* deviceInfo,
+                              const PmeGpuProgram*     pmeGpuProgram,
                               const Matrix3x3&         box,
                               const real               ewaldCoeff_q,
                               const real               ewaldCoeff_lj)
@@ -115,7 +116,7 @@ PmeSafePointer pmeInitWrapper(const t_inputrec*        inputRec,
     NumPmeDomains  numPmeDomains = { 1, 1 };
     gmx_pme_t*     pmeDataRaw =
             gmx_pme_init(&dummyCommrec, numPmeDomains, inputRec, false, false, true, ewaldCoeff_q,
-                         ewaldCoeff_lj, 1, runMode, nullptr, gpuInfo, pmeGpuProgram, dummyLogger);
+                         ewaldCoeff_lj, 1, runMode, nullptr, deviceInfo, pmeGpuProgram, dummyLogger);
     PmeSafePointer pme(pmeDataRaw); // taking ownership
 
     // TODO get rid of this with proper matrix type
@@ -127,7 +128,7 @@ PmeSafePointer pmeInitWrapper(const t_inputrec*        inputRec,
             boxTemp[i][j] = box[i * DIM + j];
         }
     }
-    const char* boxError = check_box(-1, boxTemp);
+    const char* boxError = check_box(PbcType::Unset, boxTemp);
     GMX_RELEASE_ASSERT(boxError == nullptr, boxError);
 
     switch (mode)
@@ -148,13 +149,13 @@ PmeSafePointer pmeInitWrapper(const t_inputrec*        inputRec,
 //! Simple PME initialization based on input, no atom data
 PmeSafePointer pmeInitEmpty(const t_inputrec*        inputRec,
                             const CodePath           mode,
-                            const gmx_device_info_t* gpuInfo,
-                            PmeGpuProgramHandle      pmeGpuProgram,
+                            const DeviceInformation* deviceInfo,
+                            const PmeGpuProgram*     pmeGpuProgram,
                             const Matrix3x3&         box,
                             real                     ewaldCoeff_q,
                             real                     ewaldCoeff_lj)
 {
-    return pmeInitWrapper(inputRec, mode, gpuInfo, pmeGpuProgram, box, ewaldCoeff_q, ewaldCoeff_lj);
+    return pmeInitWrapper(inputRec, mode, deviceInfo, pmeGpuProgram, box, ewaldCoeff_q, ewaldCoeff_lj);
     // hiding the fact that PME actually needs to know the number of atoms in advance
 }
 
@@ -505,7 +506,7 @@ void pmeSetGridLineIndices(gmx_pme_t* pme, CodePath mode, const GridLineIndicesV
     switch (mode)
     {
         case CodePath::GPU:
-            memcpy(pme->gpu->staging.h_gridlineIndices, gridLineIndices.data(),
+            memcpy(pme_gpu_staging(pme->gpu).h_gridlineIndices, gridLineIndices.data(),
                    atomCount * sizeof(gridLineIndices[0]));
             break;
 
@@ -622,7 +623,7 @@ GridLineIndicesVector pmeGetGridlineIndices(const gmx_pme_t* pme, CodePath mode)
     {
         case CodePath::GPU:
             gridLineIndices = arrayRefFromArray(
-                    reinterpret_cast<IVec*>(pme->gpu->staging.h_gridlineIndices), atomCount);
+                    reinterpret_cast<IVec*>(pme_gpu_staging(pme->gpu).h_gridlineIndices), atomCount);
             break;
 
         case CodePath::CPU: gridLineIndices = atc->idx; break;

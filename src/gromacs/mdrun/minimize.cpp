@@ -61,7 +61,7 @@
 #include "gromacs/domdec/domdec_struct.h"
 #include "gromacs/domdec/mdsetup.h"
 #include "gromacs/domdec/partition.h"
-#include "gromacs/ewald/pme.h"
+#include "gromacs/ewald/pme_pp.h"
 #include "gromacs/fileio/confio.h"
 #include "gromacs/fileio/mtxio.h"
 #include "gromacs/gmxlib/network.h"
@@ -108,7 +108,9 @@
 #include "legacysimulator.h"
 #include "shellfc.h"
 
+using gmx::ArrayRef;
 using gmx::MdrunScheduleWorkload;
+using gmx::RVec;
 
 //! Utility structure for manipulating states during EM
 typedef struct
@@ -455,8 +457,9 @@ static void init_em(FILE*                fplog,
         {
             /* Constrain the starting coordinates */
             dvdl_constr = 0;
-            constr->apply(TRUE, TRUE, -1, 0, 1.0, ems->s.x.rvec_array(), ems->s.x.rvec_array(),
-                          nullptr, ems->s.box, ems->s.lambda[efptFEP], &dvdl_constr, nullptr,
+            constr->apply(TRUE, TRUE, -1, 0, 1.0, ems->s.x.arrayRefWithPadding(),
+                          ems->s.x.arrayRefWithPadding(), ArrayRef<RVec>(), ems->s.box,
+                          ems->s.lambda[efptFEP], &dvdl_constr, gmx::ArrayRefWithPadding<RVec>(),
                           nullptr, gmx::ConstraintVariable::Positions);
         }
     }
@@ -554,14 +557,14 @@ static void write_em_traj(FILE*               fplog,
 
         if (MASTER(cr))
         {
-            if (ir->ePBC != epbcNONE && !ir->bPeriodicMols && DOMAINDECOMP(cr))
+            if (ir->pbcType != PbcType::No && !ir->bPeriodicMols && DOMAINDECOMP(cr))
             {
                 /* Make molecules whole only for confout writing */
-                do_pbc_mtop(ir->ePBC, state->s.box, top_global, state_global->x.rvec_array());
+                do_pbc_mtop(ir->pbcType, state->s.box, top_global, state_global->x.rvec_array());
             }
 
             write_sto_conf_mtop(confout, *top_global->name, top_global,
-                                state_global->x.rvec_array(), nullptr, ir->ePBC, state->s.box);
+                                state_global->x.rvec_array(), nullptr, ir->pbcType, state->s.box);
         }
     }
 }
@@ -680,9 +683,10 @@ static bool do_em_step(const t_commrec*                   cr,
     if (constr)
     {
         dvdl_constr = 0;
-        validStep = constr->apply(TRUE, TRUE, count, 0, 1.0, s1->x.rvec_array(), s2->x.rvec_array(),
-                                  nullptr, s2->box, s2->lambda[efptBONDED], &dvdl_constr, nullptr,
-                                  nullptr, gmx::ConstraintVariable::Positions);
+        validStep   = constr->apply(
+                TRUE, TRUE, count, 0, 1.0, s1->x.arrayRefWithPadding(), s2->x.arrayRefWithPadding(),
+                ArrayRef<RVec>(), s2->box, s2->lambda[efptBONDED], &dvdl_constr,
+                gmx::ArrayRefWithPadding<RVec>(), nullptr, gmx::ConstraintVariable::Positions);
 
         if (cr->nnodes > 1)
         {
@@ -829,7 +833,7 @@ void EnergyEvaluator::run(em_state_t* ems, rvec mu_tot, tensor vir, tensor pres,
     if (vsite)
     {
         construct_vsites(vsite, ems->s.x.rvec_array(), 1, nullptr, top->idef.iparams, top->idef.il,
-                         fr->ePBC, fr->bMolPBC, cr, ems->s.box);
+                         fr->pbcType, fr->bMolPBC, cr, ems->s.box);
     }
 
     if (DOMAINDECOMP(cr) && bNS)
@@ -860,8 +864,8 @@ void EnergyEvaluator::run(em_state_t* ems, rvec mu_tot, tensor vir, tensor pres,
     {
         wallcycle_start(wcycle, ewcMoveE);
 
-        global_stat(gstat, cr, enerd, force_vir, shake_vir, mu_tot, inputrec, nullptr, nullptr, nullptr,
-                    1, &terminate, nullptr, FALSE, CGLO_ENERGY | CGLO_PRESSURE | CGLO_CONSTRAINT);
+        global_stat(gstat, cr, enerd, force_vir, shake_vir, inputrec, nullptr, nullptr, nullptr, 1,
+                    &terminate, nullptr, FALSE, CGLO_ENERGY | CGLO_PRESSURE | CGLO_CONSTRAINT);
 
         wallcycle_stop(wcycle, ewcMoveE);
     }
@@ -887,11 +891,11 @@ void EnergyEvaluator::run(em_state_t* ems, rvec mu_tot, tensor vir, tensor pres,
     if (constr)
     {
         /* Project out the constraint components of the force */
-        dvdl_constr  = 0;
-        rvec* f_rvec = ems->f.rvec_array();
-        constr->apply(FALSE, FALSE, count, 0, 1.0, ems->s.x.rvec_array(), f_rvec, f_rvec,
-                      ems->s.box, ems->s.lambda[efptBONDED], &dvdl_constr, nullptr, &shake_vir,
-                      gmx::ConstraintVariable::ForceDispl);
+        dvdl_constr = 0;
+        auto f      = ems->f.arrayRefWithPadding();
+        constr->apply(FALSE, FALSE, count, 0, 1.0, ems->s.x.arrayRefWithPadding(), f,
+                      f.unpaddedArrayRef(), ems->s.box, ems->s.lambda[efptBONDED], &dvdl_constr,
+                      gmx::ArrayRefWithPadding<RVec>(), &shake_vir, gmx::ConstraintVariable::ForceDispl);
         enerd->term[F_DVDL_CONSTR] += dvdl_constr;
         m_add(force_vir, shake_vir, vir);
     }
@@ -901,7 +905,7 @@ void EnergyEvaluator::run(em_state_t* ems, rvec mu_tot, tensor vir, tensor pres,
     }
 
     clear_mat(ekin);
-    enerd->term[F_PRES] = calc_pres(fr->ePBC, inputrec->nwall, ems->s.box, ekin, vir, pres);
+    enerd->term[F_PRES] = calc_pres(fr->pbcType, inputrec->nwall, ems->s.box, ekin, vir, pres);
 
     sum_dhdl(enerd, ems->s.lambda, *inputrec->fepvals);
 
@@ -1751,7 +1755,7 @@ void LegacySimulator::do_lbfgs()
     if (vsite)
     {
         construct_vsites(vsite, state_global->x.rvec_array(), 1, nullptr, top.idef.iparams,
-                         top.idef.il, fr->ePBC, fr->bMolPBC, cr, state_global->box);
+                         top.idef.il, fr->pbcType, fr->bMolPBC, cr, state_global->box);
     }
 
     /* Call the force routine and some auxiliary (neighboursearching etc.) */

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -131,11 +131,12 @@ void applyLincs(ConstraintsTestData* testData, t_pbc pbc)
     // Evaluate constraints
     bool success = constrain_lincs(
             false, testData->ir_, 0, lincsd, testData->md_, &testData->cr_, &testData->ms_,
-            as_rvec_array(testData->x_.data()), as_rvec_array(testData->xPrime_.data()),
-            as_rvec_array(testData->xPrime2_.data()), pbc.box, &pbc, testData->md_.lambda,
-            &testData->dHdLambda_, testData->invdt_, as_rvec_array(testData->v_.data()),
-            testData->computeVirial_, testData->virialScaled_, gmx::ConstraintVariable::Positions,
-            &testData->nrnb_, maxwarn, &warncount_lincs);
+            testData->x_.arrayRefWithPadding(), testData->xPrime_.arrayRefWithPadding(),
+            testData->xPrime2_.arrayRefWithPadding().unpaddedArrayRef(), pbc.box, &pbc,
+            testData->md_.lambda, &testData->dHdLambda_, testData->invdt_,
+            testData->v_.arrayRefWithPadding().unpaddedArrayRef(), testData->computeVirial_,
+            testData->virialScaled_, gmx::ConstraintVariable::Positions, &testData->nrnb_, maxwarn,
+            &warncount_lincs);
     EXPECT_TRUE(success) << "Test failed with a false return value in LINCS.";
     EXPECT_EQ(warncount_lincs, 0) << "There were warnings in LINCS.";
     done_lincs(lincsd);
@@ -143,12 +144,12 @@ void applyLincs(ConstraintsTestData* testData, t_pbc pbc)
 
 #if GMX_GPU != GMX_GPU_CUDA
 /*! \brief
- * Stub for LINCS constraints on CUDA-enabled GPU to satisfy compiler.
+ * Stub for GPU version of LINCS constraints to satisfy compiler.
  *
  * \param[in] testData        Test data structure.
  * \param[in] pbc             Periodic boundary data.
  */
-void applyLincsCuda(ConstraintsTestData gmx_unused* testData, t_pbc gmx_unused pbc)
+void applyLincsGpu(ConstraintsTestData gmx_unused* testData, t_pbc gmx_unused pbc)
 {
     FAIL() << "Dummy LINCS CUDA function was called instead of the real one.";
 }

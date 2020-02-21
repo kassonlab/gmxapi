@@ -54,6 +54,7 @@
 #include "gromacs/mdlib/gmx_omp_nthreads.h"
 #include "gromacs/mdtypes/group.h"
 #include "gromacs/mdtypes/md_enums.h"
+#include "gromacs/nbnxm/atomdata.h"
 #include "gromacs/nbnxm/gpu_data_mgmt.h"
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/pbcutil/pbc.h"
@@ -65,7 +66,6 @@
 #include "gromacs/utility/listoflists.h"
 #include "gromacs/utility/smalloc.h"
 
-#include "atomdata.h"
 #include "boundingboxes.h"
 #include "clusterdistancekerneltype.h"
 #include "gridset.h"
@@ -3173,7 +3173,7 @@ static void nbnxn_make_pairlist_part(const Nbnxm::GridSet&   gridSet,
         /* Check if we need periodicity shifts.
          * Without PBC or with domain decomposition we don't need them.
          */
-        if (d >= ePBC2npbcdim(gridSet.domainSetup().ePBC)
+        if (d >= numPbcDimensions(gridSet.domainSetup().pbcType)
             || gridSet.domainSetup().haveMultipleDomainsPerDim[d])
         {
             shp[d] = 0;
@@ -3539,9 +3539,12 @@ static void nbnxn_make_pairlist_part(const Nbnxm::GridSet&   gridSet,
                         }
                     }
 
-                    /* Set the exclusions for this ci list */
-                    setExclusionsForIEntry(gridSet, nbl, excludeSubDiagonal, na_cj_2log,
-                                           *getOpenIEntry(nbl), exclusions);
+                    if (!exclusions.empty())
+                    {
+                        /* Set the exclusions for this ci list */
+                        setExclusionsForIEntry(gridSet, nbl, excludeSubDiagonal, na_cj_2log,
+                                               *getOpenIEntry(nbl), exclusions);
+                    }
 
                     if (haveFep)
                     {
@@ -4201,8 +4204,20 @@ void PairlistSets::construct(const InteractionLocality iLocality,
                              const int64_t             step,
                              t_nrnb*                   nrnb)
 {
-    pairlistSet(iLocality).constructPairlists(pairSearch->gridSet(), pairSearch->work(), nbat,
-                                              exclusions, minimumIlistCountForGpuBalancing_, nrnb,
+    const auto& gridSet = pairSearch->gridSet();
+    const auto* ddZones = gridSet.domainSetup().zones;
+
+    /* The Nbnxm code can also work with more exclusions than those in i-zones only
+     * when using DD, but the equality check can catch more issues.
+     */
+    GMX_RELEASE_ASSERT(
+            exclusions.empty() || (!ddZones && exclusions.ssize() == gridSet.numRealAtomsTotal())
+                    || (ddZones && exclusions.ssize() == ddZones->cg_range[ddZones->iZones.size()]),
+            "exclusions should either be empty or the number of lists should match the number of "
+            "local i-atoms");
+
+    pairlistSet(iLocality).constructPairlists(gridSet, pairSearch->work(), nbat, exclusions,
+                                              minimumIlistCountForGpuBalancing_, nrnb,
                                               &pairSearch->cycleCounting_);
 
     if (iLocality == InteractionLocality::Local)

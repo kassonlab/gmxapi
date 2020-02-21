@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -50,12 +50,12 @@
 #include <memory>
 
 struct PmeGpuProgramImpl;
-struct gmx_device_info_t;
+struct DeviceInformation;
 
 class PmeGpuProgram
 {
 public:
-    explicit PmeGpuProgram(const gmx_device_info_t* deviceInfo);
+    explicit PmeGpuProgram(const DeviceInformation* deviceInfo);
     ~PmeGpuProgram();
 
     // TODO: design getters for information inside, if needed for PME, and make this private?
@@ -66,14 +66,9 @@ public:
  */
 using PmeGpuProgramStorage = std::unique_ptr<PmeGpuProgram>;
 
-/*! \brief This is a handle for passing references to PME GPU program data.
- * TODO: it should be a const reference, but for that the PmeGpu types need to be C++
- */
-using PmeGpuProgramHandle = const PmeGpuProgram*;
-
 /*! \brief
  * Factory function used to build persistent PME GPU program for the device at once.
  */
-PmeGpuProgramStorage buildPmeGpuProgram(const gmx_device_info_t* /*deviceInfo*/);
+PmeGpuProgramStorage buildPmeGpuProgram(const DeviceInformation* /*deviceInfo*/);
 
 #endif

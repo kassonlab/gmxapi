@@ -50,6 +50,7 @@
 #include "topologyholder.h"
 
 struct gmx_mdoutf;
+enum class PbcType : int;
 struct t_commrec;
 struct t_inputrec;
 class t_state;
@@ -143,11 +144,11 @@ public:
     //! Get pointer to box
     rvec* box();
     //! Get const pointer to box
-    const rvec* constBox();
+    const rvec* constBox() const;
     //! Get pointer to previous box
     rvec* previousBox();
     //! Get const pointer to previous box
-    const rvec* constPreviousBox();
+    const rvec* constPreviousBox() const;
     //! Get the local number of atoms
     int localNumAtoms();
 
@@ -272,7 +273,7 @@ private:
     //! Whether system has molecules self-interacting through PBC (used for final output only)
     const bool systemHasPeriodicMolecules_;
     //! The PBC type (used for final output only)
-    const int pbcType_;
+    const PbcType pbcType_;
     //! Pointer to the topology (used for final output only)
     const TopologyHolder* topologyHolder_;
     //! The (planned) last step - determines whether final configuration is written (used for final output only)

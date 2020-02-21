@@ -93,7 +93,7 @@ StatePropagatorData::StatePropagatorData(int                            numAtoms
     lastStep_(-1),
     canMoleculesBeDistributedOverPBC_(canMoleculesBeDistributedOverPBC),
     systemHasPeriodicMolecules_(inputrec->bPeriodicMols),
-    pbcType_(inputrec->ePBC),
+    pbcType_(inputrec->pbcType),
     topologyHolder_(topologyHolder),
     lastPlannedStep_(inputrec->nsteps + inputrec->init_step),
     writeFinalConfiguration_(writeFinalConfiguration),
@@ -210,7 +210,7 @@ rvec* StatePropagatorData::box()
     return box_;
 }
 
-const rvec* StatePropagatorData::constBox()
+const rvec* StatePropagatorData::constBox() const
 {
     return box_;
 }
@@ -220,7 +220,7 @@ rvec* StatePropagatorData::previousBox()
     return previousBox_;
 }
 
-const rvec* StatePropagatorData::constPreviousBox()
+const rvec* StatePropagatorData::constPreviousBox() const
 {
     return previousBox_;
 }

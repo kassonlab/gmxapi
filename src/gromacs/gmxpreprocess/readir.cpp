@@ -3,7 +3,8 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013-2019,2020, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2017, The GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -561,7 +562,7 @@ void check_ir(const char*                   mdparin,
         // Inquire all MdModules, if their parameters match with the energy
         // calculation frequency
         gmx::EnergyCalculationFrequencyErrors energyCalculationFrequencyErrors(ir->nstcalcenergy);
-        mdModulesNotifier.notifier_.notify(&energyCalculationFrequencyErrors);
+        mdModulesNotifier.preProcessingNotifications_.notify(&energyCalculationFrequencyErrors);
 
         // Emit all errors from the energy calculation frequency checks
         for (const std::string& energyFrequencyErrorMessage :
@@ -589,8 +590,8 @@ void check_ir(const char*                   mdparin,
     /* TPI STUFF */
     if (EI_TPI(ir->eI))
     {
-        sprintf(err_buf, "TPI only works with pbc = %s", epbc_names[epbcXYZ]);
-        CHECK(ir->ePBC != epbcXYZ);
+        sprintf(err_buf, "TPI only works with pbc = %s", c_pbcTypeNames[PbcType::Xyz].c_str());
+        CHECK(ir->pbcType != PbcType::Xyz);
         sprintf(err_buf, "with TPI nstlist should be larger than zero");
         CHECK(ir->nstlist <= 0);
         sprintf(err_buf, "TPI does not work with full electrostatics other than PME");
@@ -667,9 +668,11 @@ void check_ir(const char*                   mdparin,
         sprintf(err_buf, "The soft-core power is %d and can only be 1 or 2", fep->sc_power);
         CHECK(fep->sc_alpha != 0 && fep->sc_power != 1 && fep->sc_power != 2);
 
-        sprintf(err_buf, "The soft-core sc-r-power is %d and can only be 6 or 48",
+        sprintf(err_buf,
+                "The soft-core sc-r-power is %d and can only be 6. (sc-r-power 48 is no longer "
+                "supported.)",
                 static_cast<int>(fep->sc_r_power));
-        CHECK(fep->sc_alpha != 0 && fep->sc_r_power != 6.0 && fep->sc_r_power != 48.0);
+        CHECK(fep->sc_alpha != 0 && fep->sc_r_power != 6.0);
 
         sprintf(err_buf,
                 "Can't use positive delta-lambda (%g) if initial state/lambda does not start at "
@@ -910,13 +913,13 @@ void check_ir(const char*                   mdparin,
     }
 
     /* PBC/WALLS */
-    sprintf(err_buf, "walls only work with pbc=%s", epbc_names[epbcXY]);
-    CHECK(ir->nwall && ir->ePBC != epbcXY);
+    sprintf(err_buf, "walls only work with pbc=%s", c_pbcTypeNames[PbcType::XY].c_str());
+    CHECK(ir->nwall && ir->pbcType != PbcType::XY);
 
     /* VACUUM STUFF */
-    if (ir->ePBC != epbcXYZ && ir->nwall != 2)
+    if (ir->pbcType != PbcType::Xyz && ir->nwall != 2)
     {
-        if (ir->ePBC == epbcNONE)
+        if (ir->pbcType == PbcType::No)
         {
             if (ir->epc != epcNO)
             {
@@ -926,13 +929,15 @@ void check_ir(const char*                   mdparin,
         }
         else
         {
-            sprintf(err_buf, "Can not have pressure coupling with pbc=%s", epbc_names[ir->ePBC]);
+            sprintf(err_buf, "Can not have pressure coupling with pbc=%s",
+                    c_pbcTypeNames[ir->pbcType].c_str());
             CHECK(ir->epc != epcNO);
         }
-        sprintf(err_buf, "Can not have Ewald with pbc=%s", epbc_names[ir->ePBC]);
+        sprintf(err_buf, "Can not have Ewald with pbc=%s", c_pbcTypeNames[ir->pbcType].c_str());
         CHECK(EEL_FULL(ir->coulombtype));
 
-        sprintf(err_buf, "Can not have dispersion correction with pbc=%s", epbc_names[ir->ePBC]);
+        sprintf(err_buf, "Can not have dispersion correction with pbc=%s",
+                c_pbcTypeNames[ir->pbcType].c_str());
         CHECK(ir->eDispCorr != edispcNO);
     }
 
@@ -943,9 +948,9 @@ void check_ir(const char*                   mdparin,
                 "with coulombtype = %s or coulombtype = %s\n"
                 "without periodic boundary conditions (pbc = %s) and\n"
                 "rcoulomb and rvdw set to zero",
-                eel_names[eelCUT], eel_names[eelUSER], epbc_names[epbcNONE]);
+                eel_names[eelCUT], eel_names[eelUSER], c_pbcTypeNames[PbcType::No].c_str());
         CHECK(((ir->coulombtype != eelCUT) && (ir->coulombtype != eelUSER))
-              || (ir->ePBC != epbcNONE) || (ir->rcoulomb != 0.0) || (ir->rvdw != 0.0));
+              || (ir->pbcType != PbcType::No) || (ir->rcoulomb != 0.0) || (ir->rvdw != 0.0));
 
         if (ir->nstlist > 0)
         {
@@ -991,7 +996,7 @@ void check_ir(const char*                   mdparin,
                     "Can not remove the rotation around the center of mass with periodic "
                     "molecules");
             CHECK(ir->bPeriodicMols);
-            if (ir->ePBC != epbcNONE)
+            if (ir->pbcType != PbcType::No)
             {
                 warning(wi,
                         "Removing the rotation around the center of mass in a periodic system, "
@@ -1001,7 +1006,7 @@ void check_ir(const char*                   mdparin,
         }
     }
 
-    if (EI_STATE_VELOCITY(ir->eI) && !EI_SD(ir->eI) && ir->ePBC == epbcNONE && ir->comm_mode != ecmANGULAR)
+    if (EI_STATE_VELOCITY(ir->eI) && !EI_SD(ir->eI) && ir->pbcType == PbcType::No && ir->comm_mode != ecmANGULAR)
     {
         sprintf(warn_buf,
                 "Tumbling and flying ice-cubes: We are not removing rotation around center of mass "
@@ -1308,18 +1313,18 @@ void check_ir(const char*                   mdparin,
     {
         if (ir->ewald_geometry == eewg3D)
         {
-            sprintf(warn_buf, "With pbc=%s you should use ewald-geometry=%s", epbc_names[ir->ePBC],
-                    eewg_names[eewg3DC]);
+            sprintf(warn_buf, "With pbc=%s you should use ewald-geometry=%s",
+                    c_pbcTypeNames[ir->pbcType].c_str(), eewg_names[eewg3DC]);
             warning(wi, warn_buf);
         }
         /* This check avoids extra pbc coding for exclusion corrections */
         sprintf(err_buf, "wall-ewald-zfac should be >= 2");
         CHECK(ir->wall_ewald_zfac < 2);
     }
-    if ((ir->ewald_geometry == eewg3DC) && (ir->ePBC != epbcXY) && EEL_FULL(ir->coulombtype))
+    if ((ir->ewald_geometry == eewg3DC) && (ir->pbcType != PbcType::XY) && EEL_FULL(ir->coulombtype))
     {
         sprintf(warn_buf, "With %s and ewald_geometry = %s you should use pbc = %s",
-                eel_names[ir->coulombtype], eewg_names[eewg3DC], epbc_names[epbcXY]);
+                eel_names[ir->coulombtype], eewg_names[eewg3DC], c_pbcTypeNames[PbcType::XY].c_str());
         warning(wi, warn_buf);
     }
     if ((ir->epsilon_surface != 0) && EEL_FULL(ir->coulombtype))
@@ -1563,17 +1568,6 @@ static void do_fep_params(t_inputrec* ir, char fep_lambda[][STRLEN], char weight
         }
     }
 
-
-    /* make it easier if sc_r_power = 48 by increasing it to the 4th power, to be in the right scale. */
-    if (fep->sc_r_power == 48)
-    {
-        if (fep->sc_alpha > 0.1)
-        {
-            gmx_fatal(FARGS,
-                      "sc_alpha (%f) for sc_r_power = 48 should usually be between 0.001 and 0.004",
-                      fep->sc_alpha);
-        }
-    }
 
     /* now read in the weights */
     parse_n_real(weights, &nweights, &(expand->init_lambda_weights), wi);
@@ -1963,7 +1957,13 @@ void get_ir(const char*     mdparin,
     printStringNoNewline(&inp, "nblist update frequency");
     ir->nstlist = get_eint(&inp, "nstlist", 10, wi);
     printStringNoNewline(&inp, "Periodic boundary conditions: xyz, no, xy");
-    ir->ePBC          = get_eeenum(&inp, "pbc", epbc_names, wi);
+    // TODO This conversion should be removed when proper std:string handling will be added to get_eeenum(...), etc.
+    std::vector<const char*> pbcTypesNamesChar;
+    for (const auto& pbcTypeName : c_pbcTypeNames)
+    {
+        pbcTypesNamesChar.push_back(pbcTypeName.c_str());
+    }
+    ir->pbcType       = static_cast<PbcType>(get_eeenum(&inp, "pbc", pbcTypesNamesChar.data(), wi));
     ir->bPeriodicMols = get_eeenum(&inp, "periodic-molecules", yesno_names, wi) != 0;
     printStringNoNewline(&inp,
                          "Allowed energy error due to the Verlet buffer in kJ/mol/ps per atom,");
@@ -3615,7 +3615,7 @@ void do_index(const char*                   mdparin,
 
     gmx::IndexGroupsAndNames defaultIndexGroupsAndNames(
             *defaultIndexGroups, gmx::arrayRefFromArray(gnames, defaultIndexGroups->nr));
-    notifier.notifier_.notify(defaultIndexGroupsAndNames);
+    notifier.preProcessingNotifications_.notify(defaultIndexGroupsAndNames);
 
     auto accelerations          = gmx::splitString(is->acc);
     auto accelerationGroupNames = gmx::splitString(is->accgrps);
@@ -4091,7 +4091,8 @@ void triple_check(const char* mdparin, t_inputrec* ir, gmx_mtop_t* sys, warninp_
     {
         warning_note(wi,
                      "Removing center of mass motion in the presence of position restraints might "
-                     "cause artifacts");
+                     "cause artifacts. When you are using position restraints to equilibrate a "
+                     "macro-molecule, the artifacts are usually negligible.");
     }
 
     if (ir->cutoff_scheme == ecutsVERLET && ir->verletbuf_tol > 0 && ir->nstlist > 1
@@ -4376,7 +4377,7 @@ void double_check(t_inputrec* ir, matrix box, bool bHasNormalConstraints, bool b
     char        warn_buf[STRLEN];
     const char* ptr;
 
-    ptr = check_box(ir->ePBC, box);
+    ptr = check_box(ir->pbcType, box);
     if (ptr)
     {
         warning_error(wi, ptr);
@@ -4426,7 +4427,7 @@ void double_check(t_inputrec* ir, matrix box, bool bHasNormalConstraints, bool b
         ir->LincsWarnAngle = 90.0;
     }
 
-    if (ir->ePBC != epbcNONE)
+    if (ir->pbcType != PbcType::No)
     {
         if (ir->nstlist == 0)
         {
@@ -4434,7 +4435,7 @@ void double_check(t_inputrec* ir, matrix box, bool bHasNormalConstraints, bool b
                     "With nstlist=0 atoms are only put into the box at step 0, therefore drifting "
                     "atoms might cause the simulation to crash.");
         }
-        if (gmx::square(ir->rlist) >= max_cutoff2(ir->ePBC, box))
+        if (gmx::square(ir->rlist) >= max_cutoff2(ir->pbcType, box))
         {
             sprintf(warn_buf,
                     "ERROR: The cut-off length is longer than half the shortest box vector or "

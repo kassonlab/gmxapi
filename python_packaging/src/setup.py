@@ -150,7 +150,7 @@ setup(
     name='gmxapi',
 
     # TODO: single-source version information (currently repeated in gmxapi/version.py)
-    version='0.2.0b1',
+    version='0.2.0a1',
     python_requires='>=3.5, <3.9',
     setup_requires=['cmake>=3.12',
                     'setuptools>=28',

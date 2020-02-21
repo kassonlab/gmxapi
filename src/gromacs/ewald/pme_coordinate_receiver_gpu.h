@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -42,13 +42,18 @@
 #ifndef GMX_PMECOORDINATERECEIVERGPU_H
 #define GMX_PMECOORDINATERECEIVERGPU_H
 
-#include "gromacs/ewald/pme.h"
-#include "gromacs/ewald/pme_force_sender_gpu.h"
+#include "gromacs/gpu_utils/devicebuffer_datatype.h"
+#include "gromacs/math/vectypes.h"
 #include "gromacs/utility/classhelpers.h"
 #include "gromacs/utility/gmxmpi.h"
 
+struct PpRanks;
+
 namespace gmx
 {
+
+template<typename>
+class ArrayRef;
 
 class PmeCoordinateReceiverGpu
 {
@@ -59,14 +64,14 @@ public:
      * \param[in] comm            Communicator used for simulation
      * \param[in] ppRanks         List of PP ranks
      */
-    PmeCoordinateReceiverGpu(void* pmeStream, MPI_Comm comm, gmx::ArrayRef<PpRanks> ppRanks);
+    PmeCoordinateReceiverGpu(const void* pmeStream, MPI_Comm comm, gmx::ArrayRef<PpRanks> ppRanks);
     ~PmeCoordinateReceiverGpu();
 
     /*! \brief
      * send coordinates buffer address to PP rank
      * \param[in] d_x   coordinates buffer in GPU memory
      */
-    void sendCoordinateBufferAddressToPpRanks(DeviceBuffer<float> d_x);
+    void sendCoordinateBufferAddressToPpRanks(DeviceBuffer<RVec> d_x);
 
 
     /*! \brief

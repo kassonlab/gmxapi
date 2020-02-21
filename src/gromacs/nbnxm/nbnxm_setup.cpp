@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -49,15 +49,15 @@
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/forcerec.h"
 #include "gromacs/mdtypes/inputrec.h"
+#include "gromacs/nbnxm/atomdata.h"
 #include "gromacs/nbnxm/gpu_data_mgmt.h"
 #include "gromacs/nbnxm/nbnxm.h"
 #include "gromacs/nbnxm/pairlist_tuning.h"
 #include "gromacs/simd/simd.h"
+#include "gromacs/topology/mtop_util.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/logger.h"
 
-#include "atomdata.h"
-#include "gpu_types.h"
 #include "grid.h"
 #include "nbnxm_geometry.h"
 #include "nbnxm_simd.h"
@@ -321,7 +321,7 @@ namespace Nbnxm
 {
 
 /*! \brief Gets and returns the minimum i-list count for balacing based on the GPU used or env.var. when set */
-static int getMinimumIlistCountForGpuBalancing(gmx_nbnxn_gpu_t* nbnxmGpu)
+static int getMinimumIlistCountForGpuBalancing(NbnxmGpu* nbnxmGpu)
 {
     int minimumIlistCount;
 
@@ -358,12 +358,11 @@ static int getMinimumIlistCountForGpuBalancing(gmx_nbnxn_gpu_t* nbnxmGpu)
 }
 
 std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger&     mdlog,
-                                                   gmx_bool                 bFEP_NonBonded,
                                                    const t_inputrec*        ir,
                                                    const t_forcerec*        fr,
                                                    const t_commrec*         cr,
                                                    const gmx_hw_info_t&     hardwareInfo,
-                                                   const gmx_device_info_t* deviceInfo,
+                                                   const DeviceInformation* deviceInfo,
                                                    const gmx_mtop_t*        mtop,
                                                    matrix                   box,
                                                    gmx_wallcycle*           wcycle)
@@ -393,6 +392,7 @@ std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger&     mdlo
 
     const bool haveMultipleDomains = (DOMAINDECOMP(cr) && cr->dd->nnodes > 1);
 
+    bool           bFEP_NonBonded = (fr->efep != efepNO) && haveFepPerturbedNBInteractions(mtop);
     PairlistParams pairlistParams(kernelSetup.kernelType, bFEP_NonBonded, ir->rlist,
                                   havePPDomainDecomposition(cr));
 
@@ -441,8 +441,8 @@ std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger&     mdlo
                         fr->nbfp, mimimumNumEnergyGroupNonbonded,
                         (useGpu || emulateGpu) ? 1 : gmx_omp_nthreads_get(emntNonbonded));
 
-    gmx_nbnxn_gpu_t* gpu_nbv                          = nullptr;
-    int              minimumIlistCountForGpuBalancing = 0;
+    NbnxmGpu* gpu_nbv                          = nullptr;
+    int       minimumIlistCountForGpuBalancing = 0;
     if (useGpu)
     {
         /* init the NxN GPU data; the last argument tells whether we'll have
@@ -456,7 +456,7 @@ std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger&     mdlo
                                                        minimumIlistCountForGpuBalancing);
 
     auto pairSearch = std::make_unique<PairSearch>(
-            ir->ePBC, EI_TPI(ir->eI), DOMAINDECOMP(cr) ? &cr->dd->numCells : nullptr,
+            ir->pbcType, EI_TPI(ir->eI), DOMAINDECOMP(cr) ? &cr->dd->numCells : nullptr,
             DOMAINDECOMP(cr) ? domdec_zones(cr->dd) : nullptr, pairlistParams.pairlistType,
             bFEP_NonBonded, gmx_omp_nthreads_get(emntPairsearch), pinPolicy);
 
@@ -470,7 +470,7 @@ nonbonded_verlet_t::nonbonded_verlet_t(std::unique_ptr<PairlistSets>     pairlis
                                        std::unique_ptr<PairSearch>       pairSearch,
                                        std::unique_ptr<nbnxn_atomdata_t> nbat_in,
                                        const Nbnxm::KernelSetup&         kernelSetup,
-                                       gmx_nbnxn_gpu_t*                  gpu_nbv_ptr,
+                                       NbnxmGpu*                         gpu_nbv_ptr,
                                        gmx_wallcycle*                    wcycle) :
     pairlistSets_(std::move(pairlistSets)),
     pairSearch_(std::move(pairSearch)),

@@ -60,8 +60,8 @@
 #include "gromacs/domdec/mdsetup.h"
 #include "gromacs/domdec/partition.h"
 #include "gromacs/essentialdynamics/edsam.h"
-#include "gromacs/ewald/pme.h"
 #include "gromacs/ewald/pme_load_balancing.h"
+#include "gromacs/ewald/pme_pp.h"
 #include "gromacs/fileio/trxio.h"
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/gmxlib/nrnb.h"
@@ -300,8 +300,8 @@ void gmx::LegacySimulator::do_mimic()
         t_vcm* vcm          = nullptr;
         compute_globals(gstat, cr, ir, fr, ekind, state->x.rvec_array(), state->v.rvec_array(),
                         state->box, state->lambda[efptVDW], mdatoms, nrnb, vcm, nullptr, enerd,
-                        force_vir, shake_vir, total_vir, pres, mu_tot, constr, &nullSignaller,
-                        state->box, &totalNumberOfBondedInteractions, &bSumEkinhOld, cglo_flags);
+                        force_vir, shake_vir, total_vir, pres, constr, &nullSignaller, state->box,
+                        &totalNumberOfBondedInteractions, &bSumEkinhOld, cglo_flags);
     }
     checkNumberOfBondedInteractions(mdlog, cr, totalNumberOfBondedInteractions, top_global, &top,
                                     state->x.rvec_array(), state->box,
@@ -469,7 +469,7 @@ void gmx::LegacySimulator::do_mimic()
             }
             construct_vsites(vsite, as_rvec_array(state->x.data()), ir->delta_t,
                              as_rvec_array(state->v.data()), top.idef.iparams, top.idef.il,
-                             fr->ePBC, fr->bMolPBC, cr, state->box);
+                             fr->pbcType, fr->bMolPBC, cr, state->box);
 
             if (graph != nullptr)
             {
@@ -487,8 +487,8 @@ void gmx::LegacySimulator::do_mimic()
 
             compute_globals(gstat, cr, ir, fr, ekind, state->x.rvec_array(), state->v.rvec_array(),
                             state->box, state->lambda[efptVDW], mdatoms, nrnb, vcm, wcycle, enerd,
-                            nullptr, nullptr, nullptr, nullptr, mu_tot, constr, &signaller,
-                            state->box, &totalNumberOfBondedInteractions, &bSumEkinhOld,
+                            nullptr, nullptr, nullptr, nullptr, constr, &signaller, state->box,
+                            &totalNumberOfBondedInteractions, &bSumEkinhOld,
                             CGLO_GSTAT | CGLO_ENERGY
                                     | (shouldCheckNumberOfBondedInteractions ? CGLO_CHECK_NUMBER_OF_BONDED_INTERACTIONS
                                                                              : 0));

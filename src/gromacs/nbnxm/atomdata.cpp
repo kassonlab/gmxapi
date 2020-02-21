@@ -2,7 +2,7 @@
  * This file is part of the GROMACS molecular simulation package.
  *
  * Copyright (c) 2012-2018, The GROMACS development team.
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -67,6 +67,7 @@
 #include "grid.h"
 #include "gridset.h"
 #include "nbnxm_geometry.h"
+#include "nbnxm_gpu.h"
 #include "pairlist.h"
 
 using namespace gmx; // TODO: Remove when this file is moved into gmx namespace
@@ -1073,8 +1074,8 @@ void nbnxn_atomdata_copy_x_to_nbat_x(const Nbnxm::GridSet&   gridSet,
 void nbnxn_atomdata_x_to_nbat_x_gpu(const Nbnxm::GridSet&   gridSet,
                                     const gmx::AtomLocality locality,
                                     bool                    fillLocal,
-                                    gmx_nbnxn_gpu_t*        gpu_nbv,
-                                    DeviceBuffer<float>     d_x,
+                                    NbnxmGpu*               gpu_nbv,
+                                    DeviceBuffer<RVec>      d_x,
                                     GpuEventSynchronizer*   xReadyOnDevice)
 {
 
@@ -1458,11 +1459,11 @@ void reduceForces(nbnxn_atomdata_t* nbat, const gmx::AtomLocality locality, cons
 
 /* Add the force array(s) from nbnxn_atomdata_t to f */
 void reduceForcesGpu(const gmx::AtomLocality                    locality,
-                     DeviceBuffer<float>                        totalForcesDevice,
+                     DeviceBuffer<RVec>                         totalForcesDevice,
                      const Nbnxm::GridSet&                      gridSet,
                      void*                                      pmeForcesDevice,
                      gmx::ArrayRef<GpuEventSynchronizer* const> dependencyList,
-                     gmx_nbnxn_gpu_t*                           gpu_nbv,
+                     NbnxmGpu*                                  gpu_nbv,
                      bool                                       useGpuFPmeReduction,
                      bool                                       accumulateForce)
 {

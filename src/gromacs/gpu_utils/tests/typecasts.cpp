@@ -1,8 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014,2015,2016 by the GROMACS development team.
- * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
+ * Copyright (c) 2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -33,31 +32,47 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-#ifndef GMX_NBNXN_CONSTANTS_H
-#define GMX_NBNXN_CONSTANTS_H
-
-// Lower limit for square interaction distances in nonbonded kernels.
-// For smaller values we will overflow when calculating r^-1 or r^-12, but
-// to keep it simple we always apply the limit from the tougher r^-12 condition.
-#if GMX_DOUBLE
-// Some double precision SIMD architectures use single precision in the first
-// step, so although the double precision criterion would allow smaller rsq,
-// we need to stay in single precision with some margin for the N-R iterations.
-#    define NBNXN_MIN_RSQ 1.0e-36
-#else
-// The worst intermediate value we might evaluate is r^-12, which
-// means we should ensure r^2 stays above pow(GMX_FLOAT_MAX,-1.0/6.0)*1.01 (some margin)
-#    define NBNXN_MIN_RSQ 3.82e-07f // r > 6.2e-4
-#endif
-
-
-/* The number of clusters in a super-cluster, used for GPU */
-#define c_nbnxnGpuNumClusterPerSupercluster 8
-
-/* With GPU kernels we group cluster pairs in 4 to optimize memory usage
- * of integers containing 32 bits.
+/*! \internal \file
+ * \brief
+ * Tests for CUDA float3 type layout.
+ *
+ * \author Artem Zhmurov <zhmurov@gmail.com>
  */
-#define c_nbnxnGpuJgroupSize (32 / c_nbnxnGpuNumClusterPerSupercluster)
+#include "gmxpre.h"
 
-#endif
+#include <vector>
+
+#include <gtest/gtest.h>
+
+#include "gromacs/utility/exceptions.h"
+
+#include "testutils/testasserts.h"
+#include "testutils/testmatchers.h"
+
+#include "typecasts_runner.h"
+
+namespace gmx
+{
+
+namespace test
+{
+
+//! Test data in RVec format
+static const std::vector<RVec> rVecInput = { { 1.0, 2.0, 3.0 }, { 4.0, 5.0, 6.0 } };
+
+TEST(GpuDataTypesCompatibilityTest, RVecAndFloat3OnHost)
+{
+    std::vector<RVec> rVecOutput(rVecInput.size());
+    convertRVecToFloat3OnHost(rVecOutput, rVecInput);
+    EXPECT_THAT(rVecInput, testing::Pointwise(RVecEq(ulpTolerance(0)), rVecOutput));
+}
+
+TEST(GpuDataTypesCompatibilityTest, RVecAndFloat3OnDevice)
+{
+    std::vector<RVec> rVecOutput(rVecInput.size());
+    convertRVecToFloat3OnDevice(rVecOutput, rVecInput);
+    EXPECT_THAT(rVecInput, testing::Pointwise(RVecEq(ulpTolerance(0)), rVecOutput));
+}
+
+} // namespace test
+} // namespace gmx

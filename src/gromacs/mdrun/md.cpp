@@ -58,11 +58,12 @@
 #include "gromacs/domdec/domdec.h"
 #include "gromacs/domdec/domdec_network.h"
 #include "gromacs/domdec/domdec_struct.h"
+#include "gromacs/domdec/gpuhaloexchange.h"
 #include "gromacs/domdec/mdsetup.h"
 #include "gromacs/domdec/partition.h"
 #include "gromacs/essentialdynamics/edsam.h"
-#include "gromacs/ewald/pme.h"
 #include "gromacs/ewald/pme_load_balancing.h"
+#include "gromacs/ewald/pme_pp.h"
 #include "gromacs/fileio/trxio.h"
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/gmxlib/nrnb.h"
@@ -95,7 +96,7 @@
 #include "gromacs/mdlib/tgroup.h"
 #include "gromacs/mdlib/trajectory_writing.h"
 #include "gromacs/mdlib/update.h"
-#include "gromacs/mdlib/update_constrain_cuda.h"
+#include "gromacs/mdlib/update_constrain_gpu.h"
 #include "gromacs/mdlib/vcm.h"
 #include "gromacs/mdlib/vsite.h"
 #include "gromacs/mdrunutility/handlerestart.h"
@@ -287,7 +288,7 @@ void gmx::LegacySimulator::do_md()
 
     auto mdatoms = mdAtoms->mdatoms();
 
-    std::unique_ptr<UpdateConstrainCuda> integrator;
+    std::unique_ptr<UpdateConstrainGpu> integrator;
 
     if (DOMAINDECOMP(cr))
     {
@@ -353,8 +354,11 @@ void gmx::LegacySimulator::do_md()
                            "Constraints pulling is not supported with the GPU update.\n");
         GMX_RELEASE_ASSERT(fcd->orires.nr == 0,
                            "Orientation restraints are not supported with the GPU update.\n");
-        GMX_RELEASE_ASSERT(ir->efep == efepNO,
-                           "Free energy perturbations are not supported with the GPU update.");
+        GMX_RELEASE_ASSERT(
+                ir->efep == efepNO
+                        || (!haveFreeEnergyType(*ir, efptBONDED) && !haveFreeEnergyType(*ir, efptMASS)),
+                "Free energy perturbation of masses and constraints are not supported with the GPU "
+                "update.");
         GMX_RELEASE_ASSERT(graph == nullptr, "The graph is not supported with GPU update.");
 
         if (constr != nullptr && constr->numConstraintsTotal() > 0)
@@ -367,12 +371,10 @@ void gmx::LegacySimulator::do_md()
         {
             GMX_LOG(mdlog.info).asParagraph().appendText("Updating coordinates on the GPU.");
         }
-        integrator = std::make_unique<UpdateConstrainCuda>(
+        integrator = std::make_unique<UpdateConstrainGpu>(
                 *ir, *top_global, stateGpu->getUpdateStream(), stateGpu->xUpdatedOnDevice());
 
-        t_pbc pbc;
-        set_pbc(&pbc, epbcXYZ, state->box);
-        integrator->setPbc(&pbc);
+        integrator->setPbc(PbcType::Xyz, state->box);
     }
 
     if (useGpuForPme || (useGpuForNonbonded && useGpuForBufferOps) || useGpuForUpdate)
@@ -471,7 +473,7 @@ void gmx::LegacySimulator::do_md()
         {
             /* Construct the virtual sites for the initial configuration */
             construct_vsites(vsite, state->x.rvec_array(), ir->delta_t, nullptr, top.idef.iparams,
-                             top.idef.il, fr->ePBC, fr->bMolPBC, cr, state->box);
+                             top.idef.il, fr->pbcType, fr->bMolPBC, cr, state->box);
         }
     }
 
@@ -540,8 +542,8 @@ void gmx::LegacySimulator::do_md()
         }
         compute_globals(gstat, cr, ir, fr, ekind, state->x.rvec_array(), state->v.rvec_array(),
                         state->box, state->lambda[efptVDW], mdatoms, nrnb, &vcm, nullptr, enerd,
-                        force_vir, shake_vir, total_vir, pres, mu_tot, constr, &nullSignaller,
-                        state->box, &totalNumberOfBondedInteractions, &bSumEkinhOld,
+                        force_vir, shake_vir, total_vir, pres, constr, &nullSignaller, state->box,
+                        &totalNumberOfBondedInteractions, &bSumEkinhOld,
                         cglo_flags_iteration
                                 | (shouldCheckNumberOfBondedInteractions ? CGLO_CHECK_NUMBER_OF_BONDED_INTERACTIONS
                                                                          : 0));
@@ -572,8 +574,8 @@ void gmx::LegacySimulator::do_md()
 
         compute_globals(gstat, cr, ir, fr, ekind, state->x.rvec_array(), state->v.rvec_array(),
                         state->box, state->lambda[efptVDW], mdatoms, nrnb, &vcm, nullptr, enerd,
-                        force_vir, shake_vir, total_vir, pres, mu_tot, constr, &nullSignaller,
-                        state->box, nullptr, &bSumEkinhOld, cglo_flags & ~CGLO_PRESSURE);
+                        force_vir, shake_vir, total_vir, pres, constr, &nullSignaller, state->box,
+                        nullptr, &bSumEkinhOld, cglo_flags & ~CGLO_PRESSURE);
     }
 
     /* Calculate the initial half step temperature, and save the ekinh_old */
@@ -825,9 +827,7 @@ void gmx::LegacySimulator::do_md()
                     // If update is offloaded, it should be informed about the box size change
                     if (useGpuForUpdate)
                     {
-                        t_pbc pbc;
-                        set_pbc(&pbc, epbcXYZ, state->box);
-                        integrator->setPbc(&pbc);
+                        integrator->setPbc(PbcType::Xyz, state->box);
                     }
                 }
             }
@@ -844,6 +844,18 @@ void gmx::LegacySimulator::do_md()
                                     fr, vsite, constr, nrnb, wcycle, do_verbose && !bPMETunePrinting);
                 shouldCheckNumberOfBondedInteractions = true;
                 upd.setNumAtoms(state->natoms);
+
+                // Allocate or re-size GPU halo exchange object, if necessary
+                if (havePPDomainDecomposition(cr) && simulationWork.useGpuHaloExchange
+                    && useGpuForNonbonded && is1D(*cr->dd))
+                {
+                    // TODO remove need to pass local stream into GPU halo exchange - Redmine #3093
+                    void* streamLocal =
+                            Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::Local);
+                    void* streamNonLocal = Nbnxm::gpu_get_command_stream(
+                            fr->nbv->gpu_nbv, InteractionLocality::NonLocal);
+                    constructGpuHaloExchange(mdlog, *cr, streamLocal, streamNonLocal);
+                }
             }
         }
 
@@ -865,8 +877,8 @@ void gmx::LegacySimulator::do_md()
             /* This may not be quite working correctly yet . . . . */
             compute_globals(gstat, cr, ir, fr, ekind, state->x.rvec_array(), state->v.rvec_array(),
                             state->box, state->lambda[efptVDW], mdatoms, nrnb, &vcm, wcycle, enerd,
-                            nullptr, nullptr, nullptr, nullptr, mu_tot, constr, &nullSignaller,
-                            state->box, &totalNumberOfBondedInteractions, &bSumEkinhOld,
+                            nullptr, nullptr, nullptr, nullptr, constr, &nullSignaller, state->box,
+                            &totalNumberOfBondedInteractions, &bSumEkinhOld,
                             CGLO_GSTAT | CGLO_TEMPERATURE | CGLO_CHECK_NUMBER_OF_BONDED_INTERACTIONS);
             checkNumberOfBondedInteractions(mdlog, cr, totalNumberOfBondedInteractions, top_global,
                                             &top, state->x.rvec_array(), state->box,
@@ -1002,8 +1014,8 @@ void gmx::LegacySimulator::do_md()
             {
                 wallcycle_stop(wcycle, ewcUPDATE);
                 compute_globals(gstat, cr, ir, fr, ekind, state->x.rvec_array(), state->v.rvec_array(),
-                                state->box, state->lambda[efptVDW], mdatoms, nrnb, &vcm, wcycle, enerd,
-                                force_vir, shake_vir, total_vir, pres, mu_tot, constr, &nullSignaller,
+                                state->box, state->lambda[efptVDW], mdatoms, nrnb, &vcm, wcycle,
+                                enerd, force_vir, shake_vir, total_vir, pres, constr, &nullSignaller,
                                 state->box, &totalNumberOfBondedInteractions, &bSumEkinhOld,
                                 (bGStat ? CGLO_GSTAT : 0) | (bCalcEner ? CGLO_ENERGY : 0)
                                         | (bTemp ? CGLO_TEMPERATURE : 0) | (bPres ? CGLO_PRESSURE : 0)
@@ -1065,7 +1077,7 @@ void gmx::LegacySimulator::do_md()
                     compute_globals(gstat, cr, ir, fr, ekind, state->x.rvec_array(),
                                     state->v.rvec_array(), state->box, state->lambda[efptVDW],
                                     mdatoms, nrnb, &vcm, wcycle, enerd, nullptr, nullptr, nullptr,
-                                    nullptr, mu_tot, constr, &nullSignaller, state->box, nullptr,
+                                    nullptr, constr, &nullSignaller, state->box, nullptr,
                                     &bSumEkinhOld, CGLO_GSTAT | CGLO_TEMPERATURE);
                     wallcycle_start(wcycle, ewcUPDATE);
                 }
@@ -1314,7 +1326,7 @@ void gmx::LegacySimulator::do_md()
             /* just compute the kinetic energy at the half step to perform a trotter step */
             compute_globals(gstat, cr, ir, fr, ekind, state->x.rvec_array(), state->v.rvec_array(),
                             state->box, state->lambda[efptVDW], mdatoms, nrnb, &vcm, wcycle, enerd,
-                            force_vir, shake_vir, total_vir, pres, mu_tot, constr, &nullSignaller, lastbox,
+                            force_vir, shake_vir, total_vir, pres, constr, &nullSignaller, lastbox,
                             nullptr, &bSumEkinhOld, (bGStat ? CGLO_GSTAT : 0) | CGLO_TEMPERATURE);
             wallcycle_start(wcycle, ewcUPDATE);
             trotter_update(ir, step, ekind, enerd, state, total_vir, mdatoms, &MassQ, trotter_seq, ettTSEQ4);
@@ -1363,7 +1375,7 @@ void gmx::LegacySimulator::do_md()
                 shift_self(graph, state->box, state->x.rvec_array());
             }
             construct_vsites(vsite, state->x.rvec_array(), ir->delta_t, state->v.rvec_array(),
-                             top.idef.iparams, top.idef.il, fr->ePBC, fr->bMolPBC, cr, state->box);
+                             top.idef.iparams, top.idef.il, fr->pbcType, fr->bMolPBC, cr, state->box);
 
             if (graph != nullptr)
             {
@@ -1403,7 +1415,7 @@ void gmx::LegacySimulator::do_md()
                 compute_globals(
                         gstat, cr, ir, fr, ekind, state->x.rvec_array(), state->v.rvec_array(),
                         state->box, state->lambda[efptVDW], mdatoms, nrnb, &vcm, wcycle, enerd,
-                        force_vir, shake_vir, total_vir, pres, mu_tot, constr, &signaller, lastbox,
+                        force_vir, shake_vir, total_vir, pres, constr, &signaller, lastbox,
                         &totalNumberOfBondedInteractions, &bSumEkinhOld,
                         (bGStat ? CGLO_GSTAT : 0) | (!EI_VV(ir->eI) && bCalcEner ? CGLO_ENERGY : 0)
                                 | (!EI_VV(ir->eI) && bStopCM ? CGLO_STOPCM : 0)
@@ -1455,9 +1467,7 @@ void gmx::LegacySimulator::do_md()
         if (useGpuForUpdate && (doBerendsenPressureCoupling || doParrinelloRahman))
         {
             integrator->scaleCoordinates(pressureCouplingMu);
-            t_pbc pbc;
-            set_pbc(&pbc, epbcXYZ, state->box);
-            integrator->setPbc(&pbc);
+            integrator->setPbc(PbcType::Xyz, state->box);
         }
 
         /* ################# END UPDATE STEP 2 ################# */

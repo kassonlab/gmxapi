@@ -139,7 +139,7 @@ public:
     /*! \brief Applies constraints to coordinates.
      *
      * When econq=ConstraintVariable::Positions constrains
-     * coordinates xprime using th directions in x, min_proj is
+     * coordinates xprime using the directions in x, min_proj is
      * not used.
      *
      * When econq=ConstraintVariable::Derivative, calculates the
@@ -167,21 +167,23 @@ public:
      * If vir!=NULL calculate the constraint virial.
      *
      * Return whether the application of constraints succeeded without error.
+     *
+     * /note x is non-const, because non-local atoms need to be communicated.
      */
-    bool apply(bool               bLog,
-               bool               bEner,
-               int64_t            step,
-               int                delta_step,
-               real               step_scaling,
-               rvec*              x,
-               rvec*              xprime,
-               rvec*              min_proj,
-               const matrix       box,
-               real               lambda,
-               real*              dvdlambda,
-               rvec*              v,
-               tensor*            vir,
-               ConstraintVariable econq);
+    bool apply(bool                      bLog,
+               bool                      bEner,
+               int64_t                   step,
+               int                       delta_step,
+               real                      step_scaling,
+               ArrayRefWithPadding<RVec> x,
+               ArrayRefWithPadding<RVec> xprime,
+               ArrayRef<RVec>            min_proj,
+               const matrix              box,
+               real                      lambda,
+               real*                     dvdlambda,
+               ArrayRefWithPadding<RVec> v,
+               tensor*                   vir,
+               ConstraintVariable        econq);
     //! Links the essentialdynamics and constraint code.
     void saveEdsamPointer(gmx_edsam* ed);
     //! Getter for use by domain decomposition.

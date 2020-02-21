@@ -314,7 +314,7 @@ real comm_box_frac(const gmx::IVec& dd_nc, real cutoff, const gmx_ddbox_t& ddbox
 /*! \brief Return whether the DD inhomogeneous in the z direction */
 static gmx_bool inhomogeneous_z(const t_inputrec& ir)
 {
-    return ((EEL_PME(ir.coulombtype) || ir.coulombtype == eelEWALD) && ir.ePBC == epbcXYZ
+    return ((EEL_PME(ir.coulombtype) || ir.coulombtype == eelEWALD) && ir.pbcType == PbcType::Xyz
             && ir.ewald_geometry == eewg3DC);
 }
 
@@ -364,8 +364,8 @@ static float comm_cost_est(real               limit,
     float temp;
 
     /* Check the DD algorithm restrictions */
-    if ((ir.ePBC == epbcXY && ir.nwall < 2 && nc[ZZ] > 1)
-        || (ir.ePBC == epbcSCREW && (nc[XX] == 1 || nc[YY] > 1 || nc[ZZ] > 1)))
+    if ((ir.pbcType == PbcType::XY && ir.nwall < 2 && nc[ZZ] > 1)
+        || (ir.pbcType == PbcType::Screw && (nc[XX] == 1 || nc[YY] > 1 || nc[ZZ] > 1)))
     {
         return -1;
     }
@@ -528,7 +528,7 @@ static float comm_cost_est(real               limit,
 
     /* Add cost of pbc_dx for bondeds */
     cost_pbcdx = 0;
-    if ((nc[XX] == 1 || nc[YY] == 1) || (nc[ZZ] == 1 && ir.ePBC != epbcXY))
+    if ((nc[XX] == 1 || nc[YY] == 1) || (nc[ZZ] == 1 && ir.pbcType != PbcType::XY))
     {
         if ((ddbox.tric_dir[XX] && nc[XX] == 1) || (ddbox.tric_dir[YY] && nc[YY] == 1))
         {
@@ -639,7 +639,7 @@ static gmx::IVec optimizeDDCells(const gmx::MDLogger& mdlog,
                                  const int            numRanksRequested,
                                  const int            numPmeOnlyRanks,
                                  const real           cellSizeLimit,
-                                 const bool           request1DAnd1Pulse,
+                                 const bool           request1D,
                                  const gmx_mtop_t&    mtop,
                                  const matrix         box,
                                  const gmx_ddbox_t&   ddbox,
@@ -716,24 +716,19 @@ static gmx::IVec optimizeDDCells(const gmx::MDLogger& mdlog,
 
     gmx::IVec itry       = { 1, 1, 1 };
     gmx::IVec numDomains = { 0, 0, 0 };
-    assign_factors(cellSizeLimit, request1DAnd1Pulse, systemInfo.cutoff, box, ddbox, mtop.natoms, ir,
-                   pbcdxr, numRanksDoingPmeWork, div.size(), div.data(), mdiv.data(), &itry, &numDomains);
+    assign_factors(cellSizeLimit, request1D, systemInfo.cutoff, box, ddbox, mtop.natoms, ir, pbcdxr,
+                   numRanksDoingPmeWork, div.size(), div.data(), mdiv.data(), &itry, &numDomains);
 
     return numDomains;
 }
 
 real getDDGridSetupCellSizeLimit(const gmx::MDLogger& mdlog,
-                                 const bool           request1DAnd1Pulse,
                                  const bool           bDynLoadBal,
                                  const real           dlb_scale,
                                  const t_inputrec&    ir,
-                                 const real           systemInfoCellSizeLimit)
+                                 real                 systemInfoCellSizeLimit)
 {
     real cellSizeLimit = systemInfoCellSizeLimit;
-    if (request1DAnd1Pulse)
-    {
-        cellSizeLimit = std::max(cellSizeLimit, ir.rlist);
-    }
 
     /* Add a margin for DLB and/or pressure scaling */
     if (bDynLoadBal)
@@ -759,7 +754,10 @@ real getDDGridSetupCellSizeLimit(const gmx::MDLogger& mdlog,
 
     return cellSizeLimit;
 }
-void checkForValidRankCountRequests(const int numRanksRequested, const bool usingPme, const int numPmeRanksRequested)
+void checkForValidRankCountRequests(const int  numRanksRequested,
+                                    const bool usingPme,
+                                    const int  numPmeRanksRequested,
+                                    const bool checkForLargePrimeFactors)
 {
     int numPPRanksRequested = numRanksRequested;
     if (usingPme && numPmeRanksRequested > 0)
@@ -777,7 +775,7 @@ void checkForValidRankCountRequests(const int numRanksRequested, const bool usin
     // Once the rank count is large enough, it becomes worth
     // suggesting improvements to the user.
     const int minPPRankCountToCheckForLargePrimeFactors = 13;
-    if (numPPRanksRequested >= minPPRankCountToCheckForLargePrimeFactors)
+    if (checkForLargePrimeFactors && numPPRanksRequested >= minPPRankCountToCheckForLargePrimeFactors)
     {
         const int largestDivisor = largest_divisor(numPPRanksRequested);
         /* Check if the largest divisor is more than numPPRanks ^ (2/3) */
@@ -915,11 +913,11 @@ DDGridSetup getDDGridSetup(const gmx::MDLogger&           mdlog,
 {
     int numPmeOnlyRanks = getNumPmeOnlyRanksToUse(mdlog, options, mtop, ir, box, numRanksRequested);
 
-    if (ddSettings.request1DAnd1Pulse && (numRanksRequested - numPmeOnlyRanks == 1))
+    if (ddSettings.request1D && (numRanksRequested - numPmeOnlyRanks == 1))
     {
         // With only one PP rank, there will not be a need for
         // GPU-based halo exchange that wants to request that any DD
-        // has only 1 dimension and 1 pulse.
+        // has only 1 dimension.
         return DDGridSetup{};
     }
 
@@ -937,7 +935,7 @@ DDGridSetup getDDGridSetup(const gmx::MDLogger&           mdlog,
         if (MASTER(cr))
         {
             numDomains = optimizeDDCells(mdlog, numRanksRequested, numPmeOnlyRanks, cellSizeLimit,
-                                         ddSettings.request1DAnd1Pulse, mtop, box, *ddbox, ir, systemInfo);
+                                         ddSettings.request1D, mtop, box, *ddbox, ir, systemInfo);
         }
     }
 

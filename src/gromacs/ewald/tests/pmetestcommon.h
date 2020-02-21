@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2016,2017,2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -121,16 +121,16 @@ uint64_t getSplineModuliDoublePrecisionUlps(int splineOrder);
 //! PME initialization
 PmeSafePointer pmeInitWrapper(const t_inputrec*        inputRec,
                               CodePath                 mode,
-                              const gmx_device_info_t* gpuInfo,
-                              PmeGpuProgramHandle      pmeGpuProgram,
+                              const DeviceInformation* deviceInfo,
+                              const PmeGpuProgram*     pmeGpuProgram,
                               const Matrix3x3&         box,
                               real                     ewaldCoeff_q  = 1.0F,
                               real                     ewaldCoeff_lj = 1.0F);
 //! Simple PME initialization (no atom data)
 PmeSafePointer pmeInitEmpty(const t_inputrec*        inputRec,
                             CodePath                 mode          = CodePath::CPU,
-                            const gmx_device_info_t* gpuInfo       = nullptr,
-                            PmeGpuProgramHandle      pmeGpuProgram = nullptr,
+                            const DeviceInformation* deviceInfo    = nullptr,
+                            const PmeGpuProgram*     pmeGpuProgram = nullptr,
                             const Matrix3x3& box = { { 1.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 1.0F } },
                             real             ewaldCoeff_q  = 0.0F,
                             real             ewaldCoeff_lj = 0.0F);

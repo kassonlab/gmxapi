@@ -171,7 +171,6 @@ void compute_globals(gmx_global_stat*          gstat,
                      tensor                    shake_vir,
                      tensor                    total_vir,
                      tensor                    pres,
-                     rvec                      mu_tot,
                      gmx::Constraints*         constr,
                      gmx::SimulationSignaller* signalCoordinator,
                      const matrix              lastbox,
@@ -242,7 +241,7 @@ void compute_globals(gmx_global_stat*          gstat,
             if (PAR(cr))
             {
                 wallcycle_start(wcycle, ewcMoveE);
-                global_stat(gstat, cr, enerd, force_vir, shake_vir, mu_tot, ir, ekind, constr,
+                global_stat(gstat, cr, enerd, force_vir, shake_vir, ir, ekind, constr,
                             bStopCM ? vcm : nullptr, signalBuffer.size(), signalBuffer.data(),
                             totalNumberOfBondedInteractions, *bSumEkinhOld, flags);
                 wallcycle_stop(wcycle, ewcMoveE);
@@ -283,7 +282,7 @@ void compute_globals(gmx_global_stat*          gstat,
          * Use the box from last timestep since we already called update().
          */
 
-        enerd->term[F_PRES] = calc_pres(fr->ePBC, ir->nwall, lastbox, ekind->ekin, total_vir, pres);
+        enerd->term[F_PRES] = calc_pres(fr->pbcType, ir->nwall, lastbox, ekind->ekin, total_vir, pres);
     }
 
     /* ##########  Long range energy information ###### */
@@ -520,7 +519,7 @@ void set_state_entries(t_state* state, const t_inputrec* ir)
     }
 
     state->nnhpres = 0;
-    if (ir->ePBC != epbcNONE)
+    if (ir->pbcType != PbcType::No)
     {
         state->flags |= (1 << estBOX);
         if (inputrecPreserveShape(ir))

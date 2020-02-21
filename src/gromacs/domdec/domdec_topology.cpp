@@ -2,7 +2,7 @@
  * This file is part of the GROMACS molecular simulation package.
  *
  * Copyright (c) 2006 - 2014, The GROMACS development team.
- * Copyright (c) 2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2015,2016,2017,2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -1340,15 +1340,6 @@ static int make_bondeds_zone(gmx_domdec_t*                      dd,
     return nbonded_local;
 }
 
-/*! \brief Set the exclusion data for i-zone \p iz for the case of no exclusions */
-static void set_no_exclusions_zone(const gmx_domdec_zones_t* zones, int iz, ListOfLists<int>* lexcls)
-{
-    for (int a = zones->cg_range[iz]; a < zones->cg_range[iz + 1]; a++)
-    {
-        lexcls->pushBack({});
-    }
-}
-
 /*! \brief Set the exclusion data for i-zone \p iz */
 static void make_exclusions_zone(gmx_domdec_t*                     dd,
                                  gmx_domdec_zones_t*               zones,
@@ -1420,24 +1411,6 @@ static void make_exclusions_zone(gmx_domdec_t*                     dd,
             "The number of exclusion list should match the number of atoms in the range");
 }
 
-/*! \brief Set the total count indexes for the local exclusions, needed by several functions */
-static void finish_local_exclusions(gmx_domdec_t* dd, gmx_domdec_zones_t* zones, ListOfLists<int>* lexcls)
-{
-    const gmx::Range<int> nonhomeIzonesAtomRange(zones->iZones[0].iAtomRange.end(),
-                                                 zones->iZones.back().iAtomRange.end());
-
-    if (!dd->haveExclusions)
-    {
-        /* There are no exclusions involving non-home charge groups,
-         * but we need to set the indices for neighborsearching.
-         */
-        for (int gmx_unused la : nonhomeIzonesAtomRange)
-        {
-            lexcls->pushBack({});
-        }
-    }
-}
-
 /*! \brief Clear a t_idef struct */
 static void clear_idef(t_idef* idef)
 {
@@ -1465,7 +1438,7 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
                                     ListOfLists<int>*   lexcls,
                                     int*                excl_count)
 {
-    int                nzone_bondeds, nzone_excl;
+    int                nzone_bondeds;
     int                cg0, cg1;
     real               rc2;
     int                nbonded_local;
@@ -1483,16 +1456,8 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
         nzone_bondeds = 1;
     }
 
-    if (dd->haveExclusions)
-    {
-        /* We only use exclusions from i-zones to i- and j-zones */
-        nzone_excl = zones->iZones.size();
-    }
-    else
-    {
-        /* There are no exclusions and only zone 0 sees itself */
-        nzone_excl = 1;
-    }
+    /* We only use exclusions from i-zones to i- and j-zones */
+    const int numIZonesForExclusions = (dd->haveExclusions ? zones->iZones.size() : 0);
 
     rt = dd->reverse_top;
 
@@ -1536,7 +1501,7 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
                         dd, zones, mtop->molblock, bRCheckMB, rcheck, bRCheck2B, rc2, pbc_null,
                         cg_cm, idef->iparams, idef_t, izone, gmx::Range<int>(cg0t, cg1t));
 
-                if (izone < nzone_excl)
+                if (izone < numIZonesForExclusions)
                 {
                     ListOfLists<int>* excl_t;
                     if (thread == 0)
@@ -1569,7 +1534,7 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
             nbonded_local += th_work.nbonded;
         }
 
-        if (izone < nzone_excl)
+        if (izone < numIZonesForExclusions)
         {
             for (std::size_t th = 1; th < rt->th_work.size(); th++)
             {
@@ -1582,15 +1547,6 @@ static int make_local_bondeds_excls(gmx_domdec_t*       dd,
         }
     }
 
-    /* Some zones might not have exclusions, but some code still needs to
-     * loop over the index, so we set the indices here.
-     */
-    for (size_t iZone = nzone_excl; iZone < zones->iZones.size(); iZone++)
-    {
-        set_no_exclusions_zone(zones, iZone, lexcls);
-    }
-
-    finish_local_exclusions(dd, zones, lexcls);
     if (debug)
     {
         fprintf(debug, "We have %d exclusions, check count %d\n", lexcls->numElements(), *excl_count);
@@ -1664,7 +1620,7 @@ void dd_make_local_top(gmx_domdec_t*       dd,
         {
             if (fr->bMolPBC)
             {
-                pbc_null = set_pbc_dd(&pbc, fr->ePBC, dd->numCells, TRUE, box);
+                pbc_null = set_pbc_dd(&pbc, fr->pbcType, dd->numCells, TRUE, box);
             }
             else
             {
@@ -1987,14 +1943,14 @@ static void bonded_cg_distance_mol(const gmx_moltype_t* molt,
 static void bonded_distance_intermol(const InteractionLists& ilists_intermol,
                                      gmx_bool                bBCheck,
                                      const rvec*             x,
-                                     int                     ePBC,
+                                     PbcType                 pbcType,
                                      const matrix            box,
                                      bonded_distance_t*      bd_2b,
                                      bonded_distance_t*      bd_mb)
 {
     t_pbc pbc;
 
-    set_pbc(&pbc, ePBC, box);
+    set_pbc(&pbc, pbcType, box);
 
     for (int ftype = 0; ftype < F_NRE; ftype++)
     {
@@ -2049,7 +2005,7 @@ static bool moltypeHasVsite(const gmx_moltype_t& molt)
 //! Returns coordinates not broken over PBC for a molecule
 static void getWholeMoleculeCoordinates(const gmx_moltype_t*  molt,
                                         const gmx_ffparams_t* ffparams,
-                                        int                   ePBC,
+                                        PbcType               pbcType,
                                         t_graph*              graph,
                                         const matrix          box,
                                         const rvec*           x,
@@ -2057,9 +2013,9 @@ static void getWholeMoleculeCoordinates(const gmx_moltype_t*  molt,
 {
     int n, i;
 
-    if (ePBC != epbcNONE)
+    if (pbcType != PbcType::No)
     {
-        mk_mshift(nullptr, graph, ePBC, box, x);
+        mk_mshift(nullptr, graph, pbcType, box, x);
 
         shift_x(graph, box, x, xs);
         /* By doing an extra mk_mshift the molecules that are broken
@@ -2067,7 +2023,7 @@ static void getWholeMoleculeCoordinates(const gmx_moltype_t*  molt,
          * will be made whole again. Such are the healing powers
          * of GROMACS.
          */
-        mk_mshift(nullptr, graph, ePBC, box, xs);
+        mk_mshift(nullptr, graph, pbcType, box, xs);
     }
     else
     {
@@ -2095,8 +2051,8 @@ static void getWholeMoleculeCoordinates(const gmx_moltype_t*  molt,
             }
         }
 
-        construct_vsites(nullptr, xs, 0.0, nullptr, ffparams->iparams.data(), ilist, epbcNONE, TRUE,
-                         nullptr, nullptr);
+        construct_vsites(nullptr, xs, 0.0, nullptr, ffparams->iparams.data(), ilist, PbcType::No,
+                         TRUE, nullptr, nullptr);
     }
 }
 
@@ -2130,7 +2086,7 @@ void dd_bonded_cg_distance(const gmx::MDLogger& mdlog,
         }
         else
         {
-            if (ir->ePBC != epbcNONE)
+            if (ir->pbcType != PbcType::No)
             {
                 mk_graph_moltype(molt, &graph);
             }
@@ -2138,7 +2094,7 @@ void dd_bonded_cg_distance(const gmx::MDLogger& mdlog,
             snew(xs, molt.atoms.nr);
             for (int mol = 0; mol < molb.nmol; mol++)
             {
-                getWholeMoleculeCoordinates(&molt, &mtop->ffparams, ir->ePBC, &graph, box,
+                getWholeMoleculeCoordinates(&molt, &mtop->ffparams, ir->pbcType, &graph, box,
                                             x + at_offset, xs);
 
                 bonded_distance_t bd_mol_2b = { 0, -1, -1, -1 };
@@ -2155,7 +2111,7 @@ void dd_bonded_cg_distance(const gmx::MDLogger& mdlog,
                 at_offset += molt.atoms.nr;
             }
             sfree(xs);
-            if (ir->ePBC != epbcNONE)
+            if (ir->pbcType != PbcType::No)
             {
                 done_graph(&graph);
             }
@@ -2167,7 +2123,7 @@ void dd_bonded_cg_distance(const gmx::MDLogger& mdlog,
         GMX_RELEASE_ASSERT(mtop->intermolecular_ilist,
                            "We should have an ilist when intermolecular interactions are on");
 
-        bonded_distance_intermol(*mtop->intermolecular_ilist, bBCheck, x, ir->ePBC, box, &bd_2b, &bd_mb);
+        bonded_distance_intermol(*mtop->intermolecular_ilist, bBCheck, x, ir->pbcType, box, &bd_2b, &bd_mb);
     }
 
     *r_2b = sqrt(bd_2b.r2);
