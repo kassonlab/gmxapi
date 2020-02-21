@@ -26,7 +26,6 @@ compiler: gcc
 
 env:
 # Python 2.7 and 3.6 are the only generations provided by pyenv on Travis-CI out-of-the-box
-  - CI_MPI=0 PY=3.5
   - CI_MPI=0 PY=3.6
   - CI_MPI=0 PY=3.7
   - CI_MPI=0 PY=3.8

@@ -4,7 +4,6 @@
 pushd /opt/pyenv/plugins/python-build/../..
  git pull origin master
 popd
-[ "$PY" = "3.5" ] && PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -s 3.5.3
 [ "$PY" = "3.6" ] && PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -s 3.6.7
 [ "$PY" = "3.7" ] && PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -s 3.7.1
 [ "$PY" = "3.8" ] && PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install -s 3.8.0
