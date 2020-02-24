@@ -38,6 +38,7 @@ Provide command line operation.
 
 __all__ = ['commandline_operation']
 
+import os
 import shutil
 import subprocess
 
@@ -70,7 +71,7 @@ logger.info('Importing {}'.format(__name__))
 # TODO: Operation returns the output object when called with the shorter signature.
 #
 @gmx.function_wrapper(output={'erroroutput': str, 'returncode': int})
-def cli(command: NDArray, shell: bool, output: OutputCollectionDescription):
+def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdin: str = ''):
     """Execute a command line program in a subprocess.
 
     Configure an executable in a subprocess. Executes when run in an execution
@@ -88,6 +89,16 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription):
          command: a tuple (or list) to be the subprocess arguments, including `executable`
          output: mapping of command line flags to output filename arguments
          shell: unused (provides forward-compatibility)
+         stdin (str): String input to send to STDIN (terminal input) of the executable.
+
+    Multi-line text sent to *stdin* should be joined into a single string
+    (e.g. ``'\n'.join(list_of_strings) + '\n'``).
+    If multiple strings are provided to *stdin*, gmxapi will assume an ensemble,
+    and will run one operation for each provided string.
+
+    Only string input (:py:func:str) to *stdin* is currently supported.
+    If you have a use case that requires streaming input or binary input,
+    please open an issue or contact the author(s).
 
     Arguments are iteratively added to the command line with standard Python
     iteration, so you should use a tuple or list even if you have only one parameter.
@@ -95,12 +106,12 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription):
     `... "a" "s" "d" "f"`. To pass a single string argument, `arguments=("asdf")`
     or `arguments=["asdf"]`.
 
-    `input` and `output` should be a dictionary with string keys, where the keys
+    ``input`` and ``output`` should be dictionaries with string keys, where the keys
     name command line "flags" or options.
 
     Example:
-        Execute a command named `exe` that takes a flagged option for file name
-        (stored in a local Python variable `my_filename`) and an `origin` flag
+        Execute a command named ``exe`` that takes a flagged option for file name
+        (stored in a local Python variable ``my_filename``) and an ``origin`` flag
         that uses the next three arguments to define a vector.
 
             >>> my_filename = "somefilename"
@@ -110,28 +121,25 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription):
             >>> assert hasattr(result, 'returncode')
 
     Returns:
-        A data structure with attributes for each of the results `file`, `erroroutput`, and `returncode`
+        A data structure with attributes for each of the results ``file``, ``erroroutput``, and ``returncode``
 
     Result object attributes:
-        * `file`: the mapping of CLI flags to filename strings resulting from the `output` kwarg
-        * `erroroutput`: A string of error output (if any) if the process failed.
-        * `returncode`: return code of the subprocess.
+        * ``erroroutput``: A string of error output (if any) if the process failed.
+        * ``returncode``: return code of the subprocess.
 
     """
     # Note: we could make provisions for stdio filehandles in a future version. E.g.
-    # * STDOUT is available if a consuming operation is bound to `output.stdout`.
-    # * STDERR is available if a consuming operation is bound to `output.stderr`.
+    # * STDOUT is available if a consuming operation is bound to ``output.stdout``.
+    # * STDERR is available if a consuming operation is bound to ``output.stderr``.
     # * Otherwise, STDOUT and/or STDERR is(are) closed when command is called.
-    #
-    # Warning:
-    #     Commands relying on STDIN cannot be used and is closed when command is called.
 
-    # In the operation implementation, we expect the `shell` parameter to be intercepted by the
+    # In the operation implementation, we expect the *shell* parameter to be intercepted by the
     # wrapper and set to False.
     if shell:
         raise exceptions.UsageError("Operation does not support shell processing.")
 
-    stdin = None
+    if stdin == '':
+        stdin = None
 
     if isinstance(command, (str, bytes)):
         command = [command]
@@ -212,6 +220,8 @@ def commandline_operation(executable=None,
                           arguments=(),
                           input_files: dict = None,
                           output_files: dict = None,
+                          required_exit_code: int = 0,
+                          stdin: str = None,
                           **kwargs):
     """Helper function to define a new operation that executes a subprocess in gmxapi data flow.
 
@@ -224,6 +234,24 @@ def commandline_operation(executable=None,
         arguments: list of positional arguments to insert at ``argv[1]``
         input_files: mapping of command-line flags to input file names
         output_files: mapping of command-line flags to output file names
+        required_exit_code: require the command to exit with this code (optional)
+        stdin (str): String input to send to STDIN (terminal input) of the executable (optional).
+
+    Multi-line text sent to *stdin* should be joined into a single string
+    (e.g. ``'\n'.join(list_of_strings) + '\n'``).
+    If multiple strings are provided to *stdin*, gmxapi will assume an ensemble,
+    and will run one operation for each provided string.
+
+    Only string input (:py:func:str) to *stdin* is currently supported.
+    If you have a use case that requires streaming input or binary input,
+    please open an issue or contact the author(s).
+
+    By default, the operation fails if the command exits with status code other
+    than 0 (the usual value for successful program termination).
+    You may set *required_exit_code* to another integer value or to ``None`` to
+    disable return code checking.
+
+    TODO: Define operation failure behavior.
 
     Output:
         The output node of the resulting operation handle contains
@@ -341,6 +369,8 @@ def commandline_operation(executable=None,
     cli_args = {'command': command,
                 'shell': shell}
     cli_args.update(**kwargs)
+    if stdin is not None:
+        cli_args['stdin'] = str(stdin)
 
     ##
     # 3. Merge operations
