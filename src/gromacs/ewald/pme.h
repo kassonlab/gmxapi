@@ -54,7 +54,6 @@
 #include "gromacs/gpu_utils/devicebuffer_datatype.h"
 #include "gromacs/gpu_utils/gpu_macros.h"
 #include "gromacs/math/vectypes.h"
-#include "gromacs/timing/walltime_accounting.h"
 #include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/basedefinitions.h"
 #include "gromacs/utility/real.h"
@@ -98,14 +97,6 @@ enum class PmeRunMode
     CPU,   //!< Whole PME computation is done on CPU
     GPU,   //!< Whole PME computation is done on GPU
     Mixed, //!< Mixed mode: only spread and gather run on GPU; FFT and solving are done on CPU.
-};
-
-//! PME gathering output forces treatment
-enum class PmeForceOutputHandling
-{
-    Set,             /**< Gather simply writes into provided force buffer */
-    ReduceWithInput, /**< Gather adds its output to the buffer.
-                        On GPU, that means additional H2D copy before the kernel launch. */
 };
 
 /*! \brief Return the smallest allowed PME grid size for \p pmeOrder */
@@ -377,13 +368,9 @@ GPU_FUNC_QUALIFIER void pme_gpu_launch_complex_transforms(gmx_pme_t* GPU_FUNC_AR
  *
  * \param[in]  pme               The PME data structure.
  * \param[in]  wcycle            The wallclock counter.
- * \param[in]  forceTreatment    Tells how data should be treated. The gathering kernel either
- * stores the output reciprocal forces into the host array, or copies its contents to the GPU first
- *                               and accumulates. The reduction is non-atomic.
  */
 GPU_FUNC_QUALIFIER void pme_gpu_launch_gather(const gmx_pme_t* GPU_FUNC_ARGUMENT(pme),
-                                              gmx_wallcycle*   GPU_FUNC_ARGUMENT(wcycle),
-                                              PmeForceOutputHandling GPU_FUNC_ARGUMENT(forceTreatment)) GPU_FUNC_TERM;
+                                              gmx_wallcycle* GPU_FUNC_ARGUMENT(wcycle)) GPU_FUNC_TERM;
 
 /*! \brief
  * Attempts to complete PME GPU tasks.

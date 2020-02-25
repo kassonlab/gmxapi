@@ -38,6 +38,7 @@ Provide command line operation.
 
 __all__ = ['commandline_operation']
 
+import os
 import shutil
 import subprocess
 
@@ -70,7 +71,7 @@ logger.info('Importing {}'.format(__name__))
 # TODO: Operation returns the output object when called with the shorter signature.
 #
 @gmx.function_wrapper(output={'erroroutput': str, 'returncode': int})
-def cli(command: NDArray, shell: bool, output: OutputCollectionDescription):
+def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdin: str = ''):
     """Execute a command line program in a subprocess.
 
     Configure an executable in a subprocess. Executes when run in an execution
@@ -88,6 +89,16 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription):
          command: a tuple (or list) to be the subprocess arguments, including `executable`
          output: mapping of command line flags to output filename arguments
          shell: unused (provides forward-compatibility)
+         stdin (str): String input to send to STDIN (terminal input) of the executable.
+
+    Multi-line text sent to *stdin* should be joined into a single string
+    (e.g. ``'\n'.join(list_of_strings) + '\n'``).
+    If multiple strings are provided to *stdin*, gmxapi will assume an ensemble,
+    and will run one operation for each provided string.
+
+    Only string input (:py:func:str) to *stdin* is currently supported.
+    If you have a use case that requires streaming input or binary input,
+    please open an issue or contact the author(s).
 
     Arguments are iteratively added to the command line with standard Python
     iteration, so you should use a tuple or list even if you have only one parameter.
@@ -122,22 +133,23 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription):
     # * STDOUT is available if a consuming operation is bound to `output.stdout`.
     # * STDERR is available if a consuming operation is bound to `output.stderr`.
     # * Otherwise, STDOUT and/or STDERR is(are) closed when command is called.
-    #
-    # Warning:
-    #     Commands relying on STDIN cannot be used and is closed when command is called.
 
     # In the operation implementation, we expect the `shell` parameter to be intercepted by the
     # wrapper and set to False.
     if shell:
         raise exceptions.UsageError("Operation does not support shell processing.")
 
+    if stdin == '':
+        stdin = None
+
     if isinstance(command, (str, bytes)):
         command = [command]
     command = list([arg for arg in command])
-    try:
-        command[0] = shutil.which(command[0])
-    except Exception:
-        raise exceptions.ValueError('command argument could not be resolved to an executable file path.')
+
+    executable = shutil.which(command[0])
+    if executable is None:
+        raise exceptions.ValueError('"{}" is not found or not executable.'.format(command[0]))
+    command[0] = executable
 
     # TODO: (FR9) Can OS input/output filehandles be a responsibility of
     #  the code providing 'resources'?
@@ -145,31 +157,25 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription):
     erroroutput = ''
     logger.debug('executing subprocess')
     try:
-        # TODO: If Python >=3.5 is required, switch to subprocess.run()
-        command_output = subprocess.check_output(command,
-                                                 shell=shell,
-                                                 stdin=subprocess.DEVNULL,
-                                                 stderr=subprocess.STDOUT,
-                                                 )
-        returncode = 0
+        completed_process = subprocess.run(command,
+                                           shell=shell,
+                                           input=stdin,
+                                           check=True,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.STDOUT,
+                                           universal_newlines=True
+                                           )
+        returncode = completed_process.returncode
         # TODO: Resource management code should manage a safe data object for `output`.
-        # WARNING: We have no reason to assume the output is utf-8 encoded text!!!
-        for line in command_output.decode('utf-8').split('\n'):
+        for line in completed_process.stdout.split('\n'):
             logger.debug(line)
     except subprocess.CalledProcessError as e:
         logger.info("commandline operation had non-zero return status when calling {}".format(e.cmd))
-        erroroutput = e.output.decode('utf-8')
+        erroroutput = e.output
         returncode = e.returncode
-    # resources.output.erroroutput.publish(erroroutput)
-    # resources.output.returncode.publish(returncode)
-    # `publish` is descriptive, but redundant. Access to the output data handler is
-    # assumed to coincide with publishing, and we assume data is published when the
-    # handler is released. A class with a single `publish` method is overly complex
-    # since we can just use the assignment operator.
+    # Publish outputs.
     output.erroroutput = erroroutput
     output.returncode = returncode
-    # TODO: Handle the file output at the higher level wrapper.
-    # output.file = None
 
 
 # TODO: (FR4) Make this a formal operation to properly handle gmxapi data dependencies.
@@ -215,6 +221,7 @@ def commandline_operation(executable=None,
                           arguments=(),
                           input_files: dict = None,
                           output_files: dict = None,
+                          stdin: str = None,
                           **kwargs):
     """Helper function to define a new operation that executes a subprocess in gmxapi data flow.
 
@@ -227,9 +234,23 @@ def commandline_operation(executable=None,
         arguments: list of positional arguments to insert at ``argv[1]``
         input_files: mapping of command-line flags to input file names
         output_files: mapping of command-line flags to output file names
+        stdin (str): String input to send to STDIN (terminal input) of the executable (optional).
+
+    Multi-line text sent to *stdin* should be joined into a single string.
+    E.g.::
+
+        commandline_operation(..., stdin='\\n'.join(list_of_strings) + '\\n')
+
+    If multiple strings are provided to *stdin*, gmxapi will assume an ensemble,
+    and will run one operation for each provided string.
+
+    Only string input (:py:func:`str`) to *stdin* is currently supported.
+    If you have a use case that requires streaming input or binary input,
+    please open an issue or contact the author(s).
 
     Output:
         The output node of the resulting operation handle contains
+
         * ``file``: the mapping of CLI flags to filename strings resulting from the ``output_files`` kwarg
         * ``erroroutput``: A string of error output (if any) if the process failed.
         * ``returncode``: return code of the subprocess.
@@ -344,6 +365,8 @@ def commandline_operation(executable=None,
     cli_args = {'command': command,
                 'shell': shell}
     cli_args.update(**kwargs)
+    if stdin is not None:
+        cli_args['stdin'] = str(stdin)
 
     ##
     # 3. Merge operations

@@ -76,16 +76,20 @@
 #include "gromacs/mdlib/constr.h"
 #include "gromacs/mdlib/enerdata_utils.h"
 #include "gromacs/mdlib/force.h"
+#include "gromacs/mdlib/force_flags.h"
 #include "gromacs/mdlib/forcerec.h"
 #include "gromacs/mdlib/gmx_omp_nthreads.h"
 #include "gromacs/mdlib/qmmm.h"
 #include "gromacs/mdlib/update.h"
+#include "gromacs/mdlib/vsite.h"
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/enerdata.h"
 #include "gromacs/mdtypes/forceoutput.h"
+#include "gromacs/mdtypes/forcerec.h"
 #include "gromacs/mdtypes/iforceprovider.h"
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/md_enums.h"
+#include "gromacs/mdtypes/mdatom.h"
 #include "gromacs/mdtypes/simulation_workload.h"
 #include "gromacs/mdtypes/state.h"
 #include "gromacs/mdtypes/state_propagator_data_gpu.h"
@@ -644,7 +648,7 @@ static inline void launchPmeGpuSpread(gmx_pme_t*            pmedata,
 static void launchPmeGpuFftAndGather(gmx_pme_t* pmedata, gmx_wallcycle_t wcycle)
 {
     pme_gpu_launch_complex_transforms(pmedata, wcycle);
-    pme_gpu_launch_gather(pmedata, wcycle, PmeForceOutputHandling::Set);
+    pme_gpu_launch_gather(pmedata, wcycle);
 }
 
 /*! \brief
