@@ -72,7 +72,7 @@ from .exceptions import FeatureNotAvailableError
 _major = 0
 _minor = 2
 _micro = 0
-_suffix = 'a1'
+_suffix = 'a2'
 
 # Reference https://www.python.org/dev/peps/pep-0440/
 # and https://packaging.pypa.io/en/latest/version/
