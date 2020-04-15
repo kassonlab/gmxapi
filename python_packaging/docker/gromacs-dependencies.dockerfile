@@ -11,7 +11,6 @@ FROM ubuntu:bionic
 RUN apt-get update && \
     apt-get -yq --no-install-suggests --no-install-recommends install software-properties-common && \
     apt-get -yq --no-install-suggests --no-install-recommends install \
-        cmake \
         git \
         libblas-dev \
         libcr-dev \
@@ -30,3 +29,15 @@ RUN apt-get update && \
         libmpich-dev \
         mpich && \
     rm -rf /var/lib/apt/lists/*
+
+# CMake installation layer
+RUN mkdir cmake_install && \
+    cd cmake_install && \
+    wget https://github.com/Kitware/CMake/releases/download/v3.15.2/cmake-3.15.2.tar.gz && \
+    tar -zxvf cmake-3.15.2.tar.gz && \
+    cd cmake-3.15.2 && \
+    ./bootstrap && \
+    make && \
+    make install && \
+    cd .. && \
+    rm -rf cmake_install
