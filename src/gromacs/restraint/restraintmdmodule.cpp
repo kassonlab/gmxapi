@@ -119,7 +119,7 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
     {
         // Note: this assumes that all ranks are hitting this line, which is not generally true.
         // I need to find the right subcommunicator. What I really want is a _scoped_ communicator...
-        gmx_barrier(&cr);
+        gmx_barrier(cr.mpi_comm_mygroup);
     }
 
     // Apply restraint on all thread ranks only after any updates have been made.
@@ -158,16 +158,6 @@ RestraintMDModuleImpl::RestraintMDModuleImpl(std::shared_ptr<IRestraintPotential
     GMX_ASSERT(forceProvider_, "Class invariant implies non-null ForceProvider.");
 }
 
-IMdpOptionProvider* RestraintMDModuleImpl::mdpOptionProvider()
-{
-    return nullptr;
-}
-
-IMDOutputProvider* RestraintMDModuleImpl::outputProvider()
-{
-    return nullptr;
-}
-
 void RestraintMDModuleImpl::initForceProviders(ForceProviders* forceProviders)
 {
     GMX_ASSERT(forceProvider_, "Class invariant implies non-null ForceProvider member.");
@@ -203,6 +193,10 @@ std::unique_ptr<RestraintMDModule> RestraintMDModule::create(std::shared_ptr<IRe
     auto newModule      = std::make_unique<RestraintMDModule>(std::move(implementation));
     return newModule;
 }
+
+void RestraintMDModule::subscribeToSimulationSetupNotifications(MdModulesNotifier* /*notifier*/) {}
+
+void RestraintMDModule::subscribeToPreProcessingNotifications(MdModulesNotifier* /*notifier*/) {}
 
 // private constructor to implement static create() method.
 RestraintMDModule::RestraintMDModule(std::unique_ptr<RestraintMDModuleImpl> restraint) :

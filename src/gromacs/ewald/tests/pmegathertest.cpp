@@ -53,6 +53,7 @@
 #include "testutils/testasserts.h"
 
 #include "pmetestcommon.h"
+#include "testhardwarecontexts.h"
 
 namespace gmx
 {
@@ -279,13 +280,13 @@ public:
         TestReferenceData refData;
         for (const auto& context : getPmeTestEnv()->getHardwareContexts())
         {
-            CodePath   codePath = context->getCodePath();
+            CodePath   codePath = context->codePath();
             const bool supportedInput =
                     pmeSupportsInputForMode(*getPmeTestEnv()->hwinfo(), &inputRec, codePath);
             if (!supportedInput)
             {
                 /* Testing the failure for the unsupported input */
-                EXPECT_THROW_GMX(pmeInitWrapper(&inputRec, codePath, nullptr, nullptr, box),
+                EXPECT_THROW_GMX(pmeInitWrapper(&inputRec, codePath, nullptr, nullptr, nullptr, box),
                                  NotImplementedError);
                 continue;
             }
@@ -294,13 +295,17 @@ public:
             SCOPED_TRACE(
                     formatString("Testing force gathering with %s %sfor PME grid size %d %d %d"
                                  ", order %d, %zu atoms",
-                                 codePathToString(codePath), context->getDescription().c_str(),
+                                 codePathToString(codePath), context->description().c_str(),
                                  gridSize[XX], gridSize[YY], gridSize[ZZ], pmeOrder, atomCount));
 
-            PmeSafePointer pmeSafe = pmeInitWrapper(&inputRec, codePath, context->getDeviceInfo(),
-                                                    context->getPmeGpuProgram(), box);
+            PmeSafePointer pmeSafe =
+                    pmeInitWrapper(&inputRec, codePath, context->deviceContext(),
+                                   context->deviceStream(), context->pmeGpuProgram(), box);
             std::unique_ptr<StatePropagatorDataGpu> stateGpu =
-                    (codePath == CodePath::GPU) ? makeStatePropagatorDataGpu(*pmeSafe.get()) : nullptr;
+                    (codePath == CodePath::GPU)
+                            ? makeStatePropagatorDataGpu(*pmeSafe.get(), context->deviceContext(),
+                                                         context->deviceStream())
+                            : nullptr;
 
             pmeInitAtoms(pmeSafe.get(), stateGpu.get(), codePath, inputAtomData.coordinates,
                          inputAtomData.charges);

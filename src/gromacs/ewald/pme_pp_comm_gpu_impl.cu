@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -48,6 +48,8 @@
 #include "config.h"
 
 #include "gromacs/gpu_utils/cudautils.cuh"
+#include "gromacs/gpu_utils/device_context.h"
+#include "gromacs/gpu_utils/device_stream.h"
 #include "gromacs/gpu_utils/devicebuffer.h"
 #include "gromacs/gpu_utils/gpueventsynchronizer.cuh"
 #include "gromacs/utility/gmxmpi.h"
@@ -55,12 +57,18 @@
 namespace gmx
 {
 
-PmePpCommGpu::Impl::Impl(MPI_Comm comm, int pmeRank) : comm_(comm), pmeRank_(pmeRank)
+PmePpCommGpu::Impl::Impl(MPI_Comm             comm,
+                         int                  pmeRank,
+                         const DeviceContext& deviceContext,
+                         const DeviceStream&  deviceStream) :
+    deviceContext_(deviceContext),
+    pmePpCommStream_(deviceStream),
+    comm_(comm),
+    pmeRank_(pmeRank)
 {
     GMX_RELEASE_ASSERT(
             GMX_THREAD_MPI,
             "PME-PP GPU Communication is currently only supported with thread-MPI enabled");
-    cudaStreamCreate(&pmePpCommStream_);
 }
 
 PmePpCommGpu::Impl::~Impl() = default;
@@ -73,7 +81,7 @@ void PmePpCommGpu::Impl::reinit(int size)
     MPI_Recv(&remotePmeFBuffer_, sizeof(void**), MPI_BYTE, pmeRank_, 0, comm_, MPI_STATUS_IGNORE);
 
     // Reallocate buffer used for staging PME force on GPU
-    reallocateDeviceBuffer(&d_pmeForces_, size, &d_pmeForcesSize_, &d_pmeForcesSizeAlloc_, nullptr);
+    reallocateDeviceBuffer(&d_pmeForces_, size, &d_pmeForcesSize_, &d_pmeForcesSizeAlloc_, deviceContext_);
 #else
     GMX_UNUSED_VALUE(size);
 #endif
@@ -94,7 +102,7 @@ void PmePpCommGpu::Impl::receiveForceFromPmeCudaDirect(void* recvPtr, int recvSi
     // Pull force data from remote GPU
     void*       pmeForcePtr = receivePmeForceToGpu ? static_cast<void*>(d_pmeForces_) : recvPtr;
     cudaError_t stat = cudaMemcpyAsync(pmeForcePtr, remotePmeFBuffer_, recvSize * DIM * sizeof(float),
-                                       cudaMemcpyDefault, pmePpCommStream_);
+                                       cudaMemcpyDefault, pmePpCommStream_.stream());
     CU_RET_ERR(stat, "cudaMemcpyAsync on Recv from PME CUDA direct data transfer failed");
 
     if (receivePmeForceToGpu)
@@ -108,7 +116,7 @@ void PmePpCommGpu::Impl::receiveForceFromPmeCudaDirect(void* recvPtr, int recvSi
     {
         // Ensure CPU waits for PME forces to be copied before reducing
         // them with other forces on the CPU
-        cudaStreamSynchronize(pmePpCommStream_);
+        cudaStreamSynchronize(pmePpCommStream_.stream());
     }
 #else
     GMX_UNUSED_VALUE(recvPtr);
@@ -127,7 +135,7 @@ void PmePpCommGpu::Impl::sendCoordinatesToPmeCudaDirect(void* sendPtr,
     coordinatesReadyOnDeviceEvent->enqueueWaitEvent(pmePpCommStream_);
 
     cudaError_t stat = cudaMemcpyAsync(remotePmeXBuffer_, sendPtr, sendSize * DIM * sizeof(float),
-                                       cudaMemcpyDefault, pmePpCommStream_);
+                                       cudaMemcpyDefault, pmePpCommStream_.stream());
     CU_RET_ERR(stat, "cudaMemcpyAsync on Send to PME CUDA direct data transfer failed");
 
     // Record and send event to allow PME task to sync to above transfer before commencing force calculations
@@ -151,7 +159,13 @@ void* PmePpCommGpu::Impl::getForcesReadySynchronizer()
     return static_cast<void*>(&forcesReadySynchronizer_);
 }
 
-PmePpCommGpu::PmePpCommGpu(MPI_Comm comm, int pmeRank) : impl_(new Impl(comm, pmeRank)) {}
+PmePpCommGpu::PmePpCommGpu(MPI_Comm             comm,
+                           int                  pmeRank,
+                           const DeviceContext& deviceContext,
+                           const DeviceStream&  deviceStream) :
+    impl_(new Impl(comm, pmeRank, deviceContext, deviceStream))
+{
+}
 
 PmePpCommGpu::~PmePpCommGpu() = default;
 

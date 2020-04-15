@@ -80,7 +80,6 @@
 #include "gromacs/mdlib/compute_io.h"
 #include "gromacs/mdlib/constr.h"
 #include "gromacs/mdlib/perf_est.h"
-#include "gromacs/mdlib/qmmm.h"
 #include "gromacs/mdlib/vsite.h"
 #include "gromacs/mdrun/mdmodules.h"
 #include "gromacs/mdtypes/inputrec.h"
@@ -1132,7 +1131,7 @@ static int nrdf_internal(const t_atoms* atoms)
     }
     switch (nmass)
     {
-        case 0: nrdf = 0; break;
+        case 0: // Fall through intended
         case 1: nrdf = 0; break;
         case 2: nrdf = 1; break;
         default: nrdf = nmass * 3 - 6; break;
@@ -1379,7 +1378,7 @@ static void checkForUnboundAtoms(const gmx_moltype_t* molt, gmx_bool bVerbose, w
 
     for (int ftype = 0; ftype < F_NRE; ftype++)
     {
-        if (((interaction_function[ftype].flags & IF_BOND) && ftype != F_CONNBONDS)
+        if (((interaction_function[ftype].flags & IF_BOND) && NRAL(ftype) == 2 && ftype != F_CONNBONDS)
             || (interaction_function[ftype].flags & IF_CONSTRAINT) || ftype == F_SETTLE)
         {
             const InteractionList& il   = molt->ilist[ftype];
@@ -1446,7 +1445,7 @@ static bool haveDecoupledModeInMol(const gmx_moltype_t&           molt,
                                    gmx::ArrayRef<const t_iparams> iparams,
                                    real                           massFactorThreshold)
 {
-    if (molt.ilist[F_CONSTR].size() == 0 && molt.ilist[F_CONSTRNC].size() == 0)
+    if (molt.ilist[F_CONSTR].empty() && molt.ilist[F_CONSTRNC].empty())
     {
         return false;
     }
@@ -1771,7 +1770,6 @@ int gmx_grompp(int argc, char* argv[])
     double                               reppow;
     const char*                          mdparin;
     bool                                 bNeedVel, bGenVel;
-    gmx_bool                             have_atomnumber;
     gmx_output_env_t*                    oenv;
     gmx_bool                             bVerbose = FALSE;
     warninp*                             wi;
@@ -1789,7 +1787,7 @@ int gmx_grompp(int argc, char* argv[])
                        { efEDR, "-e", nullptr, ffOPTRD },
                        /* This group is needed by the VMD viewer as the start configuration for IMD sessions: */
                        { efGRO, "-imd", "imdgroup", ffOPTWR },
-                       { efTRN, "-ref", "rotref", ffOPTRW } };
+                       { efTRN, "-ref", "rotref", ffOPTRW | ffALLOW_MISSING } };
 #define NFILE asize(fnm)
 
     /* Command line options */
@@ -1855,6 +1853,11 @@ int gmx_grompp(int argc, char* argv[])
         get_ir(mdparin, opt2fn("-po", NFILE, fnm), &mdModules, ir, opts, WriteMdpHeader::yes, wi);
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
+
+    // Now that the MdModules have their options assigned from get_ir, subscribe
+    // to eventual notifications during pre-processing their data
+    mdModules.subscribeToPreProcessingNotifications();
+
 
     if (bVerbose)
     {
@@ -1952,25 +1955,6 @@ int gmx_grompp(int argc, char* argv[])
     if (EI_SD(ir->eI) && ir->etc != etcNO)
     {
         warning_note(wi, "Temperature coupling is ignored with SD integrators.");
-    }
-
-    /* If we are doing QM/MM, check that we got the atom numbers */
-    have_atomnumber = TRUE;
-    for (gmx::index i = 0; i < gmx::ssize(atypes); i++)
-    {
-        have_atomnumber = have_atomnumber && (atypes.atomNumberFromAtomType(i) >= 0);
-    }
-    if (!have_atomnumber && ir->bQMMM)
-    {
-        warning_error(
-                wi,
-                "\n"
-                "It appears as if you are trying to run a QM/MM calculation, but the force\n"
-                "field you are using does not contain atom numbers fields. This is an\n"
-                "optional field (introduced in GROMACS 3.3) for general runs, but mandatory\n"
-                "for QM/MM. The good news is that it is easy to add - put the atom number as\n"
-                "an integer just before the mass column in ffXXXnb.itp.\n"
-                "NB: United atoms have the same atom numbers as normal ones.\n\n");
     }
 
     /* Check for errors in the input now, since they might cause problems
@@ -2222,20 +2206,9 @@ int gmx_grompp(int argc, char* argv[])
         pr_symtab(debug, 0, "After close", &sys.symtab);
     }
 
-    /* make exclusions between QM atoms and remove charges if needed */
-    if (ir->bQMMM)
-    {
-        generate_qmexcl(&sys, ir, wi, GmxQmmmMode::GMX_QMMM_ORIGINAL, logger);
-        if (ir->QMMMscheme != eQMMMschemeoniom)
-        {
-            std::vector<int> qmmmAtoms = qmmmAtomIndices(*ir, sys);
-            removeQmmmAtomCharges(&sys, qmmmAtoms);
-        }
-    }
-
     if (ir->eI == eiMimic)
     {
-        generate_qmexcl(&sys, ir, wi, GmxQmmmMode::GMX_QMMM_MIMIC, logger);
+        generate_qmexcl(&sys, ir, logger);
     }
 
     if (ftp2bSet(efTRN, NFILE, fnm))

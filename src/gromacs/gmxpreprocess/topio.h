@@ -54,7 +54,6 @@ struct MoleculeInformation;
 struct InteractionsOfType;
 struct t_symtab;
 struct warninp;
-enum struct GmxQmmmMode;
 typedef warninp* warninp_t;
 
 namespace gmx
@@ -85,6 +84,6 @@ char** do_top(bool                                  bVerbose,
               const gmx::MDLogger&                  logger);
 
 /* This routine expects sys->molt[m].ilist to be of size F_NRE and ordered. */
-void generate_qmexcl(gmx_mtop_t* sys, t_inputrec* ir, warninp_t wi, GmxQmmmMode qmmmMode, const gmx::MDLogger& logger);
+void generate_qmexcl(gmx_mtop_t* sys, t_inputrec* ir, const gmx::MDLogger& logger);
 
 #endif

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -57,10 +57,13 @@ class PmePpCommGpu::Impl
 
 public:
     /*! \brief Creates PME-PP GPU communication object.
+     *
      * \param[in] comm            Communicator used for simulation
      * \param[in] pmeRank         Rank of PME task
+     * \param[in] deviceContext   GPU context.
+     * \param[in] deviceStream    GPU stream.
      */
-    Impl(MPI_Comm comm, int pmeRank);
+    Impl(MPI_Comm comm, int pmeRank, const DeviceContext& deviceContext, const DeviceStream& deviceStream);
     ~Impl();
 
     /*! \brief Perform steps required when buffer size changes
@@ -115,8 +118,10 @@ public:
     void* getForcesReadySynchronizer();
 
 private:
-    //! CUDA stream used for the communication operations in this class
-    cudaStream_t pmePpCommStream_ = nullptr;
+    //! GPU context handle (not used in CUDA)
+    const DeviceContext& deviceContext_;
+    //! Handle for CUDA stream used for the communication operations in this class
+    const DeviceStream& pmePpCommStream_;
     //! Remote location of PME coordinate data buffer
     void* remotePmeXBuffer_ = nullptr;
     //! Remote location of PME force data buffer

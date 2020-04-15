@@ -1,2 +1,6 @@
 [build-system]
-requires = ["cmake>=3.9.6", "pip>=10.1", "setuptools>=28.0.0", "scikit-build>=0.7"]
+requires = ['cmake>=3.13',
+            'scikit-build>=0.10',
+            'setuptools>=42',
+            'wheel']
+build-backend = 'setuptools.build_meta:__legacy__'

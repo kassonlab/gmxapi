@@ -49,6 +49,8 @@
 
 #include "gromacs/domdec/domdec.h"
 #include "gromacs/ewald/pme_gather.h"
+#include "gromacs/ewald/pme_gpu_calculate_splines.h"
+#include "gromacs/ewald/pme_gpu_constants.h"
 #include "gromacs/ewald/pme_gpu_internal.h"
 #include "gromacs/ewald/pme_gpu_staging.h"
 #include "gromacs/ewald/pme_grid.h"
@@ -57,6 +59,7 @@
 #include "gromacs/ewald/pme_solve.h"
 #include "gromacs/ewald/pme_spread.h"
 #include "gromacs/fft/parallel_3dfft.h"
+#include "gromacs/gpu_utils/device_stream_manager.h"
 #include "gromacs/gpu_utils/gpu_utils.h"
 #include "gromacs/math/invertmatrix.h"
 #include "gromacs/mdtypes/commrec.h"
@@ -68,6 +71,8 @@
 #include "gromacs/utility/stringutil.h"
 
 #include "testutils/testasserts.h"
+
+#include "testhardwarecontexts.h"
 
 namespace gmx
 {
@@ -102,21 +107,22 @@ uint64_t getSplineModuliDoublePrecisionUlps(int splineOrder)
 }
 
 //! PME initialization
-PmeSafePointer pmeInitWrapper(const t_inputrec*        inputRec,
-                              const CodePath           mode,
-                              const DeviceInformation* deviceInfo,
-                              const PmeGpuProgram*     pmeGpuProgram,
-                              const Matrix3x3&         box,
-                              const real               ewaldCoeff_q,
-                              const real               ewaldCoeff_lj)
+PmeSafePointer pmeInitWrapper(const t_inputrec*    inputRec,
+                              const CodePath       mode,
+                              const DeviceContext* deviceContext,
+                              const DeviceStream*  deviceStream,
+                              const PmeGpuProgram* pmeGpuProgram,
+                              const Matrix3x3&     box,
+                              const real           ewaldCoeff_q,
+                              const real           ewaldCoeff_lj)
 {
     const MDLogger dummyLogger;
     const auto     runMode       = (mode == CodePath::CPU) ? PmeRunMode::CPU : PmeRunMode::Mixed;
     t_commrec      dummyCommrec  = { 0 };
     NumPmeDomains  numPmeDomains = { 1, 1 };
-    gmx_pme_t*     pmeDataRaw =
-            gmx_pme_init(&dummyCommrec, numPmeDomains, inputRec, false, false, true, ewaldCoeff_q,
-                         ewaldCoeff_lj, 1, runMode, nullptr, deviceInfo, pmeGpuProgram, dummyLogger);
+    gmx_pme_t* pmeDataRaw = gmx_pme_init(&dummyCommrec, numPmeDomains, inputRec, false, false, true,
+                                         ewaldCoeff_q, ewaldCoeff_lj, 1, runMode, nullptr,
+                                         deviceContext, deviceStream, pmeGpuProgram, dummyLogger);
     PmeSafePointer pme(pmeDataRaw); // taking ownership
 
     // TODO get rid of this with proper matrix type
@@ -147,27 +153,36 @@ PmeSafePointer pmeInitWrapper(const t_inputrec*        inputRec,
 }
 
 //! Simple PME initialization based on input, no atom data
-PmeSafePointer pmeInitEmpty(const t_inputrec*        inputRec,
-                            const CodePath           mode,
-                            const DeviceInformation* deviceInfo,
-                            const PmeGpuProgram*     pmeGpuProgram,
-                            const Matrix3x3&         box,
-                            real                     ewaldCoeff_q,
-                            real                     ewaldCoeff_lj)
+PmeSafePointer pmeInitEmpty(const t_inputrec*    inputRec,
+                            const CodePath       mode,
+                            const DeviceContext* deviceContext,
+                            const DeviceStream*  deviceStream,
+                            const PmeGpuProgram* pmeGpuProgram,
+                            const Matrix3x3&     box,
+                            const real           ewaldCoeff_q,
+                            const real           ewaldCoeff_lj)
 {
-    return pmeInitWrapper(inputRec, mode, deviceInfo, pmeGpuProgram, box, ewaldCoeff_q, ewaldCoeff_lj);
+    return pmeInitWrapper(inputRec, mode, deviceContext, deviceStream, pmeGpuProgram, box,
+                          ewaldCoeff_q, ewaldCoeff_lj);
     // hiding the fact that PME actually needs to know the number of atoms in advance
 }
 
+PmeSafePointer pmeInitEmpty(const t_inputrec* inputRec)
+{
+    const Matrix3x3 defaultBox = { { 1.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 1.0F } };
+    return pmeInitWrapper(inputRec, CodePath::CPU, nullptr, nullptr, nullptr, defaultBox, 0.0F, 0.0F);
+}
+
 //! Make a GPU state-propagator manager
-std::unique_ptr<StatePropagatorDataGpu> makeStatePropagatorDataGpu(const gmx_pme_t& pme)
+std::unique_ptr<StatePropagatorDataGpu> makeStatePropagatorDataGpu(const gmx_pme_t&     pme,
+                                                                   const DeviceContext* deviceContext,
+                                                                   const DeviceStream* deviceStream)
 {
     // TODO: Pin the host buffer and use async memory copies
     // TODO: Special constructor for PME-only rank / PME-tests is used here. There should be a mechanism to
     //       restrict one from using other constructor here.
-    return std::make_unique<StatePropagatorDataGpu>(
-            pme_gpu_get_device_stream(&pme), pme_gpu_get_device_context(&pme),
-            GpuApiCallBehavior::Sync, pme_gpu_get_padding_size(&pme), nullptr);
+    return std::make_unique<StatePropagatorDataGpu>(deviceStream, *deviceContext, GpuApiCallBehavior::Sync,
+                                                    pme_gpu_get_block_size(&pme), nullptr);
 }
 
 //! PME initialization with atom data
@@ -425,7 +440,8 @@ void pmePerformGather(gmx_pme_t* pme, CodePath mode, ForcesVector& forces)
         case CodePath::GPU:
         {
             // Variable initialization needs a non-switch scope
-            PmeOutput output = pme_gpu_getOutput(*pme, GMX_PME_CALC_F);
+            const bool computeEnergyAndVirial = false;
+            PmeOutput  output                 = pme_gpu_getOutput(*pme, computeEnergyAndVirial);
             GMX_ASSERT(forces.size() == output.forces_.size(),
                        "Size of force buffers did not match");
             pme_gpu_gather(pme->gpu, reinterpret_cast<float*>(fftgrid));
@@ -447,6 +463,150 @@ void pmeFinalizeTest(const gmx_pme_t* pme, CodePath mode)
         case CodePath::GPU: pme_gpu_synchronize(pme->gpu); break;
 
         default: GMX_THROW(InternalError("Test not implemented for this mode"));
+    }
+}
+
+//! A binary enum for spline data layout transformation
+enum class PmeLayoutTransform
+{
+    GpuToHost,
+    HostToGpu
+};
+
+/*! \brief Gets a unique index to an element in a spline parameter buffer.
+ *
+ * These theta/dtheta buffers are laid out for GPU spread/gather
+ * kernels. The index is wrt the execution block, in range(0,
+ * atomsPerBlock * order * DIM).
+ *
+ * This is a wrapper, only used in unit tests.
+ * \param[in] order            PME order
+ * \param[in] splineIndex      Spline contribution index (from 0 to \p order - 1)
+ * \param[in] dimIndex         Dimension index (from 0 to 2)
+ * \param[in] atomIndex        Atom index wrt the block.
+ * \param[in] atomsPerWarp     Number of atoms processed by a warp.
+ *
+ * \returns Index into theta or dtheta array using GPU layout.
+ */
+static int getSplineParamFullIndex(int order, int splineIndex, int dimIndex, int atomIndex, int atomsPerWarp)
+{
+    if (order != c_pmeGpuOrder)
+    {
+        throw order;
+    }
+    constexpr int fixedOrder = c_pmeGpuOrder;
+    GMX_UNUSED_VALUE(fixedOrder);
+
+    const int atomWarpIndex = atomIndex % atomsPerWarp;
+    const int warpIndex     = atomIndex / atomsPerWarp;
+    int       indexBase, result;
+    switch (atomsPerWarp)
+    {
+        case 1:
+            indexBase = getSplineParamIndexBase<fixedOrder, 1>(warpIndex, atomWarpIndex);
+            result    = getSplineParamIndex<fixedOrder, 1>(indexBase, dimIndex, splineIndex);
+            break;
+
+        case 2:
+            indexBase = getSplineParamIndexBase<fixedOrder, 2>(warpIndex, atomWarpIndex);
+            result    = getSplineParamIndex<fixedOrder, 2>(indexBase, dimIndex, splineIndex);
+            break;
+
+        case 4:
+            indexBase = getSplineParamIndexBase<fixedOrder, 4>(warpIndex, atomWarpIndex);
+            result    = getSplineParamIndex<fixedOrder, 4>(indexBase, dimIndex, splineIndex);
+            break;
+
+        case 8:
+            indexBase = getSplineParamIndexBase<fixedOrder, 8>(warpIndex, atomWarpIndex);
+            result    = getSplineParamIndex<fixedOrder, 8>(indexBase, dimIndex, splineIndex);
+            break;
+
+        default:
+            GMX_THROW(NotImplementedError(
+                    formatString("Test function call not unrolled for atomsPerWarp = %d in "
+                                 "getSplineParamFullIndex",
+                                 atomsPerWarp)));
+    }
+    return result;
+}
+
+/*!\brief Return the number of atoms per warp */
+static int pme_gpu_get_atoms_per_warp(const PmeGpu* pmeGpu)
+{
+    const int order = pmeGpu->common->pme_order;
+    const int threadsPerAtom =
+            (pmeGpu->settings.threadsPerAtom == ThreadsPerAtom::Order ? order : order * order);
+    return pmeGpu->programHandle_->warpSize() / threadsPerAtom;
+}
+
+/*! \brief Rearranges the atom spline data between the GPU and host layouts.
+ * Only used for test purposes so far, likely to be horribly slow.
+ *
+ * \param[in]  pmeGpu     The PME GPU structure.
+ * \param[out] atc        The PME CPU atom data structure (with a single-threaded layout).
+ * \param[in]  type       The spline data type (values or derivatives).
+ * \param[in]  dimIndex   Dimension index.
+ * \param[in]  transform  Layout transform type
+ */
+static void pme_gpu_transform_spline_atom_data(const PmeGpu*      pmeGpu,
+                                               const PmeAtomComm* atc,
+                                               PmeSplineDataType  type,
+                                               int                dimIndex,
+                                               PmeLayoutTransform transform)
+{
+    // The GPU atom spline data is laid out in a different way currently than the CPU one.
+    // This function converts the data from GPU to CPU layout (in the host memory).
+    // It is only intended for testing purposes so far.
+    // Ideally we should use similar layouts on CPU and GPU if we care about mixed modes and their
+    // performance (e.g. spreading on GPU, gathering on CPU).
+    GMX_RELEASE_ASSERT(atc->nthread == 1, "Only the serial PME data layout is supported");
+    const uintmax_t threadIndex  = 0;
+    const auto      atomCount    = atc->numAtoms();
+    const auto      atomsPerWarp = pme_gpu_get_atoms_per_warp(pmeGpu);
+    const auto      pmeOrder     = pmeGpu->common->pme_order;
+    GMX_ASSERT(pmeOrder == c_pmeGpuOrder, "Only PME order 4 is implemented");
+
+    real*  cpuSplineBuffer;
+    float* h_splineBuffer;
+    switch (type)
+    {
+        case PmeSplineDataType::Values:
+            cpuSplineBuffer = atc->spline[threadIndex].theta.coefficients[dimIndex];
+            h_splineBuffer  = pmeGpu->staging.h_theta;
+            break;
+
+        case PmeSplineDataType::Derivatives:
+            cpuSplineBuffer = atc->spline[threadIndex].dtheta.coefficients[dimIndex];
+            h_splineBuffer  = pmeGpu->staging.h_dtheta;
+            break;
+
+        default: GMX_THROW(InternalError("Unknown spline data type"));
+    }
+
+    for (auto atomIndex = 0; atomIndex < atomCount; atomIndex++)
+    {
+        for (auto orderIndex = 0; orderIndex < pmeOrder; orderIndex++)
+        {
+            const auto gpuValueIndex =
+                    getSplineParamFullIndex(pmeOrder, orderIndex, dimIndex, atomIndex, atomsPerWarp);
+            const auto cpuValueIndex = atomIndex * pmeOrder + orderIndex;
+            GMX_ASSERT(cpuValueIndex < atomCount * pmeOrder,
+                       "Atom spline data index out of bounds (while transforming GPU data layout "
+                       "for host)");
+            switch (transform)
+            {
+                case PmeLayoutTransform::GpuToHost:
+                    cpuSplineBuffer[cpuValueIndex] = h_splineBuffer[gpuValueIndex];
+                    break;
+
+                case PmeLayoutTransform::HostToGpu:
+                    h_splineBuffer[gpuValueIndex] = cpuSplineBuffer[cpuValueIndex];
+                    break;
+
+                default: GMX_THROW(InternalError("Unknown layout transform"));
+            }
+        }
     }
 }
 

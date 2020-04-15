@@ -37,7 +37,9 @@
 
 /*! \libinternal \file
  *  \brief Declares the OpenCL type traits.
+ *
  *  \author Aleksei Iupinov <a.yupinov@gmail.com>
+ *  \author Artem Zhmurov <zhmurov@gmail.com>
  *
  * \inlibraryapi
  * \ingroup module_gpu_utils
@@ -77,12 +79,8 @@ struct DeviceInformation
     size_t maxWorkGroupSize; //!< Workgroup total size limit (CL_DEVICE_MAX_WORK_GROUP_SIZE).
 };
 
-//! \brief GPU command stream
-using CommandStream = cl_command_queue;
 //! \brief Single GPU call timing event
 using CommandEvent = cl_event;
-//! \brief Context used explicitly in OpenCL
-using DeviceContext = cl_context;
 
 /*! \internal \brief
  * GPU kernels scheduling description. This is same in OpenCL/CUDA.
@@ -91,10 +89,12 @@ using DeviceContext = cl_context;
  */
 struct KernelLaunchConfig
 {
-    size_t        gridSize[3]      = { 1, 1, 1 }; //!< Work groups (CUDA blocks) counts
-    size_t        blockSize[3]     = { 1, 1, 1 }; //!< Per work group (CUDA block) thread counts
-    size_t        sharedMemorySize = 0;           //!< Shared memory size in bytes
-    CommandStream stream           = nullptr;     //!< Stream to launch kernel in
+    //! Work groups (CUDA blocks) counts
+    size_t gridSize[3] = { 1, 1, 1 };
+    //! Per work group (CUDA block) thread counts
+    size_t blockSize[3] = { 1, 1, 1 };
+    //! Shared memory size in bytes
+    size_t sharedMemorySize = 0;
 };
 
 /*! \brief Sets whether device code can use arrays that are embedded in structs.

@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+# Copyright (c) 2013,2014,2015,2016,2017 The GROMACS development team.
 # Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
@@ -39,36 +39,38 @@ gmx_add_unit_test_library(mdrun_test_infrastructure
     energyreader.cpp
     energycomparison.cpp
     moduletest.cpp
-    mdmodulenotification.cpp
     terminationhelper.cpp
     trajectorycomparison.cpp
     trajectoryreader.cpp
+    # pseudo-library for code for mdrun
+    $<TARGET_OBJECTS:mdrun_objlib>
     )
 target_include_directories(mdrun_test_infrastructure SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/src/external)
 
 set(testname "MdrunTests")
 set(exename "mdrun-test")
 
-gmx_add_gtest_executable(
-    ${exename}
-    # files with code for tests
-    compressed_x_output.cpp
-    densityfittingmodule.cpp
-    exactcontinuation.cpp
-    grompp.cpp
-    helpwriting.cpp
-    initialconstraints.cpp
-    interactiveMD.cpp
-    outputfiles.cpp
-    pmetest.cpp
-    simulator.cpp
-    swapcoords.cpp
-    tabulated_bonded_interactions.cpp
-    termination.cpp
-    trajectory_writing.cpp
-    mimic.cpp
-    # pseudo-library for code for mdrun
-    $<TARGET_OBJECTS:mdrun_objlib>
+gmx_add_gtest_executable(${exename}
+    CPP_SOURCE_FILES
+        compressed_x_output.cpp
+        densityfittingmodule.cpp
+        exactcontinuation.cpp
+        ewaldsurfaceterm.cpp
+        grompp.cpp
+        helpwriting.cpp
+        initialconstraints.cpp
+        interactiveMD.cpp
+        orires.cpp
+        outputfiles.cpp
+        pmetest.cpp
+        simulator.cpp
+        swapcoords.cpp
+        tabulated_bonded_interactions.cpp
+        termination.cpp
+        trajectory_writing.cpp
+        mimic.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
     )
 target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
 gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST)
@@ -79,17 +81,17 @@ gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST
 set(testname "MdrunNonIntegratorTests")
 set(exename "mdrun-non-integrator-test")
 
-gmx_add_gtest_executable(
-    ${exename}
-    # files with code for tests
-    minimize.cpp
-    nonbonded_bench.cpp
-    normalmodes.cpp
-    rerun.cpp
-    simple_mdrun.cpp
-    # pseudo-library for code for mdrun
-    $<TARGET_OBJECTS:mdrun_objlib>
-    )
+gmx_add_gtest_executable(${exename}
+    CPP_SOURCE_FILES
+        # files with code for tests
+        minimize.cpp
+        nonbonded_bench.cpp
+        normalmodes.cpp
+        rerun.cpp
+        simple_mdrun.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+        )
 target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
 gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST)
 
@@ -97,13 +99,13 @@ gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST
 set(testname "MdrunTpiTests")
 set(exename "mdrun-tpi-test")
 
-gmx_add_gtest_executable(
-    ${exename}
-    # files with code for tests
-    tpitest.cpp
-    # pseudo-library for code for mdrun
-    $<TARGET_OBJECTS:mdrun_objlib>
-    )
+gmx_add_gtest_executable(${exename}
+    CPP_SOURCE_FILES
+        # files with code for tests
+        tpitest.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+        )
 target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
 gmx_register_gtest_test(${testname} ${exename} INTEGRATION_TEST)
 
@@ -112,31 +114,31 @@ gmx_register_gtest_test(${testname} ${exename} INTEGRATION_TEST)
 set(testname "MdrunMpiTests")
 set(exename "mdrun-mpi-test")
 
-gmx_add_gtest_executable(
-    ${exename} MPI
-    # files with code for tests
-    domain_decomposition.cpp
-    minimize.cpp
-    mimic.cpp
-    multisim.cpp
-    multisimtest.cpp
-    pmetest.cpp
-    replicaexchange.cpp
-    # pseudo-library for code for mdrun
-    $<TARGET_OBJECTS:mdrun_objlib>
-    )
+gmx_add_gtest_executable(${exename} MPI
+    CPP_SOURCE_FILES
+        # files with code for tests
+        domain_decomposition.cpp
+        minimize.cpp
+        mimic.cpp
+        multisim.cpp
+        multisimtest.cpp
+        pmetest.cpp
+        replicaexchange.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+        )
 target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
 gmx_register_gtest_test(${testname} ${exename} MPI_RANKS 2 OPENMP_THREADS 2 INTEGRATION_TEST)
 
 # Slow-running tests that target testing multiple-rank coordination behaviors
 set(exename "mdrun-mpi-coordination-test")
-gmx_add_gtest_executable(
-    ${exename} MPI
-    # files with code for tests
-    periodicactions.cpp
-    # pseudo-library for code for mdrun
-    $<TARGET_OBJECTS:mdrun_objlib>
-    )
+gmx_add_gtest_executable(${exename} MPI
+    CPP_SOURCE_FILES
+        # files with code for tests
+        periodicactions.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+        )
 target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
 
 # These tests are extremely slow without optimization or OpenMP, so only run them for

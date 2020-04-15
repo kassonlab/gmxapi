@@ -33,6 +33,7 @@ GROMACS python interface.
    probably neither especially elegant nor especially safe. Use of this
    module in any remotely critical application is strongly discouraged.
 """
+import errno
 import os
 import sys
 import subprocess
@@ -93,11 +94,7 @@ class GromacsInterface(object):
 
     @includepath.setter
     def includepath(self, path):
-        try:  # py2/3 compatibility
-            basestring
-        except NameError:
-            basestring = str
-        if isinstance(path, basestring):
+        if isinstance(path, str):
             path = [path]
         self._includepath = path
 
@@ -421,10 +418,11 @@ class GromacsInterface(object):
         if exe is None:
             exe = self._exe
         try:
-            devnull = open(os.devnull)
-            exe_out = subprocess.check_output([exe, '--version'], stderr=devnull)
+            exe_out = subprocess.run([exe, '--version'],
+                                     stdout=subprocess.PIPE,
+                                     universal_newlines=True).stdout
         except OSError as e:
-            if e.errno == os.errno.ENOENT:
+            if hasattr(errno, 'ENOENT') and e.errno == errno.ENOENT:
                 # file not found error.
                 if not quiet:
                     print('ERROR: gmx executable not found')
@@ -433,7 +431,7 @@ class GromacsInterface(object):
             else:
                 raise e
         # check that output is as expected
-        return re.search(br':-\) GROMACS - gmx.* \(-:', exe_out)
+        return re.search(r':-\) GROMACS - gmx.* \(-:', exe_out)
 
     def _run(self, cmd, args, cwd=None, stdin=None, stdout=None, stderr=None, mpicmd=None):
         if self.exe is None:

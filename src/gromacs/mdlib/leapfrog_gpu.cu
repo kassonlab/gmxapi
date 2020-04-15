@@ -287,7 +287,7 @@ void LeapFrogGpu::integrate(const float3*                     d_x,
                 h_lambdas_[i] = tcstat[i].lambda;
             }
             copyToDeviceBuffer(&d_lambdas_, h_lambdas_.data(), 0, numTempScaleValues_,
-                               commandStream_, GpuApiCallBehavior::Async, nullptr);
+                               deviceStream_, GpuApiCallBehavior::Async, nullptr);
         }
         VelocityScalingType prVelocityScalingType = VelocityScalingType::None;
         if (doParrinelloRahman)
@@ -311,12 +311,14 @@ void LeapFrogGpu::integrate(const float3*                     d_x,
     const auto kernelArgs = prepareGpuKernelArguments(
             kernelPtr, kernelLaunchConfig_, &numAtoms_, &d_x, &d_xp, &d_v, &d_f, &d_inverseMasses_,
             &dt, &d_lambdas_, &d_tempScaleGroups_, &prVelocityScalingMatrixDiagonal_);
-    launchGpuKernel(kernelPtr, kernelLaunchConfig_, nullptr, "leapfrog_kernel", kernelArgs);
+    launchGpuKernel(kernelPtr, kernelLaunchConfig_, deviceStream_, nullptr, "leapfrog_kernel", kernelArgs);
 
     return;
 }
 
-LeapFrogGpu::LeapFrogGpu(CommandStream commandStream) : commandStream_(commandStream)
+LeapFrogGpu::LeapFrogGpu(const DeviceContext& deviceContext, const DeviceStream& deviceStream) :
+    deviceContext_(deviceContext),
+    deviceStream_(deviceStream)
 {
     numAtoms_ = 0;
 
@@ -326,7 +328,6 @@ LeapFrogGpu::LeapFrogGpu(CommandStream commandStream) : commandStream_(commandSt
     kernelLaunchConfig_.blockSize[1]     = 1;
     kernelLaunchConfig_.blockSize[2]     = 1;
     kernelLaunchConfig_.sharedMemorySize = 0;
-    kernelLaunchConfig_.stream           = commandStream_;
 }
 
 LeapFrogGpu::~LeapFrogGpu()
@@ -342,16 +343,16 @@ void LeapFrogGpu::set(const t_mdatoms& md, const int numTempScaleValues, const u
     numTempScaleValues_ = numTempScaleValues;
 
     reallocateDeviceBuffer(&d_inverseMasses_, numAtoms_, &numInverseMasses_,
-                           &numInverseMassesAlloc_, nullptr);
-    copyToDeviceBuffer(&d_inverseMasses_, (float*)md.invmass, 0, numAtoms_, commandStream_,
+                           &numInverseMassesAlloc_, deviceContext_);
+    copyToDeviceBuffer(&d_inverseMasses_, (float*)md.invmass, 0, numAtoms_, deviceStream_,
                        GpuApiCallBehavior::Sync, nullptr);
 
     // Temperature scale group map only used if there are more then one group
     if (numTempScaleValues > 1)
     {
         reallocateDeviceBuffer(&d_tempScaleGroups_, numAtoms_, &numTempScaleGroups_,
-                               &numTempScaleGroupsAlloc_, nullptr);
-        copyToDeviceBuffer(&d_tempScaleGroups_, tempScaleGroups, 0, numAtoms_, commandStream_,
+                               &numTempScaleGroupsAlloc_, deviceContext_);
+        copyToDeviceBuffer(&d_tempScaleGroups_, tempScaleGroups, 0, numAtoms_, deviceStream_,
                            GpuApiCallBehavior::Sync, nullptr);
     }
 
@@ -359,7 +360,8 @@ void LeapFrogGpu::set(const t_mdatoms& md, const int numTempScaleValues, const u
     if (numTempScaleValues_ > 0)
     {
         h_lambdas_.resize(numTempScaleValues);
-        reallocateDeviceBuffer(&d_lambdas_, numTempScaleValues_, &numLambdas_, &numLambdasAlloc_, nullptr);
+        reallocateDeviceBuffer(&d_lambdas_, numTempScaleValues_, &numLambdas_, &numLambdasAlloc_,
+                               deviceContext_);
     }
 }
 

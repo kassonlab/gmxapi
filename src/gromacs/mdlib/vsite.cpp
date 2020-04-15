@@ -3,7 +3,7 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2013,2014,2015,2016,2017 The GROMACS development team.
  * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
@@ -55,7 +55,6 @@
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/mdatom.h"
 #include "gromacs/pbcutil/ishift.h"
-#include "gromacs/pbcutil/mshift.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/timing/wallcycle.h"
 #include "gromacs/topology/ifunc.h"
@@ -86,17 +85,8 @@
  * Any remaining vsites are assigned to a separate master thread task.
  */
 
+using gmx::ArrayRef;
 using gmx::RVec;
-
-static void init_ilist(t_ilist* ilist)
-{
-    for (int i = 0; i < F_NRE; i++)
-    {
-        ilist[i].nr     = 0;
-        ilist[i].nalloc = 0;
-        ilist[i].iatoms = nullptr;
-    }
-}
 
 /*! \brief List of atom indices belonging to a task */
 struct AtomIndex
@@ -109,7 +99,7 @@ struct AtomIndex
 struct InterdependentTask
 {
     //! The interaction lists, only vsite entries are used
-    t_ilist ilist[F_NRE];
+    InteractionLists ilist;
     //! Thread/task-local force buffer
     std::vector<RVec> force;
     //! The atom indices of the vsites of our task
@@ -117,19 +107,13 @@ struct InterdependentTask
     //! Flags if elements in force are spread to or not
     std::vector<bool> use;
     //! The number of entries set to true in use
-    int nuse;
+    int nuse = 0;
     //! Array of atoms indices, size nthreads, covering all nuse set elements in use
     std::vector<AtomIndex> atomIndex;
     //! List of tasks (force blocks) this task spread forces to
     std::vector<int> spreadTask;
     //! List of tasks that write to this tasks force block range
     std::vector<int> reduceTask;
-
-    InterdependentTask()
-    {
-        init_ilist(ilist);
-        nuse = 0;
-    }
 };
 
 /*! \brief Vsite thread task data structure */
@@ -140,7 +124,7 @@ struct VsiteThread
     //! End of atom range of this task
     int rangeEnd;
     //! The interaction lists, only vsite entries are used
-    t_ilist ilist[F_NRE];
+    std::array<InteractionList, F_NRE> ilist;
     //! Local fshift accumulation buffer
     rvec fshift[SHIFTS];
     //! Local virial dx*df accumulation buffer
@@ -155,7 +139,6 @@ struct VsiteThread
     {
         rangeStart = -1;
         rangeEnd   = -1;
-        init_ilist(ilist);
         clear_rvecs(SHIFTS, fshift);
         clear_mat(dxdf);
         useInterdependentTask = false;
@@ -166,8 +149,7 @@ struct VsiteThread
  *
  * \param[in] ilist  The interaction list
  */
-template<typename T>
-static int vsiteIlistNrCount(const T* ilist)
+static int vsiteIlistNrCount(ArrayRef<const InteractionList> ilist)
 {
     int nr = 0;
     for (int ftype = c_ftypeVsiteStart; ftype < c_ftypeVsiteEnd; ftype++)
@@ -417,7 +399,7 @@ static void constr_vsite4FDN(const rvec   xi,
 }
 
 
-static int constr_vsiten(const t_iatom* ia, const t_iparams ip[], rvec* x, const t_pbc* pbc)
+static int constr_vsiten(const t_iatom* ia, ArrayRef<const t_iparams> ip, rvec* x, const t_pbc* pbc)
 {
     rvec x1, dx;
     dvec dsum;
@@ -477,12 +459,12 @@ static PbcMode getPbcMode(const t_pbc* pbcPtr)
     }
 }
 
-static void construct_vsites_thread(rvec            x[],
-                                    real            dt,
-                                    rvec*           v,
-                                    const t_iparams ip[],
-                                    const t_ilist   ilist[],
-                                    const t_pbc*    pbc_null)
+static void construct_vsites_thread(rvec                            x[],
+                                    real                            dt,
+                                    rvec*                           v,
+                                    ArrayRef<const t_iparams>       ip,
+                                    ArrayRef<const InteractionList> ilist,
+                                    const t_pbc*                    pbc_null)
 {
     real inv_dt;
     if (v != nullptr)
@@ -500,7 +482,7 @@ static void construct_vsites_thread(rvec            x[],
 
     for (int ftype = c_ftypeVsiteStart; ftype < c_ftypeVsiteEnd; ftype++)
     {
-        if (ilist[ftype].nr == 0)
+        if (ilist[ftype].empty())
         {
             continue;
         }
@@ -508,9 +490,9 @@ static void construct_vsites_thread(rvec            x[],
         { // TODO remove me
             int nra = interaction_function[ftype].nratoms;
             int inc = 1 + nra;
-            int nr  = ilist[ftype].nr;
+            int nr  = ilist[ftype].size();
 
-            const t_iatom* ia = ilist[ftype].iatoms;
+            const t_iatom* ia = ilist[ftype].iatoms.data();
 
             for (int i = 0; i < nr;)
             {
@@ -609,16 +591,16 @@ static void construct_vsites_thread(rvec            x[],
     }
 }
 
-void construct_vsites(const gmx_vsite_t* vsite,
-                      rvec               x[],
-                      real               dt,
-                      rvec*              v,
-                      const t_iparams    ip[],
-                      const t_ilist      ilist[],
-                      PbcType            pbcType,
-                      gmx_bool           bMolPBC,
-                      const t_commrec*   cr,
-                      const matrix       box)
+void construct_vsites(const gmx_vsite_t*              vsite,
+                      rvec                            x[],
+                      real                            dt,
+                      rvec*                           v,
+                      ArrayRef<const t_iparams>       ip,
+                      ArrayRef<const InteractionList> ilist,
+                      PbcType                         pbcType,
+                      gmx_bool                        bMolPBC,
+                      const t_commrec*                cr,
+                      const matrix                    box)
 {
     const bool useDomdec = (vsite != nullptr && vsite->useDomdec);
     GMX_ASSERT(!useDomdec || (cr != nullptr && DOMAINDECOMP(cr)),
@@ -686,17 +668,10 @@ void construct_vsites(const gmx_vsite_t* vsite,
     }
 }
 
-static void spread_vsite2(const t_iatom  ia[],
-                          real           a,
-                          const rvec     x[],
-                          rvec           f[],
-                          rvec           fshift[],
-                          const t_pbc*   pbc,
-                          const t_graph* g)
+static void spread_vsite2(const t_iatom ia[], real a, const rvec x[], rvec f[], rvec fshift[], const t_pbc* pbc)
 {
     rvec    fi, fj, dx;
     t_iatom av, ai, aj;
-    ivec    di;
     int     siv, sij;
 
     av = ia[1];
@@ -711,14 +686,7 @@ static void spread_vsite2(const t_iatom  ia[],
     rvec_inc(f[aj], fj);
     /* 6 Flops */
 
-    if (g)
-    {
-        ivec_sub(SHIFT_IVEC(g, ai), SHIFT_IVEC(g, av), di);
-        siv = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, ai), SHIFT_IVEC(g, aj), di);
-        sij = IVEC2IS(di);
-    }
-    else if (pbc)
+    if (pbc)
     {
         siv = pbc_dx_aiuc(pbc, x[ai], x[av], dx);
         sij = pbc_dx_aiuc(pbc, x[ai], x[aj], dx);
@@ -749,35 +717,27 @@ void constructVsitesGlobal(const gmx_mtop_t& mtop, gmx::ArrayRef<gmx::RVec> x)
     {
         const gmx_molblock_t& molb = mtop.molblock[mb];
         const gmx_moltype_t&  molt = mtop.moltype[molb.type];
-        if (vsiteIlistNrCount(molt.ilist.data()) > 0)
+        if (vsiteIlistNrCount(molt.ilist) > 0)
         {
             int atomOffset = mtop.moleculeBlockIndices[mb].globalAtomStart;
             for (int mol = 0; mol < molb.nmol; mol++)
             {
-                t_ilist ilist[F_NRE];
-                for (int ftype = c_ftypeVsiteStart; ftype < c_ftypeVsiteEnd; ftype++)
-                {
-                    ilist[ftype].nr     = molt.ilist[ftype].size();
-                    ilist[ftype].iatoms = const_cast<t_iatom*>(molt.ilist[ftype].iatoms.data());
-                }
-
                 construct_vsites(nullptr, as_rvec_array(x.data()) + atomOffset, 0.0, nullptr,
-                                 mtop.ffparams.iparams.data(), ilist, PbcType::No, TRUE, nullptr, nullptr);
+                                 mtop.ffparams.iparams, molt.ilist, PbcType::No, TRUE, nullptr, nullptr);
                 atomOffset += molt.atoms.nr;
             }
         }
     }
 }
 
-static void spread_vsite2FD(const t_iatom  ia[],
-                            real           a,
-                            const rvec     x[],
-                            rvec           f[],
-                            rvec           fshift[],
-                            gmx_bool       VirCorr,
-                            matrix         dxdf,
-                            const t_pbc*   pbc,
-                            const t_graph* g)
+static void spread_vsite2FD(const t_iatom ia[],
+                            real          a,
+                            const rvec    x[],
+                            rvec          f[],
+                            rvec          fshift[],
+                            gmx_bool      VirCorr,
+                            matrix        dxdf,
+                            const t_pbc*  pbc)
 {
     const int av = ia[1];
     const int ai = ia[2];
@@ -815,15 +775,7 @@ static void spread_vsite2FD(const t_iatom  ia[],
     if (fshift)
     {
         int svi;
-        if (g)
-        {
-            ivec di;
-            ivec_sub(SHIFT_IVEC(g, ia[1]), SHIFT_IVEC(g, ai), di);
-            svi = IVEC2IS(di);
-            ivec_sub(SHIFT_IVEC(g, aj), SHIFT_IVEC(g, ai), di);
-            sji = IVEC2IS(di);
-        }
-        else if (pbc)
+        if (pbc)
         {
             rvec xvi;
             svi = pbc_rvec_sub(pbc, x[av], x[ai], xvi);
@@ -872,18 +824,10 @@ static void spread_vsite2FD(const t_iatom  ia[],
     /* TOTAL: 38 flops */
 }
 
-static void spread_vsite3(const t_iatom  ia[],
-                          real           a,
-                          real           b,
-                          const rvec     x[],
-                          rvec           f[],
-                          rvec           fshift[],
-                          const t_pbc*   pbc,
-                          const t_graph* g)
+static void spread_vsite3(const t_iatom ia[], real a, real b, const rvec x[], rvec f[], rvec fshift[], const t_pbc* pbc)
 {
     rvec fi, fj, fk, dx;
     int  av, ai, aj, ak;
-    ivec di;
     int  siv, sij, sik;
 
     av = ia[1];
@@ -901,16 +845,7 @@ static void spread_vsite3(const t_iatom  ia[],
     rvec_inc(f[ak], fk);
     /* 9 Flops */
 
-    if (g)
-    {
-        ivec_sub(SHIFT_IVEC(g, ai), SHIFT_IVEC(g, ia[1]), di);
-        siv = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, ai), SHIFT_IVEC(g, aj), di);
-        sij = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, ai), SHIFT_IVEC(g, ak), di);
-        sik = IVEC2IS(di);
-    }
-    else if (pbc)
+    if (pbc)
     {
         siv = pbc_dx_aiuc(pbc, x[ai], x[av], dx);
         sij = pbc_dx_aiuc(pbc, x[ai], x[aj], dx);
@@ -934,22 +869,20 @@ static void spread_vsite3(const t_iatom  ia[],
     /* TOTAL: 20 flops */
 }
 
-static void spread_vsite3FD(const t_iatom  ia[],
-                            real           a,
-                            real           b,
-                            const rvec     x[],
-                            rvec           f[],
-                            rvec           fshift[],
-                            gmx_bool       VirCorr,
-                            matrix         dxdf,
-                            const t_pbc*   pbc,
-                            const t_graph* g)
+static void spread_vsite3FD(const t_iatom ia[],
+                            real          a,
+                            real          b,
+                            const rvec    x[],
+                            rvec          f[],
+                            rvec          fshift[],
+                            gmx_bool      VirCorr,
+                            matrix        dxdf,
+                            const t_pbc*  pbc)
 {
     real    fproj, a1;
     rvec    xvi, xij, xjk, xix, fv, temp;
     t_iatom av, ai, aj, ak;
     int     svi, sji, skj;
-    ivec    di;
 
     av = ia[1];
     ai = ia[2];
@@ -993,16 +926,7 @@ static void spread_vsite3FD(const t_iatom  ia[],
     f[ak][ZZ] += a * temp[ZZ];
     /* 19 Flops */
 
-    if (g)
-    {
-        ivec_sub(SHIFT_IVEC(g, ia[1]), SHIFT_IVEC(g, ai), di);
-        svi = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, aj), SHIFT_IVEC(g, ai), di);
-        sji = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, ak), SHIFT_IVEC(g, aj), di);
-        skj = IVEC2IS(di);
-    }
-    else if (pbc)
+    if (pbc)
     {
         svi = pbc_rvec_sub(pbc, x[av], x[ai], xvi);
     }
@@ -1052,22 +976,20 @@ static void spread_vsite3FD(const t_iatom  ia[],
     /* TOTAL: 61 flops */
 }
 
-static void spread_vsite3FAD(const t_iatom  ia[],
-                             real           a,
-                             real           b,
-                             const rvec     x[],
-                             rvec           f[],
-                             rvec           fshift[],
-                             gmx_bool       VirCorr,
-                             matrix         dxdf,
-                             const t_pbc*   pbc,
-                             const t_graph* g)
+static void spread_vsite3FAD(const t_iatom ia[],
+                             real          a,
+                             real          b,
+                             const rvec    x[],
+                             rvec          f[],
+                             rvec          fshift[],
+                             gmx_bool      VirCorr,
+                             matrix        dxdf,
+                             const t_pbc*  pbc)
 {
     rvec    xvi, xij, xjk, xperp, Fpij, Fppp, fv, f1, f2, f3;
     real    a1, b1, c1, c2, invdij, invdij2, invdp, fproj;
     t_iatom av, ai, aj, ak;
     int     svi, sji, skj, d;
-    ivec    di;
 
     av = ia[1];
     ai = ia[2];
@@ -1121,16 +1043,7 @@ static void spread_vsite3FAD(const t_iatom  ia[],
     f[ak][ZZ] += f2[ZZ];
     /* 30 Flops */
 
-    if (g)
-    {
-        ivec_sub(SHIFT_IVEC(g, ia[1]), SHIFT_IVEC(g, ai), di);
-        svi = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, aj), SHIFT_IVEC(g, ai), di);
-        sji = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, ak), SHIFT_IVEC(g, aj), di);
-        skj = IVEC2IS(di);
-    }
-    else if (pbc)
+    if (pbc)
     {
         svi = pbc_rvec_sub(pbc, x[av], x[ai], xvi);
     }
@@ -1174,22 +1087,20 @@ static void spread_vsite3FAD(const t_iatom  ia[],
     /* TOTAL: 113 flops */
 }
 
-static void spread_vsite3OUT(const t_iatom  ia[],
-                             real           a,
-                             real           b,
-                             real           c,
-                             const rvec     x[],
-                             rvec           f[],
-                             rvec           fshift[],
-                             gmx_bool       VirCorr,
-                             matrix         dxdf,
-                             const t_pbc*   pbc,
-                             const t_graph* g)
+static void spread_vsite3OUT(const t_iatom ia[],
+                             real          a,
+                             real          b,
+                             real          c,
+                             const rvec    x[],
+                             rvec          f[],
+                             rvec          fshift[],
+                             gmx_bool      VirCorr,
+                             matrix        dxdf,
+                             const t_pbc*  pbc)
 {
     rvec xvi, xij, xik, fv, fj, fk;
     real cfx, cfy, cfz;
     int  av, ai, aj, ak;
-    ivec di;
     int  svi, sji, ski;
 
     av = ia[1];
@@ -1224,16 +1135,7 @@ static void spread_vsite3OUT(const t_iatom  ia[],
     rvec_inc(f[ak], fk);
     /* 15 Flops */
 
-    if (g)
-    {
-        ivec_sub(SHIFT_IVEC(g, ia[1]), SHIFT_IVEC(g, ai), di);
-        svi = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, aj), SHIFT_IVEC(g, ai), di);
-        sji = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, ak), SHIFT_IVEC(g, ai), di);
-        ski = IVEC2IS(di);
-    }
-    else if (pbc)
+    if (pbc)
     {
         svi = pbc_rvec_sub(pbc, x[av], x[ai], xvi);
     }
@@ -1270,22 +1172,20 @@ static void spread_vsite3OUT(const t_iatom  ia[],
     /* TOTAL: 54 flops */
 }
 
-static void spread_vsite4FD(const t_iatom  ia[],
-                            real           a,
-                            real           b,
-                            real           c,
-                            const rvec     x[],
-                            rvec           f[],
-                            rvec           fshift[],
-                            gmx_bool       VirCorr,
-                            matrix         dxdf,
-                            const t_pbc*   pbc,
-                            const t_graph* g)
+static void spread_vsite4FD(const t_iatom ia[],
+                            real          a,
+                            real          b,
+                            real          c,
+                            const rvec    x[],
+                            rvec          f[],
+                            rvec          fshift[],
+                            gmx_bool      VirCorr,
+                            matrix        dxdf,
+                            const t_pbc*  pbc)
 {
     real fproj, a1;
     rvec xvi, xij, xjk, xjl, xix, fv, temp;
     int  av, ai, aj, ak, al;
-    ivec di;
     int  svi, sji, skj, slj, m;
 
     av = ia[1];
@@ -1333,18 +1233,7 @@ static void spread_vsite4FD(const t_iatom  ia[],
     }
     /* 26 Flops */
 
-    if (g)
-    {
-        ivec_sub(SHIFT_IVEC(g, ia[1]), SHIFT_IVEC(g, ai), di);
-        svi = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, aj), SHIFT_IVEC(g, ai), di);
-        sji = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, ak), SHIFT_IVEC(g, aj), di);
-        skj = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, al), SHIFT_IVEC(g, aj), di);
-        slj = IVEC2IS(di);
-    }
-    else if (pbc)
+    if (pbc)
     {
         svi = pbc_rvec_sub(pbc, x[av], x[ai], xvi);
     }
@@ -1385,23 +1274,21 @@ static void spread_vsite4FD(const t_iatom  ia[],
 }
 
 
-static void spread_vsite4FDN(const t_iatom  ia[],
-                             real           a,
-                             real           b,
-                             real           c,
-                             const rvec     x[],
-                             rvec           f[],
-                             rvec           fshift[],
-                             gmx_bool       VirCorr,
-                             matrix         dxdf,
-                             const t_pbc*   pbc,
-                             const t_graph* g)
+static void spread_vsite4FDN(const t_iatom ia[],
+                             real          a,
+                             real          b,
+                             real          c,
+                             const rvec    x[],
+                             rvec          f[],
+                             rvec          fshift[],
+                             gmx_bool      VirCorr,
+                             matrix        dxdf,
+                             const t_pbc*  pbc)
 {
     rvec xvi, xij, xik, xil, ra, rb, rja, rjb, rab, rm, rt;
     rvec fv, fj, fk, fl;
     real invrm, denom;
     real cfx, cfy, cfz;
-    ivec di;
     int  av, ai, aj, ak, al;
     int  svi, sij, sik, sil;
 
@@ -1502,18 +1389,7 @@ static void spread_vsite4FDN(const t_iatom  ia[],
     rvec_inc(f[al], fl);
     /* 21 flops */
 
-    if (g)
-    {
-        ivec_sub(SHIFT_IVEC(g, av), SHIFT_IVEC(g, ai), di);
-        svi = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, aj), SHIFT_IVEC(g, ai), di);
-        sij = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, ak), SHIFT_IVEC(g, ai), di);
-        sik = IVEC2IS(di);
-        ivec_sub(SHIFT_IVEC(g, al), SHIFT_IVEC(g, ai), di);
-        sil = IVEC2IS(di);
-    }
-    else if (pbc)
+    if (pbc)
     {
         svi = pbc_rvec_sub(pbc, x[av], x[ai], xvi);
     }
@@ -1553,18 +1429,16 @@ static void spread_vsite4FDN(const t_iatom  ia[],
 }
 
 
-static int spread_vsiten(const t_iatom   ia[],
-                         const t_iparams ip[],
-                         const rvec      x[],
-                         rvec            f[],
-                         rvec            fshift[],
-                         const t_pbc*    pbc,
-                         const t_graph*  g)
+static int spread_vsiten(const t_iatom             ia[],
+                         ArrayRef<const t_iparams> ip,
+                         const rvec                x[],
+                         rvec                      f[],
+                         rvec                      fshift[],
+                         const t_pbc*              pbc)
 {
     rvec xv, dx, fi;
     int  n3, av, i, ai;
     real a;
-    ivec di;
     int  siv;
 
     n3 = 3 * ip[ia[0]].vsiten.n;
@@ -1574,12 +1448,7 @@ static int spread_vsiten(const t_iatom   ia[],
     for (i = 0; i < n3; i += 3)
     {
         ai = ia[i + 2];
-        if (g)
-        {
-            ivec_sub(SHIFT_IVEC(g, ai), SHIFT_IVEC(g, av), di);
-            siv = IVEC2IS(di);
-        }
-        else if (pbc)
+        if (pbc)
         {
             siv = pbc_dx_aiuc(pbc, x[ai], xv, dx);
         }
@@ -1602,27 +1471,26 @@ static int spread_vsiten(const t_iatom   ia[],
 }
 
 
-static int vsite_count(const t_ilist* ilist, int ftype)
+static int vsite_count(ArrayRef<const InteractionList> ilist, int ftype)
 {
     if (ftype == F_VSITEN)
     {
-        return ilist[ftype].nr / 3;
+        return ilist[ftype].size() / 3;
     }
     else
     {
-        return ilist[ftype].nr / (1 + interaction_function[ftype].nratoms);
+        return ilist[ftype].size() / (1 + interaction_function[ftype].nratoms);
     }
 }
 
-static void spread_vsite_f_thread(const rvec     x[],
-                                  rvec           f[],
-                                  rvec*          fshift,
-                                  gmx_bool       VirCorr,
-                                  matrix         dxdf,
-                                  t_iparams      ip[],
-                                  const t_ilist  ilist[],
-                                  const t_graph* g,
-                                  const t_pbc*   pbc_null)
+static void spread_vsite_f_thread(const rvec                      x[],
+                                  rvec                            f[],
+                                  rvec*                           fshift,
+                                  gmx_bool                        VirCorr,
+                                  matrix                          dxdf,
+                                  ArrayRef<const t_iparams>       ip,
+                                  ArrayRef<const InteractionList> ilist,
+                                  const t_pbc*                    pbc_null)
 {
     const PbcMode pbcMode = getPbcMode(pbc_null);
     /* We need another pbc pointer, as with charge groups we switch per vsite */
@@ -1633,7 +1501,7 @@ static void spread_vsite_f_thread(const rvec     x[],
      * higher type vsites from lower types         */
     for (int ftype = c_ftypeVsiteEnd - 1; ftype >= c_ftypeVsiteStart; ftype--)
     {
-        if (ilist[ftype].nr == 0)
+        if (ilist[ftype].empty())
         {
             continue;
         }
@@ -1641,9 +1509,9 @@ static void spread_vsite_f_thread(const rvec     x[],
         { // TODO remove me
             int nra = interaction_function[ftype].nratoms;
             int inc = 1 + nra;
-            int nr  = ilist[ftype].nr;
+            int nr  = ilist[ftype].size();
 
-            const t_iatom* ia = ilist[ftype].iatoms;
+            const t_iatom* ia = ilist[ftype].iatoms.data();
 
             if (pbcMode == PbcMode::all)
             {
@@ -1660,38 +1528,38 @@ static void spread_vsite_f_thread(const rvec     x[],
                 /* Construct the vsite depending on type */
                 switch (ftype)
                 {
-                    case F_VSITE2: spread_vsite2(ia, a1, x, f, fshift, pbc_null2, g); break;
+                    case F_VSITE2: spread_vsite2(ia, a1, x, f, fshift, pbc_null2); break;
                     case F_VSITE2FD:
-                        spread_vsite2FD(ia, a1, x, f, fshift, VirCorr, dxdf, pbc_null2, g);
+                        spread_vsite2FD(ia, a1, x, f, fshift, VirCorr, dxdf, pbc_null2);
                         break;
                     case F_VSITE3:
                         b1 = ip[tp].vsite.b;
-                        spread_vsite3(ia, a1, b1, x, f, fshift, pbc_null2, g);
+                        spread_vsite3(ia, a1, b1, x, f, fshift, pbc_null2);
                         break;
                     case F_VSITE3FD:
                         b1 = ip[tp].vsite.b;
-                        spread_vsite3FD(ia, a1, b1, x, f, fshift, VirCorr, dxdf, pbc_null2, g);
+                        spread_vsite3FD(ia, a1, b1, x, f, fshift, VirCorr, dxdf, pbc_null2);
                         break;
                     case F_VSITE3FAD:
                         b1 = ip[tp].vsite.b;
-                        spread_vsite3FAD(ia, a1, b1, x, f, fshift, VirCorr, dxdf, pbc_null2, g);
+                        spread_vsite3FAD(ia, a1, b1, x, f, fshift, VirCorr, dxdf, pbc_null2);
                         break;
                     case F_VSITE3OUT:
                         b1 = ip[tp].vsite.b;
                         c1 = ip[tp].vsite.c;
-                        spread_vsite3OUT(ia, a1, b1, c1, x, f, fshift, VirCorr, dxdf, pbc_null2, g);
+                        spread_vsite3OUT(ia, a1, b1, c1, x, f, fshift, VirCorr, dxdf, pbc_null2);
                         break;
                     case F_VSITE4FD:
                         b1 = ip[tp].vsite.b;
                         c1 = ip[tp].vsite.c;
-                        spread_vsite4FD(ia, a1, b1, c1, x, f, fshift, VirCorr, dxdf, pbc_null2, g);
+                        spread_vsite4FD(ia, a1, b1, c1, x, f, fshift, VirCorr, dxdf, pbc_null2);
                         break;
                     case F_VSITE4FDN:
                         b1 = ip[tp].vsite.b;
                         c1 = ip[tp].vsite.c;
-                        spread_vsite4FDN(ia, a1, b1, c1, x, f, fshift, VirCorr, dxdf, pbc_null2, g);
+                        spread_vsite4FDN(ia, a1, b1, c1, x, f, fshift, VirCorr, dxdf, pbc_null2);
                         break;
-                    case F_VSITEN: inc = spread_vsiten(ia, ip, x, f, fshift, pbc_null2, g); break;
+                    case F_VSITEN: inc = spread_vsiten(ia, ip, x, f, fshift, pbc_null2); break;
                     default:
                         gmx_fatal(FARGS, "No such vsite type %d in %s, line %d", ftype, __FILE__, __LINE__);
                 }
@@ -1724,17 +1592,16 @@ static void clearTaskForceBufferUsedElements(InterdependentTask* idTask)
 void spread_vsite_f(const gmx_vsite_t* vsite,
                     const rvec* gmx_restrict x,
                     rvec* gmx_restrict f,
-                    rvec* gmx_restrict fshift,
-                    gmx_bool           VirCorr,
-                    matrix             vir,
-                    t_nrnb*            nrnb,
-                    const t_idef*      idef,
-                    PbcType            pbcType,
-                    gmx_bool           bMolPBC,
-                    const t_graph*     g,
-                    const matrix       box,
-                    const t_commrec*   cr,
-                    gmx_wallcycle*     wcycle)
+                    rvec* gmx_restrict            fshift,
+                    gmx_bool                      VirCorr,
+                    matrix                        vir,
+                    t_nrnb*                       nrnb,
+                    const InteractionDefinitions& idef,
+                    PbcType                       pbcType,
+                    gmx_bool                      bMolPBC,
+                    const matrix                  box,
+                    const t_commrec*              cr,
+                    gmx_wallcycle*                wcycle)
 {
     wallcycle_start(wcycle, ewcVSITESPREAD);
     const bool useDomdec = vsite->useDomdec;
@@ -1768,7 +1635,7 @@ void spread_vsite_f(const gmx_vsite_t* vsite,
         {
             clear_mat(dxdf);
         }
-        spread_vsite_f_thread(x, f, fshift, VirCorr, dxdf, idef->iparams, idef->il, g, pbc_null);
+        spread_vsite_f_thread(x, f, fshift, VirCorr, dxdf, idef.iparams, idef.il, pbc_null);
 
         if (VirCorr)
         {
@@ -1789,7 +1656,7 @@ void spread_vsite_f(const gmx_vsite_t* vsite,
             clear_mat(vsite->tData[vsite->nthreads]->dxdf);
         }
         spread_vsite_f_thread(x, f, fshift, VirCorr, vsite->tData[vsite->nthreads]->dxdf,
-                              idef->iparams, vsite->tData[vsite->nthreads]->ilist, g, pbc_null);
+                              idef.iparams, vsite->tData[vsite->nthreads]->ilist, pbc_null);
 
 #pragma omp parallel num_threads(vsite->nthreads)
         {
@@ -1836,7 +1703,7 @@ void spread_vsite_f(const gmx_vsite_t* vsite,
                         copy_rvec(f[idTask->vsite[i]], idTask->force[idTask->vsite[i]]);
                     }
                     spread_vsite_f_thread(x, as_rvec_array(idTask->force.data()), fshift_t, VirCorr,
-                                          tData.dxdf, idef->iparams, tData.idTask.ilist, g, pbc_null);
+                                          tData.dxdf, idef.iparams, tData.idTask.ilist, pbc_null);
 
                     /* We need a barrier before reducing forces below
                      * that have been produced by a different thread above.
@@ -1874,8 +1741,8 @@ void spread_vsite_f(const gmx_vsite_t* vsite,
                 }
 
                 /* Spread the vsites that spread locally only */
-                spread_vsite_f_thread(x, f, fshift_t, VirCorr, tData.dxdf, idef->iparams,
-                                      tData.ilist, g, pbc_null);
+                spread_vsite_f_thread(x, f, fshift_t, VirCorr, tData.dxdf, idef.iparams,
+                                      tData.ilist, pbc_null);
             }
             GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
         }
@@ -1914,15 +1781,15 @@ void spread_vsite_f(const gmx_vsite_t* vsite,
         dd_move_f_vsites(cr->dd, f, fshift);
     }
 
-    inc_nrnb(nrnb, eNR_VSITE2, vsite_count(idef->il, F_VSITE2));
-    inc_nrnb(nrnb, eNR_VSITE2FD, vsite_count(idef->il, F_VSITE2FD));
-    inc_nrnb(nrnb, eNR_VSITE3, vsite_count(idef->il, F_VSITE3));
-    inc_nrnb(nrnb, eNR_VSITE3FD, vsite_count(idef->il, F_VSITE3FD));
-    inc_nrnb(nrnb, eNR_VSITE3FAD, vsite_count(idef->il, F_VSITE3FAD));
-    inc_nrnb(nrnb, eNR_VSITE3OUT, vsite_count(idef->il, F_VSITE3OUT));
-    inc_nrnb(nrnb, eNR_VSITE4FD, vsite_count(idef->il, F_VSITE4FD));
-    inc_nrnb(nrnb, eNR_VSITE4FDN, vsite_count(idef->il, F_VSITE4FDN));
-    inc_nrnb(nrnb, eNR_VSITEN, vsite_count(idef->il, F_VSITEN));
+    inc_nrnb(nrnb, eNR_VSITE2, vsite_count(idef.il, F_VSITE2));
+    inc_nrnb(nrnb, eNR_VSITE2FD, vsite_count(idef.il, F_VSITE2FD));
+    inc_nrnb(nrnb, eNR_VSITE3, vsite_count(idef.il, F_VSITE3));
+    inc_nrnb(nrnb, eNR_VSITE3FD, vsite_count(idef.il, F_VSITE3FD));
+    inc_nrnb(nrnb, eNR_VSITE3FAD, vsite_count(idef.il, F_VSITE3FAD));
+    inc_nrnb(nrnb, eNR_VSITE3OUT, vsite_count(idef.il, F_VSITE3OUT));
+    inc_nrnb(nrnb, eNR_VSITE4FD, vsite_count(idef.il, F_VSITE4FD));
+    inc_nrnb(nrnb, eNR_VSITE4FDN, vsite_count(idef.il, F_VSITE4FDN));
+    inc_nrnb(nrnb, eNR_VSITEN, vsite_count(idef.il, F_VSITEN));
 
     wallcycle_stop(wcycle, ewcVSITESPREAD);
 }
@@ -2103,24 +1970,24 @@ static inline void flagAtom(InterdependentTask* idTask, int atom, int thread, in
  * taskIndex[] is set for all vsites in our range, either to our local tasks
  * or to the single last task as taskIndex[]=2*nthreads.
  */
-static void assignVsitesToThread(VsiteThread*          tData,
-                                 int                   thread,
-                                 int                   nthread,
-                                 int                   natperthread,
-                                 gmx::ArrayRef<int>    taskIndex,
-                                 const t_ilist*        ilist,
-                                 const t_iparams*      ip,
-                                 const unsigned short* ptype)
+static void assignVsitesToThread(VsiteThread*                    tData,
+                                 int                             thread,
+                                 int                             nthread,
+                                 int                             natperthread,
+                                 gmx::ArrayRef<int>              taskIndex,
+                                 ArrayRef<const InteractionList> ilist,
+                                 ArrayRef<const t_iparams>       ip,
+                                 const unsigned short*           ptype)
 {
     for (int ftype = c_ftypeVsiteStart; ftype < c_ftypeVsiteEnd; ftype++)
     {
-        tData->ilist[ftype].nr        = 0;
-        tData->idTask.ilist[ftype].nr = 0;
+        tData->ilist[ftype].clear();
+        tData->idTask.ilist[ftype].clear();
 
-        int      nral1 = 1 + NRAL(ftype);
-        int      inc   = nral1;
-        t_iatom* iat   = ilist[ftype].iatoms;
-        for (int i = 0; i < ilist[ftype].nr;)
+        int        nral1 = 1 + NRAL(ftype);
+        int        inc   = nral1;
+        const int* iat   = ilist[ftype].iatoms.data();
+        for (int i = 0; i < ilist[ftype].size();)
         {
             if (ftype == F_VSITEN)
             {
@@ -2193,7 +2060,7 @@ static void assignVsitesToThread(VsiteThread*          tData,
             if (task == thread || task == nthread + thread)
             {
                 /* Copy this vsite to the thread data struct of thread */
-                t_ilist* il_task;
+                InteractionList* il_task;
                 if (task == thread)
                 {
                     il_task = &tData->ilist[ftype];
@@ -2202,17 +2069,8 @@ static void assignVsitesToThread(VsiteThread*          tData,
                 {
                     il_task = &tData->idTask.ilist[ftype];
                 }
-                /* Ensure we have sufficient memory allocated */
-                if (il_task->nr + inc > il_task->nalloc)
-                {
-                    il_task->nalloc = over_alloc_large(il_task->nr + inc);
-                    srenew(il_task->iatoms, il_task->nalloc);
-                }
                 /* Copy the vsite data to the thread-task local array */
-                for (int j = i; j < i + inc; j++)
-                {
-                    il_task->iatoms[il_task->nr++] = iat[j];
-                }
+                il_task->push_back(iat[i], nral1 - 1, iat + i + 1);
                 if (task == nthread + thread)
                 {
                     /* This vsite write outside our own task force block.
@@ -2243,23 +2101,23 @@ static void assignVsitesToThread(VsiteThread*          tData,
 }
 
 /*! \brief Assign all vsites with taskIndex[]==task to task tData */
-static void assignVsitesToSingleTask(VsiteThread*             tData,
-                                     int                      task,
-                                     gmx::ArrayRef<const int> taskIndex,
-                                     const t_ilist*           ilist,
-                                     const t_iparams*         ip)
+static void assignVsitesToSingleTask(VsiteThread*                    tData,
+                                     int                             task,
+                                     gmx::ArrayRef<const int>        taskIndex,
+                                     ArrayRef<const InteractionList> ilist,
+                                     ArrayRef<const t_iparams>       ip)
 {
     for (int ftype = c_ftypeVsiteStart; ftype < c_ftypeVsiteEnd; ftype++)
     {
-        tData->ilist[ftype].nr        = 0;
-        tData->idTask.ilist[ftype].nr = 0;
+        tData->ilist[ftype].clear();
+        tData->idTask.ilist[ftype].clear();
 
-        int      nral1   = 1 + NRAL(ftype);
-        int      inc     = nral1;
-        t_iatom* iat     = ilist[ftype].iatoms;
-        t_ilist* il_task = &tData->ilist[ftype];
+        int              nral1   = 1 + NRAL(ftype);
+        int              inc     = nral1;
+        const int*       iat     = ilist[ftype].iatoms.data();
+        InteractionList* il_task = &tData->ilist[ftype];
 
-        for (int i = 0; i < ilist[ftype].nr;)
+        for (int i = 0; i < ilist[ftype].size();)
         {
             if (ftype == F_VSITEN)
             {
@@ -2269,17 +2127,8 @@ static void assignVsitesToSingleTask(VsiteThread*             tData,
             /* Check if the vsite is assigned to our task */
             if (taskIndex[iat[1 + i]] == task)
             {
-                /* Ensure we have sufficient memory allocated */
-                if (il_task->nr + inc > il_task->nalloc)
-                {
-                    il_task->nalloc = over_alloc_large(il_task->nr + inc);
-                    srenew(il_task->iatoms, il_task->nalloc);
-                }
                 /* Copy the vsite data to the thread-task local array */
-                for (int j = i; j < i + inc; j++)
-                {
-                    il_task->iatoms[il_task->nr++] = iat[j];
-                }
+                il_task->push_back(iat[i], inc - 1, iat + i + 1);
             }
 
             i += inc;
@@ -2287,7 +2136,10 @@ static void assignVsitesToSingleTask(VsiteThread*             tData,
     }
 }
 
-void split_vsites_over_threads(const t_ilist* ilist, const t_iparams* ip, const t_mdatoms* mdatoms, gmx_vsite_t* vsite)
+void split_vsites_over_threads(ArrayRef<const InteractionList> ilist,
+                               ArrayRef<const t_iparams>       ip,
+                               const t_mdatoms*                mdatoms,
+                               gmx_vsite_t*                    vsite)
 {
     int vsite_atom_range, natperthread;
 
@@ -2315,9 +2167,9 @@ void split_vsites_over_threads(const t_ilist* ilist, const t_iparams* ip, const 
             { // TODO remove me
                 if (ftype != F_VSITEN)
                 {
-                    int            nral1 = 1 + NRAL(ftype);
-                    const t_iatom* iat   = ilist[ftype].iatoms;
-                    for (int i = 0; i < ilist[ftype].nr; i += nral1)
+                    int                 nral1 = 1 + NRAL(ftype);
+                    ArrayRef<const int> iat   = ilist[ftype].iatoms;
+                    for (int i = 0; i < ilist[ftype].size(); i += nral1)
                     {
                         for (int j = i + 1; j < i + nral1; j++)
                         {
@@ -2329,10 +2181,10 @@ void split_vsites_over_threads(const t_ilist* ilist, const t_iparams* ip, const 
                 {
                     int vs_ind_end;
 
-                    const t_iatom* iat = ilist[ftype].iatoms;
+                    ArrayRef<const int> iat = ilist[ftype].iatoms;
 
                     int i = 0;
-                    while (i < ilist[ftype].nr)
+                    while (i < ilist[ftype].size())
                     {
                         /* The 3 below is from 1+NRAL(ftype)=3 */
                         vs_ind_end = i + ip[iat[i]].vsiten.n * 3;
@@ -2518,13 +2370,13 @@ void split_vsites_over_threads(const t_ilist* ilist, const t_iparams* ip, const 
 
         for (int ftype = c_ftypeVsiteStart; ftype < c_ftypeVsiteEnd; ftype++)
         {
-            if (ilist[ftype].nr > 0)
+            if (!ilist[ftype].empty())
             {
                 fprintf(debug, "%-20s thread dist:", interaction_function[ftype].longname);
                 for (int th = 0; th < vsite->nthreads + 1; th++)
                 {
-                    fprintf(debug, " %4d %4d ", vsite->tData[th]->ilist[ftype].nr,
-                            vsite->tData[th]->idTask.ilist[ftype].nr);
+                    fprintf(debug, " %4d %4d ", vsite->tData[th]->ilist[ftype].size(),
+                            vsite->tData[th]->idTask.ilist[ftype].size());
                 }
                 fprintf(debug, "\n");
             }

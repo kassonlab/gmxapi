@@ -45,6 +45,7 @@
 
 #include "gromacs/math/vectypes.h"
 #include "gromacs/utility/basedefinitions.h"
+#include "gromacs/utility/gmxmpi.h"
 #include "gromacs/utility/keyvaluetreebuilder.h"
 
 class energyhistory_t;
@@ -75,8 +76,10 @@ struct MdModulesCheckpointReadingDataOnMaster
  */
 struct MdModulesCheckpointReadingBroadcast
 {
-    //! The communication record
-    const t_commrec& cr_;
+    //! The communicator
+    MPI_Comm communicator_;
+    //! Whether the run is executed in parallel
+    bool isParallelRun_;
     //! The version of the read file version
     int checkpointFileVersion_;
 };
@@ -194,7 +197,9 @@ void write_checkpoint(const char*                   fn,
                       double                        t,
                       t_state*                      state,
                       ObservablesHistory*           observablesHistory,
-                      const gmx::MdModulesNotifier& notifier);
+                      const gmx::MdModulesNotifier& notifier,
+                      bool                          applyMpiBarrierBeforeRename,
+                      MPI_Comm                      mpiBarrierCommunicator);
 
 /* Loads a checkpoint from fn for run continuation.
  * Generates a fatal error on system size mismatch.

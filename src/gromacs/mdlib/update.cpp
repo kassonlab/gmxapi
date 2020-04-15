@@ -70,7 +70,6 @@
 #include "gromacs/mdtypes/mdatom.h"
 #include "gromacs/mdtypes/state.h"
 #include "gromacs/pbcutil/boxutilities.h"
-#include "gromacs/pbcutil/mshift.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/pulling/pull.h"
 #include "gromacs/random/tabulatednormaldistribution.h"
@@ -1313,22 +1312,27 @@ void restore_ekinstate_from_state(const t_commrec* cr, gmx_ekindata_t* ekind, co
 
     if (PAR(cr))
     {
-        gmx_bcast(sizeof(n), &n, cr);
+        gmx_bcast(sizeof(n), &n, cr->mpi_comm_mygroup);
         for (i = 0; i < n; i++)
         {
-            gmx_bcast(DIM * DIM * sizeof(ekind->tcstat[i].ekinh[0][0]), ekind->tcstat[i].ekinh[0], cr);
-            gmx_bcast(DIM * DIM * sizeof(ekind->tcstat[i].ekinf[0][0]), ekind->tcstat[i].ekinf[0], cr);
+            gmx_bcast(DIM * DIM * sizeof(ekind->tcstat[i].ekinh[0][0]), ekind->tcstat[i].ekinh[0],
+                      cr->mpi_comm_mygroup);
+            gmx_bcast(DIM * DIM * sizeof(ekind->tcstat[i].ekinf[0][0]), ekind->tcstat[i].ekinf[0],
+                      cr->mpi_comm_mygroup);
             gmx_bcast(DIM * DIM * sizeof(ekind->tcstat[i].ekinh_old[0][0]),
-                      ekind->tcstat[i].ekinh_old[0], cr);
+                      ekind->tcstat[i].ekinh_old[0], cr->mpi_comm_mygroup);
 
-            gmx_bcast(sizeof(ekind->tcstat[i].ekinscalef_nhc), &(ekind->tcstat[i].ekinscalef_nhc), cr);
-            gmx_bcast(sizeof(ekind->tcstat[i].ekinscaleh_nhc), &(ekind->tcstat[i].ekinscaleh_nhc), cr);
-            gmx_bcast(sizeof(ekind->tcstat[i].vscale_nhc), &(ekind->tcstat[i].vscale_nhc), cr);
+            gmx_bcast(sizeof(ekind->tcstat[i].ekinscalef_nhc), &(ekind->tcstat[i].ekinscalef_nhc),
+                      cr->mpi_comm_mygroup);
+            gmx_bcast(sizeof(ekind->tcstat[i].ekinscaleh_nhc), &(ekind->tcstat[i].ekinscaleh_nhc),
+                      cr->mpi_comm_mygroup);
+            gmx_bcast(sizeof(ekind->tcstat[i].vscale_nhc), &(ekind->tcstat[i].vscale_nhc),
+                      cr->mpi_comm_mygroup);
         }
-        gmx_bcast(DIM * DIM * sizeof(ekind->ekin[0][0]), ekind->ekin[0], cr);
+        gmx_bcast(DIM * DIM * sizeof(ekind->ekin[0][0]), ekind->ekin[0], cr->mpi_comm_mygroup);
 
-        gmx_bcast(sizeof(ekind->dekindl), &ekind->dekindl, cr);
-        gmx_bcast(sizeof(ekind->cosacc.mvcos), &ekind->cosacc.mvcos, cr);
+        gmx_bcast(sizeof(ekind->dekindl), &ekind->dekindl, cr->mpi_comm_mygroup);
+        gmx_bcast(sizeof(ekind->cosacc.mvcos), &ekind->cosacc.mvcos, cr->mpi_comm_mygroup);
     }
 }
 
@@ -1576,89 +1580,56 @@ void update_sd_second_half(int64_t step,
 void finish_update(const t_inputrec*       inputrec, /* input record and box stuff	*/
                    const t_mdatoms*        md,
                    t_state*                state,
-                   const t_graph*          graph,
-                   t_nrnb*                 nrnb,
                    gmx_wallcycle_t         wcycle,
                    Update*                 upd,
                    const gmx::Constraints* constr)
 {
-    int homenr = md->homenr;
+    /* NOTE: Currently we always integrate to a temporary buffer and
+     * then copy the results back here.
+     */
 
-    /* We must always unshift after updating coordinates; if we did not shake
-       x was shifted in do_force */
+    wallcycle_start_nocount(wcycle, ewcUPDATE);
 
-    /* NOTE Currently we always integrate to a temporary buffer and
-     * then copy the results back. */
+    const int homenr = md->homenr;
+    auto      xp     = makeConstArrayRef(*upd->xp()).subArray(0, homenr);
+    auto      x      = makeArrayRef(state->x).subArray(0, homenr);
+
+    if (md->havePartiallyFrozenAtoms && constr != nullptr)
     {
-        wallcycle_start_nocount(wcycle, ewcUPDATE);
+        /* We have atoms that are frozen along some, but not all dimensions,
+         * then constraints will have moved them also along the frozen dimensions.
+         * To freeze such degrees of freedom we do not copy them back here.
+         */
+        const ivec* nFreeze = inputrec->opts.nFreeze;
 
-        if (md->cFREEZE != nullptr && constr != nullptr)
+        for (int i = 0; i < homenr; i++)
         {
-            /* If we have atoms that are frozen along some, but not all
-             * dimensions, then any constraints will have moved them also along
-             * the frozen dimensions. To freeze such degrees of freedom
-             * we copy them back here to later copy them forward. It would
-             * be more elegant and slightly more efficient to copies zero
-             * times instead of twice, but the graph case below prevents this.
-             */
-            const ivec* nFreeze                     = inputrec->opts.nFreeze;
-            bool        partialFreezeAndConstraints = false;
-            for (int g = 0; g < inputrec->opts.ngfrz; g++)
-            {
-                int numFreezeDim = nFreeze[g][XX] + nFreeze[g][YY] + nFreeze[g][ZZ];
-                if (numFreezeDim > 0 && numFreezeDim < 3)
-                {
-                    partialFreezeAndConstraints = true;
-                }
-            }
-            if (partialFreezeAndConstraints)
-            {
-                auto xp = makeArrayRef(*upd->xp()).subArray(0, homenr);
-                auto x  = makeConstArrayRef(state->x).subArray(0, homenr);
-                for (int i = 0; i < homenr; i++)
-                {
-                    int g = md->cFREEZE[i];
+            const int g = md->cFREEZE[i];
 
-                    for (int d = 0; d < DIM; d++)
-                    {
-                        if (nFreeze[g][d])
-                        {
-                            xp[i][d] = x[i][d];
-                        }
-                    }
+            for (int d = 0; d < DIM; d++)
+            {
+                if (nFreeze[g][d] == 0)
+                {
+                    x[i][d] = xp[i][d];
                 }
             }
         }
-
-        if (graph && (graph->nnodes > 0))
-        {
-            unshift_x(graph, state->box, state->x.rvec_array(), upd->xp()->rvec_array());
-            if (TRICLINIC(state->box))
-            {
-                inc_nrnb(nrnb, eNR_SHIFTX, 2 * graph->nnodes);
-            }
-            else
-            {
-                inc_nrnb(nrnb, eNR_SHIFTX, graph->nnodes);
-            }
-        }
-        else
-        {
-            auto xp = makeConstArrayRef(*upd->xp()).subArray(0, homenr);
-            auto x  = makeArrayRef(state->x).subArray(0, homenr);
-
-
-            int gmx_unused nth = gmx_omp_nthreads_get(emntUpdate);
-#pragma omp parallel for num_threads(nth) schedule(static)
-            for (int i = 0; i < homenr; i++)
-            {
-                // Trivial statement, does not throw
-                x[i] = xp[i];
-            }
-        }
-        wallcycle_stop(wcycle, ewcUPDATE);
     }
-    /* ############# END the update of velocities and positions ######### */
+    else
+    {
+        /* We have no frozen atoms or fully frozen atoms which have not
+         * been moved by the update, so we can simply copy all coordinates.
+         */
+        int gmx_unused nth = gmx_omp_nthreads_get(emntUpdate);
+#pragma omp parallel for num_threads(nth) schedule(static)
+        for (int i = 0; i < homenr; i++)
+        {
+            // Trivial statement, does not throw
+            x[i] = xp[i];
+        }
+    }
+
+    wallcycle_stop(wcycle, ewcUPDATE);
 }
 
 void update_pcouple_after_coordinates(FILE*             fplog,

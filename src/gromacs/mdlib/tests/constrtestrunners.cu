@@ -70,38 +70,42 @@ namespace test
  */
 void applyLincsGpu(ConstraintsTestData* testData, t_pbc pbc)
 {
-    auto lincsGpu =
-            std::make_unique<LincsGpu>(testData->ir_.nLincsIter, testData->ir_.nProjOrder, nullptr);
+    DeviceInformation   deviceInfo;
+    const DeviceContext deviceContext(deviceInfo);
+    const DeviceStream  deviceStream(deviceContext, DeviceStreamPriority::Normal, false);
+
+    auto lincsGpu = std::make_unique<LincsGpu>(testData->ir_.nLincsIter, testData->ir_.nProjOrder,
+                                               deviceContext, deviceStream);
 
     bool    updateVelocities = true;
     int     numAtoms         = testData->numAtoms_;
     float3 *d_x, *d_xp, *d_v;
 
-    lincsGpu->set(testData->idef_, testData->md_);
+    lincsGpu->set(*testData->idef_, testData->md_);
     PbcAiuc pbcAiuc;
     setPbcAiuc(pbc.ndim_ePBC, pbc.box, &pbcAiuc);
 
-    allocateDeviceBuffer(&d_x, numAtoms, nullptr);
-    allocateDeviceBuffer(&d_xp, numAtoms, nullptr);
-    allocateDeviceBuffer(&d_v, numAtoms, nullptr);
+    allocateDeviceBuffer(&d_x, numAtoms, deviceContext);
+    allocateDeviceBuffer(&d_xp, numAtoms, deviceContext);
+    allocateDeviceBuffer(&d_v, numAtoms, deviceContext);
 
-    copyToDeviceBuffer(&d_x, (float3*)(testData->x_.data()), 0, numAtoms, nullptr,
+    copyToDeviceBuffer(&d_x, (float3*)(testData->x_.data()), 0, numAtoms, deviceStream,
                        GpuApiCallBehavior::Sync, nullptr);
-    copyToDeviceBuffer(&d_xp, (float3*)(testData->xPrime_.data()), 0, numAtoms, nullptr,
+    copyToDeviceBuffer(&d_xp, (float3*)(testData->xPrime_.data()), 0, numAtoms, deviceStream,
                        GpuApiCallBehavior::Sync, nullptr);
     if (updateVelocities)
     {
-        copyToDeviceBuffer(&d_v, (float3*)(testData->v_.data()), 0, numAtoms, nullptr,
+        copyToDeviceBuffer(&d_v, (float3*)(testData->v_.data()), 0, numAtoms, deviceStream,
                            GpuApiCallBehavior::Sync, nullptr);
     }
     lincsGpu->apply(d_x, d_xp, updateVelocities, d_v, testData->invdt_, testData->computeVirial_,
                     testData->virialScaled_, pbcAiuc);
 
-    copyFromDeviceBuffer((float3*)(testData->xPrime_.data()), &d_xp, 0, numAtoms, nullptr,
+    copyFromDeviceBuffer((float3*)(testData->xPrime_.data()), &d_xp, 0, numAtoms, deviceStream,
                          GpuApiCallBehavior::Sync, nullptr);
     if (updateVelocities)
     {
-        copyFromDeviceBuffer((float3*)(testData->v_.data()), &d_v, 0, numAtoms, nullptr,
+        copyFromDeviceBuffer((float3*)(testData->v_.data()), &d_v, 0, numAtoms, deviceStream,
                              GpuApiCallBehavior::Sync, nullptr);
     }
 

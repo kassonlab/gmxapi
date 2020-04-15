@@ -85,40 +85,15 @@ public:
      * ops are offloaded. This feature is currently not available in OpenCL and
      * hence these streams are not set in these builds.
      *
-     * \note In CUDA, the update stream is created in the constructor as a temporary
-     *       solution, in place until the stream manager is introduced.
-     *       Note that this makes it impossible to construct this object in CUDA
-     *       builds executing on a host without any CUDA-capable device available.
-     *
-     * \note In CUDA, \p deviceContext is unused, hence always nullptr;
-     *       all stream arguments can also be nullptr in runs where the
-     *       respective streams are not required.
-     *       In OpenCL, \p deviceContext needs to be a valid device context.
-     *       In OpenCL runs StatePropagatorDataGpu is currently only used
-     *       with PME offload, and only on ranks with PME duty. Hence, the
-     *       \p pmeStream argument needs to be a valid OpenCL queue object
-     *       which must have been created in \p deviceContext.
-     *
-     * \todo Make a \p CommandStream visible in the CPU parts of the code so we
-     *       will not have to pass a void*.
-     * \todo Make a \p DeviceContext object visible in CPU parts of the code so we
-     *       will not have to pass a void*.
-     *
-     *  \param[in] pmeStream       Device PME stream, nullptr allowed.
-     *  \param[in] localStream     Device NBNXM local stream, nullptr allowed.
-     *  \param[in] nonLocalStream  Device NBNXM non-local stream, nullptr allowed.
-     *  \param[in] deviceContext   Device context, nullptr allowed.
-     *  \param[in] transferKind    H2D/D2H transfer call behavior (synchronous or not).
-     *  \param[in] paddingSize     Padding size for coordinates buffer.
-     *  \param[in] wcycle          Wall cycle counter data.
+     *  \param[in] deviceStreamManager         Object that owns the DeviceContext and DeviceStreams.
+     *  \param[in] transferKind                H2D/D2H transfer call behavior (synchronous or not).
+     *  \param[in] allocationBlockSizeDivisor  Determines the padding size for coordinates buffer.
+     *  \param[in] wcycle                      Wall cycle counter data.
      */
-    Impl(const void*        pmeStream,
-         const void*        localStream,
-         const void*        nonLocalStream,
-         const void*        deviceContext,
-         GpuApiCallBehavior transferKind,
-         int                paddingSize,
-         gmx_wallcycle*     wcycle);
+    Impl(const DeviceStreamManager& deviceStreamManager,
+         GpuApiCallBehavior         transferKind,
+         int                        allocationBlockSizeDivisor,
+         gmx_wallcycle*             wcycle);
 
     /*! \brief Constructor to use in PME-only rank and in tests.
      *
@@ -133,14 +108,14 @@ public:
      *  \param[in] pmeStream       Device PME stream, nullptr is not allowed.
      *  \param[in] deviceContext   Device context, nullptr allowed for non-OpenCL builds.
      *  \param[in] transferKind    H2D/D2H transfer call behavior (synchronous or not).
-     *  \param[in] paddingSize     Padding size for coordinates buffer.
+     *  \param[in] allocationBlockSizeDivisor  Determines the padding size for coordinates buffer.
      *  \param[in] wcycle          Wall cycle counter data.
      */
-    Impl(const void*        pmeStream,
-         const void*        deviceContext,
-         GpuApiCallBehavior transferKind,
-         int                paddingSize,
-         gmx_wallcycle*     wcycle);
+    Impl(const DeviceStream*  pmeStream,
+         const DeviceContext& deviceContext,
+         GpuApiCallBehavior   transferKind,
+         int                  allocationBlockSizeDivisor,
+         gmx_wallcycle*       wcycle);
 
     ~Impl();
 
@@ -327,7 +302,7 @@ public:
      *
      *  \returns The device command stream to use in update-constraints.
      */
-    void* getUpdateStream();
+    const DeviceStream* getUpdateStream();
 
     /*! \brief Getter for the number of local atoms.
      *
@@ -343,20 +318,20 @@ public:
 
 private:
     //! GPU PME stream.
-    CommandStream pmeStream_ = nullptr;
+    const DeviceStream* pmeStream_;
     //! GPU NBNXM local stream.
-    CommandStream localStream_ = nullptr;
-    //! GPU NBNXM non-local stream
-    CommandStream nonLocalStream_ = nullptr;
+    const DeviceStream* localStream_;
+    //! GPU NBNXM non-local stream.
+    const DeviceStream* nonLocalStream_;
     //! GPU Update-constreaints stream.
-    CommandStream updateStream_ = nullptr;
+    const DeviceStream* updateStream_;
 
     // Streams to use for coordinates H2D and D2H copies (one event for each atom locality)
-    EnumerationArray<AtomLocality, CommandStream> xCopyStreams_ = { { nullptr } };
+    EnumerationArray<AtomLocality, const DeviceStream*> xCopyStreams_ = { { nullptr } };
     // Streams to use for velocities H2D and D2H copies (one event for each atom locality)
-    EnumerationArray<AtomLocality, CommandStream> vCopyStreams_ = { { nullptr } };
+    EnumerationArray<AtomLocality, const DeviceStream*> vCopyStreams_ = { { nullptr } };
     // Streams to use for forces H2D and D2H copies (one event for each atom locality)
-    EnumerationArray<AtomLocality, CommandStream> fCopyStreams_ = { { nullptr } };
+    EnumerationArray<AtomLocality, const DeviceStream*> fCopyStreams_ = { { nullptr } };
 
     /*! \brief An array of events that indicate H2D copy is complete (one event for each atom locality)
      *
@@ -380,14 +355,12 @@ private:
     //! An array of events that indicate D2H copy of forces is complete (one event for each atom locality)
     EnumerationArray<AtomLocality, GpuEventSynchronizer> fReadyOnHost_;
 
-    /*! \brief GPU context (for OpenCL builds)
-     * \todo Make a Context class usable in CPU code
-     */
-    DeviceContext deviceContext_ = nullptr;
+    //! GPU context (for OpenCL builds)
+    const DeviceContext& deviceContext_;
     //! Default GPU calls behavior
     GpuApiCallBehavior transferKind_ = GpuApiCallBehavior::Async;
-    //! Padding size for the coordinates buffer
-    int paddingSize_ = 0;
+    //! Required minimum divisor of the allocation size of the coordinates buffer
+    int allocationBlockSizeDivisor_ = 0;
 
     //! Number of local atoms
     int numAtomsLocal_ = -1;
@@ -426,13 +399,13 @@ private:
      *  \param[in]  h_data         Host-side buffer.
      *  \param[in]  dataSize       Device-side data allocation size.
      *  \param[in]  atomLocality   If all, local or non-local ranges should be copied.
-     *  \param[in]  commandStream  GPU stream to execute copy in.
+     *  \param[in]  deviceStream   GPU stream to execute copy in.
      */
     void copyToDevice(DeviceBuffer<RVec>             d_data,
                       gmx::ArrayRef<const gmx::RVec> h_data,
                       int                            dataSize,
                       AtomLocality                   atomLocality,
-                      CommandStream                  commandStream);
+                      const DeviceStream&            deviceStream);
 
     /*! \brief Performs the copy of data from device to host buffer.
      *
@@ -440,13 +413,13 @@ private:
      *  \param[in]  d_data         Device-side buffer.
      *  \param[in]  dataSize       Device-side data allocation size.
      *  \param[in]  atomLocality   If all, local or non-local ranges should be copied.
-     *  \param[in]  commandStream  GPU stream to execute copy in.
+     *  \param[in]  deviceStream   GPU stream to execute copy in.
      */
     void copyFromDevice(gmx::ArrayRef<gmx::RVec> h_data,
                         DeviceBuffer<RVec>       d_data,
                         int                      dataSize,
                         AtomLocality             atomLocality,
-                        CommandStream            commandStream);
+                        const DeviceStream&      deviceStream);
 };
 
 } // namespace gmx

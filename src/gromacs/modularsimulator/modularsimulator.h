@@ -33,7 +33,10 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 /*! \libinternal \file
- * \brief Declares the modular simulator
+ * \brief Provides the modular simulator.
+ *
+ * Defines the ModularSimulator class. Provides checkUseModularSimulator() utility function
+ * to determine whether the ModularSimulator should be used.
  *
  * \author Pascal Merz <pascal.merz@me.com>
  * \ingroup module_modularsimulator
@@ -85,14 +88,12 @@ public:
     static bool isInputCompatible(bool                             exitOnFailure,
                                   const t_inputrec*                inputrec,
                                   bool                             doRerun,
-                                  const gmx_vsite_t*               vsite,
+                                  const gmx_mtop_t&                globalTopology,
                                   const gmx_multisim_t*            ms,
                                   const ReplicaExchangeParameters& replExParams,
                                   const t_fcdata*                  fcd,
-                                  int                              nfile,
-                                  const t_filenm*                  fnm,
-                                  ObservablesHistory*              observablesHistory,
-                                  const gmx_membed_t*              membed);
+                                  bool                             doEssentialDynamics,
+                                  bool                             doMembed);
 
     // Only builder can construct
     friend class SimulatorBuilder;
@@ -337,6 +338,24 @@ void ModularSimulator::addToCallListAndMove(std::unique_ptr<U>                 e
     }
 }
 //! \endcond
+
+/*!
+ * \brief Whether or not to use the ModularSimulator
+ *
+ * GMX_DISABLE_MODULAR_SIMULATOR environment variable allows to disable modular simulator for
+ * all uses.
+ *
+ * See ModularSimulator::isInputCompatible() for function signature.
+ *
+ * \ingroup module_modularsimulator
+ */
+template<typename... Ts>
+auto checkUseModularSimulator(Ts&&... args)
+        -> decltype(ModularSimulator::isInputCompatible(std::forward<Ts>(args)...))
+{
+    return ModularSimulator::isInputCompatible(std::forward<Ts>(args)...)
+           && getenv("GMX_DISABLE_MODULAR_SIMULATOR") == nullptr;
+}
 
 } // namespace gmx
 

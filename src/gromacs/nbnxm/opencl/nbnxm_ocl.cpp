@@ -70,6 +70,7 @@
 
 #include "thread_mpi/atomic.h"
 
+#include "gromacs/gpu_utils/device_context.h"
 #include "gromacs/gpu_utils/gputraits_ocl.h"
 #include "gromacs/gpu_utils/oclutils.h"
 #include "gromacs/hardware/hw_info.h"
@@ -483,10 +484,10 @@ void gpu_copy_xq_to_gpu(NbnxmGpu* nb, const nbnxn_atomdata_t* nbatom, const Atom
     /* local/nonlocal offset and length used for xq and f */
     int adat_begin, adat_len;
 
-    cl_atomdata_t*   adat   = nb->atdat;
-    cl_plist_t*      plist  = nb->plist[iloc];
-    cl_timers_t*     t      = nb->timers;
-    cl_command_queue stream = nb->stream[iloc];
+    cl_atomdata_t*      adat         = nb->atdat;
+    cl_plist_t*         plist        = nb->plist[iloc];
+    cl_timers_t*        t            = nb->timers;
+    const DeviceStream& deviceStream = *nb->deviceStreams[iloc];
 
     bool bDoTime = nb->bDoTime;
 
@@ -521,17 +522,17 @@ void gpu_copy_xq_to_gpu(NbnxmGpu* nb, const nbnxn_atomdata_t* nbatom, const Atom
     /* beginning of timed HtoD section */
     if (bDoTime)
     {
-        t->xf[atomLocality].nb_h2d.openTimingRegion(stream);
+        t->xf[atomLocality].nb_h2d.openTimingRegion(deviceStream);
     }
 
     /* HtoD x, q */
-    ocl_copy_H2D_async(adat->xq, nbatom->x().data() + adat_begin * 4,
-                       adat_begin * sizeof(float) * 4, adat_len * sizeof(float) * 4, stream,
+    ocl_copy_H2D_async(adat->xq, nbatom->x().data() + adat_begin * 4, adat_begin * sizeof(float) * 4,
+                       adat_len * sizeof(float) * 4, deviceStream.stream(),
                        bDoTime ? t->xf[atomLocality].nb_h2d.fetchNextEvent() : nullptr);
 
     if (bDoTime)
     {
-        t->xf[atomLocality].nb_h2d.closeTimingRegion(stream);
+        t->xf[atomLocality].nb_h2d.closeTimingRegion(deviceStream);
     }
 
     /* When we get here all misc operations issues in the local stream as well as
@@ -542,7 +543,7 @@ void gpu_copy_xq_to_gpu(NbnxmGpu* nb, const nbnxn_atomdata_t* nbatom, const Atom
         if (iloc == InteractionLocality::Local)
         {
             cl_int gmx_used_in_debug cl_error = clEnqueueMarkerWithWaitList(
-                    stream, 0, nullptr, &(nb->misc_ops_and_local_H2D_done));
+                    deviceStream.stream(), 0, nullptr, &(nb->misc_ops_and_local_H2D_done));
             GMX_ASSERT(cl_error == CL_SUCCESS,
                        ("clEnqueueMarkerWithWaitList failed: " + ocl_get_error_string(cl_error)).c_str());
 
@@ -550,13 +551,13 @@ void gpu_copy_xq_to_gpu(NbnxmGpu* nb, const nbnxn_atomdata_t* nbatom, const Atom
              * in the local stream in order to be able to sync with the above event
              * from the non-local stream.
              */
-            cl_error = clFlush(stream);
+            cl_error = clFlush(deviceStream.stream());
             GMX_ASSERT(cl_error == CL_SUCCESS,
                        ("clFlush failed: " + ocl_get_error_string(cl_error)).c_str());
         }
         else
         {
-            sync_ocl_event(stream, &(nb->misc_ops_and_local_H2D_done));
+            sync_ocl_event(deviceStream.stream(), &(nb->misc_ops_and_local_H2D_done));
         }
     }
 }
@@ -582,11 +583,11 @@ void gpu_copy_xq_to_gpu(NbnxmGpu* nb, const nbnxn_atomdata_t* nbatom, const Atom
  */
 void gpu_launch_kernel(NbnxmGpu* nb, const gmx::StepWorkload& stepWork, const Nbnxm::InteractionLocality iloc)
 {
-    cl_atomdata_t*   adat   = nb->atdat;
-    cl_nbparam_t*    nbp    = nb->nbparam;
-    cl_plist_t*      plist  = nb->plist[iloc];
-    cl_timers_t*     t      = nb->timers;
-    cl_command_queue stream = nb->stream[iloc];
+    cl_atomdata_t*      adat         = nb->atdat;
+    cl_nbparam_t*       nbp          = nb->nbparam;
+    cl_plist_t*         plist        = nb->plist[iloc];
+    cl_timers_t*        t            = nb->timers;
+    const DeviceStream& deviceStream = *nb->deviceStreams[iloc];
 
     bool bDoTime = nb->bDoTime;
 
@@ -627,19 +628,18 @@ void gpu_launch_kernel(NbnxmGpu* nb, const gmx::StepWorkload& stepWork, const Nb
     /* beginning of timed nonbonded calculation section */
     if (bDoTime)
     {
-        t->interaction[iloc].nb_k.openTimingRegion(stream);
+        t->interaction[iloc].nb_k.openTimingRegion(deviceStream);
     }
 
     /* kernel launch config */
 
     KernelLaunchConfig config;
     config.sharedMemorySize = calc_shmem_required_nonbonded(nbp->vdwtype, nb->bPrefetchLjParam);
-    config.stream           = stream;
     config.blockSize[0]     = c_clSize;
     config.blockSize[1]     = c_clSize;
     config.gridSize[0]      = plist->nsci;
 
-    validate_global_work_size(config, 3, nb->deviceInfo);
+    validate_global_work_size(config, 3, &nb->deviceContext_->deviceInfo());
 
     if (debug)
     {
@@ -671,7 +671,7 @@ void gpu_launch_kernel(NbnxmGpu* nb, const gmx::StepWorkload& stepWork, const Nb
                 &adat->fshift, &adat->lj_comb, &adat->shift_vec, &nbp->nbfp_climg2d, &nbp->nbfp_comb_climg2d,
                 &nbp->coulomb_tab_climg2d, &plist->sci, &plist->cj4, &plist->excl, &computeFshift);
 
-        launchGpuKernel(kernel, config, timingEvent, kernelName, kernelArgs);
+        launchGpuKernel(kernel, config, deviceStream, timingEvent, kernelName, kernelArgs);
     }
     else
     {
@@ -680,12 +680,12 @@ void gpu_launch_kernel(NbnxmGpu* nb, const gmx::StepWorkload& stepWork, const Nb
                 &adat->e_el, &adat->fshift, &adat->atom_types, &adat->shift_vec, &nbp->nbfp_climg2d,
                 &nbp->nbfp_comb_climg2d, &nbp->coulomb_tab_climg2d, &plist->sci, &plist->cj4,
                 &plist->excl, &computeFshift);
-        launchGpuKernel(kernel, config, timingEvent, kernelName, kernelArgs);
+        launchGpuKernel(kernel, config, deviceStream, timingEvent, kernelName, kernelArgs);
     }
 
     if (bDoTime)
     {
-        t->interaction[iloc].nb_k.closeTimingRegion(stream);
+        t->interaction[iloc].nb_k.closeTimingRegion(deviceStream);
     }
 }
 
@@ -721,12 +721,12 @@ static inline int calc_shmem_required_prune(const int num_threads_z)
  */
 void gpu_launch_kernel_pruneonly(NbnxmGpu* nb, const InteractionLocality iloc, const int numParts)
 {
-    cl_atomdata_t*   adat    = nb->atdat;
-    cl_nbparam_t*    nbp     = nb->nbparam;
-    cl_plist_t*      plist   = nb->plist[iloc];
-    cl_timers_t*     t       = nb->timers;
-    cl_command_queue stream  = nb->stream[iloc];
-    bool             bDoTime = nb->bDoTime;
+    cl_atomdata_t*      adat         = nb->atdat;
+    cl_nbparam_t*       nbp          = nb->nbparam;
+    cl_plist_t*         plist        = nb->plist[iloc];
+    cl_timers_t*        t            = nb->timers;
+    const DeviceStream& deviceStream = *nb->deviceStreams[iloc];
+    bool                bDoTime      = nb->bDoTime;
 
     if (plist->haveFreshList)
     {
@@ -780,7 +780,7 @@ void gpu_launch_kernel_pruneonly(NbnxmGpu* nb, const InteractionLocality iloc, c
     /* beginning of timed prune calculation section */
     if (bDoTime)
     {
-        timer->openTimingRegion(stream);
+        timer->openTimingRegion(deviceStream);
     }
 
     /* Kernel launch config:
@@ -794,13 +794,12 @@ void gpu_launch_kernel_pruneonly(NbnxmGpu* nb, const InteractionLocality iloc, c
     /* kernel launch config */
     KernelLaunchConfig config;
     config.sharedMemorySize = calc_shmem_required_prune(num_threads_z);
-    config.stream           = stream;
     config.blockSize[0]     = c_clSize;
     config.blockSize[1]     = c_clSize;
     config.blockSize[2]     = num_threads_z;
     config.gridSize[0]      = numSciInPart;
 
-    validate_global_work_size(config, 3, nb->deviceInfo);
+    validate_global_work_size(config, 3, &nb->deviceContext_->deviceInfo());
 
     if (debug)
     {
@@ -823,7 +822,7 @@ void gpu_launch_kernel_pruneonly(NbnxmGpu* nb, const InteractionLocality iloc, c
     const auto     kernelArgs   = prepareGpuKernelArguments(pruneKernel, config, &nbparams_params,
                                                       &adat->xq, &adat->shift_vec, &plist->sci,
                                                       &plist->cj4, &plist->imask, &numParts, &part);
-    launchGpuKernel(pruneKernel, config, timingEvent, kernelName, kernelArgs);
+    launchGpuKernel(pruneKernel, config, deviceStream, timingEvent, kernelName, kernelArgs);
 
     if (plist->haveFreshList)
     {
@@ -839,7 +838,7 @@ void gpu_launch_kernel_pruneonly(NbnxmGpu* nb, const InteractionLocality iloc, c
 
     if (bDoTime)
     {
-        timer->closeTimingRegion(stream);
+        timer->closeTimingRegion(deviceStream);
     }
 }
 
@@ -860,10 +859,10 @@ void gpu_launch_cpyback(NbnxmGpu*                nb,
     /* determine interaction locality from atom locality */
     const InteractionLocality iloc = gpuAtomToInteractionLocality(aloc);
 
-    cl_atomdata_t*   adat    = nb->atdat;
-    cl_timers_t*     t       = nb->timers;
-    bool             bDoTime = nb->bDoTime;
-    cl_command_queue stream  = nb->stream[iloc];
+    cl_atomdata_t*      adat         = nb->atdat;
+    cl_timers_t*        t            = nb->timers;
+    bool                bDoTime      = nb->bDoTime;
+    const DeviceStream& deviceStream = *nb->deviceStreams[iloc];
 
     /* don't launch non-local copy-back if there was no non-local work to do */
     if ((iloc == InteractionLocality::NonLocal) && !haveGpuShortRangeWork(*nb, iloc))
@@ -885,24 +884,24 @@ void gpu_launch_cpyback(NbnxmGpu*                nb,
     /* beginning of timed D2H section */
     if (bDoTime)
     {
-        t->xf[aloc].nb_d2h.openTimingRegion(stream);
+        t->xf[aloc].nb_d2h.openTimingRegion(deviceStream);
     }
 
     /* With DD the local D2H transfer can only start after the non-local
        has been launched. */
     if (iloc == InteractionLocality::Local && nb->bNonLocalStreamActive)
     {
-        sync_ocl_event(stream, &(nb->nonlocal_done));
+        sync_ocl_event(deviceStream.stream(), &(nb->nonlocal_done));
     }
 
     /* DtoH f */
     ocl_copy_D2H_async(nbatom->out[0].f.data() + adat_begin * DIM, adat->f,
                        adat_begin * DIM * sizeof(nbatom->out[0].f[0]),
-                       adat_len * DIM * sizeof(nbatom->out[0].f[0]), stream,
+                       adat_len * DIM * sizeof(nbatom->out[0].f[0]), deviceStream.stream(),
                        bDoTime ? t->xf[aloc].nb_d2h.fetchNextEvent() : nullptr);
 
     /* kick off work */
-    cl_error = clFlush(stream);
+    cl_error = clFlush(deviceStream.stream());
     GMX_ASSERT(cl_error == CL_SUCCESS, ("clFlush failed: " + ocl_get_error_string(cl_error)).c_str());
 
     /* After the non-local D2H is launched the nonlocal_done event can be
@@ -911,7 +910,7 @@ void gpu_launch_cpyback(NbnxmGpu*                nb,
        data back first. */
     if (iloc == InteractionLocality::NonLocal)
     {
-        cl_error = clEnqueueMarkerWithWaitList(stream, 0, nullptr, &(nb->nonlocal_done));
+        cl_error = clEnqueueMarkerWithWaitList(deviceStream.stream(), 0, nullptr, &(nb->nonlocal_done));
         GMX_ASSERT(cl_error == CL_SUCCESS,
                    ("clEnqueueMarkerWithWaitList failed: " + ocl_get_error_string(cl_error)).c_str());
         nb->bNonLocalStreamActive = CL_TRUE;
@@ -923,24 +922,25 @@ void gpu_launch_cpyback(NbnxmGpu*                nb,
         /* DtoH fshift when virial is needed */
         if (stepWork.computeVirial)
         {
-            ocl_copy_D2H_async(nb->nbst.fshift, adat->fshift, 0, SHIFTS * sizeof(nb->nbst.fshift[0]),
-                               stream, bDoTime ? t->xf[aloc].nb_d2h.fetchNextEvent() : nullptr);
+            ocl_copy_D2H_async(nb->nbst.fshift, adat->fshift, 0,
+                               SHIFTS * sizeof(nb->nbst.fshift[0]), deviceStream.stream(),
+                               bDoTime ? t->xf[aloc].nb_d2h.fetchNextEvent() : nullptr);
         }
 
         /* DtoH energies */
         if (stepWork.computeEnergy)
         {
-            ocl_copy_D2H_async(nb->nbst.e_lj, adat->e_lj, 0, sizeof(float), stream,
+            ocl_copy_D2H_async(nb->nbst.e_lj, adat->e_lj, 0, sizeof(float), deviceStream.stream(),
                                bDoTime ? t->xf[aloc].nb_d2h.fetchNextEvent() : nullptr);
 
-            ocl_copy_D2H_async(nb->nbst.e_el, adat->e_el, 0, sizeof(float), stream,
+            ocl_copy_D2H_async(nb->nbst.e_el, adat->e_el, 0, sizeof(float), deviceStream.stream(),
                                bDoTime ? t->xf[aloc].nb_d2h.fetchNextEvent() : nullptr);
         }
     }
 
     if (bDoTime)
     {
-        t->xf[aloc].nb_d2h.closeTimingRegion(stream);
+        t->xf[aloc].nb_d2h.closeTimingRegion(deviceStream);
     }
 }
 

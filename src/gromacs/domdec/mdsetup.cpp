@@ -48,46 +48,61 @@
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/interaction_const.h"
 #include "gromacs/mdtypes/mdatom.h"
-#include "gromacs/pbcutil/mshift.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/topology/mtop_util.h"
 #include "gromacs/topology/topology.h"
 #include "gromacs/utility/gmxassert.h"
 #include "gromacs/utility/smalloc.h"
 
+namespace gmx
+{
+
 /* TODO: Add a routine that collects the initial setup of the algorithms.
  *
  * The final solution should be an MD algorithm base class with methods
  * for initialization and atom-data setup.
  */
-void mdAlgorithmsSetupAtomData(const t_commrec*  cr,
-                               const t_inputrec* ir,
-                               const gmx_mtop_t& top_global,
-                               gmx_localtop_t*   top,
-                               t_forcerec*       fr,
-                               t_graph**         graph,
-                               gmx::MDAtoms*     mdAtoms,
-                               gmx::Constraints* constr,
-                               gmx_vsite_t*      vsite,
-                               gmx_shellfc_t*    shellfc)
+void mdAlgorithmsSetupAtomData(const t_commrec*        cr,
+                               const t_inputrec*       ir,
+                               const gmx_mtop_t&       top_global,
+                               gmx_localtop_t*         top,
+                               t_forcerec*             fr,
+                               PaddedHostVector<RVec>* force,
+                               MDAtoms*                mdAtoms,
+                               Constraints*            constr,
+                               gmx_vsite_t*            vsite,
+                               gmx_shellfc_t*          shellfc)
 {
     bool usingDomDec = DOMAINDECOMP(cr);
 
-    int  numAtomIndex, numHomeAtoms;
+    int  numAtomIndex;
     int* atomIndex;
+    int  numHomeAtoms;
+    int  numTotalAtoms;
 
     if (usingDomDec)
     {
-        numAtomIndex = dd_natoms_mdatoms(cr->dd);
-        atomIndex    = cr->dd->globalAtomIndices.data();
-        numHomeAtoms = dd_numHomeAtoms(*cr->dd);
+        numAtomIndex  = dd_natoms_mdatoms(cr->dd);
+        atomIndex     = cr->dd->globalAtomIndices.data();
+        numHomeAtoms  = dd_numHomeAtoms(*cr->dd);
+        numTotalAtoms = dd_natoms_mdatoms(cr->dd);
     }
     else
     {
-        numAtomIndex = -1;
-        atomIndex    = nullptr;
-        numHomeAtoms = top_global.natoms;
+        numAtomIndex  = -1;
+        atomIndex     = nullptr;
+        numHomeAtoms  = top_global.natoms;
+        numTotalAtoms = top_global.natoms;
     }
+
+    if (force != nullptr)
+    {
+        /* We need to allocate one element extra, since we might use
+         * (unaligned) 4-wide SIMD loads to access rvec entries.
+         */
+        force->resizeWithPadding(numTotalAtoms);
+    }
+
     atoms2md(&top_global, ir, numAtomIndex, atomIndex, numHomeAtoms, mdAtoms);
 
     auto mdatoms = mdAtoms->mdatoms();
@@ -115,17 +130,6 @@ void mdAlgorithmsSetupAtomData(const t_commrec*  cr,
         }
     }
 
-    if (!usingDomDec && ir->pbcType != PbcType::No && !fr->bMolPBC)
-    {
-        GMX_ASSERT(graph != nullptr, "We use a graph with PBC (no periodic mols) and without DD");
-
-        *graph = mk_graph(nullptr, &(top->idef), 0, top_global.natoms, FALSE, FALSE);
-    }
-    else if (graph != nullptr)
-    {
-        *graph = nullptr;
-    }
-
     /* Note that with DD only flexible constraints, not shells, are supported
      * and these don't require setup in make_local_shells().
      *
@@ -150,6 +154,8 @@ void mdAlgorithmsSetupAtomData(const t_commrec*  cr,
 
     if (constr)
     {
-        constr->setConstraints(*top, *mdatoms);
+        constr->setConstraints(top, *mdatoms);
     }
 }
+
+} // namespace gmx

@@ -64,13 +64,14 @@ struct t_inputrec;
 struct t_nrnb;
 struct PmeGpu;
 struct gmx_wallclock_gpu_pme_t;
-struct DeviceInformation;
 struct gmx_enerdata_t;
 struct gmx_mtop_t;
 struct gmx_pme_t;
 struct gmx_wallcycle;
 struct NumPmeDomains;
 
+class DeviceContext;
+class DeviceStream;
 enum class GpuTaskCompletion;
 class PmeGpuProgram;
 class GpuEventSynchronizer;
@@ -80,6 +81,7 @@ namespace gmx
 class ForceWithVirial;
 class MDLogger;
 enum class PinningPolicy : int;
+class StepWorkload;
 } // namespace gmx
 
 enum
@@ -132,22 +134,23 @@ bool gmx_pme_check_restrictions(int  pme_order,
  * \todo We should evolve something like a \c GpuManager that holds \c
  * DeviceInformation* and \c PmeGpuProgram* and perhaps other
  * related things whose lifetime can/should exceed that of a task (or
- * perhaps task manager). See Redmine #2522.
+ * perhaps task manager). See Issue #2522.
  */
-gmx_pme_t* gmx_pme_init(const t_commrec*         cr,
-                        const NumPmeDomains&     numPmeDomains,
-                        const t_inputrec*        ir,
-                        gmx_bool                 bFreeEnergy_q,
-                        gmx_bool                 bFreeEnergy_lj,
-                        gmx_bool                 bReproducible,
-                        real                     ewaldcoeff_q,
-                        real                     ewaldcoeff_lj,
-                        int                      nthread,
-                        PmeRunMode               runMode,
-                        PmeGpu*                  pmeGpu,
-                        const DeviceInformation* deviceInfo,
-                        const PmeGpuProgram*     pmeGpuProgram,
-                        const gmx::MDLogger&     mdlog);
+gmx_pme_t* gmx_pme_init(const t_commrec*     cr,
+                        const NumPmeDomains& numPmeDomains,
+                        const t_inputrec*    ir,
+                        gmx_bool             bFreeEnergy_q,
+                        gmx_bool             bFreeEnergy_lj,
+                        gmx_bool             bReproducible,
+                        real                 ewaldcoeff_q,
+                        real                 ewaldcoeff_lj,
+                        int                  nthread,
+                        PmeRunMode           runMode,
+                        PmeGpu*              pmeGpu,
+                        const DeviceContext* deviceContext,
+                        const DeviceStream*  deviceStream,
+                        const PmeGpuProgram* pmeGpuProgram,
+                        const gmx::MDLogger& mdlog);
 
 /*! \brief As gmx_pme_init, but takes most settings, except the grid/Ewald coefficients, from
  * pme_src. This is only called when the PME cut-off/grid size changes.
@@ -162,21 +165,6 @@ void gmx_pme_reinit(gmx_pme_t**       pmedata,
 
 /*! \brief Destroys the PME data structure.*/
 void gmx_pme_destroy(gmx_pme_t* pme);
-
-//@{
-/*! \brief Flag values that control what gmx_pme_do() will calculate
- *
- * These can be combined with bitwise-OR if more than one thing is required.
- */
-#define GMX_PME_SPREAD (1 << 0)
-#define GMX_PME_SOLVE (1 << 1)
-#define GMX_PME_CALC_F (1 << 2)
-#define GMX_PME_CALC_ENER_VIR (1 << 3)
-/* This forces the grid to be backtransformed even without GMX_PME_CALC_F */
-#define GMX_PME_CALC_POT (1 << 4)
-
-#define GMX_PME_DO_ALL_F (GMX_PME_SPREAD | GMX_PME_SOLVE | GMX_PME_CALC_F)
-//@}
 
 /*! \brief Do a PME calculation on a CPU for the long range electrostatics and/or LJ.
  *
@@ -212,13 +200,12 @@ int gmx_pme_do(struct gmx_pme_t*              pme,
                real                           lambda_lj,
                real*                          dvdlambda_q,
                real*                          dvdlambda_lj,
-               int                            flags);
+               const gmx::StepWorkload&       stepWork);
 
 /*! \brief Calculate the PME grid energy V for n charges.
  *
  * The potential (found in \p pme) must have been found already with a
- * call to gmx_pme_do() with at least GMX_PME_SPREAD and GMX_PME_SOLVE
- * specified. Note that the charges are not spread on the grid in the
+ * call to gmx_pme_do(). Note that the charges are not spread on the grid in the
  * pme struct. Currently does not work in parallel or with free
  * energy.
  */
@@ -298,11 +285,14 @@ inline bool pme_gpu_task_enabled(const gmx_pme_t* pme)
     return (pme != nullptr) && (pme_run_mode(pme) != PmeRunMode::CPU);
 }
 
-/*! \brief Returns the size of the padding needed by GPU version of PME in the coordinates array.
+/*! \brief Returns the block size requirement
+ *
+ * The GPU version of PME requires that the coordinates array have a
+ * size divisible by the returned number.
  *
  * \param[in]  pme  The PME data structure.
  */
-GPU_FUNC_QUALIFIER int pme_gpu_get_padding_size(const gmx_pme_t* GPU_FUNC_ARGUMENT(pme))
+GPU_FUNC_QUALIFIER int pme_gpu_get_block_size(const gmx_pme_t* GPU_FUNC_ARGUMENT(pme))
         GPU_FUNC_TERM_WITH_RETURN(0);
 
 // The following functions are all the PME GPU entry points,
@@ -329,19 +319,14 @@ GPU_FUNC_QUALIFIER void pme_gpu_get_timings(const gmx_pme_t* GPU_FUNC_ARGUMENT(p
 /*! \brief
  * Prepares PME on GPU computation (updating the box if needed)
  * \param[in] pme               The PME data structure.
- * \param[in] needToUpdateBox   Tells if the stored unit cell parameters should be updated from \p box.
  * \param[in] box               The unit cell box.
  * \param[in] wcycle            The wallclock counter.
- * \param[in] flags             The combination of flags to affect this PME computation.
- *                              The flags are the GMX_PME_ flags from pme.h.
- * \param[in]  useGpuForceReduction Whether PME forces are reduced on GPU this step or should be downloaded for CPU reduction
+ * \param[in] stepWork          The required work for this simulation step
  */
-GPU_FUNC_QUALIFIER void pme_gpu_prepare_computation(gmx_pme_t*   GPU_FUNC_ARGUMENT(pme),
-                                                    bool         GPU_FUNC_ARGUMENT(needToUpdateBox),
-                                                    const matrix GPU_FUNC_ARGUMENT(box),
+GPU_FUNC_QUALIFIER void pme_gpu_prepare_computation(gmx_pme_t*     GPU_FUNC_ARGUMENT(pme),
+                                                    const matrix   GPU_FUNC_ARGUMENT(box),
                                                     gmx_wallcycle* GPU_FUNC_ARGUMENT(wcycle),
-                                                    int            GPU_FUNC_ARGUMENT(flags),
-                                                    bool GPU_FUNC_ARGUMENT(useGpuForceReduction)) GPU_FUNC_TERM;
+                                                    const gmx::StepWorkload& GPU_FUNC_ARGUMENT(stepWork)) GPU_FUNC_TERM;
 
 /*! \brief
  * Launches first stage of PME on GPU - spreading kernel.
@@ -359,9 +344,12 @@ GPU_FUNC_QUALIFIER void pme_gpu_launch_spread(gmx_pme_t*            GPU_FUNC_ARG
  *
  * \param[in] pme               The PME data structure.
  * \param[in] wcycle            The wallclock counter.
+ * \param[in] stepWork          The required work for this simulation step
  */
-GPU_FUNC_QUALIFIER void pme_gpu_launch_complex_transforms(gmx_pme_t* GPU_FUNC_ARGUMENT(pme),
-                                                          gmx_wallcycle* GPU_FUNC_ARGUMENT(wcycle)) GPU_FUNC_TERM;
+GPU_FUNC_QUALIFIER void
+pme_gpu_launch_complex_transforms(gmx_pme_t*               GPU_FUNC_ARGUMENT(pme),
+                                  gmx_wallcycle*           GPU_FUNC_ARGUMENT(wcycle),
+                                  const gmx::StepWorkload& GPU_FUNC_ARGUMENT(stepWork)) GPU_FUNC_TERM;
 
 /*! \brief
  * Launches last stage of PME on GPU - force gathering and D2H force transfer.
@@ -382,20 +370,18 @@ GPU_FUNC_QUALIFIER void pme_gpu_launch_gather(const gmx_pme_t* GPU_FUNC_ARGUMENT
  * by assigning the ArrayRef to the \p forces pointer passed in.
  * Virial/energy are also outputs if they were to be computed.
  *
- * \param[in]  pme            The PME data structure.
- * \param[in]  flags          The combination of flags to affect this PME computation.
- *                            The flags are the GMX_PME_ flags from pme.h.
- * \param[in]  wcycle         The wallclock counter.
+ * \param[in]  pme             The PME data structure.
+ * \param[in]  stepWork        The required work for this simulation step
+ * \param[in]  wcycle          The wallclock counter.
  * \param[out] forceWithVirial The output force and virial
  * \param[out] enerd           The output energies
- * \param[in] flags            The combination of flags to affect this PME computation.
- *                             The flags are the GMX_PME_ flags from pme.h.
  * \param[in]  completionKind  Indicates whether PME task completion should only be checked rather
- * than waited for \returns                   True if the PME GPU tasks have completed
+ *                             than waited for
+ * \returns                    True if the PME GPU tasks have completed
  */
-GPU_FUNC_QUALIFIER bool pme_gpu_try_finish_task(gmx_pme_t*            GPU_FUNC_ARGUMENT(pme),
-                                                int                   GPU_FUNC_ARGUMENT(flags),
-                                                gmx_wallcycle*        GPU_FUNC_ARGUMENT(wcycle),
+GPU_FUNC_QUALIFIER bool pme_gpu_try_finish_task(gmx_pme_t*               GPU_FUNC_ARGUMENT(pme),
+                                                const gmx::StepWorkload& GPU_FUNC_ARGUMENT(stepWork),
+                                                gmx_wallcycle*           GPU_FUNC_ARGUMENT(wcycle),
                                                 gmx::ForceWithVirial* GPU_FUNC_ARGUMENT(forceWithVirial),
                                                 gmx_enerdata_t*       GPU_FUNC_ARGUMENT(enerd),
                                                 GpuTaskCompletion GPU_FUNC_ARGUMENT(completionKind))
@@ -406,15 +392,14 @@ GPU_FUNC_QUALIFIER bool pme_gpu_try_finish_task(gmx_pme_t*            GPU_FUNC_A
  * (if they were to be computed).
  *
  * \param[in]  pme             The PME data structure.
- * \param[in]  flags           The combination of flags to affect this PME computation.
- *                             The flags are the GMX_PME_ flags from pme.h.
+ * \param[in]  stepWork        The required work for this simulation step
  * \param[in]  wcycle          The wallclock counter.
  * \param[out] forceWithVirial The output force and virial
  * \param[out] enerd           The output energies
  */
-GPU_FUNC_QUALIFIER void pme_gpu_wait_and_reduce(gmx_pme_t*            GPU_FUNC_ARGUMENT(pme),
-                                                int                   GPU_FUNC_ARGUMENT(flags),
-                                                gmx_wallcycle*        GPU_FUNC_ARGUMENT(wcycle),
+GPU_FUNC_QUALIFIER void pme_gpu_wait_and_reduce(gmx_pme_t*               GPU_FUNC_ARGUMENT(pme),
+                                                const gmx::StepWorkload& GPU_FUNC_ARGUMENT(stepWork),
+                                                gmx_wallcycle*           GPU_FUNC_ARGUMENT(wcycle),
                                                 gmx::ForceWithVirial* GPU_FUNC_ARGUMENT(forceWithVirial),
                                                 gmx_enerdata_t* GPU_FUNC_ARGUMENT(enerd)) GPU_FUNC_TERM;
 
@@ -446,20 +431,6 @@ GPU_FUNC_QUALIFIER void pme_gpu_set_device_x(const gmx_pme_t*        GPU_FUNC_AR
  * \returns                  Pointer to force data
  */
 GPU_FUNC_QUALIFIER void* pme_gpu_get_device_f(const gmx_pme_t* GPU_FUNC_ARGUMENT(pme))
-        GPU_FUNC_TERM_WITH_RETURN(nullptr);
-
-/*! \brief Returns the pointer to the GPU stream.
- *  \param[in] pme            The PME data structure.
- *  \returns                  Pointer to GPU stream object.
- */
-GPU_FUNC_QUALIFIER void* pme_gpu_get_device_stream(const gmx_pme_t* GPU_FUNC_ARGUMENT(pme))
-        GPU_FUNC_TERM_WITH_RETURN(nullptr);
-
-/*! \brief Returns the pointer to the GPU context.
- *  \param[in] pme            The PME data structure.
- *  \returns                  Pointer to GPU context object.
- */
-GPU_FUNC_QUALIFIER void* pme_gpu_get_device_context(const gmx_pme_t* GPU_FUNC_ARGUMENT(pme))
         GPU_FUNC_TERM_WITH_RETURN(nullptr);
 
 /*! \brief Get pointer to the device synchronizer object that allows syncing on PME force calculation completion

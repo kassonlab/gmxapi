@@ -152,23 +152,15 @@ struct PmeGpu
     PmeGpuStaging staging;
 
     /*! \brief Number of local atoms, padded to be divisible by c_pmeAtomDataAlignment.
-     * Used for kernel scheduling.
-     * kernelParams.atoms.nAtoms is the actual atom count to be used for data copying.
-     * TODO: this and the next member represent a memory allocation/padding properties -
-     * what a container type should do ideally.
-     */
-    int nAtomsPadded;
-    /*! \brief Number of local atoms, padded to be divisible by c_pmeAtomDataAlignment
-     * if c_usePadding is true.
+     *
      * Used only as a basic size for almost all the atom data allocations
      * (spline parameter data is also aligned by PME_SPREADGATHER_PARTICLES_PER_WARP).
-     * This should be the same as (c_usePadding ? nAtomsPadded : kernelParams.atoms.nAtoms).
      * kernelParams.atoms.nAtoms is the actual atom count to be used for most data copying.
+     *
+     * TODO: memory allocation/padding properties should be handled by
+     * something like a container
      */
     int nAtomsAlloc;
-
-    /*! \brief A pointer to the device used during the execution. */
-    const DeviceInformation* deviceInfo;
 
     /*! \brief Kernel scheduling grid width limit in X - derived from deviceinfo compute capability in CUDA.
      * Declared as very large int to make it useful in computations with type promotion, to avoid overflows.

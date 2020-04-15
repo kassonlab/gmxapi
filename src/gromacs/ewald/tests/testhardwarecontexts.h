@@ -52,59 +52,14 @@
 #include "gromacs/hardware/gpu_hw_info.h"
 #include "gromacs/utility/gmxassert.h"
 
+#include "testhardwarecontext.h"
+
 struct gmx_hw_info_t;
 
 namespace gmx
 {
 namespace test
 {
-//! Hardware code path being tested
-enum class CodePath
-{
-    CPU,
-    GPU
-};
-
-//! Return a string useful for human-readable messages describing a \c codePath.
-const char* codePathToString(CodePath codePath);
-
-/*! \internal \brief
- * A structure to describe a hardware context  that persists over the lifetime
- * of the test binary - an abstraction over PmeGpuProgram with a human-readable string.
- */
-struct TestHardwareContext
-{
-    //! Hardware path for the code being tested.
-    CodePath codePath_;
-    //! Readable description
-    std::string description_;
-    //! Device information pointer
-    const DeviceInformation* deviceInfo_;
-    //! Persistent compiled GPU kernels for PME.
-    PmeGpuProgramStorage program_;
-
-public:
-    //! Retuns the code path for this context.
-    CodePath getCodePath() const { return codePath_; }
-    //! Returns a human-readable context description line
-    std::string getDescription() const { return description_; }
-    //! Returns the device info pointer
-    const DeviceInformation* getDeviceInfo() const { return deviceInfo_; }
-    //! Returns the persistent PME GPU kernels
-    const PmeGpuProgram* getPmeGpuProgram() const { return program_.get(); }
-    //! Constructs the context
-    TestHardwareContext(CodePath codePath, const char* description, const DeviceInformation* deviceInfo) :
-        codePath_(codePath),
-        description_(description),
-        deviceInfo_(deviceInfo)
-    {
-        if (codePath == CodePath::GPU)
-        {
-            program_ = buildPmeGpuProgram(deviceInfo_);
-        }
-    }
-    ~TestHardwareContext();
-};
 
 //! A container of handles to hardware contexts
 typedef std::vector<std::unique_ptr<TestHardwareContext>> TestHardwareContexts;
@@ -123,6 +78,8 @@ private:
 public:
     //! This is called by GTest framework once to query the hardware
     void SetUp() override;
+    //! This is called by GTest framework once release the hardware
+    void TearDown() override;
     //! Get available hardware contexts.
     const TestHardwareContexts& getHardwareContexts() const { return hardwareContexts_; }
     //! Get available hardware information.

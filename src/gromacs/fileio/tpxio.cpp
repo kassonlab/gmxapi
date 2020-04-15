@@ -130,7 +130,8 @@ enum tpxv
     tpxv_GenericInternalParameters, /**< Added internal parameters for mdrun modules*/
     tpxv_VSite2FD,                  /**< Added 2FD type virtual site */
     tpxv_AddSizeField, /**< Added field with information about the size of the serialized tpr file in bytes, excluding the header */
-    tpxv_Count         /**< the total number of tpxv versions */
+    tpxv_StoreNonBondedInteractionExclusionGroup, /**< Store the non bonded interaction exclusion group in the topology */
+    tpxv_Count                                    /**< the total number of tpxv versions */
 };
 
 /*! \brief Version number of the file format written to run input
@@ -1155,20 +1156,14 @@ static void do_inputrec(gmx::ISerializer* serializer, t_inputrec* ir, int file_v
             real dummy_rlistlong = -1;
             serializer->doReal(&dummy_rlistlong);
 
-            if (ir->rlist > 0 && (dummy_rlistlong == 0 || dummy_rlistlong > ir->rlist))
-            {
-                // Get mdrun to issue an error (regardless of
-                // ir->cutoff_scheme).
-                ir->useTwinRange = true;
-            }
-            else
-            {
-                // grompp used to set rlistlong actively. Users were
-                // probably also confused and set rlistlong == rlist.
-                // However, in all remaining cases, it is safe to let
-                // mdrun proceed normally.
-                ir->useTwinRange = false;
-            }
+            ir->useTwinRange = (ir->rlist > 0 && (dummy_rlistlong == 0 || dummy_rlistlong > ir->rlist));
+            // When true, this forces mdrun to issue an error (regardless of
+            // ir->cutoff_scheme).
+            //
+            // Otherwise, grompp used to set rlistlong actively. Users
+            // were probably also confused and set rlistlong == rlist.
+            // However, in all remaining cases, it is safe to let
+            // mdrun proceed normally.
         }
     }
     else
@@ -1351,14 +1346,6 @@ static void do_inputrec(gmx::ISerializer* serializer, t_inputrec* ir, int file_v
     if (file_version >= 79)
     {
         serializer->doBool(&ir->bExpanded);
-        if (ir->bExpanded)
-        {
-            ir->bExpanded = TRUE;
-        }
-        else
-        {
-            ir->bExpanded = FALSE;
-        }
     }
     if (ir->bExpanded)
     {
@@ -1624,43 +1611,43 @@ static void do_inputrec(gmx::ISerializer* serializer, t_inputrec* ir, int file_v
         }
     }
 
-    /* QMMM stuff */
+    /* QMMM reading - despite defunct we require reading for backwards
+     * compability and correct serialization
+     */
     {
         serializer->doBool(&ir->bQMMM);
-        serializer->doInt(&ir->QMMMscheme);
-        serializer->doReal(&ir->scalefactor);
+        int qmmmScheme;
+        serializer->doInt(&qmmmScheme);
+        real unusedScalefactor;
+        serializer->doReal(&unusedScalefactor);
+
+        // this is still used in Mimic
         serializer->doInt(&ir->opts.ngQM);
-        if (serializer->reading())
-        {
-            snew(ir->opts.QMmethod, ir->opts.ngQM);
-            snew(ir->opts.QMbasis, ir->opts.ngQM);
-            snew(ir->opts.QMcharge, ir->opts.ngQM);
-            snew(ir->opts.QMmult, ir->opts.ngQM);
-            snew(ir->opts.bSH, ir->opts.ngQM);
-            snew(ir->opts.CASorbitals, ir->opts.ngQM);
-            snew(ir->opts.CASelectrons, ir->opts.ngQM);
-            snew(ir->opts.SAon, ir->opts.ngQM);
-            snew(ir->opts.SAoff, ir->opts.ngQM);
-            snew(ir->opts.SAsteps, ir->opts.ngQM);
-        }
         if (ir->opts.ngQM > 0 && ir->bQMMM)
         {
-            serializer->doIntArray(ir->opts.QMmethod, ir->opts.ngQM);
-            serializer->doIntArray(ir->opts.QMbasis, ir->opts.ngQM);
-            serializer->doIntArray(ir->opts.QMcharge, ir->opts.ngQM);
-            serializer->doIntArray(ir->opts.QMmult, ir->opts.ngQM);
-            serializer->doBoolArray(ir->opts.bSH, ir->opts.ngQM);
-            serializer->doIntArray(ir->opts.CASorbitals, ir->opts.ngQM);
-            serializer->doIntArray(ir->opts.CASelectrons, ir->opts.ngQM);
-            serializer->doRealArray(ir->opts.SAon, ir->opts.ngQM);
-            serializer->doRealArray(ir->opts.SAoff, ir->opts.ngQM);
-            serializer->doIntArray(ir->opts.SAsteps, ir->opts.ngQM);
             /* We leave in dummy i/o for removed parameters to avoid
-             * changing the tpr format for every QMMM change.
+             * changing the tpr format.
              */
-            std::vector<int> dummy(ir->opts.ngQM, 0);
-            serializer->doIntArray(dummy.data(), ir->opts.ngQM);
-            serializer->doIntArray(dummy.data(), ir->opts.ngQM);
+            std::vector<int> dummyIntVec(4 * ir->opts.ngQM, 0);
+            serializer->doIntArray(dummyIntVec.data(), dummyIntVec.size());
+            dummyIntVec.clear();
+
+            // std::vector<bool> has no data()
+            std::vector<char> dummyBoolVec(ir->opts.ngQM * sizeof(bool) / sizeof(char));
+            serializer->doBoolArray(reinterpret_cast<bool*>(dummyBoolVec.data()), dummyBoolVec.size());
+            dummyBoolVec.clear();
+
+            dummyIntVec.resize(2 * ir->opts.ngQM, 0);
+            serializer->doIntArray(dummyIntVec.data(), dummyIntVec.size());
+            dummyIntVec.clear();
+
+            std::vector<real> dummyRealVec(2 * ir->opts.ngQM, 0);
+            serializer->doRealArray(dummyRealVec.data(), dummyRealVec.size());
+            dummyRealVec.clear();
+
+            dummyIntVec.resize(3 * ir->opts.ngQM, 0);
+            serializer->doIntArray(dummyIntVec.data(), dummyIntVec.size());
+            dummyIntVec.clear();
         }
         /* end of QMMM stuff */
     }
@@ -1936,9 +1923,7 @@ static void do_iparams(gmx::ISerializer* serializer, t_functype ftype, t_iparams
             break;
         case F_CBTDIHS: serializer->doRealArray(iparams->cbtdihs.cbtcA, NR_CBTDIHS); break;
         case F_RBDIHS:
-            serializer->doRealArray(iparams->rbdihs.rbcA, NR_RBDIHS);
-            serializer->doRealArray(iparams->rbdihs.rbcB, NR_RBDIHS);
-            break;
+            // Fall-through intended
         case F_FOURDIHS:
             /* Fourier dihedrals are internally represented
              * as Ryckaert-Bellemans since those are faster to compute.
@@ -2107,7 +2092,7 @@ static void do_ilists(gmx::ISerializer* serializer, InteractionLists* ilists, in
         else
         {
             do_ilist(serializer, &ilist);
-            if (file_version < 78 && j == F_SETTLE && ilist.size() > 0)
+            if (file_version < 78 && j == F_SETTLE && !ilist.empty())
             {
                 add_settle_atoms(&ilist);
             }
@@ -2508,7 +2493,7 @@ static void set_disres_npair(gmx_mtop_t* mtop)
     {
         const InteractionList& il = (*ilist)[F_DISRES];
 
-        if (il.size() > 0)
+        if (!il.empty())
         {
             gmx::ArrayRef<const int> a     = il.iatoms;
             int                      npair = 0;
@@ -2589,6 +2574,18 @@ static void do_mtop(gmx::ISerializer* serializer, gmx_mtop_t* mtop, int file_ver
     do_groups(serializer, &mtop->groups, &(mtop->symtab));
 
     mtop->haveMoleculeIndices = true;
+
+    if (file_version >= tpxv_StoreNonBondedInteractionExclusionGroup)
+    {
+        std::int64_t intermolecularExclusionGroupSize = gmx::ssize(mtop->intermolecularExclusionGroup);
+        serializer->doInt64(&intermolecularExclusionGroupSize);
+        GMX_RELEASE_ASSERT(intermolecularExclusionGroupSize >= 0,
+                           "Number of atoms with excluded intermolecular non-bonded interactions "
+                           "is negative.");
+        mtop->intermolecularExclusionGroup.resize(intermolecularExclusionGroupSize); // no effect when writing
+        serializer->doIntArray(mtop->intermolecularExclusionGroup.data(),
+                               mtop->intermolecularExclusionGroup.size());
+    }
 
     if (serializer->reading())
     {
@@ -3021,7 +3018,7 @@ static void do_tpx_finalize(TpxFileHeader* tpx, t_inputrec* ir, t_state* state, 
         {
             if (tpx->fileVersion < 57)
             {
-                if (mtop->moltype[0].ilist[F_DISRES].size() > 0)
+                if (!mtop->moltype[0].ilist[F_DISRES].empty())
                 {
                     ir->eDisre = edrSimple;
                 }

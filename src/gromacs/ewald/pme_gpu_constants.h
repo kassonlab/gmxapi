@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -42,7 +42,7 @@
  *
  * \todo The values are currently common to both CUDA and OpenCL
  * implementations, but should be reconsidered when we tune the OpenCL
- * implementation. See Redmine #2528.
+ * implementation. See Issue #2528.
  *
  * \author Aleksei Iupinov <a.yupinov@gmail.com>
  * \ingroup module_ewald
@@ -58,18 +58,6 @@
 #endif
 
 /* General settings for PME GPU behaviour */
-
-/*! \brief
- * false: The atom data GPU buffers are sized precisely according to the number of atoms.
- *        (Except GPU spline data layout which is regardless intertwined for 2 atoms per warp).
- *        The atom index checks in the spread/gather code potentially hinder the performance.
- * true:  The atom data GPU buffers are padded with zeroes so that the possible number of atoms
- *        fitting in is divisible by c_pmeAtomDataAlignment.
- *        The atom index checks are not performed. There should be a performance win, but how big is it, remains to be seen.
- *        Additional cudaMemsetAsync calls are done occasionally (only charges/coordinates; spline data is always recalculated now).
- * \todo Estimate performance differences
- */
-constexpr bool c_usePadding = true;
 
 /*! \brief
  * false: Atoms with zero charges are processed by PME. Could introduce some overhead.
@@ -120,40 +108,27 @@ constexpr int c_virialAndEnergyCount = 7;
  */
 constexpr int c_pmeGpuOrder = 4;
 
-/*! \brief
- * The number of GPU threads used for computing spread/gather contributions of a single atom as function of the PME order.
- * The assumption is currently that any thread processes only a single atom's contributions.
- * TODO: this assumption leads to minimum execution width of 16. See Redmine #2516
- */
-constexpr int c_pmeSpreadGatherThreadsPerAtom = c_pmeGpuOrder * c_pmeGpuOrder;
-
-//! Number of threads per atom when order threads are used
-constexpr int c_pmeSpreadGatherThreadsPerAtom4ThPerAtom = c_pmeGpuOrder;
-
-/*! \brief Minimum execution width of the PME spread and gather kernels.
+/*! \brief The number of GPU threads used for computing spread/gather
+ * contributions of a single atom, which relates to the PME order.
  *
- * Due to the one thread per atom and order=4 implementation constraints, order^2 threads
- * should execute without synchronization needed. See c_pmeSpreadGatherThreadsPerAtom
+ * TODO: this assumption leads to minimum execution width of 16. See Issue #2516
  */
-constexpr int c_pmeSpreadGatherMinWarpSize = c_pmeSpreadGatherThreadsPerAtom;
-
-//! Minimum warp size if order threads pera atom are used instead of order^2
-constexpr int c_pmeSpreadGatherMinWarpSize4ThPerAtom = c_pmeSpreadGatherThreadsPerAtom4ThPerAtom;
-
-/*! \brief
- * Atom data alignment (in terms of number of atoms).
- * This is the least common multiple of number of atoms processed by
- * a single block/workgroup of the spread and gather kernels.
- * If the GPU atom data buffers are padded (c_usePadding == true),
- * Then the numbers of atoms which would fit in the padded GPU buffers have to be divisible by this.
- * There are debug asserts for this divisibility in pme_gpu_spread() and pme_gpu_gather().
- */
-constexpr int c_pmeAtomDataAlignment = 64;
+enum class ThreadsPerAtom : int
+{
+    /*! \brief Use a number of threads equal to the PME order (ie. 4)
+     *
+     * Only CUDA implements this. See Issue #2516 */
+    Order,
+    //! Use a number of threads equal to the square of the PME order (ie. 16)
+    OrderSquared,
+    //! Size of the enumeration
+    Count
+};
 
 /*
  * The execution widths for PME GPU kernels, used both on host and device for correct scheduling.
  * TODO: those were tuned for CUDA with assumption of warp size 32; specialize those for OpenCL
- * (Redmine #2528).
+ * (Issue #2528).
  * As noted below, these are very approximate maximum sizes; in run time we might have to use
  * smaller block/workgroup sizes, depending on device capabilities.
  */
@@ -168,36 +143,26 @@ constexpr int c_solveMaxWarpsPerBlock = 8;
 //! Gathering max block width in warps - picked empirically among 2, 4, 8, 16 for max. occupancy and min. runtime
 constexpr int c_gatherMaxWarpsPerBlock = 4;
 
-
 #if GMX_GPU == GMX_GPU_CUDA
-
-/* All the guys below are dependent on warp_size and should ideally be removed from the host-side code,
- * as we have to do that for OpenCL already.
- * They also express maximum desired block/workgroup sizes, while both with CUDA and OpenCL we have to treat
- * the device runtime limitations gracefully as well.
+/* All the fields below are dependent on warp_size and should
+ * ideally be removed from the device-side code, as we have to
+ * do that for OpenCL already.
+ *
+ * They also express maximum desired block/workgroup sizes,
+ * while both with CUDA and OpenCL we have to treat the device
+ * runtime limitations gracefully as well.
  */
-
-/*! \brief
- * The number of atoms processed by a single warp in spread/gather.
- * This macro depends on the templated order parameter (2 atoms per warp for order 4 and warp_size
- * of 32). It is mostly used for spline data layout tweaked for coalesced access.
- */
-constexpr int c_pmeSpreadGatherAtomsPerWarp = (warp_size / c_pmeSpreadGatherThreadsPerAtom);
-
-//! number of atoms per warp when order threads are used per atom
-constexpr int c_pmeSpreadGatherAtomsPerWarp4ThPerAtom =
-        (warp_size / c_pmeSpreadGatherThreadsPerAtom4ThPerAtom);
 
 //! Spreading max block size in threads
-constexpr int c_spreadMaxThreadsPerBlock = c_spreadMaxWarpsPerBlock * warp_size;
+static constexpr int c_spreadMaxThreadsPerBlock = c_spreadMaxWarpsPerBlock * warp_size;
 
 //! Solving kernel max block size in threads
-constexpr int c_solveMaxThreadsPerBlock = (c_solveMaxWarpsPerBlock * warp_size);
+static constexpr int c_solveMaxThreadsPerBlock = c_solveMaxWarpsPerBlock * warp_size;
 
 //! Gathering max block size in threads
-constexpr int c_gatherMaxThreadsPerBlock = c_gatherMaxWarpsPerBlock * warp_size;
+static constexpr int c_gatherMaxThreadsPerBlock = c_gatherMaxWarpsPerBlock * warp_size;
 //! Gathering min blocks per CUDA multiprocessor
-constexpr int c_gatherMinBlocksPerMP = GMX_CUDA_MAX_THREADS_PER_MP / c_gatherMaxThreadsPerBlock;
+static constexpr int c_gatherMinBlocksPerMP = GMX_CUDA_MAX_THREADS_PER_MP / c_gatherMaxThreadsPerBlock;
 
 #endif // GMX_GPU == GMX_GPU_CUDA
 

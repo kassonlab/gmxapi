@@ -45,8 +45,9 @@
 
 #include "pme_gpu_program_impl.h"
 
-PmeGpuProgramImpl::PmeGpuProgramImpl(const DeviceInformation* /* deviceInfo */) :
-    warpSize(0),
+PmeGpuProgramImpl::PmeGpuProgramImpl(const DeviceContext& deviceContext) :
+    deviceContext_(deviceContext),
+    warpSize_(0),
     spreadWorkGroupSize(0),
     gatherWorkGroupSize(0),
     solveMaxWorkGroupSize(0)

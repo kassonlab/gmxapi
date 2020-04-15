@@ -57,6 +57,8 @@
 #include <algorithm>
 
 #include "gromacs/gpu_utils/cudautils.cuh"
+#include "gromacs/gpu_utils/device_context.h"
+#include "gromacs/gpu_utils/device_stream.h"
 #include "gromacs/gpu_utils/devicebuffer.h"
 #include "gromacs/gpu_utils/gputraits.cuh"
 #include "gromacs/gpu_utils/vectype_ops.cuh"
@@ -118,10 +120,10 @@ void UpdateConstrainGpu::Impl::integrate(GpuEventSynchronizer*             fRead
     clear_mat(virial);
 
     // Make sure that the forces are ready on device before proceeding with the update.
-    fReadyOnDevice->enqueueWaitEvent(commandStream_);
+    fReadyOnDevice->enqueueWaitEvent(deviceStream_);
 
-    // The integrate should save a copy of the current coordinates in d_xp_ and write updated once
-    // into d_x_. The d_xp_ is only needed by constraints.
+    // The integrate should save a copy of the current coordinates in d_xp_ and write updated
+    // once into d_x_. The d_xp_ is only needed by constraints.
     integrator_->integrate(d_x_, d_xp_, d_v_, d_f_, dt, doTemperatureScaling, tcstat,
                            doParrinelloRahman, dtPressureCouple, prVelocityScalingMatrix);
     // Constraints need both coordinates before (d_x_) and after (d_xp_) update. However, after constraints
@@ -140,7 +142,7 @@ void UpdateConstrainGpu::Impl::integrate(GpuEventSynchronizer*             fRead
         }
     }
 
-    coordinatesReady_->markEvent(commandStream_);
+    coordinatesReady_->markEvent(deviceStream_);
 
     return;
 }
@@ -157,43 +159,43 @@ void UpdateConstrainGpu::Impl::scaleCoordinates(const matrix scalingMatrix)
 
     const auto kernelArgs = prepareGpuKernelArguments(
             scaleCoordinates_kernel, coordinateScalingKernelLaunchConfig_, &numAtoms_, &d_x_, &mu);
-    launchGpuKernel(scaleCoordinates_kernel, coordinateScalingKernelLaunchConfig_, nullptr,
-                    "scaleCoordinates_kernel", kernelArgs);
+    launchGpuKernel(scaleCoordinates_kernel, coordinateScalingKernelLaunchConfig_, deviceStream_,
+                    nullptr, "scaleCoordinates_kernel", kernelArgs);
     // TODO: Although this only happens on the pressure coupling steps, this synchronization
     //       can affect the perfornamce if nstpcouple is small.
-    gpuStreamSynchronize(commandStream_);
+    deviceStream_.synchronize();
 }
 
 UpdateConstrainGpu::Impl::Impl(const t_inputrec&     ir,
                                const gmx_mtop_t&     mtop,
-                               const void*           commandStream,
+                               const DeviceContext&  deviceContext,
+                               const DeviceStream&   deviceStream,
                                GpuEventSynchronizer* xUpdatedOnDevice) :
+    deviceContext_(deviceContext),
+    deviceStream_(deviceStream),
     coordinatesReady_(xUpdatedOnDevice)
 {
     GMX_ASSERT(xUpdatedOnDevice != nullptr, "The event synchronizer can not be nullptr.");
-    commandStream != nullptr ? commandStream_ = *static_cast<const CommandStream*>(commandStream)
-                             : commandStream_ = nullptr;
 
 
-    integrator_ = std::make_unique<LeapFrogGpu>(commandStream_);
-    lincsGpu_   = std::make_unique<LincsGpu>(ir.nLincsIter, ir.nProjOrder, commandStream_);
-    settleGpu_  = std::make_unique<SettleGpu>(mtop, commandStream_);
+    integrator_ = std::make_unique<LeapFrogGpu>(deviceContext_, deviceStream_);
+    lincsGpu_ = std::make_unique<LincsGpu>(ir.nLincsIter, ir.nProjOrder, deviceContext_, deviceStream_);
+    settleGpu_ = std::make_unique<SettleGpu>(mtop, deviceContext_, deviceStream_);
 
     coordinateScalingKernelLaunchConfig_.blockSize[0]     = c_threadsPerBlock;
     coordinateScalingKernelLaunchConfig_.blockSize[1]     = 1;
     coordinateScalingKernelLaunchConfig_.blockSize[2]     = 1;
     coordinateScalingKernelLaunchConfig_.sharedMemorySize = 0;
-    coordinateScalingKernelLaunchConfig_.stream           = commandStream_;
 }
 
 UpdateConstrainGpu::Impl::~Impl() {}
 
-void UpdateConstrainGpu::Impl::set(DeviceBuffer<RVec>       d_x,
-                                   DeviceBuffer<RVec>       d_v,
-                                   const DeviceBuffer<RVec> d_f,
-                                   const t_idef&            idef,
-                                   const t_mdatoms&         md,
-                                   const int                numTempScaleValues)
+void UpdateConstrainGpu::Impl::set(DeviceBuffer<RVec>            d_x,
+                                   DeviceBuffer<RVec>            d_v,
+                                   const DeviceBuffer<RVec>      d_f,
+                                   const InteractionDefinitions& idef,
+                                   const t_mdatoms&              md,
+                                   const int                     numTempScaleValues)
 {
     GMX_ASSERT(d_x != nullptr, "Coordinates device buffer should not be null.");
     GMX_ASSERT(d_v != nullptr, "Velocities device buffer should not be null.");
@@ -205,10 +207,10 @@ void UpdateConstrainGpu::Impl::set(DeviceBuffer<RVec>       d_x,
 
     numAtoms_ = md.nr;
 
-    reallocateDeviceBuffer(&d_xp_, numAtoms_, &numXp_, &numXpAlloc_, nullptr);
+    reallocateDeviceBuffer(&d_xp_, numAtoms_, &numXp_, &numXpAlloc_, deviceContext_);
 
     reallocateDeviceBuffer(&d_inverseMasses_, numAtoms_, &numInverseMasses_,
-                           &numInverseMassesAlloc_, nullptr);
+                           &numInverseMassesAlloc_, deviceContext_);
 
     // Integrator should also update something, but it does not even have a method yet
     integrator_->set(md, numTempScaleValues, md.cTC);
@@ -231,9 +233,10 @@ GpuEventSynchronizer* UpdateConstrainGpu::Impl::getCoordinatesReadySync()
 
 UpdateConstrainGpu::UpdateConstrainGpu(const t_inputrec&     ir,
                                        const gmx_mtop_t&     mtop,
-                                       const void*           commandStream,
+                                       const DeviceContext&  deviceContext,
+                                       const DeviceStream&   deviceStream,
                                        GpuEventSynchronizer* xUpdatedOnDevice) :
-    impl_(new Impl(ir, mtop, commandStream, xUpdatedOnDevice))
+    impl_(new Impl(ir, mtop, deviceContext, deviceStream, xUpdatedOnDevice))
 {
 }
 
@@ -259,12 +262,12 @@ void UpdateConstrainGpu::scaleCoordinates(const matrix scalingMatrix)
     impl_->scaleCoordinates(scalingMatrix);
 }
 
-void UpdateConstrainGpu::set(DeviceBuffer<RVec>       d_x,
-                             DeviceBuffer<RVec>       d_v,
-                             const DeviceBuffer<RVec> d_f,
-                             const t_idef&            idef,
-                             const t_mdatoms&         md,
-                             const int                numTempScaleValues)
+void UpdateConstrainGpu::set(DeviceBuffer<RVec>            d_x,
+                             DeviceBuffer<RVec>            d_v,
+                             const DeviceBuffer<RVec>      d_f,
+                             const InteractionDefinitions& idef,
+                             const t_mdatoms&              md,
+                             const int                     numTempScaleValues)
 {
     impl_->set(d_x, d_v, d_f, idef, md, numTempScaleValues);
 }

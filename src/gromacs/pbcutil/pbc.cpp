@@ -295,9 +295,9 @@ static int correct_box_elem(FILE* fplog, int step, tensor box, int v, int d)
     return shift;
 }
 
-gmx_bool correct_box(FILE* fplog, int step, tensor box, t_graph* graph)
+gmx_bool correct_box(FILE* fplog, int step, tensor box)
 {
-    int      zy, zx, yx, i;
+    int      zy, zx, yx;
     gmx_bool bCorrected;
 
     zy = correct_box_elem(fplog, step, box, ZZ, YY);
@@ -305,17 +305,6 @@ gmx_bool correct_box(FILE* fplog, int step, tensor box, t_graph* graph)
     yx = correct_box_elem(fplog, step, box, YY, XX);
 
     bCorrected = ((zy != 0) || (zx != 0) || (yx != 0));
-
-    if (bCorrected && graph)
-    {
-        /* correct the graph */
-        for (i = graph->at_start; i < graph->at_end; i++)
-        {
-            graph->ishift[i][YY] -= graph->ishift[i][ZZ] * zy;
-            graph->ishift[i][XX] -= graph->ishift[i][ZZ] * zx;
-            graph->ishift[i][XX] -= graph->ishift[i][YY] * yx;
-        }
-    }
 
     return bCorrected;
 }
@@ -1562,15 +1551,13 @@ void put_atoms_in_compact_unitcell(PbcType pbcType, int ecenter, const matrix bo
 static void
 low_do_pbc_mtop(FILE* fplog, PbcType pbcType, const matrix box, const gmx_mtop_t* mtop, rvec x[], gmx_bool bFirst)
 {
-    t_graph* graph;
-    int      as, mol;
+    int as, mol;
 
     if (bFirst && fplog)
     {
         fprintf(fplog, "Removing pbc first time\n");
     }
 
-    snew(graph, 1);
     as = 0;
     for (const gmx_molblock_t& molb : mtop->molblock)
     {
@@ -1582,11 +1569,11 @@ low_do_pbc_mtop(FILE* fplog, PbcType pbcType, const matrix box, const gmx_mtop_t
         }
         else
         {
-            mk_graph_moltype(moltype, graph);
+            t_graph graph = mk_graph_moltype(moltype);
 
             for (mol = 0; mol < molb.nmol; mol++)
             {
-                mk_mshift(fplog, graph, pbcType, box, x + as);
+                mk_mshift(fplog, &graph, pbcType, box, x + as);
 
                 shift_self(graph, box, x + as);
                 /* The molecule is whole now.
@@ -1596,10 +1583,8 @@ low_do_pbc_mtop(FILE* fplog, PbcType pbcType, const matrix box, const gmx_mtop_t
 
                 as += moltype.atoms.nr;
             }
-            done_graph(graph);
         }
     }
-    sfree(graph);
 }
 
 void do_pbc_first_mtop(FILE* fplog, PbcType pbcType, const matrix box, const gmx_mtop_t* mtop, rvec x[])

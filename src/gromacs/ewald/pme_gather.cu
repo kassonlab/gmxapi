@@ -47,8 +47,7 @@
 #include "gromacs/gpu_utils/typecasts.cuh"
 
 #include "pme.cuh"
-#include "pme_calculate_splines.cuh"
-#include "pme_gpu_utils.h"
+#include "pme_gpu_calculate_splines.cuh"
 #include "pme_grid.h"
 
 /*! \brief
@@ -70,14 +69,20 @@ __device__ __forceinline__ float read_grid_size(const float* realGridSizeFP, con
  *
  * \tparam[in] order              The PME order (must be 4).
  * \tparam[in] atomDataSize       The number of partial force contributions for each atom (currently
- * order^2 == 16) \tparam[in] blockSize          The CUDA block size \param[out] sm_forces Shared
- * memory array with the output forces (number of elements is number of atoms per block) \param[in]
- * atomIndexLocal     Local atom index \param[in]  splineIndex        Spline index \param[in]
- * lineIndex          Line index (same as threadLocalId) \param[in]  realGridSizeFP     Local grid
- * size constant \param[in]  fx                 Input force partial component X \param[in]  fy Input
- * force partial component Y \param[in]  fz                 Input force partial component Z
+ *                                order^2 == 16)
+ * \tparam[in] blockSize          The CUDA block size
+ *
+ * \param[out] sm_forces          Shared memory array with the output forces (number of elements
+ *                                is number of atoms per block)
+ * \param[in]  atomIndexLocal     Local atom index
+ * \param[in]  splineIndex        Spline index
+ * \param[in]  lineIndex          Line index (same as threadLocalId)
+ * \param[in]  realGridSizeFP     Local grid size constant
+ * \param[in]  fx                 Input force partial component X
+ * \param[in]  fy                 Input force partial component Y
+ * \param[in]  fz                 Input force partial component Z
  */
-template<const int order, const int atomDataSize, const int blockSize>
+template<int order, int atomDataSize, int blockSize>
 __device__ __forceinline__ void reduce_atom_forces(float3* __restrict__ sm_forces,
                                                    const int    atomIndexLocal,
                                                    const int    splineIndex,
@@ -216,11 +221,11 @@ __device__ __forceinline__ void reduce_atom_forces(float3* __restrict__ sm_force
  * \tparam[in] wrapX                Tells if the grid is wrapped in the X dimension.
  * \tparam[in] wrapY                Tells if the grid is wrapped in the Y dimension.
  * \tparam[in] readGlobal           Tells if we should read spline values from global memory
- * \tparam[in] useOrderThreads      Tells if we should use order threads per atom
- *                                   (order*order used if false)
+ * \tparam[in] threadsPerAtom       How many threads work on each atom
+ *
  * \param[in]  kernelParams         All the PME GPU data.
  */
-template<const int order, const bool wrapX, const bool wrapY, const bool readGlobal, const bool useOrderThreads>
+template<int order, bool wrapX, bool wrapY, bool readGlobal, ThreadsPerAtom threadsPerAtom>
 __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
         void pme_gather_kernel(const PmeGpuCudaKernelParams kernelParams)
 {
@@ -237,17 +242,14 @@ __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
     float3 atomX;
     float  atomCharge;
 
-    /* Some sizes */
-    const int atomsPerBlock =
-            useOrderThreads ? (c_gatherMaxThreadsPerBlock / c_pmeSpreadGatherThreadsPerAtom4ThPerAtom)
-                            : (c_gatherMaxThreadsPerBlock / c_pmeSpreadGatherThreadsPerAtom);
     const int blockIndex = blockIdx.y * gridDim.x + blockIdx.x;
 
     /* Number of data components and threads for a single atom */
-    const int atomDataSize = useOrderThreads ? c_pmeSpreadGatherThreadsPerAtom4ThPerAtom
-                                             : c_pmeSpreadGatherThreadsPerAtom;
-    const int atomsPerWarp = useOrderThreads ? c_pmeSpreadGatherAtomsPerWarp4ThPerAtom
-                                             : c_pmeSpreadGatherAtomsPerWarp;
+    const int threadsPerAtomValue = (threadsPerAtom == ThreadsPerAtom::Order) ? order : order * order;
+    const int atomDataSize        = threadsPerAtomValue;
+    const int atomsPerBlock       = c_gatherMaxThreadsPerBlock / atomDataSize;
+    // Number of atoms processed by a single warp in spread and gather
+    const int atomsPerWarp = warp_size / atomDataSize;
 
     const int blockSize = atomsPerBlock * atomDataSize;
     assert(blockSize == blockDim.x * blockDim.y * blockDim.z);
@@ -288,9 +290,7 @@ __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
         /* Read splines */
         const int localGridlineIndicesIndex = threadLocalId;
         const int globalGridlineIndicesIndex = blockIndex * gridlineIndicesSize + localGridlineIndicesIndex;
-        const int globalCheckIndices         = pme_gpu_check_atom_data_index(
-                globalGridlineIndicesIndex, kernelParams.atoms.nAtoms * DIM);
-        if ((localGridlineIndicesIndex < gridlineIndicesSize) & globalCheckIndices)
+        if (localGridlineIndicesIndex < gridlineIndicesSize)
         {
             sm_gridlineIndices[localGridlineIndicesIndex] = gm_gridlineIndices[globalGridlineIndicesIndex];
             assert(sm_gridlineIndices[localGridlineIndicesIndex] >= 0);
@@ -299,7 +299,7 @@ __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
            with order*order threads per atom, it is only required for each thread to load one data value */
 
         const int iMin = 0;
-        const int iMax = useOrderThreads ? 3 : 1;
+        const int iMax = (threadsPerAtom == ThreadsPerAtom::Order) ? 3 : 1;
 
         for (int i = iMin; i < iMax; i++)
         {
@@ -307,9 +307,7 @@ __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
                     threadLocalId
                     + i * threadLocalIdMax; /* i will always be zero for order*order threads per atom */
             int globalSplineParamsIndex = blockIndex * splineParamsSize + localSplineParamsIndex;
-            int globalCheckSplineParams = pme_gpu_check_atom_data_index(
-                    globalSplineParamsIndex, kernelParams.atoms.nAtoms * DIM * order);
-            if ((localSplineParamsIndex < splineParamsSize) && globalCheckSplineParams)
+            if (localSplineParamsIndex < splineParamsSize)
             {
                 sm_theta[localSplineParamsIndex]  = gm_theta[globalSplineParamsIndex];
                 sm_dtheta[localSplineParamsIndex] = gm_dtheta[globalSplineParamsIndex];
@@ -330,10 +328,10 @@ __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
             // Coordinates
             __shared__ float3 sm_coordinates[atomsPerBlock];
             /* Staging coefficients/charges */
-            pme_gpu_stage_atom_data<float, atomsPerBlock, 1>(kernelParams, sm_coefficients, gm_coefficients);
+            pme_gpu_stage_atom_data<float, atomsPerBlock, 1>(sm_coefficients, gm_coefficients);
 
             /* Staging coordinates */
-            pme_gpu_stage_atom_data<float3, atomsPerBlock, 1>(kernelParams, sm_coordinates, gm_coordinates);
+            pme_gpu_stage_atom_data<float3, atomsPerBlock, 1>(sm_coordinates, gm_coordinates);
             __syncthreads();
             atomX      = sm_coordinates[atomIndexLocal];
             atomCharge = sm_coefficients[atomIndexLocal];
@@ -351,10 +349,9 @@ __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
     float fy = 0.0f;
     float fz = 0.0f;
 
-    const int globalCheck = pme_gpu_check_atom_data_index(atomIndexGlobal, kernelParams.atoms.nAtoms);
     const int chargeCheck = pme_gpu_check_atom_charge(gm_coefficients[atomIndexGlobal]);
 
-    if (chargeCheck & globalCheck)
+    if (chargeCheck)
     {
         const int nx  = kernelParams.grid.realGridSize[XX];
         const int ny  = kernelParams.grid.realGridSize[YY];
@@ -378,8 +375,8 @@ __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
         }
         int constOffset, iy;
 
-        const int ithyMin = useOrderThreads ? 0 : threadIdx.y;
-        const int ithyMax = useOrderThreads ? order : threadIdx.y + 1;
+        const int ithyMin = (threadsPerAtom == ThreadsPerAtom::Order) ? 0 : threadIdx.y;
+        const int ithyMax = (threadsPerAtom == ThreadsPerAtom::Order) ? order : threadIdx.y + 1;
         for (int ithy = ithyMin; ithy < ithyMax; ithy++)
         {
             const int splineIndexY = getSplineParamIndex<order, atomsPerWarp>(splineIndexBase, YY, ithy);
@@ -425,8 +422,7 @@ __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
     /* Calculating the final forces with no component branching, atomsPerBlock threads */
     const int forceIndexLocal  = threadLocalId;
     const int forceIndexGlobal = atomIndexOffset + forceIndexLocal;
-    const int calcIndexCheck = pme_gpu_check_atom_data_index(forceIndexGlobal, kernelParams.atoms.nAtoms);
-    if ((forceIndexLocal < atomsPerBlock) & calcIndexCheck)
+    if (forceIndexLocal < atomsPerBlock)
     {
         const float3 atomForces     = sm_forces[forceIndexLocal];
         const float  negCoefficient = -gm_coefficients[forceIndexGlobal];
@@ -454,21 +450,18 @@ __launch_bounds__(c_gatherMaxThreadsPerBlock, c_gatherMinBlocksPerMP) __global__
 #pragma unroll
         for (int i = 0; i < numIter; i++)
         {
-            int       outputIndexLocal  = i * iterThreads + threadLocalId;
-            int       outputIndexGlobal = blockIndex * blockForcesSize + outputIndexLocal;
-            const int globalOutputCheck =
-                    pme_gpu_check_atom_data_index(outputIndexGlobal, kernelParams.atoms.nAtoms * DIM);
-            if (globalOutputCheck)
-            {
-                const float outputForceComponent = ((float*)sm_forces)[outputIndexLocal];
-                gm_forces[outputIndexGlobal]     = outputForceComponent;
-            }
+            int         outputIndexLocal     = i * iterThreads + threadLocalId;
+            int         outputIndexGlobal    = blockIndex * blockForcesSize + outputIndexLocal;
+            const float outputForceComponent = ((float*)sm_forces)[outputIndexLocal];
+            gm_forces[outputIndexGlobal]     = outputForceComponent;
         }
     }
 }
 
 //! Kernel instantiations
-template __global__ void pme_gather_kernel<4, true, true, true, true>(const PmeGpuCudaKernelParams);
-template __global__ void pme_gather_kernel<4, true, true, true, false>(const PmeGpuCudaKernelParams);
-template __global__ void pme_gather_kernel<4, true, true, false, true>(const PmeGpuCudaKernelParams);
-template __global__ void pme_gather_kernel<4, true, true, false, false>(const PmeGpuCudaKernelParams);
+// clang-format off
+template __global__ void pme_gather_kernel<4, true, true, true,  ThreadsPerAtom::Order>       (const PmeGpuCudaKernelParams);
+template __global__ void pme_gather_kernel<4, true, true, true,  ThreadsPerAtom::OrderSquared>(const PmeGpuCudaKernelParams);
+template __global__ void pme_gather_kernel<4, true, true, false, ThreadsPerAtom::Order>       (const PmeGpuCudaKernelParams);
+template __global__ void pme_gather_kernel<4, true, true, false, ThreadsPerAtom::OrderSquared>(const PmeGpuCudaKernelParams);
+// clang-format on

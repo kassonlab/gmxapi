@@ -48,6 +48,8 @@
 
 #include "gromacs/gpu_utils/gpu_utils.h" // for GpuApiCallBehavior
 
+enum class ThreadsPerAtom : int;
+
 /*! \internal \brief
  * The PME GPU settings structure, included in the main PME GPU structure by value.
  */
@@ -75,14 +77,13 @@ struct PmeGpuSettings
     bool copyAllOutputs;
     /*! \brief An enum which tells whether most PME GPU D2H/H2D data transfers should be synchronous. */
     GpuApiCallBehavior transferKind;
-    /*! \brief Various flags for the current PME computation, corresponding to the GMX_PME_ flags in pme.h. */
-    int currentFlags;
     /*! \brief
-     *  Currently only supported by CUDA.
-     *  Controls if we should use order (i.e. 4) threads per atom for the GPU
+     *  Controls whether we use order (i.e. 4) threads per atom for the GPU
      *  or order*order (i.e. 16) threads per atom.
+     *
+     *  Currently ThreadsPerAtom::Order is only supported by CUDA.
      */
-    bool useOrderThreadsPerAtom;
+    ThreadsPerAtom threadsPerAtom;
     /*! \brief
      * Currently only supported by CUDA.
      * Controls if we should recalculate the splines in the gather or

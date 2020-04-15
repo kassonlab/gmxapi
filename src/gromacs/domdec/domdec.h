@@ -85,10 +85,12 @@ struct t_nrnb;
 struct gmx_wallcycle;
 enum class PbcType : int;
 class t_state;
+class DeviceContext;
 class GpuEventSynchronizer;
 
 namespace gmx
 {
+class DeviceStreamManager;
 class ForceWithShiftForces;
 class MDLogger;
 class RangePartitioning;
@@ -292,13 +294,6 @@ void dd_make_local_top(struct gmx_domdec_t*       dd,
 /*! \brief Sort ltop->ilist when we are doing free energy. */
 void dd_sort_local_top(gmx_domdec_t* dd, const t_mdatoms* mdatoms, gmx_localtop_t* ltop);
 
-/*! \brief Initialize local topology
- *
- * \param[in] top_global Reference to global topology.
- * \param[in,out] top Pointer to new local topology
- */
-void dd_init_local_top(const gmx_mtop_t& top_global, gmx_localtop_t* top);
-
 /*! \brief Construct local state */
 void dd_init_local_state(struct gmx_domdec_t* dd, const t_state* state_global, t_state* local_state);
 
@@ -318,13 +313,15 @@ void dd_bonded_cg_distance(const gmx::MDLogger& mdlog,
                            real*                r_2b,
                            real*                r_mb);
 
-/*! \brief Construct the GPU halo exchange object(s)
- * \param[in] mdlog          The logger object
- * \param[in] cr             The commrec object
- * \param[in] streamLocal    The local GPU stream
- * \param[in] streamNonLocal The non-local GPU stream
+/*! \brief Construct the GPU halo exchange object(s).
+ *
+ * \param[in] mdlog               The logger object.
+ * \param[in] cr                  The commrec object.
+ * \param[in] deviceStreamManager Manager of the GPU context and streams.
  */
-void constructGpuHaloExchange(const gmx::MDLogger& mdlog, const t_commrec& cr, void* streamLocal, void* streamNonLocal);
+void constructGpuHaloExchange(const gmx::MDLogger&            mdlog,
+                              const t_commrec&                cr,
+                              const gmx::DeviceStreamManager& deviceStreamManager);
 
 /*! \brief
  * (Re-) Initialization for GPU halo exchange

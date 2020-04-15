@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -136,8 +136,9 @@ void DomDecHelper::run(Step step, Time gmx_unused time)
     // Correct the new box if it is too skewed
     if (inputrecDynamicBox(inputrec_))
     {
-        t_graph* graph = nullptr;
-        if (correct_box(fplog_, step, localState->box, graph))
+        // TODO: Correcting the box is done here (if using DD) or in ForceElement (non-DD simulations).
+        //       Think about unifying this responsibility, could this be done in one place?
+        if (correct_box(fplog_, step, localState->box))
         {
             isMasterState = true;
         }

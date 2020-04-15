@@ -36,8 +36,10 @@
 #define GMX_GPU_UTILS_GPUTRAITS_H
 
 /*! \libinternal \file
- *  \brief Declares the GPU type traits for non-GPU builds
+ *  \brief Declares the GPU type traits for non-GPU builds.
+ *
  *  \author Mark Abraham <mark.j.abraham@gmail.com>
+ *  \author Artem Zhmurov <zhmurov@gmail.com>
  *
  * \inlibraryapi
  * \ingroup module_gpu_utils
@@ -61,12 +63,8 @@ struct DeviceInformation
     // No member needed
 };
 
-//! \brief GPU command stream
-using CommandStream = void*;
 //! \brief Single GPU call timing event
 using CommandEvent = void*;
-//! \brief GPU context
-using DeviceContext = void*;
 
 #endif // GMX_GPU
 

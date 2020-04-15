@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -45,10 +45,14 @@
 #include "gromacs/utility/classhelpers.h"
 #include "gromacs/utility/gmxmpi.h"
 
+class DeviceContext;
+class DeviceStream;
 class GpuEventSynchronizer;
 
 namespace gmx
 {
+
+class DeviceStreamManager;
 
 /*! \libinternal
 
@@ -61,8 +65,10 @@ public:
     /*! \brief Creates PME-PP GPU communication object
      * \param[in] comm            Communicator used for simulation
      * \param[in] pmeRank         Rank of PME task
+     * \param[in] deviceContext   GPU context.
+     * \param[in] deviceStream    GPU stream.
      */
-    PmePpCommGpu(MPI_Comm comm, int pmeRank);
+    PmePpCommGpu(MPI_Comm comm, int pmeRank, const DeviceContext& deviceContext, const DeviceStream& deviceStream);
     ~PmePpCommGpu();
 
     /*! \brief Perform steps required when buffer size changes

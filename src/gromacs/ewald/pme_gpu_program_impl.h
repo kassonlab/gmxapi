@@ -44,9 +44,11 @@
 
 #include "config.h"
 
+#include "gromacs/gpu_utils/device_context.h"
 #include "gromacs/gpu_utils/gputraits.h"
 #include "gromacs/utility/classhelpers.h"
 
+class DeviceContext;
 struct DeviceInformation;
 
 /*! \internal
@@ -67,17 +69,15 @@ struct DeviceInformation;
  * This also doesn't manage cuFFT/clFFT kernels, which depend on the PME grid dimensions.
  *
  * TODO: pass cl_context to the constructor and not create it inside.
- * See also Redmine #2522.
+ * See also Issue #2522.
  */
 struct PmeGpuProgramImpl
 {
     /*! \brief
      * This is a handle to the GPU context, which is just a dummy in CUDA,
      * but is created/destroyed by this class in OpenCL.
-     * TODO: Later we want to be able to own the context at a higher level and not here,
-     * but this class would still need the non-owning context handle to build the kernels.
      */
-    DeviceContext context;
+    const DeviceContext& deviceContext_;
 
     //! Conveniently all the PME kernels use the same single argument type
 #if GMX_GPU == GMX_GPU_CUDA
@@ -94,7 +94,7 @@ struct PmeGpuProgramImpl
      * For CUDA, this is a static value that comes from gromacs/gpu_utils/cuda_arch_utils.cuh;
      * for OpenCL, we have to query it dynamically.
      */
-    size_t warpSize;
+    size_t warpSize_;
 
     //@{
     /**
@@ -146,13 +146,16 @@ struct PmeGpuProgramImpl
 
     PmeGpuProgramImpl() = delete;
     //! Constructor for the given device
-    explicit PmeGpuProgramImpl(const DeviceInformation* deviceInfo);
+    explicit PmeGpuProgramImpl(const DeviceContext& deviceContext);
     ~PmeGpuProgramImpl();
     GMX_DISALLOW_COPY_AND_ASSIGN(PmeGpuProgramImpl);
 
+    //! Return the warp size for which the kernels were compiled
+    int warpSize() const { return warpSize_; }
+
 private:
     // Compiles kernels, if supported. Called by the constructor.
-    void compileKernels(const DeviceInformation* deviceInfo);
+    void compileKernels(const DeviceInformation& deviceInfo);
 };
 
 #endif

@@ -68,26 +68,26 @@ static bool sid_comp(const t_sid& sa, const t_sid& sb)
     }
 }
 
-static int mk_grey(egCol egc[], t_graph* g, int* AtomI, int maxsid, t_sid sid[])
+static int mk_grey(gmx::ArrayRef<egCol> edgeColor, const t_graph* g, int* AtomI, int maxsid, t_sid sid[])
 {
-    int j, ng, ai, aj, g0;
+    int ng, ai, g0;
 
     ng = 0;
     ai = *AtomI;
 
-    g0 = g->at_start;
+    g0 = g->edgeAtomBegin;
     /* Loop over all the bonds */
-    for (j = 0; (j < g->nedge[ai]); j++)
+    for (int aj : g->edges[ai])
     {
-        aj = g->edge[ai][j] - g0;
+        aj -= g0;
         /* If there is a white one, make it gray and set pbc */
-        if (egc[aj] == egcolWhite)
+        if (edgeColor[aj] == egcolWhite)
         {
             if (aj < *AtomI)
             {
                 *AtomI = aj;
             }
-            egc[aj] = egcolGrey;
+            edgeColor[aj] = egcolGrey;
 
             /* Check whether this one has been set before... */
             range_check(aj + g0, 0, maxsid);
@@ -108,16 +108,16 @@ static int mk_grey(egCol egc[], t_graph* g, int* AtomI, int maxsid, t_sid sid[])
     return ng;
 }
 
-static int first_colour(int fC, egCol Col, t_graph* g, const egCol egc[])
+static int first_colour(const int fC, const egCol Col, const t_graph* g, gmx::ArrayRef<const egCol> edgeColor)
 /* Return the first node with colour Col starting at fC.
  * return -1 if none found.
  */
 {
     int i;
 
-    for (i = fC; (i < g->nnodes); i++)
+    for (i = fC; i < int(g->edges.size()); i++)
     {
-        if ((g->nedge[i] > 0) && (egc[i] == Col))
+        if (!g->edges[i].empty() && edgeColor[i] == Col)
         {
             return i;
         }
@@ -128,24 +128,22 @@ static int first_colour(int fC, egCol Col, t_graph* g, const egCol egc[])
 
 static int mk_sblocks(FILE* fp, t_graph* g, int maxsid, t_sid sid[])
 {
-    int    ng, nnodes;
-    int    nW, nG, nB;    /* Number of Grey, Black, White	*/
-    int    fW, fG;        /* First of each category	*/
-    egCol* egc = nullptr; /* The colour of each node	*/
-    int    g0, nblock;
+    int ng;
+    int nW, nG, nB; /* Number of Grey, Black, White	*/
+    int fW, fG;     /* First of each category	*/
+    int g0, nblock;
 
-    if (!g->nbound)
+    if (!g->numConnectedAtoms)
     {
         return 0;
     }
 
     nblock = 0;
 
-    nnodes = g->nnodes;
-    snew(egc, nnodes);
+    std::vector<egCol> edgeColor(g->edges.size(), egcolWhite);
 
-    g0 = g->at_start;
-    nW = g->nbound;
+    g0 = g->edgeAtomBegin;
+    nW = g->numConnectedAtoms;
     nG = 0;
     nB = 0;
 
@@ -166,13 +164,13 @@ static int mk_sblocks(FILE* fp, t_graph* g, int maxsid, t_sid sid[])
          * number than before, because no nodes are made white
          * in the loop
          */
-        if ((fW = first_colour(fW, egcolWhite, g, egc)) == -1)
+        if ((fW = first_colour(fW, egcolWhite, g, edgeColor)) == -1)
         {
             gmx_fatal(FARGS, "No WHITE nodes found while nW=%d\n", nW);
         }
 
         /* Make the first white node grey, and set the block number */
-        egc[fW] = egcolGrey;
+        edgeColor[fW] = egcolGrey;
         range_check(fW + g0, 0, maxsid);
         sid[fW + g0].sid = nblock++;
         nG++;
@@ -188,26 +186,25 @@ static int mk_sblocks(FILE* fp, t_graph* g, int maxsid, t_sid sid[])
 
         while (nG > 0)
         {
-            if ((fG = first_colour(fG, egcolGrey, g, egc)) == -1)
+            if ((fG = first_colour(fG, egcolGrey, g, edgeColor)) == -1)
             {
                 gmx_fatal(FARGS, "No GREY nodes found while nG=%d\n", nG);
             }
 
             /* Make the first grey node black */
-            egc[fG] = egcolBlack;
+            edgeColor[fG] = egcolBlack;
             nB++;
             nG--;
 
             /* Make all the neighbours of this black node grey
              * and set their block number
              */
-            ng = mk_grey(egc, g, &fG, maxsid, sid);
+            ng = mk_grey(edgeColor, g, &fG, maxsid, sid);
             /* ng is the number of white nodes made grey */
             nG += ng;
             nW -= ng;
         }
     }
-    sfree(egc);
 
     if (debug)
     {
@@ -347,20 +344,20 @@ static int merge_sid(int at_start, int at_end, int nsid, t_sid sid[], t_blocka* 
     return nsid;
 }
 
-void gen_sblocks(FILE* fp, int at_start, int at_end, const t_idef* idef, t_blocka* sblock, gmx_bool bSettle)
+void gen_sblocks(FILE* fp, int at_end, const InteractionDefinitions& idef, t_blocka* sblock, gmx_bool bSettle)
 {
     t_graph* g;
     int      i, i0;
     t_sid*   sid;
     int      nsid;
 
-    g = mk_graph(nullptr, idef, at_start, at_end, TRUE, bSettle);
+    g = mk_graph(nullptr, idef, at_end, TRUE, bSettle);
     if (debug)
     {
         p_graph(debug, "Graaf Dracula", g);
     }
     snew(sid, at_end);
-    for (i = at_start; (i < at_end); i++)
+    for (i = 0; i < at_end; i++)
     {
         sid[i].atom = i;
         sid[i].sid  = -1;
@@ -373,18 +370,18 @@ void gen_sblocks(FILE* fp, int at_start, int at_end, const t_idef* idef, t_block
     }
 
     /* Now sort the shake blocks... */
-    std::sort(sid + at_start, sid + at_end, sid_comp);
+    std::sort(sid, sid + at_end, sid_comp);
 
     if (debug)
     {
         fprintf(debug, "Sorted shake block\n");
-        for (i = at_start; (i < at_end); i++)
+        for (i = 0; i < at_end; i++)
         {
             fprintf(debug, "sid[%5d] = atom:%5d sid:%5d\n", i, sid[i].atom, sid[i].sid);
         }
     }
     /* Now check how many are NOT -1, i.e. how many have to be shaken */
-    for (i0 = at_start; (i0 < at_end); i0++)
+    for (i0 = 0; i0 < at_end; i0++)
     {
         if (sid[i0].sid > -1)
         {
@@ -398,11 +395,10 @@ void gen_sblocks(FILE* fp, int at_start, int at_end, const t_idef* idef, t_block
      * part of the shake block too. There may be cases where blocks overlap
      * and they will have to be merged.
      */
-    merge_sid(at_start, at_end, nsid, sid, sblock);
+    merge_sid(0, at_end, nsid, sid, sblock);
     sfree(sid);
     /* Due to unknown reason this free generates a problem sometimes */
     done_graph(g);
-    sfree(g);
     if (debug)
     {
         fprintf(debug, "Done gen_sblocks\n");

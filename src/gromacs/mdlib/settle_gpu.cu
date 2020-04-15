@@ -434,7 +434,7 @@ void SettleGpu::apply(const float3* d_x,
     {
         // Fill with zeros so the values can be reduced to it
         // Only 6 values are needed because virial is symmetrical
-        clearDeviceBufferAsync(&d_virialScaled_, 0, 6, commandStream_);
+        clearDeviceBufferAsync(&d_virialScaled_, 0, 6, deviceStream_);
     }
 
     auto kernelPtr = getSettleKernelPtr(updateVelocities, computeVirial);
@@ -455,17 +455,17 @@ void SettleGpu::apply(const float3* d_x,
     {
         config.sharedMemorySize = 0;
     }
-    config.stream = commandStream_;
 
     const auto kernelArgs = prepareGpuKernelArguments(kernelPtr, config, &numSettles_, &d_atomIds_,
                                                       &settleParameters_, &d_x, &d_xp, &invdt, &d_v,
                                                       &d_virialScaled_, &pbcAiuc);
 
-    launchGpuKernel(kernelPtr, config, nullptr, "settle_kernel<updateVelocities, computeVirial>", kernelArgs);
+    launchGpuKernel(kernelPtr, config, deviceStream_, nullptr,
+                    "settle_kernel<updateVelocities, computeVirial>", kernelArgs);
 
     if (computeVirial)
     {
-        copyFromDeviceBuffer(h_virialScaled_.data(), &d_virialScaled_, 0, 6, commandStream_,
+        copyFromDeviceBuffer(h_virialScaled_.data(), &d_virialScaled_, 0, 6, deviceStream_,
                              GpuApiCallBehavior::Sync, nullptr);
 
         // Mapping [XX, XY, XZ, YY, YZ, ZZ] internal format to a tensor object
@@ -485,8 +485,9 @@ void SettleGpu::apply(const float3* d_x,
     return;
 }
 
-SettleGpu::SettleGpu(const gmx_mtop_t& mtop, CommandStream commandStream) :
-    commandStream_(commandStream)
+SettleGpu::SettleGpu(const gmx_mtop_t& mtop, const DeviceContext& deviceContext, const DeviceStream& deviceStream) :
+    deviceContext_(deviceContext),
+    deviceStream_(deviceStream)
 {
     static_assert(sizeof(real) == sizeof(float),
                   "Real numbers should be in single precision in GPU code.");
@@ -586,7 +587,7 @@ SettleGpu::SettleGpu(const gmx_mtop_t& mtop, CommandStream commandStream) :
 
     initSettleParameters(&settleParameters_, mO, mH, dOH, dHH);
 
-    allocateDeviceBuffer(&d_virialScaled_, 6, nullptr);
+    allocateDeviceBuffer(&d_virialScaled_, 6, deviceContext_);
     h_virialScaled_.resize(6);
 }
 
@@ -604,14 +605,14 @@ SettleGpu::~SettleGpu()
     }
 }
 
-void SettleGpu::set(const t_idef& idef, const t_mdatoms gmx_unused& md)
+void SettleGpu::set(const InteractionDefinitions& idef, const t_mdatoms gmx_unused& md)
 {
-    const int nral1     = 1 + NRAL(F_SETTLE);
-    t_ilist   il_settle = idef.il[F_SETTLE];
-    t_iatom*  iatoms    = il_settle.iatoms;
-    numSettles_         = il_settle.nr / nral1;
+    const int              nral1     = 1 + NRAL(F_SETTLE);
+    const InteractionList& il_settle = idef.il[F_SETTLE];
+    ArrayRef<const int>    iatoms    = il_settle.iatoms;
+    numSettles_                      = il_settle.size() / nral1;
 
-    reallocateDeviceBuffer(&d_atomIds_, numSettles_, &numAtomIds_, &numAtomIdsAlloc_, nullptr);
+    reallocateDeviceBuffer(&d_atomIds_, numSettles_, &numAtomIds_, &numAtomIdsAlloc_, deviceContext_);
     h_atomIds_.resize(numSettles_);
     for (int i = 0; i < numSettles_; i++)
     {
@@ -621,7 +622,7 @@ void SettleGpu::set(const t_idef& idef, const t_mdatoms gmx_unused& md)
         settler.z        = iatoms[i * nral1 + 3]; // Second hydrogen index
         h_atomIds_.at(i) = settler;
     }
-    copyToDeviceBuffer(&d_atomIds_, h_atomIds_.data(), 0, numSettles_, commandStream_,
+    copyToDeviceBuffer(&d_atomIds_, h_atomIds_.data(), 0, numSettles_, deviceStream_,
                        GpuApiCallBehavior::Sync, nullptr);
 }
 

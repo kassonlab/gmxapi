@@ -53,17 +53,19 @@
 
 #include "pme_gpu_program_impl.h"
 
-PmeGpuProgram::PmeGpuProgram(const DeviceInformation* deviceInfo) :
-    impl_(std::make_unique<PmeGpuProgramImpl>(deviceInfo))
+PmeGpuProgram::PmeGpuProgram(const DeviceContext& deviceContext) :
+    impl_(std::make_unique<PmeGpuProgramImpl>(deviceContext))
 {
 }
 
 PmeGpuProgram::~PmeGpuProgram() = default;
 
-PmeGpuProgramStorage buildPmeGpuProgram(const DeviceInformation* deviceInfo)
+int PmeGpuProgram::warpSize() const
 {
-    GMX_RELEASE_ASSERT(
-            deviceInfo != nullptr,
-            "Device information can not be nullptr when building PME GPU program object.");
-    return std::make_unique<PmeGpuProgram>(deviceInfo);
+    return impl_->warpSize();
+}
+
+PmeGpuProgramStorage buildPmeGpuProgram(const DeviceContext& deviceContext)
+{
+    return std::make_unique<PmeGpuProgram>(deviceContext);
 }

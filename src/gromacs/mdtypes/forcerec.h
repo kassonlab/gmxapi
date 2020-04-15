@@ -52,16 +52,19 @@
 struct gmx_pme_t;
 struct nonbonded_verlet_t;
 struct bonded_threading_t;
+class DeviceContext;
 class DispersionCorrection;
 struct t_forcetable;
 struct t_QMMMrec;
 
 namespace gmx
 {
+class DeviceStreamManager;
 class GpuBonded;
 class ForceProviders;
 class StatePropagatorDataGpu;
 class PmePpCommGpu;
+class WholeMoleculeTransform;
 } // namespace gmx
 
 /* macros for the cginfo data in forcerec
@@ -164,11 +167,10 @@ struct t_forcerec
      */
     real rlist = 0;
 
-    /* Charge sum and dipole for topology A/B ([0]/[1]) for Ewald corrections */
-    double qsum[2]   = { 0 };
-    double q2sum[2]  = { 0 };
-    double c6sum[2]  = { 0 };
-    rvec   mu_tot[2] = { { 0 } };
+    /* Charge sum for topology A/B ([0]/[1]) for Ewald corrections */
+    double qsum[2]  = { 0 };
+    double q2sum[2] = { 0 };
+    double c6sum[2] = { 0 };
 
     /* Dispersion correction stuff */
     std::unique_ptr<DispersionCorrection> dispersionCorrection;
@@ -198,6 +200,8 @@ struct t_forcerec
 
     rvec* shift_vec = nullptr;
 
+    std::unique_ptr<gmx::WholeMoleculeTransform> wholeMoleculeTransform;
+
     int      cutoff_scheme = 0;     /* group- or Verlet-style cutoff */
     gmx_bool bNonbonded    = FALSE; /* true if nonbonded calculations are *not* turned off */
 
@@ -210,11 +214,8 @@ struct t_forcerec
 
     /* The number of atoms participating in do_force_lowlevel */
     int natoms_force = 0;
-    /* The number of atoms participating in force and constraints */
+    /* The number of atoms participating in force calculation and constraints */
     int natoms_force_constr = 0;
-    /* The allocation size of vectors of size natoms_force */
-    int nalloc_force = 0;
-
     /* Forces that should not enter into the coord x force virial summation:
      * PPPM/PME/Ewald/posres/ForceProviders
      */
@@ -252,13 +253,6 @@ struct t_forcerec
      */
     int n_tpi = 0;
 
-    /* QMMM stuff */
-    gmx_bool          bQMMM = FALSE;
-    struct t_QMMMrec* qr    = nullptr;
-
-    /* QM-MM neighborlists */
-    struct t_nblist* QMMMlist = nullptr;
-
     /* Limit for printing large forces, negative is don't print */
     real print_force = 0;
 
@@ -288,6 +282,11 @@ struct t_forcerec
     // TODO: This is not supposed to be here. StatePropagatorDataGpu should be a part of
     //       general StatePropagatorData object that is passed around
     gmx::StatePropagatorDataGpu* stateGpu = nullptr;
+    // TODO: Should not be here. This is here only to pass the pointer around.
+    gmx::DeviceStreamManager* deviceStreamManager = nullptr;
+
+    //! GPU device context
+    DeviceContext* deviceContext = nullptr;
 
     /* For PME-PP GPU communication */
     std::unique_ptr<gmx::PmePpCommGpu> pmePpCommGpu;

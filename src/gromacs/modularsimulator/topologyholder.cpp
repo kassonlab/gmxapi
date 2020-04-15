@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -58,17 +58,16 @@ TopologyHolder::TopologyHolder(const gmx_mtop_t& globalTopology,
                                Constraints*      constr,
                                gmx_vsite_t*      vsite) :
     globalTopology_(globalTopology),
-    localTopology_(std::make_unique<gmx_localtop_t>())
+    localTopology_(std::make_unique<gmx_localtop_t>(globalTopology.ffparams))
 {
-    if (DOMAINDECOMP(cr))
-    {
-        dd_init_local_top(globalTopology, localTopology_.get());
-    }
-    else
+    if (!DOMAINDECOMP(cr))
     {
         // Generate and initialize new topology
         // Note that most of the data needed for the constructor is used here -
         // this function should probably be simplified sooner or later.
+        // Note: Legacy mdrun resizes the force buffer in mdAlgorithmsSetupAtomData()
+        //       TopologyHolder has no access to the forces, so we are passing a nullptr
+        //       TODO: Find a unique approach to resizing the forces in modular simulator (#3461)
         mdAlgorithmsSetupAtomData(cr, inputrec, globalTopology, localTopology_.get(), fr, nullptr,
                                   mdAtoms, constr, vsite, nullptr);
     }

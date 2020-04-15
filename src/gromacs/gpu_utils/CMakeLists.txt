@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2015,2016,2017,2018,2019, by the GROMACS development team, led by
+# Copyright (c) 2015,2016,2017,2018,2019,2020, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -38,12 +38,15 @@
 
 gmx_add_libgromacs_sources(
         clfftinitializer.cpp
+        device_stream_manager.cpp
         hostallocator.cpp
         gpu_utils.cpp
         gpu_testutils.cpp
         )
 if(GMX_USE_OPENCL)
     gmx_add_libgromacs_sources(
+        device_context_ocl.cpp
+        device_stream_ocl.cpp
         gpu_utils_ocl.cpp
         ocl_compiler.cpp
         ocl_caching.cpp
@@ -52,10 +55,18 @@ if(GMX_USE_OPENCL)
 elseif(GMX_USE_CUDA)
     gmx_add_libgromacs_sources(
         cudautils.cu
+        device_stream.cu
         gpu_utils.cu
         pinning.cu
         pmalloc_cuda.cu
         )
+    gmx_compile_cpp_as_cuda(
+        device_stream_manager.cpp
+        )
+else()
+    gmx_add_libgromacs_sources(
+        device_stream.cpp
+    )
 endif()
 
 if (BUILD_TESTING)

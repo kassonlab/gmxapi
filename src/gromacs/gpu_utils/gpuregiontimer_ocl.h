@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2016,2017,2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -48,6 +48,7 @@
 
 #include "gromacs/gpu_utils/gputraits_ocl.h"
 #include "gromacs/gpu_utils/oclutils.h"
+#include "gromacs/utility/stringutil.h"
 
 #include "gpuregiontimer.h"
 
@@ -82,9 +83,9 @@ public:
     GpuRegionTimerImpl(GpuRegionTimerImpl&&) = delete;
 
     /*! \brief Should be called before the region start. */
-    inline void openTimingRegion(CommandStream /*unused*/) {}
+    inline void openTimingRegion(const DeviceStream& /*unused*/) {}
     /*! \brief Should be called after the region end. */
-    inline void closeTimingRegion(CommandStream /*unused*/) {}
+    inline void closeTimingRegion(const DeviceStream& /*unused*/) {}
     /*! \brief Returns the last measured region timespan (in milliseconds) and calls reset(). */
     inline double getLastRangeTime()
     {
@@ -98,10 +99,16 @@ public:
 
                 cl_error = clGetEventProfilingInfo(events_[i], CL_PROFILING_COMMAND_START,
                                                    sizeof(cl_ulong), &start_ns, nullptr);
-                GMX_ASSERT(CL_SUCCESS == cl_error, "GPU timing update failure");
+                GMX_ASSERT(CL_SUCCESS == cl_error,
+                           gmx::formatString("GPU timing update failure (OpenCL error %d: %s).",
+                                             cl_error, ocl_get_error_string(cl_error).c_str())
+                                   .c_str());
                 cl_error = clGetEventProfilingInfo(events_[i], CL_PROFILING_COMMAND_END,
                                                    sizeof(cl_ulong), &end_ns, nullptr);
-                GMX_ASSERT(CL_SUCCESS == cl_error, "GPU timing update failure");
+                GMX_ASSERT(CL_SUCCESS == cl_error,
+                           gmx::formatString("GPU timing update failure (OpenCL error %d: %s).",
+                                             cl_error, ocl_get_error_string(cl_error).c_str())
+                                   .c_str());
                 milliseconds += (end_ns - start_ns) / 1000000.0;
             }
         }

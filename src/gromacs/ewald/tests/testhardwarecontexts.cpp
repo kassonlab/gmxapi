@@ -60,18 +60,6 @@ namespace gmx
 namespace test
 {
 
-TestHardwareContext::~TestHardwareContext() = default;
-
-const char* codePathToString(CodePath codePath)
-{
-    switch (codePath)
-    {
-        case CodePath::CPU: return "CPU";
-        case CodePath::GPU: return "GPU";
-        default: GMX_THROW(NotImplementedError("This CodePath should support codePathToString"));
-    }
-}
-
 /* Implements the "construct on first use" idiom to avoid any static
  * initialization order fiasco.
  *
@@ -108,7 +96,7 @@ static gmx_hw_info_t* hardwareInit()
 
 void PmeTestEnvironment::SetUp()
 {
-    hardwareContexts_.emplace_back(std::make_unique<TestHardwareContext>(CodePath::CPU, "(CPU) ", nullptr));
+    hardwareContexts_.emplace_back(std::make_unique<TestHardwareContext>(CodePath::CPU, "(CPU) "));
 
     hardwareInfo_ = hardwareInit();
     if (!pme_gpu_supports_build(nullptr) || !pme_gpu_supports_hardware(*hardwareInfo_, nullptr))
@@ -126,8 +114,13 @@ void PmeTestEnvironment::SetUp()
         get_gpu_device_info_string(stmp, hardwareInfo_->gpu_info, gpuIndex);
         std::string description = "(GPU " + std::string(stmp) + ") ";
         hardwareContexts_.emplace_back(std::make_unique<TestHardwareContext>(
-                CodePath::GPU, description.c_str(), deviceInfo));
+                CodePath::GPU, description.c_str(), *deviceInfo));
     }
+}
+
+void PmeTestEnvironment::TearDown()
+{
+    hardwareContexts_.clear();
 }
 
 } // namespace test

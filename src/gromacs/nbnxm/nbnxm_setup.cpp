@@ -358,24 +358,24 @@ static int getMinimumIlistCountForGpuBalancing(NbnxmGpu* nbnxmGpu)
     return minimumIlistCount;
 }
 
-std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger&     mdlog,
-                                                   const t_inputrec*        ir,
-                                                   const t_forcerec*        fr,
-                                                   const t_commrec*         cr,
-                                                   const gmx_hw_info_t&     hardwareInfo,
-                                                   const DeviceInformation* deviceInfo,
-                                                   const gmx_mtop_t*        mtop,
-                                                   matrix                   box,
-                                                   gmx_wallcycle*           wcycle)
+std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger& mdlog,
+                                                   const t_inputrec*    ir,
+                                                   const t_forcerec*    fr,
+                                                   const t_commrec*     cr,
+                                                   const gmx_hw_info_t& hardwareInfo,
+                                                   const bool           useGpuForNonbonded,
+                                                   const gmx::DeviceStreamManager* deviceStreamManager,
+                                                   const gmx_mtop_t*               mtop,
+                                                   matrix                          box,
+                                                   gmx_wallcycle*                  wcycle)
 {
     const bool emulateGpu = (getenv("GMX_EMULATE_GPU") != nullptr);
-    const bool useGpu     = deviceInfo != nullptr;
 
-    GMX_RELEASE_ASSERT(!(emulateGpu && useGpu),
+    GMX_RELEASE_ASSERT(!(emulateGpu && useGpuForNonbonded),
                        "When GPU emulation is active, there cannot be a GPU assignment");
 
     NonbondedResource nonbondedResource;
-    if (useGpu)
+    if (useGpuForNonbonded)
     {
         nonbondedResource = NonbondedResource::Gpu;
     }
@@ -391,11 +391,10 @@ std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger&     mdlo
     Nbnxm::KernelSetup kernelSetup = pick_nbnxn_kernel(mdlog, fr->use_simd_kernels, hardwareInfo,
                                                        nonbondedResource, ir, fr->bNonbonded);
 
-    const bool haveMultipleDomains = (DOMAINDECOMP(cr) && cr->dd->nnodes > 1);
+    const bool haveMultipleDomains = havePPDomainDecomposition(cr);
 
     bool           bFEP_NonBonded = (fr->efep != efepNO) && haveFepPerturbedNBInteractions(mtop);
-    PairlistParams pairlistParams(kernelSetup.kernelType, bFEP_NonBonded, ir->rlist,
-                                  havePPDomainDecomposition(cr));
+    PairlistParams pairlistParams(kernelSetup.kernelType, bFEP_NonBonded, ir->rlist, haveMultipleDomains);
 
     setupDynamicPairlistPruning(mdlog, ir, mtop, box, fr->ic, &pairlistParams);
 
@@ -425,7 +424,8 @@ std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger&     mdlo
         enbnxninitcombrule = enbnxninitcombruleNONE;
     }
 
-    auto pinPolicy = (useGpu ? gmx::PinningPolicy::PinnedIfSupported : gmx::PinningPolicy::CannotBePinned);
+    auto pinPolicy = (useGpuForNonbonded ? gmx::PinningPolicy::PinnedIfSupported
+                                         : gmx::PinningPolicy::CannotBePinned);
 
     auto nbat = std::make_unique<nbnxn_atomdata_t>(pinPolicy);
 
@@ -440,15 +440,18 @@ std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger&     mdlo
     }
     nbnxn_atomdata_init(mdlog, nbat.get(), kernelSetup.kernelType, enbnxninitcombrule, fr->ntype,
                         fr->nbfp, mimimumNumEnergyGroupNonbonded,
-                        (useGpu || emulateGpu) ? 1 : gmx_omp_nthreads_get(emntNonbonded));
+                        (useGpuForNonbonded || emulateGpu) ? 1 : gmx_omp_nthreads_get(emntNonbonded));
 
     NbnxmGpu* gpu_nbv                          = nullptr;
     int       minimumIlistCountForGpuBalancing = 0;
-    if (useGpu)
+    if (useGpuForNonbonded)
     {
         /* init the NxN GPU data; the last argument tells whether we'll have
          * both local and non-local NB calculation on GPU */
-        gpu_nbv = gpu_init(deviceInfo, fr->ic, pairlistParams, nbat.get(), cr->nodeid, haveMultipleDomains);
+        GMX_RELEASE_ASSERT(
+                (deviceStreamManager != nullptr),
+                "Device stream manager should be initialized in order to use GPU for non-bonded.");
+        gpu_nbv = gpu_init(*deviceStreamManager, fr->ic, pairlistParams, nbat.get(), haveMultipleDomains);
 
         minimumIlistCountForGpuBalancing = getMinimumIlistCountForGpuBalancing(gpu_nbv);
     }

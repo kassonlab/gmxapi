@@ -143,6 +143,7 @@ class GpuEventSynchronizer;
 
 namespace gmx
 {
+class DeviceStreamManager;
 class ForceWithShiftForces;
 class GpuBonded;
 template<typename>
@@ -403,15 +404,16 @@ namespace Nbnxm
 {
 
 /*! \brief Creates an Nbnxm object */
-std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger&     mdlog,
-                                                   const t_inputrec*        ir,
-                                                   const t_forcerec*        fr,
-                                                   const t_commrec*         cr,
-                                                   const gmx_hw_info_t&     hardwareInfo,
-                                                   const DeviceInformation* deviceInfo,
-                                                   const gmx_mtop_t*        mtop,
-                                                   matrix                   box,
-                                                   gmx_wallcycle*           wcycle);
+std::unique_ptr<nonbonded_verlet_t> init_nb_verlet(const gmx::MDLogger& mdlog,
+                                                   const t_inputrec*    ir,
+                                                   const t_forcerec*    fr,
+                                                   const t_commrec*     cr,
+                                                   const gmx_hw_info_t& hardwareInfo,
+                                                   bool                 useGpuForNonbonded,
+                                                   const gmx::DeviceStreamManager* deviceStreamManager,
+                                                   const gmx_mtop_t*               mtop,
+                                                   matrix                          box,
+                                                   gmx_wallcycle*                  wcycle);
 
 } // namespace Nbnxm
 

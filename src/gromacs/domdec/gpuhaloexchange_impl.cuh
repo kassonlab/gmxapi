@@ -47,6 +47,7 @@
 #define GMX_DOMDEC_GPUHALOEXCHANGE_IMPL_H
 
 #include "gromacs/domdec/gpuhaloexchange.h"
+#include "gromacs/gpu_utils/device_context.h"
 #include "gromacs/gpu_utils/gpueventsynchronizer.cuh"
 #include "gromacs/gpu_utils/hostallocator.h"
 #include "gromacs/utility/gmxmpi.h"
@@ -70,11 +71,17 @@ public:
      *
      * \param [inout] dd                       domdec structure
      * \param [in]    mpi_comm_mysim           communicator used for simulation
+     * \param [in]    deviceContext            GPU device context
      * \param [in]    localStream              local NB CUDA stream
      * \param [in]    nonLocalStream           non-local NB CUDA stream
      * \param [in]    pulse                    the communication pulse for this instance
      */
-    Impl(gmx_domdec_t* dd, MPI_Comm mpi_comm_mysim, void* localStream, void* nonLocalStream, int pulse);
+    Impl(gmx_domdec_t*        dd,
+         MPI_Comm             mpi_comm_mysim,
+         const DeviceContext& deviceContext,
+         const DeviceStream&  localStream,
+         const DeviceStream&  nonLocalStream,
+         int                  pulse);
     ~Impl();
 
     /*! \brief
@@ -175,10 +182,12 @@ private:
     GpuEventSynchronizer* haloDataTransferLaunched_ = nullptr;
     //! MPI communicator used for simulation
     MPI_Comm mpi_comm_mysim_;
+    //! GPU context object
+    const DeviceContext& deviceContext_;
     //! CUDA stream for local non-bonded calculations
-    cudaStream_t localStream_ = nullptr;
+    const DeviceStream& localStream_;
     //! CUDA stream for non-local non-bonded calculations
-    cudaStream_t nonLocalStream_ = nullptr;
+    const DeviceStream& nonLocalStream_;
     //! full coordinates buffer in GPU memory
     float3* d_x_ = nullptr;
     //! full forces buffer in GPU memory

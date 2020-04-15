@@ -1394,13 +1394,7 @@ void check_ir(const char*                   mdparin,
 
     if (ir->bQMMM)
     {
-        warning_error(wi, "QMMM is currently not supported");
-        if (!EI_DYNAMICS(ir->eI))
-        {
-            char buf[STRLEN];
-            sprintf(buf, "QMMM is only supported with dynamics, not with integrator %s", ei_names[ir->eI]);
-            warning_error(wi, buf);
-        }
+        warning_error(wi, "The QMMM integration you are trying to use is no longer supported");
     }
 
     if (ir->bAdress)
@@ -1593,19 +1587,6 @@ static void do_simtemp_params(t_inputrec* ir)
 
     snew(ir->simtempvals->temperatures, ir->fepvals->n_lambda);
     GetSimTemps(ir->fepvals->n_lambda, ir->simtempvals, ir->fepvals->all_lambda[efptTEMPERATURE]);
-}
-
-static void convertYesNos(warninp_t /*wi*/,
-                          gmx::ArrayRef<const std::string> inputs,
-                          const char* /*name*/,
-                          gmx_bool* outputs)
-{
-    int i = 0;
-    for (const auto& input : inputs)
-    {
-        outputs[i] = gmx::equalCaseInsensitive(input, "Y", 1);
-        ++i;
-    }
 }
 
 template<typename T>
@@ -2047,7 +2028,8 @@ void get_ir(const char*     mdparin,
     printStringNoNewline(&inp, "QM method");
     setStringEntry(&inp, "QMmethod", is->QMmethod, nullptr);
     printStringNoNewline(&inp, "QMMM scheme");
-    ir->QMMMscheme = get_eeenum(&inp, "QMMMscheme", eQMMMscheme_names, wi);
+    const char* noQMMMSchemeName = "normal";
+    get_eeenum(&inp, "QMMMscheme", &noQMMMSchemeName, wi);
     printStringNoNewline(&inp, "QM basisset");
     setStringEntry(&inp, "QMbasis", is->QMbasis, nullptr);
     printStringNoNewline(&inp, "QM charge");
@@ -2063,7 +2045,7 @@ void get_ir(const char*     mdparin,
     setStringEntry(&inp, "SAoff", is->SAoff, nullptr);
     setStringEntry(&inp, "SAsteps", is->SAsteps, nullptr);
     printStringNoNewline(&inp, "Scale factor for MM charges");
-    ir->scalefactor = get_ereal(&inp, "MMChargeScaleFactor", 1.0, wi);
+    get_ereal(&inp, "MMChargeScaleFactor", 1.0, wi);
 
     /* Simulated annealing */
     printStringNewline(&inp, "SIMULATED ANNEALING");
@@ -2139,14 +2121,7 @@ void get_ir(const char*     mdparin,
     ir->bDoAwh = (get_eeenum(&inp, "awh", yesno_names, wi) != 0);
     if (ir->bDoAwh)
     {
-        if (ir->bPull)
-        {
-            ir->awhParams = gmx::readAndCheckAwhParams(&inp, ir, wi);
-        }
-        else
-        {
-            gmx_fatal(FARGS, "AWH biasing is only compatible with COM pulling turned on");
-        }
+        ir->awhParams = gmx::readAwhParams(&inp, wi);
     }
 
     /* Enforced rotation */
@@ -2662,25 +2637,14 @@ void get_ir(const char*     mdparin,
         }
     }
 
+    if (ir->bDoAwh)
+    {
+        gmx::checkAwhParams(ir->awhParams, ir, wi);
+    }
+
     sfree(dumstr[0]);
     sfree(dumstr[1]);
 }
-
-static int search_QMstring(const char* s, int ng, const char* gn[])
-{
-    /* same as normal search_string, but this one searches QM strings */
-    int i;
-
-    for (i = 0; (i < ng); i++)
-    {
-        if (gmx_strcasecmp(s, gn[i]) == 0)
-        {
-            return i;
-        }
-    }
-
-    gmx_fatal(FARGS, "this QM method or basisset (%s) is not implemented\n!", s);
-} /* search_QMstring */
 
 /* We would like gn to be const as well, but C doesn't allow this */
 /* TODO this is utility functionality (search for the index of a
@@ -2706,7 +2670,7 @@ int search_string(const char* s, int ng, char* gn[])
               s);
 }
 
-static bool do_numbering(int                        natoms,
+static void do_numbering(int                        natoms,
                          SimulationGroups*          groups,
                          gmx::ArrayRef<std::string> groupsFromMdpFile,
                          t_blocka*                  block,
@@ -2721,7 +2685,6 @@ static bool do_numbering(int                        natoms,
     AtomGroupIndices* grps = &(groups->groups[gtype]);
     int               j, gid, aj, ognr, ntot = 0;
     const char*       title;
-    bool              bRest;
     char              warn_buf[STRLEN];
 
     title = shortName(gtype);
@@ -2777,7 +2740,6 @@ static bool do_numbering(int                        natoms,
     }
 
     /* Now check whether we have done all atoms */
-    bRest = FALSE;
     if (ntot != natoms)
     {
         if (grptp == egrptpALL)
@@ -2795,7 +2757,6 @@ static bool do_numbering(int                        natoms,
             if (cbuf[j] == NOGID)
             {
                 cbuf[j] = grps->size();
-                bRest   = TRUE;
             }
         }
         if (grptp != egrptpPART)
@@ -2834,8 +2795,6 @@ static bool do_numbering(int                        natoms,
     }
 
     sfree(cbuf);
-
-    return (bRest && grptp == egrptpPART);
 }
 
 static void calc_nrdf(const gmx_mtop_t* mtop, t_inputrec* ir, char** gnames)
@@ -3038,17 +2997,19 @@ static void calc_nrdf(const gmx_mtop_t* mtop, t_inputrec* ir, char** gnames)
 
     if (ir->nstcomm != 0)
     {
-        int ndim_rm_vcm;
+        GMX_RELEASE_ASSERT(!groups.groups[SimulationAtomGroupType::MassCenterVelocityRemoval].empty(),
+                           "Expect at least one group when removing COM motion");
 
         /* We remove COM motion up to dim ndof_com() */
-        ndim_rm_vcm = ndof_com(ir);
+        const int ndim_rm_vcm = ndof_com(ir);
 
         /* Subtract ndim_rm_vcm (or less with frozen dimensions) from
          * the number of degrees of freedom in each vcm group when COM
          * translation is removed and 6 when rotation is removed as well.
+         * Note that we do not and should not include the rest group here.
          */
         for (gmx::index j = 0;
-             j < gmx::ssize(groups.groups[SimulationAtomGroupType::MassCenterVelocityRemoval]) + 1; j++)
+             j < gmx::ssize(groups.groups[SimulationAtomGroupType::MassCenterVelocityRemoval]); j++)
         {
             switch (ir->comm_mode)
             {
@@ -3236,6 +3197,88 @@ static void make_IMD_group(t_IMD* IMDgroup, char* IMDgname, t_blocka* grps, char
     }
 }
 
+/* Checks whether atoms are both part of a COM removal group and frozen.
+ * If a fully frozen atom is part of a COM removal group, it is removed
+ * from the COM removal group. A note is issued if such atoms are present.
+ * A warning is issued for atom with one or two dimensions frozen that
+ * are part of a COM removal group (mdrun would need to compute COM mass
+ * per dimension to handle this correctly).
+ * Also issues a warning when non-frozen atoms are not part of a COM
+ * removal group while COM removal is active.
+ */
+static void checkAndUpdateVcmFreezeGroupConsistency(SimulationGroups* groups,
+                                                    const int         numAtoms,
+                                                    const t_grpopts&  opts,
+                                                    warninp_t         wi)
+{
+    const int vcmRestGroup =
+            std::max(int(groups->groups[SimulationAtomGroupType::MassCenterVelocityRemoval].size()), 1);
+
+    int numFullyFrozenVcmAtoms     = 0;
+    int numPartiallyFrozenVcmAtoms = 0;
+    int numNonVcmAtoms             = 0;
+    for (int a = 0; a < numAtoms; a++)
+    {
+        const int freezeGroup   = getGroupType(*groups, SimulationAtomGroupType::Freeze, a);
+        int       numFrozenDims = 0;
+        for (int d = 0; d < DIM; d++)
+        {
+            numFrozenDims += opts.nFreeze[freezeGroup][d];
+        }
+
+        const int vcmGroup = getGroupType(*groups, SimulationAtomGroupType::MassCenterVelocityRemoval, a);
+        if (vcmGroup < vcmRestGroup)
+        {
+            if (numFrozenDims == DIM)
+            {
+                /* Do not remove COM motion for this fully frozen atom */
+                if (groups->groups[SimulationAtomGroupType::MassCenterVelocityRemoval].empty())
+                {
+                    groups->groups[SimulationAtomGroupType::MassCenterVelocityRemoval].resize(numAtoms, 0);
+                }
+                groups->groups[SimulationAtomGroupType::MassCenterVelocityRemoval][a] = vcmRestGroup;
+                numFullyFrozenVcmAtoms++;
+            }
+            else if (numFrozenDims > 0)
+            {
+                numPartiallyFrozenVcmAtoms++;
+            }
+        }
+        else if (numFrozenDims < DIM)
+        {
+            numNonVcmAtoms++;
+        }
+    }
+
+    if (numFullyFrozenVcmAtoms > 0)
+    {
+        std::string warningText = gmx::formatString(
+                "There are %d atoms that are fully frozen and part of COMM removal group(s), "
+                "removing these atoms from the COMM removal group(s)",
+                numFullyFrozenVcmAtoms);
+        warning_note(wi, warningText.c_str());
+    }
+    if (numPartiallyFrozenVcmAtoms > 0 && numPartiallyFrozenVcmAtoms < numAtoms)
+    {
+        std::string warningText = gmx::formatString(
+                "There are %d atoms that are frozen along less then %d dimensions and part of COMM "
+                "removal group(s), due to limitations in the code these still contribute to the "
+                "mass of the COM along frozen dimensions and therefore the COMM correction will be "
+                "too small.",
+                numPartiallyFrozenVcmAtoms, DIM);
+        warning(wi, warningText.c_str());
+    }
+    if (numNonVcmAtoms > 0)
+    {
+        std::string warningText = gmx::formatString(
+                "%d atoms are not part of any center of mass motion removal group.\n"
+                "This may lead to artifacts.\n"
+                "In most cases one should use one group for the whole system.",
+                numNonVcmAtoms);
+        warning(wi, warningText.c_str());
+    }
+}
+
 void do_index(const char*                   mdparin,
               const char*                   ndx,
               gmx_mtop_t*                   mtop,
@@ -3248,12 +3291,12 @@ void do_index(const char*                   mdparin,
     int       natoms;
     t_symtab* symtab;
     t_atoms   atoms_all;
-    char      warnbuf[STRLEN], **gnames;
+    char**    gnames;
     int       nr;
     real      tau_min;
     int       nstcmin;
     int       i, j, k, restnm;
-    bool      bExcl, bTable, bAnneal, bRest;
+    bool      bExcl, bTable, bAnneal;
     char      warn_buf[STRLEN];
 
     if (bVerbose)
@@ -3653,7 +3696,7 @@ void do_index(const char*                   mdparin,
             {
                 if (!gmx::equalCaseInsensitive(freezeDims[k], "N", 1))
                 {
-                    sprintf(warnbuf,
+                    sprintf(warn_buf,
                             "Please use Y(ES) or N(O) for freezedim only "
                             "(not %s)",
                             freezeDims[k].c_str());
@@ -3676,15 +3719,13 @@ void do_index(const char*                   mdparin,
     add_wall_energrps(groups, ir->nwall, symtab);
     ir->opts.ngener    = groups->groups[SimulationAtomGroupType::EnergyOutput].size();
     auto vcmGroupNames = gmx::splitString(is->vcm);
-    bRest              = do_numbering(natoms, groups, vcmGroupNames, defaultIndexGroups, gnames,
-                         SimulationAtomGroupType::MassCenterVelocityRemoval, restnm,
-                         vcmGroupNames.empty() ? egrptpALL_GENREST : egrptpPART, bVerbose, wi);
-    if (bRest)
+    do_numbering(natoms, groups, vcmGroupNames, defaultIndexGroups, gnames,
+                 SimulationAtomGroupType::MassCenterVelocityRemoval, restnm,
+                 vcmGroupNames.empty() ? egrptpALL_GENREST : egrptpPART, bVerbose, wi);
+
+    if (ir->comm_mode != ecmNO)
     {
-        warning(wi,
-                "Some atoms are not part of any center of mass motion removal group.\n"
-                "This may lead to artifacts.\n"
-                "In most cases one should use one group for the whole system.");
+        checkAndUpdateVcmFreezeGroupConsistency(groups, natoms, ir->opts, wi);
     }
 
     /* Now we have filled the freeze struct, so we can calculate NRDF */
@@ -3704,76 +3745,18 @@ void do_index(const char*                   mdparin,
                  SimulationAtomGroupType::OrientationRestraintsFit, restnm, egrptpALL_GENREST,
                  bVerbose, wi);
 
-    /* QMMM input processing */
+    /* MiMiC QMMM input processing */
     auto qmGroupNames = gmx::splitString(is->QMMM);
-    auto qmMethods    = gmx::splitString(is->QMmethod);
-    auto qmBasisSets  = gmx::splitString(is->QMbasis);
-    if (ir->eI != eiMimic)
+    if (qmGroupNames.size() > 1)
     {
-        if (qmMethods.size() != qmGroupNames.size() || qmBasisSets.size() != qmGroupNames.size())
-        {
-            gmx_fatal(FARGS,
-                      "Invalid QMMM input: %zu groups %zu basissets"
-                      " and %zu methods\n",
-                      qmGroupNames.size(), qmBasisSets.size(), qmMethods.size());
-        }
-        /* group rest, if any, is always MM! */
-        do_numbering(natoms, groups, qmGroupNames, defaultIndexGroups, gnames,
-                     SimulationAtomGroupType::QuantumMechanics, restnm, egrptpALL_GENREST, bVerbose, wi);
-        nr            = qmGroupNames.size(); /*atoms->grps[egcQMMM].nr;*/
-        ir->opts.ngQM = qmGroupNames.size();
-        snew(ir->opts.QMmethod, nr);
-        snew(ir->opts.QMbasis, nr);
-        for (i = 0; i < nr; i++)
-        {
-            /* input consists of strings: RHF CASSCF PM3 .. These need to be
-             * converted to the corresponding enum in names.c
-             */
-            ir->opts.QMmethod[i] = search_QMstring(qmMethods[i].c_str(), eQMmethodNR, eQMmethod_names);
-            ir->opts.QMbasis[i] = search_QMstring(qmBasisSets[i].c_str(), eQMbasisNR, eQMbasis_names);
-        }
-        auto qmMultiplicities = gmx::splitString(is->QMmult);
-        auto qmCharges        = gmx::splitString(is->QMcharge);
-        auto qmbSH            = gmx::splitString(is->bSH);
-        snew(ir->opts.QMmult, nr);
-        snew(ir->opts.QMcharge, nr);
-        snew(ir->opts.bSH, nr);
-        convertInts(wi, qmMultiplicities, "QMmult", ir->opts.QMmult);
-        convertInts(wi, qmCharges, "QMcharge", ir->opts.QMcharge);
-        convertYesNos(wi, qmbSH, "bSH", ir->opts.bSH);
-
-        auto CASelectrons = gmx::splitString(is->CASelectrons);
-        auto CASorbitals  = gmx::splitString(is->CASorbitals);
-        snew(ir->opts.CASelectrons, nr);
-        snew(ir->opts.CASorbitals, nr);
-        convertInts(wi, CASelectrons, "CASelectrons", ir->opts.CASelectrons);
-        convertInts(wi, CASorbitals, "CASOrbitals", ir->opts.CASorbitals);
-
-        auto SAon    = gmx::splitString(is->SAon);
-        auto SAoff   = gmx::splitString(is->SAoff);
-        auto SAsteps = gmx::splitString(is->SAsteps);
-        snew(ir->opts.SAon, nr);
-        snew(ir->opts.SAoff, nr);
-        snew(ir->opts.SAsteps, nr);
-        convertInts(wi, SAon, "SAon", ir->opts.SAon);
-        convertInts(wi, SAoff, "SAoff", ir->opts.SAoff);
-        convertInts(wi, SAsteps, "SAsteps", ir->opts.SAsteps);
+        gmx_fatal(FARGS, "Currently, having more than one QM group in MiMiC is not supported");
     }
-    else
-    {
-        /* MiMiC */
-        if (qmGroupNames.size() > 1)
-        {
-            gmx_fatal(FARGS, "Currently, having more than one QM group in MiMiC is not supported");
-        }
-        /* group rest, if any, is always MM! */
-        do_numbering(natoms, groups, qmGroupNames, defaultIndexGroups, gnames,
-                     SimulationAtomGroupType::QuantumMechanics, restnm, egrptpALL_GENREST, bVerbose, wi);
+    /* group rest, if any, is always MM! */
+    do_numbering(natoms, groups, qmGroupNames, defaultIndexGroups, gnames,
+                 SimulationAtomGroupType::QuantumMechanics, restnm, egrptpALL_GENREST, bVerbose, wi);
+    ir->opts.ngQM = qmGroupNames.size();
 
-        ir->opts.ngQM = qmGroupNames.size();
-    }
-
-    /* end of QMMM input */
+    /* end of MiMiC QMMM input */
 
     if (bVerbose)
     {

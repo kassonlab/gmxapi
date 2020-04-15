@@ -55,11 +55,13 @@
 #include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/classhelpers.h"
 
+class DeviceContext;
+class DeviceStream;
+
 struct gmx_enerdata_t;
 struct gmx_ffparams_t;
 struct gmx_mtop_t;
 struct t_forcerec;
-struct t_idef;
 struct t_inputrec;
 struct gmx_wallcycle;
 
@@ -107,7 +109,10 @@ class GpuBonded
 {
 public:
     //! Construct the manager with constant data and the stream to use.
-    GpuBonded(const gmx_ffparams_t& ffparams, void* streamPtr, gmx_wallcycle* wcycle);
+    GpuBonded(const gmx_ffparams_t& ffparams,
+              const DeviceContext&  deviceContext,
+              const DeviceStream&   deviceStream,
+              gmx_wallcycle*        wcycle);
     //! Destructor
     ~GpuBonded();
 
@@ -118,11 +123,12 @@ public:
      * stage. Copies the bonded interactions assigned to the GPU
      * to device data structures, and updates device buffers that
      * may have been updated after search. */
-    void updateInteractionListsAndDeviceBuffers(ArrayRef<const int> nbnxnAtomOrder,
-                                                const t_idef&       idef,
-                                                void*               xqDevice,
-                                                DeviceBuffer<RVec>  forceDevice,
-                                                DeviceBuffer<RVec>  fshiftDevice);
+    void updateInteractionListsAndDeviceBuffers(ArrayRef<const int>           nbnxnAtomOrder,
+                                                const InteractionDefinitions& idef,
+                                                void*                         xqDevice,
+                                                DeviceBuffer<RVec>            forceDevice,
+                                                DeviceBuffer<RVec>            fshiftDevice);
+
     /*! \brief Returns whether there are bonded interactions
      * assigned to the GPU */
     bool haveInteractions() const;

@@ -49,11 +49,12 @@
 #include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/classhelpers.h"
 
+class DeviceContext;
+class DeviceStream;
 class GpuEventSynchronizer;
-
 struct gmx_mtop_t;
 enum class PbcType : int;
-struct t_idef;
+class InteractionDefinitions;
 struct t_inputrec;
 struct t_mdatoms;
 struct t_pbc;
@@ -67,7 +68,7 @@ class UpdateConstrainGpu
 public:
     /*! \brief Create Update-Constrain object.
      *
-     * The constructor is given a non-nullptr \p commandStream, in which all the update and constrain
+     * The constructor is given a non-nullptr \p deviceStream, in which all the update and constrain
      * routines are executed. \p xUpdatedOnDevice should mark the completion of all kernels that modify
      * coordinates. The event is maintained outside this class and also passed to all (if any) consumers
      * of the updated coordinates. The \p xUpdatedOnDevice also can not be a nullptr because the
@@ -77,12 +78,14 @@ public:
      *                              projection from it.
      * \param[in] mtop              Topology of the system: SETTLE gets the masses for O and H atoms
      *                              and target O-H and H-H distances from this object.
-     * \param[in] commandStream     GPU stream to use. Can be nullptr.
+     * \param[in] deviceContext     GPU device context.
+     * \param[in] deviceStream      GPU stream to use.
      * \param[in] xUpdatedOnDevice  The event synchronizer to use to mark that update is done on the GPU.
      */
     UpdateConstrainGpu(const t_inputrec&     ir,
                        const gmx_mtop_t&     mtop,
-                       const void*           commandStream,
+                       const DeviceContext&  deviceContext,
+                       const DeviceStream&   deviceStream,
                        GpuEventSynchronizer* xUpdatedOnDevice);
 
     ~UpdateConstrainGpu();
@@ -133,12 +136,12 @@ public:
      * \param[in]      md                  Atoms data.
      * \param[in]      numTempScaleValues  Number of temperature scaling groups. Zero for no temperature scaling.
      */
-    void set(DeviceBuffer<RVec> d_x,
-             DeviceBuffer<RVec> d_v,
-             DeviceBuffer<RVec> d_f,
-             const t_idef&      idef,
-             const t_mdatoms&   md,
-             int                numTempScaleValues);
+    void set(DeviceBuffer<RVec>            d_x,
+             DeviceBuffer<RVec>            d_v,
+             DeviceBuffer<RVec>            d_f,
+             const InteractionDefinitions& idef,
+             const t_mdatoms&              md,
+             int                           numTempScaleValues);
 
     /*! \brief
      * Update PBC data.

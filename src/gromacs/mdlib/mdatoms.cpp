@@ -47,7 +47,6 @@
 #include "gromacs/gpu_utils/hostallocator.h"
 #include "gromacs/math/functions.h"
 #include "gromacs/mdlib/gmx_omp_nthreads.h"
-#include "gromacs/mdlib/qmmm.h"
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/md_enums.h"
 #include "gromacs/mdtypes/mdatom.h"
@@ -94,7 +93,6 @@ MDAtoms::~MDAtoms()
     sfree(mdatoms_->bPerturbed);
     sfree(mdatoms_->cU1);
     sfree(mdatoms_->cU2);
-    sfree(mdatoms_->bQM);
 }
 
 void MDAtoms::resize(int newSize)
@@ -301,11 +299,6 @@ void atoms2md(const gmx_mtop_t* mtop, const t_inputrec* ir, int nindex, const in
         {
             srenew(md->cU2, md->nalloc);
         }
-
-        if (ir->bQMMM)
-        {
-            srenew(md->bQM, md->nalloc);
-        }
     }
 
     int molb = 0;
@@ -483,20 +476,6 @@ void atoms2md(const gmx_mtop_t* mtop, const t_inputrec* ir, int nindex, const in
             if (md->cU2)
             {
                 md->cU2[i] = groups.groupNumbers[SimulationAtomGroupType::User2][ag];
-            }
-
-            if (ir->bQMMM)
-            {
-                if (groups.groupNumbers[SimulationAtomGroupType::QuantumMechanics].empty()
-                    || groups.groupNumbers[SimulationAtomGroupType::QuantumMechanics][ag]
-                               < groups.groups[SimulationAtomGroupType::QuantumMechanics].size() - 1)
-                {
-                    md->bQM[i] = TRUE;
-                }
-                else
-                {
-                    md->bQM[i] = FALSE;
-                }
             }
         }
         GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR

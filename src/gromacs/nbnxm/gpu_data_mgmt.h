@@ -59,16 +59,22 @@ struct NbnxnPairlistGpu;
 struct PairlistParams;
 struct interaction_const_t;
 
+class DeviceStream;
+
+namespace gmx
+{
+class DeviceStreamManager;
+}
+
 namespace Nbnxm
 {
 
 /** Initializes the data structures related to GPU nonbonded calculations. */
 GPU_FUNC_QUALIFIER
-NbnxmGpu* gpu_init(const DeviceInformation gmx_unused* deviceInfo,
+NbnxmGpu* gpu_init(const gmx::DeviceStreamManager gmx_unused& deviceStreamManager,
                    const interaction_const_t gmx_unused* ic,
                    const PairlistParams gmx_unused& listParams,
                    const nbnxn_atomdata_t gmx_unused* nbat,
-                   int gmx_unused rank,
                    /* true if both local and non-local are done on GPU */
                    bool gmx_unused bLocalAndNonlocal) GPU_FUNC_TERM_WITH_RETURN(nullptr);
 
@@ -123,7 +129,7 @@ gmx_bool gpu_is_kernel_ewald_analytical(const NbnxmGpu gmx_unused* nb) GPU_FUNC_
  *  Note: CUDA only.
  */
 CUDA_FUNC_QUALIFIER
-void* gpu_get_command_stream(NbnxmGpu gmx_unused* nb, gmx::InteractionLocality gmx_unused iloc)
+const DeviceStream* gpu_get_command_stream(NbnxmGpu gmx_unused* nb, gmx::InteractionLocality gmx_unused iloc)
         CUDA_FUNC_TERM_WITH_RETURN(nullptr);
 
 /** Returns an opaque pointer to the GPU coordinate+charge array

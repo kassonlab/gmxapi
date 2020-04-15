@@ -266,8 +266,11 @@ class GpuEventSynchronizer;
  */
 struct NbnxmGpu
 {
-    /*! \brief CUDA device information */
-    const DeviceInformation* deviceInfo = nullptr;
+    /*! \brief GPU device context.
+     *
+     * \todo Make it constant reference, once NbnxmGpu is a proper class.
+     */
+    const DeviceContext* deviceContext_;
     /*! \brief true if doing both local/non-local NB work on GPU */
     bool bUseTwoStreams = false;
     /*! \brief atom data */
@@ -303,7 +306,7 @@ struct NbnxmGpu
     /*! \brief staging area where fshift/energies get downloaded */
     nb_staging_t nbst;
     /*! \brief local and non-local GPU streams */
-    gmx::EnumerationArray<Nbnxm::InteractionLocality, cudaStream_t> stream = { { nullptr } };
+    gmx::EnumerationArray<Nbnxm::InteractionLocality, const DeviceStream*> deviceStreams;
 
     /*! \brief Events used for synchronization */
     /*! \{ */

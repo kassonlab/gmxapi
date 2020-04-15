@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2013,2014,2015,2016,2017 The GROMACS development team.
  * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
@@ -49,6 +49,7 @@
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/trajectory_writing.h"
 #include "gromacs/mdrunutility/handlerestart.h"
+#include "gromacs/mdrunutility/multisim.h"
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/imdoutputprovider.h"
 #include "gromacs/mdtypes/inputrec.h"
@@ -78,11 +79,13 @@ struct gmx_mdoutf
     FILE*                         fp_dhdl;
     int                           natoms_global;
     int                           natoms_x_compressed;
-    SimulationGroups*             groups; /* for compressed position writing */
+    const SimulationGroups*       groups; /* for compressed position writing */
     gmx_wallcycle_t               wcycle;
     rvec*                         f_global;
     gmx::IMDOutputProvider*       outputProvider;
     const gmx::MdModulesNotifier* mdModulesNotifier;
+    bool                          simulationsShareState;
+    MPI_Comm                      mpiCommMasters;
 };
 
 
@@ -94,10 +97,12 @@ gmx_mdoutf_t init_mdoutf(FILE*                         fplog,
                          gmx::IMDOutputProvider*       outputProvider,
                          const gmx::MdModulesNotifier& mdModulesNotifier,
                          const t_inputrec*             ir,
-                         gmx_mtop_t*                   top_global,
+                         const gmx_mtop_t*             top_global,
                          const gmx_output_env_t*       oenv,
                          gmx_wallcycle_t               wcycle,
-                         const gmx::StartingBehavior   startingBehavior)
+                         const gmx::StartingBehavior   startingBehavior,
+                         bool                          simulationsShareState,
+                         const gmx_multisim_t*         ms)
 {
     gmx_mdoutf_t of;
     const char * appendMode = "a+", *writeMode = "w+", *filemode;
@@ -122,6 +127,14 @@ gmx_mdoutf_t init_mdoutf(FILE*                         fplog,
     of->wcycle                  = wcycle;
     of->f_global                = nullptr;
     of->outputProvider          = outputProvider;
+
+    GMX_RELEASE_ASSERT(!simulationsShareState || ms != nullptr,
+                       "Need valid multisim object when simulations share state");
+    of->simulationsShareState = simulationsShareState;
+    if (of->simulationsShareState)
+    {
+        of->mpiCommMasters = ms->mpi_comm_masters;
+    }
 
     if (MASTER(cr))
     {
@@ -296,12 +309,18 @@ void mdoutf_write_to_trajectory_files(FILE*                    fplog,
         {
             fflush_tng(of->tng);
             fflush_tng(of->tng_low_prec);
+            /* Write the checkpoint file.
+             * When simulations share the state, an MPI barrier is applied before
+             * renaming old and new checkpoint files to minimize the risk of
+             * checkpoint files getting out of sync.
+             */
             ivec one_ivec = { 1, 1, 1 };
             write_checkpoint(of->fn_cpt, of->bKeepAndNumCPT, fplog, cr,
                              DOMAINDECOMP(cr) ? cr->dd->numCells : one_ivec,
                              DOMAINDECOMP(cr) ? cr->dd->nnodes : cr->nnodes, of->eIntegrator,
                              of->simulation_part, of->bExpanded, of->elamstats, step, t,
-                             state_global, observablesHistory, *(of->mdModulesNotifier));
+                             state_global, observablesHistory, *(of->mdModulesNotifier),
+                             of->simulationsShareState, of->mpiCommMasters);
         }
 
         if (mdof_flags & (MDOF_X | MDOF_V | MDOF_F))

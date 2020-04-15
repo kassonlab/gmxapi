@@ -79,9 +79,6 @@ enum
     etabLJ6Switch,
     etabLJ12Switch,
     etabCOULSwitch,
-    etabLJ6Encad,
-    etabLJ12Encad,
-    etabCOULEncad,
     etabEXPMIN,
     etabUSER,
     etabNR
@@ -99,27 +96,12 @@ typedef struct
 /* This structure holds name and a flag that tells whether
    this is a Coulomb type funtion */
 static const t_tab_props tprops[etabNR] = {
-    { "LJ6", FALSE },
-    { "LJ12", FALSE },
-    { "LJ6Shift", FALSE },
-    { "LJ12Shift", FALSE },
-    { "Shift", TRUE },
-    { "RF", TRUE },
-    { "RF-zero", TRUE },
-    { "COUL", TRUE },
-    { "Ewald", TRUE },
-    { "Ewald-Switch", TRUE },
-    { "Ewald-User", TRUE },
-    { "Ewald-User-Switch", TRUE },
-    { "LJ6Ewald", FALSE },
-    { "LJ6Switch", FALSE },
-    { "LJ12Switch", FALSE },
-    { "COULSwitch", TRUE },
-    { "LJ6-Encad shift", FALSE },
-    { "LJ12-Encad shift", FALSE },
-    { "COUL-Encad shift", TRUE },
-    { "EXPMIN", FALSE },
-    { "USER", FALSE },
+    { "LJ6", FALSE },         { "LJ12", FALSE },      { "LJ6Shift", FALSE },
+    { "LJ12Shift", FALSE },   { "Shift", TRUE },      { "RF", TRUE },
+    { "RF-zero", TRUE },      { "COUL", TRUE },       { "Ewald", TRUE },
+    { "Ewald-Switch", TRUE }, { "Ewald-User", TRUE }, { "Ewald-User-Switch", TRUE },
+    { "LJ6Ewald", FALSE },    { "LJ6Switch", FALSE }, { "LJ12Switch", FALSE },
+    { "COULSwitch", TRUE },   { "EXPMIN", FALSE },    { "USER", FALSE },
 };
 
 typedef struct
@@ -799,7 +781,7 @@ static void fill_table(t_tabledata* td, int tp, const interaction_const_t* ic, g
     int    i;
     double reppow, p;
     double r1, rc, r12, r13;
-    double r, r2, r6, rc2, rc6, rc12;
+    double r, r2, r6, rc2;
     double expr, Vtab, Ftab;
     /* Parameters for David's function */
     double A = 0, B = 0, C = 0, A_3 = 0, B_4 = 0;
@@ -885,8 +867,9 @@ static void fill_table(t_tabledata* td, int tp, const interaction_const_t* ic, g
 
     if (bPotentialShift)
     {
-        rc2 = rc * rc;
-        rc6 = 1.0 / (rc2 * rc2 * rc2);
+        rc2        = rc * rc;
+        double rc6 = 1.0 / (rc2 * rc2 * rc2);
+        double rc12;
         if (gmx_within_tol(reppow, 12.0, 10 * GMX_DOUBLE_EPS))
         {
             rc12 = rc6 * rc6;
@@ -982,9 +965,6 @@ static void fill_table(t_tabledata* td, int tp, const interaction_const_t* ic, g
             swi1 = 0.0;
         }
 
-        rc6 = rc * rc * rc;
-        rc6 = 1.0 / (rc6 * rc6);
-
         switch (tp)
         {
             case etabLJ6:
@@ -1014,30 +994,6 @@ static void fill_table(t_tabledata* td, int tp, const interaction_const_t* ic, g
                 {
                     Vtab = r12;
                     Ftab = reppow * Vtab / r;
-                }
-                break;
-            case etabLJ6Encad:
-                if (r < rc)
-                {
-                    Vtab = -(r6 - 6.0 * (rc - r) * rc6 / rc - rc6);
-                    Ftab = -(6.0 * r6 / r - 6.0 * rc6 / rc);
-                }
-                else /* r>rc */
-                {
-                    Vtab = 0;
-                    Ftab = 0;
-                }
-                break;
-            case etabLJ12Encad:
-                if (r < rc)
-                {
-                    Vtab = -(r6 - 6.0 * (rc - r) * rc6 / rc - rc6);
-                    Ftab = -(6.0 * r6 / r - 6.0 * rc6 / rc);
-                }
-                else /* r>rc */
-                {
-                    Vtab = 0;
-                    Ftab = 0;
                 }
                 break;
             case etabCOUL:
@@ -1083,18 +1039,6 @@ static void fill_table(t_tabledata* td, int tp, const interaction_const_t* ic, g
                 expr = exp(-r);
                 Vtab = expr;
                 Ftab = expr;
-                break;
-            case etabCOULEncad:
-                if (r < rc)
-                {
-                    Vtab = 1.0 / r - (rc - r) / (rc * rc) - 1.0 / rc;
-                    Ftab = 1.0 / r2 - 1.0 / (rc * rc);
-                }
-                else /* r>rc */
-                {
-                    Vtab = 0;
-                    Ftab = 0;
-                }
                 break;
             default:
                 gmx_fatal(FARGS, "Table type %d not implemented yet. (%s,%d)", tp, __FILE__, __LINE__);
@@ -1218,7 +1162,6 @@ static void set_table_type(int tabsel[], const interaction_const_t* ic, gmx_bool
         case eelRF_ZERO: tabsel[etiCOUL] = etabRF_ZERO; break;
         case eelSWITCH: tabsel[etiCOUL] = etabCOULSwitch; break;
         case eelUSER: tabsel[etiCOUL] = etabUSER; break;
-        case eelENCADSHIFT: tabsel[etiCOUL] = etabCOULEncad; break;
         default: gmx_fatal(FARGS, "Invalid eeltype %d", eltype);
     }
 
@@ -1256,10 +1199,6 @@ static void set_table_type(int tabsel[], const interaction_const_t* ic, gmx_bool
             case evdwCUT:
                 tabsel[etiLJ6]  = etabLJ6;
                 tabsel[etiLJ12] = etabLJ12;
-                break;
-            case evdwENCADSHIFT:
-                tabsel[etiLJ6]  = etabLJ6Encad;
-                tabsel[etiLJ12] = etabLJ12Encad;
                 break;
             case evdwPME:
                 tabsel[etiLJ6]  = etabLJ6Ewald;

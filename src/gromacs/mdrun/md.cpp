@@ -67,6 +67,7 @@
 #include "gromacs/fileio/trxio.h"
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/gmxlib/nrnb.h"
+#include "gromacs/gpu_utils/device_stream_manager.h"
 #include "gromacs/gpu_utils/gpu_utils.h"
 #include "gromacs/imd/imd.h"
 #include "gromacs/listed_forces/manage_threading.h"
@@ -123,7 +124,6 @@
 #include "gromacs/modularsimulator/energyelement.h"
 #include "gromacs/nbnxm/gpu_data_mgmt.h"
 #include "gromacs/nbnxm/nbnxm.h"
-#include "gromacs/pbcutil/mshift.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/pulling/output.h"
 #include "gromacs/pulling/pull.h"
@@ -175,10 +175,8 @@ void gmx::LegacySimulator::do_md()
     rvec                        mu_tot;
     matrix                      pressureCouplingMu, M;
     gmx_repl_ex_t               repl_ex = nullptr;
-    gmx_localtop_t              top;
     PaddedHostVector<gmx::RVec> f{};
     gmx_global_stat_t           gstat;
-    t_graph*                    graph = nullptr;
     gmx_shellfc_t*              shellfc;
     gmx_bool                    bSumEkinhOld, bDoReplEx, bExchanged, bNeedRepartition;
     gmx_bool                    bTemp, bPres, bTrotter;
@@ -238,7 +236,7 @@ void gmx::LegacySimulator::do_md()
     int nstglobalcomm = computeGlobalCommunicationPeriod(mdlog, ir, cr);
     bGStatEveryStep   = (nstglobalcomm == 1);
 
-    SimulationGroups* groups = &top_global->groups;
+    const SimulationGroups* groups = &top_global->groups;
 
     std::unique_ptr<EssentialDynamics> ed = nullptr;
     if (opt2bSet("-ei", nfile, fnm))
@@ -258,12 +256,42 @@ void gmx::LegacySimulator::do_md()
     initialize_lambdas(fplog, *ir, MASTER(cr), &state_global->fep_state, state_global->lambda, lam0);
     Update     upd(ir, deform);
     const bool doSimulatedAnnealing = initSimulatedAnnealing(ir, &upd);
+    const bool useReplicaExchange   = (replExParams.exchangeInterval > 0);
+
+    bool simulationsShareState = false;
+    int  nstSignalComm         = nstglobalcomm;
+    {
+        // TODO This implementation of ensemble orientation restraints is nasty because
+        // a user can't just do multi-sim with single-sim orientation restraints.
+        bool usingEnsembleRestraints =
+                (fcd->disres.nsystems > 1) || ((ms != nullptr) && (fcd->orires.nr != 0));
+        bool awhUsesMultiSim = (ir->bDoAwh && ir->awhParams->shareBiasMultisim && (ms != nullptr));
+
+        // Replica exchange, ensemble restraints and AWH need all
+        // simulations to remain synchronized, so they need
+        // checkpoints and stop conditions to act on the same step, so
+        // the propagation of such signals must take place between
+        // simulations, not just within simulations.
+        // TODO: Make algorithm initializers set these flags.
+        simulationsShareState = useReplicaExchange || usingEnsembleRestraints || awhUsesMultiSim;
+
+        if (simulationsShareState)
+        {
+            // Inter-simulation signal communication does not need to happen
+            // often, so we use a minimum of 200 steps to reduce overhead.
+            const int c_minimumInterSimulationSignallingInterval = 200;
+            nstSignalComm = ((c_minimumInterSimulationSignallingInterval + nstglobalcomm - 1) / nstglobalcomm)
+                            * nstglobalcomm;
+        }
+    }
+
     if (startingBehavior != StartingBehavior::RestartWithAppending)
     {
         pleaseCiteCouplingAlgorithms(fplog, *ir);
     }
-    gmx_mdoutf*       outf = init_mdoutf(fplog, nfile, fnm, mdrunOptions, cr, outputProvider,
-                                   mdModulesNotifier, ir, top_global, oenv, wcycle, startingBehavior);
+    gmx_mdoutf* outf =
+            init_mdoutf(fplog, nfile, fnm, mdrunOptions, cr, outputProvider, mdModulesNotifier, ir,
+                        top_global, oenv, wcycle, startingBehavior, simulationsShareState, ms);
     gmx::EnergyOutput energyOutput(mdoutf_get_fp_ene(outf), top_global, ir, pull_work,
                                    mdoutf_get_fp_dhdl(outf), false, startingBehavior, mdModulesNotifier);
 
@@ -286,14 +314,14 @@ void gmx::LegacySimulator::do_md()
     t_state*                 state;
 
 
+    gmx_localtop_t top(top_global->ffparams);
+
     auto mdatoms = mdAtoms->mdatoms();
 
     std::unique_ptr<UpdateConstrainGpu> integrator;
 
     if (DOMAINDECOMP(cr))
     {
-        dd_init_local_top(*top_global, &top);
-
         stateInstance = std::make_unique<t_state>();
         state         = stateInstance.get();
         dd_init_local_state(cr->dd, state_global, state);
@@ -308,12 +336,11 @@ void gmx::LegacySimulator::do_md()
     else
     {
         state_change_natoms(state_global, state_global->natoms);
-        f.resizeWithPadding(state_global->natoms);
         /* Copy the pointer to the global state */
         state = state_global;
 
         /* Generate and initialize new topology */
-        mdAlgorithmsSetupAtomData(cr, ir, *top_global, &top, fr, &graph, mdAtoms, constr, vsite, shellfc);
+        mdAlgorithmsSetupAtomData(cr, ir, *top_global, &top, fr, &f, mdAtoms, constr, vsite, shellfc);
 
         upd.setNumAtoms(state->natoms);
     }
@@ -326,6 +353,7 @@ void gmx::LegacySimulator::do_md()
 
     StatePropagatorDataGpu* stateGpu = fr->stateGpu;
 
+    // TODO: the assertions below should be handled by UpdateConstraintsBuilder.
     if (useGpuForUpdate)
     {
         GMX_RELEASE_ASSERT(!DOMAINDECOMP(cr) || ddUsesUpdateGroups(*cr->dd) || constr == nullptr
@@ -359,7 +387,6 @@ void gmx::LegacySimulator::do_md()
                         || (!haveFreeEnergyType(*ir, efptBONDED) && !haveFreeEnergyType(*ir, efptMASS)),
                 "Free energy perturbation of masses and constraints are not supported with the GPU "
                 "update.");
-        GMX_RELEASE_ASSERT(graph == nullptr, "The graph is not supported with GPU update.");
 
         if (constr != nullptr && constr->numConstraintsTotal() > 0)
         {
@@ -371,8 +398,17 @@ void gmx::LegacySimulator::do_md()
         {
             GMX_LOG(mdlog.info).asParagraph().appendText("Updating coordinates on the GPU.");
         }
+        GMX_RELEASE_ASSERT(fr->deviceStreamManager != nullptr,
+                           "Device stream manager should be initialized in order to use GPU "
+                           "update-constraints.");
+        GMX_RELEASE_ASSERT(
+                fr->deviceStreamManager->streamIsValid(gmx::DeviceStreamType::UpdateAndConstraints),
+                "Update stream should be initialized in order to use GPU "
+                "update-constraints.");
         integrator = std::make_unique<UpdateConstrainGpu>(
-                *ir, *top_global, stateGpu->getUpdateStream(), stateGpu->xUpdatedOnDevice());
+                *ir, *top_global, fr->deviceStreamManager->context(),
+                fr->deviceStreamManager->stream(gmx::DeviceStreamType::UpdateAndConstraints),
+                stateGpu->xUpdatedOnDevice());
 
         integrator->setPbc(PbcType::Xyz, state->box);
     }
@@ -421,7 +457,6 @@ void gmx::LegacySimulator::do_md()
                                 startingBehavior != StartingBehavior::NewSimulation,
                                 shellfc != nullptr, opt2fn("-awh", nfile, fnm), pull_work);
 
-    const bool useReplicaExchange = (replExParams.exchangeInterval > 0);
     if (useReplicaExchange && MASTER(cr))
     {
         repl_ex = init_replica_exchange(fplog, ms, top_global->natoms, ir, replExParams);
@@ -511,7 +546,7 @@ void gmx::LegacySimulator::do_md()
     bool hasReadEkinState = MASTER(cr) ? state_global->ekinstate.hasReadEkinState : false;
     if (PAR(cr))
     {
-        gmx_bcast(sizeof(hasReadEkinState), &hasReadEkinState, cr);
+        gmx_bcast(sizeof(hasReadEkinState), &hasReadEkinState, cr->mpi_comm_mygroup);
     }
     if (hasReadEkinState)
     {
@@ -660,33 +695,6 @@ void gmx::LegacySimulator::do_md()
     bExchanged       = FALSE;
     bNeedRepartition = FALSE;
 
-    bool simulationsShareState = false;
-    int  nstSignalComm         = nstglobalcomm;
-    {
-        // TODO This implementation of ensemble orientation restraints is nasty because
-        // a user can't just do multi-sim with single-sim orientation restraints.
-        bool usingEnsembleRestraints =
-                (fcd->disres.nsystems > 1) || ((ms != nullptr) && (fcd->orires.nr != 0));
-        bool awhUsesMultiSim = (ir->bDoAwh && ir->awhParams->shareBiasMultisim && (ms != nullptr));
-
-        // Replica exchange, ensemble restraints and AWH need all
-        // simulations to remain synchronized, so they need
-        // checkpoints and stop conditions to act on the same step, so
-        // the propagation of such signals must take place between
-        // simulations, not just within simulations.
-        // TODO: Make algorithm initializers set these flags.
-        simulationsShareState = useReplicaExchange || usingEnsembleRestraints || awhUsesMultiSim;
-
-        if (simulationsShareState)
-        {
-            // Inter-simulation signal communication does not need to happen
-            // often, so we use a minimum of 200 steps to reduce overhead.
-            const int c_minimumInterSimulationSignallingInterval = 200;
-            nstSignalComm = ((c_minimumInterSimulationSignallingInterval + nstglobalcomm - 1) / nstglobalcomm)
-                            * nstglobalcomm;
-        }
-    }
-
     auto stopHandler = stopHandlerBuilder->getStopHandlerMD(
             compat::not_null<SimulationSignal*>(&signals[eglsSTOPCOND]), simulationsShareState,
             MASTER(cr), ir->nstlist, mdrunOptions.reproducible, nstSignalComm,
@@ -721,10 +729,24 @@ void gmx::LegacySimulator::do_md()
         }
         if (!multisim_int_all_are_equal(ms, ir->init_step))
         {
-            GMX_LOG(mdlog.warning)
-                    .appendText(
-                            "Note: The initial step is not consistent across multi simulations,\n"
-                            "but we are proceeding anyway!");
+            if (simulationsShareState)
+            {
+                if (MASTER(cr))
+                {
+                    gmx_fatal(FARGS,
+                              "The initial step is not consistent across multi simulations which "
+                              "share the state");
+                }
+                gmx_barrier(cr->mpi_comm_mygroup);
+            }
+            else
+            {
+                GMX_LOG(mdlog.warning)
+                        .appendText(
+                                "Note: The initial step is not consistent across multi "
+                                "simulations,\n"
+                                "but we are proceeding anyway!");
+            }
         }
     }
 
@@ -818,7 +840,7 @@ void gmx::LegacySimulator::do_md()
             /* Correct the new box if it is too skewed */
             if (inputrecDynamicBox(ir))
             {
-                if (correct_box(fplog, step, state->box, graph))
+                if (correct_box(fplog, step, state->box))
                 {
                     bMasterState = TRUE;
                     // If update is offloaded, it should be informed about the box size change
@@ -846,19 +868,19 @@ void gmx::LegacySimulator::do_md()
                 if (havePPDomainDecomposition(cr) && simulationWork.useGpuHaloExchange
                     && useGpuForNonbonded && is1D(*cr->dd))
                 {
-                    // TODO remove need to pass local stream into GPU halo exchange - Redmine #3093
-                    void* streamLocal =
-                            Nbnxm::gpu_get_command_stream(fr->nbv->gpu_nbv, InteractionLocality::Local);
-                    void* streamNonLocal = Nbnxm::gpu_get_command_stream(
-                            fr->nbv->gpu_nbv, InteractionLocality::NonLocal);
-                    constructGpuHaloExchange(mdlog, *cr, streamLocal, streamNonLocal);
+                    GMX_RELEASE_ASSERT(fr->deviceStreamManager != nullptr,
+                                       "GPU device manager has to be initialized to use GPU "
+                                       "version of halo exchange.");
+                    // TODO remove need to pass local stream into GPU halo exchange - Issue #3093
+                    constructGpuHaloExchange(mdlog, *cr, *fr->deviceStreamManager);
                 }
             }
         }
 
         if (MASTER(cr) && do_log)
         {
-            energyOutput.printHeader(fplog, step, t); /* can we improve the information printed here? */
+            gmx::EnergyOutput::printHeader(fplog, step,
+                                           t); /* can we improve the information printed here? */
         }
 
         if (ir->efep != efepNO)
@@ -925,8 +947,8 @@ void gmx::LegacySimulator::do_md()
                                 imdSession, pull_work, bNS, force_flags, &top, constr, enerd, fcd,
                                 state->natoms, state->x.arrayRefWithPadding(),
                                 state->v.arrayRefWithPadding(), state->box, state->lambda, &state->hist,
-                                f.arrayRefWithPadding(), force_vir, mdatoms, nrnb, wcycle, graph,
-                                shellfc, fr, runScheduleWork, t, mu_tot, vsite, ddBalanceRegionHandler);
+                                f.arrayRefWithPadding(), force_vir, mdatoms, nrnb, wcycle, shellfc,
+                                fr, runScheduleWork, t, mu_tot, vsite, ddBalanceRegionHandler);
         }
         else
         {
@@ -950,8 +972,8 @@ void gmx::LegacySimulator::do_md()
              */
             do_force(fplog, cr, ms, ir, awh.get(), enforcedRotation, imdSession, pull_work, step,
                      nrnb, wcycle, &top, state->box, state->x.arrayRefWithPadding(), &state->hist,
-                     f.arrayRefWithPadding(), force_vir, mdatoms, enerd, fcd, state->lambda, graph,
-                     fr, runScheduleWork, vsite, mu_tot, t, ed ? ed->getLegacyED() : nullptr,
+                     f.arrayRefWithPadding(), force_vir, mdatoms, enerd, fcd, state->lambda, fr,
+                     runScheduleWork, vsite, mu_tot, t, ed ? ed->getLegacyED() : nullptr,
                      (bNS ? GMX_FORCE_NS : 0) | force_flags, ddBalanceRegionHandler);
         }
 
@@ -1264,7 +1286,7 @@ void gmx::LegacySimulator::do_md()
 
         if (useGpuForUpdate)
         {
-            if (bNS)
+            if (bNS && (bFirstStep || DOMAINDECOMP(cr)))
             {
                 integrator->set(stateGpu->getCoordinates(), stateGpu->getVelocities(),
                                 stateGpu->getForces(), top.idef, *mdatoms, ekind->ngtc);
@@ -1310,7 +1332,7 @@ void gmx::LegacySimulator::do_md()
 
             update_sd_second_half(step, &dvdl_constr, ir, mdatoms, state, cr, nrnb, wcycle, &upd,
                                   constr, do_log, do_ene);
-            finish_update(ir, mdatoms, state, graph, nrnb, wcycle, &upd, constr);
+            finish_update(ir, mdatoms, state, wcycle, &upd, constr);
         }
 
         if (ir->bPull && ir->pull->bSetPbcRefToPrevStepCOM)
@@ -1341,14 +1363,14 @@ void gmx::LegacySimulator::do_md()
              * to numerical errors, or are they important
              * physically? I'm thinking they are just errors, but not completely sure.
              * For now, will call without actually constraining, constr=NULL*/
-            finish_update(ir, mdatoms, state, graph, nrnb, wcycle, &upd, nullptr);
+            finish_update(ir, mdatoms, state, wcycle, &upd, nullptr);
         }
         if (EI_VV(ir->eI))
         {
             /* this factor or 2 correction is necessary
                because half of the constraint force is removed
                in the vv step, so we have to double it.  See
-               the Redmine issue #1255.  It is not yet clear
+               the Issue #1255.  It is not yet clear
                if the factor of 2 is exact, or just a very
                good approximation, and this will be
                investigated.  The next step is to see if this
@@ -1369,17 +1391,8 @@ void gmx::LegacySimulator::do_md()
         if (vsite != nullptr)
         {
             wallcycle_start(wcycle, ewcVSITECONSTR);
-            if (graph != nullptr)
-            {
-                shift_self(graph, state->box, state->x.rvec_array());
-            }
             construct_vsites(vsite, state->x.rvec_array(), ir->delta_t, state->v.rvec_array(),
                              top.idef.iparams, top.idef.il, fr->pbcType, fr->bMolPBC, cr, state->box);
-
-            if (graph != nullptr)
-            {
-                unshift_self(graph, state->box, state->x.rvec_array());
-            }
             wallcycle_stop(wcycle, ewcVSITECONSTR);
         }
 
@@ -1532,7 +1545,8 @@ void gmx::LegacySimulator::do_md()
 
             if (doSimulatedAnnealing)
             {
-                energyOutput.printAnnealingTemperatures(do_log ? fplog : nullptr, groups, &(ir->opts));
+                gmx::EnergyOutput::printAnnealingTemperatures(do_log ? fplog : nullptr, groups,
+                                                              &(ir->opts));
             }
             if (do_log || do_ene || do_dr || do_or)
             {
@@ -1659,7 +1673,7 @@ void gmx::LegacySimulator::do_md()
     {
         if (ir->nstcalcenergy > 0)
         {
-            energyOutput.printAnnealingTemperatures(fplog, groups, &(ir->opts));
+            gmx::EnergyOutput::printAnnealingTemperatures(fplog, groups, &(ir->opts));
             energyOutput.printAverages(fplog, groups);
         }
     }

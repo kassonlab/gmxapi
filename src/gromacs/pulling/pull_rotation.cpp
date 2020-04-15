@@ -3494,7 +3494,7 @@ static void init_rot_group(FILE*            fplog,
 #if GMX_MPI
         if (PAR(cr))
         {
-            gmx_bcast(sizeof(erg->xc_center), erg->xc_center, cr);
+            gmx_bcast(sizeof(erg->xc_center), erg->xc_center, cr->mpi_comm_mygroup);
         }
 #endif
     }
@@ -3529,7 +3529,7 @@ static void init_rot_group(FILE*            fplog,
 #if GMX_MPI
         if (PAR(cr))
         {
-            gmx_bcast(erg->rotg->nat * sizeof(erg->xc_old[0]), erg->xc_old, cr);
+            gmx_bcast(erg->rotg->nat * sizeof(erg->xc_old[0]), erg->xc_old, cr->mpi_comm_mygroup);
         }
 #endif
     }
@@ -3636,14 +3636,7 @@ std::unique_ptr<gmx::EnforcedRotation> init_rot(FILE*                       fplo
     er->restartWithAppending = (startingBehavior == gmx::StartingBehavior::RestartWithAppending);
 
     /* When appending, skip first output to avoid duplicate entries in the data files */
-    if (er->restartWithAppending)
-    {
-        er->bOut = FALSE;
-    }
-    else
-    {
-        er->bOut = TRUE;
-    }
+    er->bOut = er->restartWithAppending;
 
     if (MASTER(cr) && er->bOut)
     {

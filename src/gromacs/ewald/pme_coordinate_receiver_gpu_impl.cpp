@@ -62,12 +62,12 @@ class PmeCoordinateReceiverGpu::Impl
 };
 
 /*!\brief Constructor stub. */
-PmeCoordinateReceiverGpu::PmeCoordinateReceiverGpu(const void* /* pmeStream */,
+PmeCoordinateReceiverGpu::PmeCoordinateReceiverGpu(const DeviceStream& /* pmeStream */,
                                                    MPI_Comm /* comm */,
                                                    gmx::ArrayRef<PpRanks> /* ppRanks */) :
     impl_(nullptr)
 {
-    GMX_ASSERT(false,
+    GMX_ASSERT(!impl_,
                "A CPU stub for PME-PP GPU communication was called instead of the correct "
                "implementation.");
 }
@@ -77,21 +77,21 @@ PmeCoordinateReceiverGpu::~PmeCoordinateReceiverGpu() = default;
 /*!\brief init PME-PP GPU communication stub */
 void PmeCoordinateReceiverGpu::sendCoordinateBufferAddressToPpRanks(DeviceBuffer<RVec> /* d_x */)
 {
-    GMX_ASSERT(false,
+    GMX_ASSERT(!impl_,
                "A CPU stub for PME-PP GPU communication initialization was called instead of the "
                "correct implementation.");
 }
 
 void PmeCoordinateReceiverGpu::launchReceiveCoordinatesFromPpCudaDirect(int /* ppRank */)
 {
-    GMX_ASSERT(false,
+    GMX_ASSERT(!impl_,
                "A CPU stub for PME-PP GPU communication was called instead of the correct "
                "implementation.");
 }
 
 void PmeCoordinateReceiverGpu::enqueueWaitReceiveCoordinatesFromPpCudaDirect()
 {
-    GMX_ASSERT(false,
+    GMX_ASSERT(!impl_,
                "A CPU stub for PME-PP GPU communication was called instead of the correct "
                "implementation.");
 }

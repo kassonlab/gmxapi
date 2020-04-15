@@ -73,8 +73,8 @@ const char* eel_names[eelNR + 1] = { "Cut-off",
                                      "Shift",
                                      "User",
                                      "Generalized-Born (unused)",
-                                     "Reaction-Field-nec",
-                                     "Encad-shift",
+                                     "Reaction-Field-nec (unsupported)",
+                                     "Encad-shift (unused)",
                                      "PME-User",
                                      "PME-Switch",
                                      "PME-User-Switch",
@@ -85,8 +85,8 @@ const char* eewg_names[eewgNR + 1] = { "3d", "3dc", nullptr };
 
 const char* eljpme_names[eljpmeNR + 1] = { "Geometric", "Lorentz-Berthelot", nullptr };
 
-const char* evdw_names[evdwNR + 1] = { "Cut-off",     "Switch", "Shift", "User",
-                                       "Encad-shift", "PME",    nullptr };
+const char* evdw_names[evdwNR + 1] = { "Cut-off", "Switch", "Shift", "User", "Encad-shift (unused)",
+                                       "PME",     nullptr };
 
 const char* econstr_names[econtNR + 1] = { "Lincs", "Shake", nullptr };
 
@@ -175,17 +175,6 @@ const char* erotg_fitnames[erotgFitNR + 1] = { "rmsd", "norm", "potential", null
 const char* eSwapTypes_names[eSwapTypesNR + 1] = { "no", "X", "Y", "Z", nullptr };
 
 const char* eSwapFixedGrp_names[eSwapFixedGrpNR + 1] = { "Split0", "Split1", "Solvent", nullptr };
-
-
-const char* eQMmethod_names[eQMmethodNR + 1] = { "AM1",      "PM3",    "RHF",  "UHF",
-                                                 "DFT",      "B3LYP",  "MP2",  "CASSCF",
-                                                 "B3LYPLAN", "DIRECT", nullptr };
-
-const char* eQMbasis_names[eQMbasisNR + 1] = { "STO3G",   "STO-3G", "3-21G", "3-21G*",
-                                               "3-21+G*", "6-21G",  "6-31G", "6-31G*",
-                                               "6-31+G*", "6-311G", nullptr };
-
-const char* eQMMMscheme_names[eQMMMschemeNR + 1] = { "normal", "ONIOM", nullptr };
 
 const char* gmx_nblist_geometry_names[GMX_NBLIST_GEOMETRY_NR + 1] = {
     "Particle-Particle", "Water3-Particle", "Water3-Water3", "Water4-Particle",

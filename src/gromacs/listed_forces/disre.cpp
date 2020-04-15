@@ -58,7 +58,6 @@
 #include "gromacs/mdtypes/md_enums.h"
 #include "gromacs/mdtypes/state.h"
 #include "gromacs/pbcutil/ishift.h"
-#include "gromacs/pbcutil/mshift.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/topology/mtop_util.h"
 #include "gromacs/topology/topology.h"
@@ -139,7 +138,7 @@ void init_disres(FILE*                 fplog,
     iloop     = gmx_mtop_ilistloop_init(mtop);
     while (const InteractionLists* il = gmx_mtop_ilistloop_next(iloop, &nmol))
     {
-        if (nmol > 1 && (*il)[F_DISRES].size() > 0 && ir->eDisre != edrEnsemble)
+        if (nmol > 1 && !(*il)[F_DISRES].empty() && ir->eDisre != edrEnsemble)
         {
             gmx_fatal(FARGS,
                       "NMR distance restraints with multiple copies of the same molecule are "
@@ -235,7 +234,7 @@ void init_disres(FILE*                 fplog,
         {
             check_multi_int(fplog, ms, dd->nsystems, "the number of systems per ensemble", FALSE);
         }
-        gmx_bcast_sim(sizeof(int), &dd->nsystems, cr);
+        gmx_bcast(sizeof(int), &dd->nsystems, cr->mpi_comm_mysim);
 
         /* We use to allow any value of nsystems which was a divisor
          * of ms->nsim. But this required an extra communicator which
@@ -403,7 +402,7 @@ void calc_disres_R_6(const t_commrec*      cr,
 
         if (DOMAINDECOMP(cr))
         {
-            gmx_bcast(2 * dd->nres, dd->Rt_6, cr);
+            gmx_bcast(2 * dd->nres, dd->Rt_6, cr->mpi_comm_mygroup);
         }
     }
 
@@ -423,7 +422,6 @@ real ta_disres(int             nfa,
                rvec4           f[],
                rvec            fshift[],
                const t_pbc*    pbc,
-               const t_graph*  g,
                real gmx_unused lambda,
                real gmx_unused* dvdlambda,
                const t_mdatoms gmx_unused* md,
@@ -440,7 +438,6 @@ real ta_disres(int             nfa,
     real          tav_viol_Rtav7, instant_viol_Rtav7;
     real          up1, up2, low;
     gmx_bool      bConservative, bMixed, bViolation;
-    ivec          dt;
     t_disresdata* dd;
     int           dr_weighting;
     gmx_bool      dr_bMixed;
@@ -618,12 +615,6 @@ real ta_disres(int             nfa,
             }
 
             fk_scal = f_scal * weight_rt_1;
-
-            if (g)
-            {
-                ivec_sub(SHIFT_IVEC(g, ai), SHIFT_IVEC(g, aj), dt);
-                ki = IVEC2IS(dt);
-            }
 
             for (int m = 0; m < DIM; m++)
             {

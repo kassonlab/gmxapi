@@ -65,6 +65,7 @@
 #include "gromacs/mdlib/constr.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/pbcutil/pbc_aiuc_cuda.cuh"
+#include "gromacs/topology/forcefieldparameters.h"
 #include "gromacs/topology/ifunc.h"
 #include "gromacs/topology/topology.h"
 
@@ -95,7 +96,7 @@ constexpr static int c_maxThreadsPerBlock = c_threadsPerBlock;
  *        3. Use analytical solution for matrix A inversion.
  *        4. Introduce mapping of thread id to both single constraint and single atom, thus designating
  *           Nth threads to deal with Nat <= Nth coupled atoms and Nc <= Nth coupled constraints.
- *       See Redmine issue #2885 for details (https://redmine.gromacs.org/issues/2885)
+ *       See Issue #2885 for details (https://gitlab.com/gromacs/gromacs/-/issues/2885)
  * \todo The use of __restrict__  for gm_xp and gm_v causes failure, probably because of the atomic
          operations. Investigate this issue further.
  *
@@ -446,7 +447,7 @@ void LincsGpu::apply(const float3* d_x,
     {
         // Fill with zeros so the values can be reduced to it
         // Only 6 values are needed because virial is symmetrical
-        clearDeviceBufferAsync(&kernelParams_.d_virialScaled, 0, 6, commandStream_);
+        clearDeviceBufferAsync(&kernelParams_.d_virialScaled, 0, 6, deviceStream_);
     }
 
     auto kernelPtr = getLincsKernelPtr(updateVelocities, computeVirial);
@@ -474,20 +475,20 @@ void LincsGpu::apply(const float3* d_x,
     {
         config.sharedMemorySize = c_threadsPerBlock * 3 * sizeof(float);
     }
-    config.stream = commandStream_;
 
     kernelParams_.pbcAiuc = pbcAiuc;
 
     const auto kernelArgs =
             prepareGpuKernelArguments(kernelPtr, config, &kernelParams_, &d_x, &d_xp, &d_v, &invdt);
 
-    launchGpuKernel(kernelPtr, config, nullptr, "lincs_kernel<updateVelocities, computeVirial>", kernelArgs);
+    launchGpuKernel(kernelPtr, config, deviceStream_, nullptr,
+                    "lincs_kernel<updateVelocities, computeVirial>", kernelArgs);
 
     if (computeVirial)
     {
         // Copy LINCS virial data and add it to the common virial
         copyFromDeviceBuffer(h_virialScaled_.data(), &kernelParams_.d_virialScaled, 0, 6,
-                             commandStream_, GpuApiCallBehavior::Sync, nullptr);
+                             deviceStream_, GpuApiCallBehavior::Sync, nullptr);
 
         // Mapping [XX, XY, XZ, YY, YZ, ZZ] internal format to a tensor object
         virialScaled[XX][XX] += h_virialScaled_[0];
@@ -506,8 +507,12 @@ void LincsGpu::apply(const float3* d_x,
     return;
 }
 
-LincsGpu::LincsGpu(int numIterations, int expansionOrder, CommandStream commandStream) :
-    commandStream_(commandStream)
+LincsGpu::LincsGpu(int                  numIterations,
+                   int                  expansionOrder,
+                   const DeviceContext& deviceContext,
+                   const DeviceStream&  deviceStream) :
+    deviceContext_(deviceContext),
+    deviceStream_(deviceStream)
 {
     kernelParams_.numIterations  = numIterations;
     kernelParams_.expansionOrder = expansionOrder;
@@ -518,7 +523,7 @@ LincsGpu::LincsGpu(int numIterations, int expansionOrder, CommandStream commandS
             c_threadsPerBlock > 0 && ((c_threadsPerBlock & (c_threadsPerBlock - 1)) == 0),
             "Number of threads per block should be a power of two in order for reduction to work.");
 
-    allocateDeviceBuffer(&kernelParams_.d_virialScaled, 6, nullptr);
+    allocateDeviceBuffer(&kernelParams_.d_virialScaled, 6, deviceContext_);
     h_virialScaled_.resize(6);
 
     // The data arrays should be expanded/reallocated on first call of set() function.
@@ -720,7 +725,7 @@ bool LincsGpu::isNumCoupledConstraintsSupported(const gmx_mtop_t& mtop)
     return true;
 }
 
-void LincsGpu::set(const t_idef& idef, const t_mdatoms& md)
+void LincsGpu::set(const InteractionDefinitions& idef, const t_mdatoms& md)
 {
     int numAtoms = md.nr;
     // List of constrained atoms (CPU memory)
@@ -735,10 +740,9 @@ void LincsGpu::set(const t_idef& idef, const t_mdatoms& md)
     std::vector<float> massFactorsHost;
 
     // List of constrained atoms in local topology
-    gmx::ArrayRef<const int> iatoms =
-            constArrayRefFromArray(idef.il[F_CONSTR].iatoms, idef.il[F_CONSTR].nr);
-    const int stride         = NRAL(F_CONSTR) + 1;
-    const int numConstraints = idef.il[F_CONSTR].nr / stride;
+    ArrayRef<const int> iatoms         = idef.il[F_CONSTR].iatoms;
+    const int           stride         = NRAL(F_CONSTR) + 1;
+    const int           numConstraints = idef.il[F_CONSTR].size() / stride;
 
     // Early exit if no constraints
     if (numConstraints == 0)
@@ -911,18 +915,19 @@ void LincsGpu::set(const t_idef& idef, const t_mdatoms& md)
 
         numConstraintsThreadsAlloc_ = kernelParams_.numConstraintsThreads;
 
-        allocateDeviceBuffer(&kernelParams_.d_constraints, kernelParams_.numConstraintsThreads, nullptr);
+        allocateDeviceBuffer(&kernelParams_.d_constraints, kernelParams_.numConstraintsThreads,
+                             deviceContext_);
         allocateDeviceBuffer(&kernelParams_.d_constraintsTargetLengths,
-                             kernelParams_.numConstraintsThreads, nullptr);
+                             kernelParams_.numConstraintsThreads, deviceContext_);
 
         allocateDeviceBuffer(&kernelParams_.d_coupledConstraintsCounts,
-                             kernelParams_.numConstraintsThreads, nullptr);
+                             kernelParams_.numConstraintsThreads, deviceContext_);
         allocateDeviceBuffer(&kernelParams_.d_coupledConstraintsIndices,
-                             maxCoupledConstraints * kernelParams_.numConstraintsThreads, nullptr);
+                             maxCoupledConstraints * kernelParams_.numConstraintsThreads, deviceContext_);
         allocateDeviceBuffer(&kernelParams_.d_massFactors,
-                             maxCoupledConstraints * kernelParams_.numConstraintsThreads, nullptr);
+                             maxCoupledConstraints * kernelParams_.numConstraintsThreads, deviceContext_);
         allocateDeviceBuffer(&kernelParams_.d_matrixA,
-                             maxCoupledConstraints * kernelParams_.numConstraintsThreads, nullptr);
+                             maxCoupledConstraints * kernelParams_.numConstraintsThreads, deviceContext_);
     }
 
     // (Re)allocate the memory, if the number of atoms has increased.
@@ -933,28 +938,28 @@ void LincsGpu::set(const t_idef& idef, const t_mdatoms& md)
             freeDeviceBuffer(&kernelParams_.d_inverseMasses);
         }
         numAtomsAlloc_ = numAtoms;
-        allocateDeviceBuffer(&kernelParams_.d_inverseMasses, numAtoms, nullptr);
+        allocateDeviceBuffer(&kernelParams_.d_inverseMasses, numAtoms, deviceContext_);
     }
 
     // Copy data to GPU.
     copyToDeviceBuffer(&kernelParams_.d_constraints, constraintsHost.data(), 0,
-                       kernelParams_.numConstraintsThreads, commandStream_,
-                       GpuApiCallBehavior::Sync, nullptr);
+                       kernelParams_.numConstraintsThreads, deviceStream_, GpuApiCallBehavior::Sync,
+                       nullptr);
     copyToDeviceBuffer(&kernelParams_.d_constraintsTargetLengths,
                        constraintsTargetLengthsHost.data(), 0, kernelParams_.numConstraintsThreads,
-                       commandStream_, GpuApiCallBehavior::Sync, nullptr);
+                       deviceStream_, GpuApiCallBehavior::Sync, nullptr);
     copyToDeviceBuffer(&kernelParams_.d_coupledConstraintsCounts,
                        coupledConstraintsCountsHost.data(), 0, kernelParams_.numConstraintsThreads,
-                       commandStream_, GpuApiCallBehavior::Sync, nullptr);
+                       deviceStream_, GpuApiCallBehavior::Sync, nullptr);
     copyToDeviceBuffer(&kernelParams_.d_coupledConstraintsIndices, coupledConstraintsIndicesHost.data(),
                        0, maxCoupledConstraints * kernelParams_.numConstraintsThreads,
-                       commandStream_, GpuApiCallBehavior::Sync, nullptr);
+                       deviceStream_, GpuApiCallBehavior::Sync, nullptr);
     copyToDeviceBuffer(&kernelParams_.d_massFactors, massFactorsHost.data(), 0,
-                       maxCoupledConstraints * kernelParams_.numConstraintsThreads, commandStream_,
+                       maxCoupledConstraints * kernelParams_.numConstraintsThreads, deviceStream_,
                        GpuApiCallBehavior::Sync, nullptr);
 
     GMX_RELEASE_ASSERT(md.invmass != nullptr, "Masses of atoms should be specified.\n");
-    copyToDeviceBuffer(&kernelParams_.d_inverseMasses, md.invmass, 0, numAtoms, commandStream_,
+    copyToDeviceBuffer(&kernelParams_.d_inverseMasses, md.invmass, 0, numAtoms, deviceStream_,
                        GpuApiCallBehavior::Sync, nullptr);
 }
 

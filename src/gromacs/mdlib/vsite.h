@@ -3,7 +3,7 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2013,2014,2015,2016,2017 The GROMACS development team.
  * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
@@ -50,8 +50,7 @@
 struct gmx_localtop_t;
 struct gmx_mtop_t;
 struct t_commrec;
-struct t_graph;
-struct t_ilist;
+struct InteractionList;
 struct t_mdatoms;
 struct t_nrnb;
 struct gmx_wallcycle;
@@ -103,16 +102,16 @@ struct gmx_vsite_t
  * \param[in]     cr       The communication record
  * \param[in]     box      The box
  */
-void construct_vsites(const gmx_vsite_t* vsite,
-                      rvec               x[],
-                      real               dt,
-                      rvec               v[],
-                      const t_iparams    ip[],
-                      const t_ilist      ilist[],
-                      PbcType            pbcType,
-                      gmx_bool           bMolPBC,
-                      const t_commrec*   cr,
-                      const matrix       box);
+void construct_vsites(const gmx_vsite_t*                   vsite,
+                      rvec                                 x[],
+                      real                                 dt,
+                      rvec                                 v[],
+                      gmx::ArrayRef<const t_iparams>       ip,
+                      gmx::ArrayRef<const InteractionList> ilist,
+                      PbcType                              pbcType,
+                      gmx_bool                             bMolPBC,
+                      const t_commrec*                     cr,
+                      const matrix                         box);
 
 /*! \brief Create positions of vsite atoms for the whole system assuming all molecules are wholex
  *
@@ -121,20 +120,19 @@ void construct_vsites(const gmx_vsite_t* vsite,
  */
 void constructVsitesGlobal(const gmx_mtop_t& mtop, gmx::ArrayRef<gmx::RVec> x);
 
-void spread_vsite_f(const gmx_vsite_t* vsite,
-                    const rvec         x[],
-                    rvec               f[],
-                    rvec*              fshift,
-                    gmx_bool           VirCorr,
-                    matrix             vir,
-                    t_nrnb*            nrnb,
-                    const t_idef*      idef,
-                    PbcType            pbcType,
-                    gmx_bool           bMolPBC,
-                    const t_graph*     g,
-                    const matrix       box,
-                    const t_commrec*   cr,
-                    gmx_wallcycle*     wcycle);
+void spread_vsite_f(const gmx_vsite_t*            vsite,
+                    const rvec                    x[],
+                    rvec                          f[],
+                    rvec*                         fshift,
+                    gmx_bool                      VirCorr,
+                    matrix                        vir,
+                    t_nrnb*                       nrnb,
+                    const InteractionDefinitions& idef,
+                    PbcType                       pbcType,
+                    gmx_bool                      bMolPBC,
+                    const matrix                  box,
+                    const t_commrec*              cr,
+                    gmx_wallcycle*                wcycle);
 /* Spread the force operating on the vsite atoms on the surrounding atoms.
  * If fshift!=NULL also update the shift forces.
  * If VirCorr=TRUE add the virial correction for non-linear vsite constructs
@@ -162,10 +160,10 @@ int countInterUpdategroupVsites(const gmx_mtop_t&                           mtop
  */
 std::unique_ptr<gmx_vsite_t> initVsite(const gmx_mtop_t& mtop, const t_commrec* cr);
 
-void split_vsites_over_threads(const t_ilist*   ilist,
-                               const t_iparams* ip,
-                               const t_mdatoms* mdatoms,
-                               gmx_vsite_t*     vsite);
+void split_vsites_over_threads(gmx::ArrayRef<const InteractionList> ilist,
+                               gmx::ArrayRef<const t_iparams>       ip,
+                               const t_mdatoms*                     mdatoms,
+                               gmx_vsite_t*                         vsite);
 /* Divide the vsite work-load over the threads.
  * Should be called at the end of the domain decomposition.
  */

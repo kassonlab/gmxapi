@@ -216,25 +216,15 @@ static inline void rvec_inc(rvec a, const float3 b)
     rvec_inc(a, tmp);
 }
 
-/*! \brief Wait for all taks in stream \p s to complete.
- *
- * \param[in] s stream to synchronize with
- */
-static inline void gpuStreamSynchronize(cudaStream_t s)
-{
-    cudaError_t stat = cudaStreamSynchronize(s);
-    CU_RET_ERR(stat, "cudaStreamSynchronize failed");
-}
-
 /*! \brief  Returns true if all tasks in \p s have completed.
  *
- * \param[in] s stream to check
+ *  \param[in] deviceStream CUDA stream to check.
  *
- *  \returns     True if all tasks enqueued in the stream \p s (at the time of this call) have completed.
+ *  \returns True if all tasks enqueued in the stream \p deviceStream (at the time of this call) have completed.
  */
-static inline bool haveStreamTasksCompleted(cudaStream_t s)
+static inline bool haveStreamTasksCompleted(const DeviceStream& deviceStream)
 {
-    cudaError_t stat = cudaStreamQuery(s);
+    cudaError_t stat = cudaStreamQuery(deviceStream.stream());
 
     if (stat == cudaErrorNotReady)
     {
@@ -323,6 +313,7 @@ std::array<void*, sizeof...(Args)> prepareGpuKernelArguments(KernelPtr kernel,
  * \tparam    Args            Types of all the kernel arguments
  * \param[in] kernel          Kernel function handle
  * \param[in] config          Kernel configuration for launching
+ * \param[in] deviceStream    GPU stream to launch kernel in
  * \param[in] kernelName      Human readable kernel description, for error handling only
  * \param[in] kernelArgs      Array of the pointers to the kernel arguments, prepared by
  * prepareGpuKernelArguments() \throws gmx::InternalError on kernel launch failure
@@ -330,6 +321,7 @@ std::array<void*, sizeof...(Args)> prepareGpuKernelArguments(KernelPtr kernel,
 template<typename... Args>
 void launchGpuKernel(void (*kernel)(Args...),
                      const KernelLaunchConfig& config,
+                     const DeviceStream&       deviceStream,
                      CommandEvent* /*timingEvent */,
                      const char*                               kernelName,
                      const std::array<void*, sizeof...(Args)>& kernelArgs)
@@ -337,7 +329,7 @@ void launchGpuKernel(void (*kernel)(Args...),
     dim3 blockSize(config.blockSize[0], config.blockSize[1], config.blockSize[2]);
     dim3 gridSize(config.gridSize[0], config.gridSize[1], config.gridSize[2]);
     cudaLaunchKernel((void*)kernel, gridSize, blockSize, const_cast<void**>(kernelArgs.data()),
-                     config.sharedMemorySize, config.stream);
+                     config.sharedMemorySize, deviceStream.stream());
 
     cudaError_t status = cudaGetLastError();
     if (cudaSuccess != status)
