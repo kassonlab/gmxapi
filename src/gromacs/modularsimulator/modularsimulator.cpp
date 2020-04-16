@@ -43,6 +43,8 @@
 
 #include "modularsimulator.h"
 
+#include <chrono>
+
 #include "gromacs/commandline/filenm.h"
 #include "gromacs/domdec/domdec.h"
 #include "gromacs/ewald/pme.h"
@@ -117,6 +119,7 @@ void ModularSimulator::run()
         pmeLoadBalanceHelper_->setup();
     }
 
+    const auto start_time_point = std::chrono::steady_clock::now();
     while (step_ <= signalHelper_->lastStep_)
     {
         populateTaskQueue();
@@ -127,6 +130,15 @@ void ModularSimulator::run()
             taskQueue_.pop();
             // run function
             (*task)();
+        }
+        if (step_ % 10000 == 0)
+        {
+            using namespace std::string_literals;
+            using namespace std::chrono;
+            const std::string message =
+                    "Step:"s + std::to_string(step_) + ";" + "Time:"s
+                    + std::to_string(duration_cast<seconds>(steady_clock::now() - start_time_point).count());
+            GMX_LOG(mdlog.info).asParagraph().appendText(message.c_str());
         }
     }
 
