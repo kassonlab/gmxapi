@@ -216,6 +216,18 @@ gmx_target_compile_options(libgromacs)
 target_compile_definitions(libgromacs PRIVATE HAVE_CONFIG_H)
 target_include_directories(libgromacs SYSTEM BEFORE PRIVATE ${PROJECT_SOURCE_DIR}/src/external/thread_mpi/include)
 
+# TODO: Move to src/gromacs/restraint/CMakeLists.txt
+# With CMake requirement update, we can either define libgromacs target earlier
+# or just use module targets instead of collecting source files for the libgromacs target.
+option(GMXAPI_ENABLE_EXTENSION_PROFILING "Enable extra profiling output." OFF)
+mark_as_advanced(GMXAPI_ENABLE_EXTENSION_PROFILING)
+if(GMXAPI_ENABLE_EXTENSION_PROFILING)
+    message(STATUS "Enabling additional gmxapi extension profiling.")
+    target_compile_definitions(libgromacs PRIVATE "GMXAPI_EXTENSION_PROFILING=1")
+else()
+    target_compile_definitions(libgromacs PRIVATE "GMXAPI_EXTENSION_PROFILING=0")
+endif()
+
 if (GMX_USE_OPENCL)
     option(GMX_EXTERNAL_CLFFT "True if an external clFFT is required to be used" FALSE)
     mark_as_advanced(GMX_EXTERNAL_CLFFT)

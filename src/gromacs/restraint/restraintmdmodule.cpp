@@ -37,6 +37,8 @@
 
 #include "restraintmdmodule.h"
 
+#include <chrono>
+#include <iostream>
 #include <memory>
 
 #include "gromacs/mdtypes/forceoutput.h"
@@ -79,6 +81,13 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
     const auto& x  = forceProviderInput.x_;
     const auto& cr = forceProviderInput.cr_;
     const auto& t  = forceProviderInput.t_;
+
+#if GMXAPI_EXTENSION_PROFILING
+    // Log the entry time of the hook.
+    // Get a std::chrono::time_point<std::chrono::steady_clock> to use later.
+    auto entry_time = std::chrono::steady_clock::now();
+#endif
+
     // Cooperatively get Cartesian coordinates for center of mass of each site
     RVec r1 = sites_[0].centerOfMass(cr, static_cast<size_t>(mdatoms.homenr), x, t);
     // r2 is to be constructed as
@@ -147,6 +156,23 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
     {
         force[static_cast<size_t>(*bLocal)] -= result.force;
     }
+
+#if GMXAPI_EXTENSION_PROFILING
+    // Log the exit time of the hook.
+    if (MASTER(&cr))
+    {
+        // Get a std::chrono::time_point<std::chrono::steady_clock> of the difference
+        // and convert to floating point representation in nanoseconds.
+        const std::chrono::nanoseconds elapsed_time = std::chrono::steady_clock::now() - entry_time;
+        // The precision of the value from the original type can be checked, but
+        // is likely not meaningful.
+        // constexpr int precision =
+        //        decltype(entry_time)::duration::period::num * 1000000000
+        //        / decltype(entry_time)::duration::period::den;
+        std::cerr << "RestraintForceProvider::calculateForces:" << t << ":" << elapsed_time.count()
+                  << "ns\n";
+    }
+#endif
 }
 
 RestraintMDModuleImpl::~RestraintMDModuleImpl() = default;
