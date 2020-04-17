@@ -136,7 +136,7 @@ void ModularSimulator::run()
             using namespace std::string_literals;
             using namespace std::chrono;
             const std::string message =
-                    "Step:"s + std::to_string(step_) + ";" + "Time:"s
+                    "Step:"s + std::to_string(step_) + ";" + "ElapsedTime:"s
                     + std::to_string(duration_cast<seconds>(steady_clock::now() - start_time_point).count());
             GMX_LOG(mdlog.info).asParagraph().appendText(message.c_str());
         }

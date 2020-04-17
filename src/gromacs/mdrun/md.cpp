@@ -49,6 +49,7 @@
 #include <cstdlib>
 
 #include <algorithm>
+#include <chrono>
 #include <memory>
 
 #include "gromacs/awh/awh.h"
@@ -752,8 +753,18 @@ void gmx::LegacySimulator::do_md()
 
     /* and stop now if we should */
     bLastStep = (bLastStep || (ir->nsteps >= 0 && step_rel > ir->nsteps));
+    using namespace std::string_literals;
+    using namespace std::chrono;
+    const auto start_time_point = steady_clock::now();
     while (!bLastStep)
     {
+        if (step % 10000 == 0)
+        {
+            const std::string message =
+                    "Step:"s + std::to_string(step) + ";" + "ElapsedTime:"s
+                    + std::to_string(duration_cast<seconds>(steady_clock::now() - start_time_point).count());
+            GMX_LOG(mdlog.info).asParagraph().appendText(message.c_str());
+        }
 
         /* Determine if this is a neighbor search step */
         bNStList = (ir->nstlist > 0 && step % ir->nstlist == 0);
