@@ -716,6 +716,11 @@ def from_tpr(input=None, **kwargs):
         else:
             raise exceptions.UsageError("Invalid key word argument: {}. {}".format(arg_key, usage))
 
+    # Temporary monkey-patch
+    params['tmpi'] = 20
+    params['pme_ranks'] = 0
+    # End monkey-patch
+
     # Create an empty WorkSpec
     workspec = WorkSpec()
 
