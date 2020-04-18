@@ -758,7 +758,7 @@ void gmx::LegacySimulator::do_md()
     const auto start_time_point = steady_clock::now();
     while (!bLastStep)
     {
-        if (step % 10000 == 0)
+        if (step % 1000 == 0)
         {
             const std::string message =
                     "Step:"s + std::to_string(step) + ";" + "ElapsedTime:"s

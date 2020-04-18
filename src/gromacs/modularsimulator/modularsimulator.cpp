@@ -131,7 +131,7 @@ void ModularSimulator::run()
             // run function
             (*task)();
         }
-        if (step_ % 10000 == 0)
+        if (step_ % 1000 == 0)
         {
             using namespace std::string_literals;
             using namespace std::chrono;
