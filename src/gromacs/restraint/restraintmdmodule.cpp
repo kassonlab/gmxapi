@@ -83,7 +83,13 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
     const auto& t  = forceProviderInput.t_;
 
 #if GMXAPI_EXTENSION_PROFILING
-    // Log the entry time of the hook.
+    // Open the log file.
+    if (((cr.dd == nullptr) || MASTER(&cr)) && !outfile_)
+    {
+        outfile_ = std::ofstream("restraint_log");
+    }
+
+    // Note the entry time of the hook.
     // Get a std::chrono::time_point<std::chrono::steady_clock> to use later.
     auto entry_time = std::chrono::steady_clock::now();
 #endif
@@ -159,7 +165,7 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
 
 #if GMXAPI_EXTENSION_PROFILING
     // Log the exit time of the hook.
-    if (MASTER(&cr))
+    if ((cr.dd == nullptr) || MASTER(&cr))
     {
         // Get a std::chrono::time_point<std::chrono::steady_clock> of the difference
         // and convert to floating point representation in nanoseconds.
@@ -169,8 +175,11 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
         // constexpr int precision =
         //        decltype(entry_time)::duration::period::num * 1000000000
         //        / decltype(entry_time)::duration::period::den;
-        std::cerr << "RestraintForceProvider::calculateForces:" << t << ":" << elapsed_time.count()
-                  << "ns\n";
+        if (outfile_.is_open())
+        {
+            outfile_ << "RestraintForceProvider::calculateForces:" << t << ":"
+                     << elapsed_time.count() << "ns\n";
+        }
     }
 #endif
 }

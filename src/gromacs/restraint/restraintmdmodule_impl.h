@@ -44,6 +44,7 @@
  * \ingroup module_restraint
  */
 
+#include <fstream>
 #include <iostream>
 #include <mutex>
 
@@ -257,6 +258,7 @@ public:
 private:
     std::shared_ptr<gmx::IRestraintPotential> restraint_;
     std::vector<Site>                         sites_;
+    std::ofstream                             outfile_;
 };
 
 /*! \internal
