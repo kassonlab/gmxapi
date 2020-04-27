@@ -171,6 +171,7 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdi
         for line in completed_process.stdout.split('\n'):
             logger.debug(line)
     except subprocess.CalledProcessError as e:
+        assert e.returncode != 0
         logger.info("commandline operation had non-zero return status when calling {}".format(e.cmd))
         erroroutput = e.output
         returncode = e.returncode
