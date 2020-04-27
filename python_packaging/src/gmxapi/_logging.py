@@ -70,5 +70,4 @@ logger = getLogger('gmxapi')
 # Prevent gmxapi logs from propagating to the root logger (and to sys.stderr)
 # if the user does not take action to handle logging.
 logger.addHandler(NullHandler(level=DEBUG))
-logger.setLevel(DEBUG)
 logger.info("Importing gmxapi.")
