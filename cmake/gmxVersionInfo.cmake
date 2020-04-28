@@ -239,9 +239,13 @@ set(GMX_VERSION_STRING "${GMX_VERSION}${GMX_VERSION_SUFFIX}")
 # If you are distributing a patch to GROMACS, then this change would
 # be great as part of your patch. Otherwise for personal use, you can
 # also just set a CMake cache variable.
-set(GMX_VERSION_STRING_OF_FORK "gmxapi-0.1-dev" CACHE INTERNAL
+if(GMXAPI_ENABLE_EXTENSION_PROFILING)
+    set(_ext "extension-")
+endif()
+set(GMX_VERSION_STRING_OF_FORK "gmxapi-${_ext}profiling" CACHE INTERNAL
     "Version string for forks of GROMACS to set to describe themselves")
 mark_as_advanced(GMX_VERSION_STRING_OF_FORK)
+unset(_ext)
 # The following flag is potentially useful to determine whether the build tree
 # is a canonical version of the API specification.
 set(gmxapi_EXPERIMENTAL TRUE)
