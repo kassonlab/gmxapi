@@ -84,9 +84,14 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
 
 #if GMXAPI_EXTENSION_PROFILING
     // Open the log file.
-    if (((cr.dd == nullptr) || MASTER(&cr)) && !outfile_)
+    if ((cr.dd == nullptr) || MASTER(&cr))
     {
-        outfile_ = std::ofstream("restraint_log");
+        if (!outfile_.is_open())
+        {
+            outfile_.open("restraint.log");
+            GMX_RELEASE_ASSERT(outfile_.good(), "Bad output stream state!");
+        }
+        GMX_RELEASE_ASSERT(outfile_.is_open(), "No output filehandle!");
     }
 
     // Note the entry time of the hook.
@@ -167,6 +172,7 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
     // Log the exit time of the hook.
     if ((cr.dd == nullptr) || MASTER(&cr))
     {
+        GMX_RELEASE_ASSERT(outfile_.is_open(), "Expected open output stream.");
         // Get a std::chrono::time_point<std::chrono::steady_clock> of the difference
         // and convert to floating point representation in nanoseconds.
         const std::chrono::nanoseconds elapsed_time = std::chrono::steady_clock::now() - entry_time;
@@ -175,11 +181,8 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
         // constexpr int precision =
         //        decltype(entry_time)::duration::period::num * 1000000000
         //        / decltype(entry_time)::duration::period::den;
-        if (outfile_.is_open())
-        {
-            outfile_ << "RestraintForceProvider::calculateForces:" << t << ":"
-                     << elapsed_time.count() << "ns\n";
-        }
+        outfile_ << "RestraintForceProvider::calculateForces:" << t << ":" << elapsed_time.count() << "ns\n";
+        outfile_ << std::flush;
     }
 #endif
 }
