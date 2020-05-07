@@ -118,18 +118,10 @@ EnsemblePotential::EnsemblePotential(size_t nbins,
                                      double samplePeriod,
                                      unsigned int nWindows,
                                      double k,
-                                     double sigma)
+                                     double sigma) :
+    state_(std::move(*makeEnsembleParams(nbins, binWidth, minDist, maxDist, experimental, nSamples,
+                              samplePeriod, nWindows, k, sigma)))
 {
-    state_.nBins = nbins;
-    state_.binWidth = binWidth;
-    state_.minDist = minDist;
-    state_.maxDist = maxDist;
-    state_.experimental = experimental;
-    state_.nSamples = nSamples;
-    state_.samplePeriod = samplePeriod;
-    state_.nWindows = nWindows;
-    state_.k = k;
-    state_.sigma = sigma;
     state_.histogram = std::move(std::vector<double>(nbins, 0.));
     state_.nextSampleTime = state_.samplePeriod;
     state_.nextWindowUpdateTime = state_.nSamples * state_.samplePeriod;
@@ -166,10 +158,14 @@ void EnsemblePotential::callback(gmx::Vector v,
                               rdiff);
     const auto R = sqrt(Rsquared);
 
-    // Store historical data every sample_period steps
-    if (t >= state_.nextSampleTime)
+    // Store historical data every sample_period steps.
+    // We skip an extra call-back at time zero, because the force is
+    // evaluated twice for the first time step.
+    // TODO: Better handling of the first time step, especially for restarts.
+    if (t >= state_.nextSampleTime && t > 0.)
     {
-        state_.distanceSamples[state_.currentSample++] = R;
+        assert(state_.distanceSamples.size() == state_.nSamples);
+        state_.distanceSamples.at(state_.currentSample++) = R;
         state_.nextSampleTime = (state_.currentSample + 1) * state_.samplePeriod + state_.windowStartTime;
     };
 
@@ -333,6 +329,7 @@ makeEnsembleParams(size_t nbins,
     params->maxDist = maxDist;
     params->experimental = experimental;
     params->nSamples = nSamples;
+    params->distanceSamples.resize(params->nSamples);
     params->samplePeriod = samplePeriod;
     params->nWindows = nWindows;
     params->k = k;

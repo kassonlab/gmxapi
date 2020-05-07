@@ -48,7 +48,7 @@ struct ensemble_input_param_type
     double maxDist{0};
 
     /// Experimental reference distribution.
-    std::vector<double> experimental{};
+    std::vector<double> experimental;
 
     /// Number of samples to store during each window.
     unsigned int nSamples{0};
@@ -77,7 +77,7 @@ struct ensemble_input_param_type
     double windowStartTime{0};
     double nextWindowUpdateTime;
     /// The history of nwindows histograms for this restraint.
-    std::vector<plugin::Matrix<double>> windows{};
+    std::vector<plugin::Matrix<double>> windows;
 };
 
 std::unique_ptr<ensemble_input_param_type>
