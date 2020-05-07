@@ -130,11 +130,14 @@ TEST_F(GmxApiTest, ApiRunnerRestrainedMD)
 
         auto restraint = std::make_shared<SimpleApiModule>();
 
-        auto session = system.launch(context);
+        MDWorkSpec spec;
+        spec.addModule(restraint);
+
+        auto session = system.launch(context, spec);
+
         EXPECT_TRUE(session != nullptr);
         EXPECT_EQ(restraint->hasBeenCalled(), false);
 
-        gmxapi::addSessionRestraint(session.get(), restraint);
         gmxapi::Status status;
         ASSERT_NO_THROW(status = session->run());
         EXPECT_TRUE(status.success());

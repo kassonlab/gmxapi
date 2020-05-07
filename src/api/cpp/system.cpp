@@ -68,9 +68,14 @@ System::Impl& System::Impl::operator=(System::Impl&& source) noexcept
 }
 //! \endcond
 
+std::shared_ptr<Session> System::launch(const std::shared_ptr<Context>& context, const MDWorkSpec& spec)
+{
+    return impl_->launch(context, spec);
+}
+
 std::shared_ptr<Session> System::launch(const std::shared_ptr<Context>& context)
 {
-    return impl_->launch(context);
+    return launch(context, MDWorkSpec());
 }
 
 //! \cond
@@ -117,14 +122,12 @@ System fromTprFile(const std::string& filename)
 }
 
 System::Impl::Impl(std::unique_ptr<gmxapi::Workflow> workflow) noexcept :
-    workflow_(std::move(workflow)),
-    spec_(std::make_shared<MDWorkSpec>())
+    workflow_(std::move(workflow))
 {
     GMX_ASSERT(workflow_, "Class invariant implies non-null workflow_ member");
-    GMX_ASSERT(spec_, "Class invariant implies non-null work specification member.");
 }
 
-std::shared_ptr<Session> System::Impl::launch(const std::shared_ptr<Context>& context)
+std::shared_ptr<Session> System::Impl::launch(const std::shared_ptr<Context>& context, const MDWorkSpec& spec)
 {
     std::shared_ptr<Session> session = nullptr;
     if (context != nullptr)
@@ -133,7 +136,7 @@ std::shared_ptr<Session> System::Impl::launch(const std::shared_ptr<Context>& co
         session = context->launch(*workflow_);
         GMX_ASSERT(session, "Context::launch() expected to produce non-null session.");
 
-        for (auto&& module : spec_->getModules())
+        for (auto&& module : spec.getModules())
         {
             // TODO: This should be the job of the launching code that produces the Session.
             // Configure the restraints in a restraint manager made available to the session launcher.

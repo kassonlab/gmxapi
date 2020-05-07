@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -83,18 +83,11 @@ public:
      * The session is returned as a shared pointer so that the Context can
      * maintain a weak reference to it via std::weak_ptr.
      */
-    std::shared_ptr<Session> launch(const std::shared_ptr<Context>& context);
+    std::shared_ptr<Session> launch(const std::shared_ptr<Context>& context, const MDWorkSpec& spec);
 
 private:
     //! Description of simulation work.
     std::shared_ptr<Workflow> workflow_;
-
-    /*!
-     * \brief Specified simulation work.
-     *
-     * \todo merge Workflow and MDWorkSpec
-     */
-    std::shared_ptr<gmxapi::MDWorkSpec> spec_;
 };
 
 } // end namespace gmxapi

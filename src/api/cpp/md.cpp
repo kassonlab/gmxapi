@@ -85,6 +85,12 @@ std::vector<std::shared_ptr<gmxapi::MDModule>>& MDWorkSpec::getModules()
     return impl_->modules;
 }
 
+const std::vector<std::shared_ptr<gmxapi::MDModule>>& MDWorkSpec::getModules() const
+{
+    GMX_ASSERT(impl_, "Expected non-null implementation object.");
+    return impl_->modules;
+}
+
 MDWorkSpec::~MDWorkSpec() = default;
 
 std::shared_ptr<::gmxapi::MDWorkSpec> MDHolder::getSpec()
