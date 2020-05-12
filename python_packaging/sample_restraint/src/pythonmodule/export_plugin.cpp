@@ -22,6 +22,7 @@
 #include "gmxapi/md/mdmodule.h"
 
 #include "ensemblepotential.h"
+#include "ensembletimer.h"
 
 // Make a convenient alias to save some typing...
 namespace py = pybind11;
@@ -72,6 +73,17 @@ std::unique_ptr<EnsembleRestraintBuilder> createEnsembleBuilder(const py::object
 // end of the PYBIND11_MODULE block.
 ////////////////////////////////////////////////////////////////////////////////
 
+using plugin::EnsembleTimer;
+using EnsembleTimerBuilder = RestraintBuilder<EnsembleTimer>;
+std::unique_ptr<EnsembleTimerBuilder> createTimerBuilder(const py::object& element)
+{
+    using std::make_unique;
+    using data_t = EnsembleTimer::input_param_type;
+    auto builder = make_unique<EnsembleTimerBuilder>(element);
+    (*builder).add_input("data", &data_t::ensemble_data);
+    return builder;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // The PYBIND11_MODULE block uses the pybind11 framework (ref
 // https://github.com/pybind/pybind11 ) to generate Python bindings to the C++
@@ -91,9 +103,9 @@ std::unique_ptr<EnsembleRestraintBuilder> createEnsembleBuilder(const py::object
 // object library in the CMakeLists.txt file. The second argument, 'm', can be
 // anything but it might as well be short since we use it to refer to aspects of
 // the module we are defining.
-PYBIND11_MODULE(myplugin, m)
+PYBIND11_MODULE(klprof, m)
 {
-    m.doc() = "sample plugin"; // This will be the text of the module's docstring.
+    m.doc() = "gmxapi profiling plugins"; // This will be the text of the module's docstring.
 
     // Matrix utility class (temporary). Borrowed from
     // http://pybind11.readthedocs.io/en/master/advanced/pycpp/numpy.html#arrays
@@ -116,39 +128,81 @@ PYBIND11_MODULE(myplugin, m)
     //
     // Define Builder to be returned from ensemble_restraint Python function
     // defined further down.
-    pybind11::class_<EnsembleRestraintBuilder> ensembleBuilder(
-            m, "EnsembleBuilder");
-    ensembleBuilder.def("add_subscriber", &EnsembleRestraintBuilder::addSubscriber);
-    ensembleBuilder.def("build", &EnsembleRestraintBuilder::build);
+    {
+        pybind11::class_<EnsembleRestraintBuilder> ensembleBuilder(m, "EnsembleBuilder");
+        ensembleBuilder.def("add_subscriber", &EnsembleRestraintBuilder::addSubscriber);
+        ensembleBuilder.def("build", &EnsembleRestraintBuilder::build);
 
-    // Define a more concise name for the template instantiation...
-    using PyEnsemble = PyRestraint<RestraintModule<Restraint<EnsemblePotential>>>;
+        // Define a more concise name for the template instantiation...
+        using PyEnsemble = PyRestraint<RestraintModule<Restraint<EnsemblePotential>>>;
 
-    // Export a Python class for our parameters struct
-    py::class_<Restraint<EnsemblePotential>::input_param_type> ensembleParams(
-            m, "EnsembleRestraintParams");
-    m.def("make_ensemble_params", &makeEnsembleParams);
+        // Export a Python class for our parameters struct
+        py::class_<Restraint<EnsemblePotential>::input_param_type> ensembleParams(
+                m, "EnsembleRestraintParams");
+        m.def("make_ensemble_params", &makeEnsembleParams);
 
-    // API object to build.
-    py::class_<PyEnsemble, std::shared_ptr<PyEnsemble>> ensemble(
-            m, "EnsembleRestraint");
-    // EnsembleRestraint can only be created via builder for now.
-    ensemble.def("bind", &PyEnsemble::bind, "Implement binding protocol");
-    /*
-     * To implement gmxapi_workspec_1_0, the module needs a function that a
-     * Context can import that produces a builder that translates workspec
-     * elements for session launching. The object returned by our function needs
-     * to have an add_subscriber(other_builder) method and a build(graph)
-     * method. The build() method returns None or a launcher. A launcher has a
-     * signature like launch(rank) and returns None or a runner.
-     */
+        // API object to build.
+        py::class_<PyEnsemble, std::shared_ptr<PyEnsemble>> ensemble(m, "EnsembleRestraint");
+        // EnsembleRestraint can only be created via builder for now.
+        ensemble.def("bind", &PyEnsemble::bind, "Implement binding protocol");
+        /*
+         * To implement gmxapi_workspec_1_0, the module needs a function that a
+         * Context can import that produces a builder that translates workspec
+         * elements for session launching. The object returned by our function needs
+         * to have an add_subscriber(other_builder) method and a build(graph)
+         * method. The build() method returns None or a launcher. A launcher has a
+         * signature like launch(rank) and returns None or a runner.
+         */
 
-    // Generate the name operation that will be used to specify elements of Work
-    // in gmxapi workflows. WorkElements will then have namespace: "myplugin"
-    // and operation: "ensemble_restraint"
-    m.def("ensemble_restraint",
-          [](const py::object element) { return createEnsembleBuilder(element); });
+        // Generate the name operation that will be used to specify elements of Work
+        // in gmxapi workflows. WorkElements will then have namespace: "myplugin"
+        // and operation: "ensemble_restraint"
+        m.def("ensemble_restraint",
+              [](const py::object element) { return createEnsembleBuilder(element); });
+    }
     //
     // End EnsembleRestraint
+    ///////////////////////////////////////////////////////////////////////////
+
+
+    //////////////////////////////////////////////////////////////////////////
+    // Begin EnsembleTimer
+    //
+    // Define Builder to be returned from ensemble_timer Python function
+    // defined further down.
+    {
+        pybind11::class_<EnsembleTimerBuilder> timerBuilder(m, "TimerBuilder");
+        timerBuilder.def("add_subscriber", &EnsembleTimerBuilder::addSubscriber);
+        timerBuilder.def("build", &EnsembleTimerBuilder::build);
+
+        // Define a more concise name for the template instantiation...
+        using PyEnsemble = PyRestraint<RestraintModule<Restraint<EnsembleTimer>>>;
+
+        // Export a Python class for our parameters struct
+        py::class_<Restraint<EnsembleTimer>::input_param_type> timerParams(
+                m, "EnsembleTimerParams");
+        m.def("make_timer_params", &plugin::makeTimerParams);
+
+        // API object to build.
+        py::class_<PyEnsemble, std::shared_ptr<PyEnsemble>> ensemble(m, "EnsembleTimer");
+        // EnsembleRestraint can only be created via builder for now.
+        ensemble.def("bind", &PyEnsemble::bind, "Implement binding protocol");
+        /*
+         * To implement gmxapi_workspec_1_0, the module needs a function that a
+         * Context can import that produces a builder that translates workspec
+         * elements for session launching. The object returned by our function needs
+         * to have an add_subscriber(other_builder) method and a build(graph)
+         * method. The build() method returns None or a launcher. A launcher has a
+         * signature like launch(rank) and returns None or a runner.
+         */
+
+        // Generate the name operation that will be used to specify elements of Work
+        // in gmxapi workflows. WorkElements will then have namespace: "klprof"
+        // and operation: "ensemble_timer"
+        m.def("ensemble_timer",
+              [](const py::object element) { return createTimerBuilder(element); });
+    }
+    //
+    // End EnsembleTimer
     ///////////////////////////////////////////////////////////////////////////
 }

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.9.6)
 # If you are using this repository as a template, you should probably change the
 # project name and adopt your own versioning scheme.
-project(sample_restraint VERSION 0.0.8)
+project(klprof VERSION 0.1)
 
 find_package(PythonInterp)
 
