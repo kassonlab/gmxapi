@@ -452,7 +452,9 @@ def _get_ensemble_update(context):
         suffix = '_{}.npz'.format(tag)
         # These will end up in the working directory and each ensemble member will have one
         filename = str("rank{}part{:04d}{}".format(active_context.rank, int(active_context.part[tag]), suffix))
-        numpy.savez(filename, recv=recv)
+        # TODO: Optional log file.
+        # Abstraction for output file, and perform write in a separate thread.
+        # numpy.savez(filename, recv=recv)
         active_context.part[tag] += 1
 
     def _no_ensemble_update(active_context, send, recv, tag=None):
