@@ -27,7 +27,6 @@ namespace plugin
  */
 struct ensemble_timer_param_type
 {
-    std::vector<plugin::Matrix<double>> ensemble_data;
 };
 
 std::unique_ptr<ensemble_timer_param_type>

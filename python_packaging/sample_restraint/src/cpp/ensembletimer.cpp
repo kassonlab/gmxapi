@@ -48,12 +48,10 @@ void EnsembleTimer::callback(gmx::Vector v,
     // We request a handle each time before using resources to make error handling easier if there is a failure in
     // one of the ensemble member processes and to give more freedom to how resources are managed from step to step.
     auto ensemble = resources.getHandle();
-    std::vector<double> data_copy = *state_.ensemble_data[0].vector();
-    Matrix<double> matrix_copy(std::move(data_copy));
+    Matrix<double> matrix1(1,1);
+    Matrix<double> matrix2(1,1);
     // Get global reduction (sum) and checkpoint.
-    assert(state_.ensemble_data[0].data() != nullptr);
-    assert(matrix_copy.data() != nullptr);
-    ensemble.reduce(matrix_copy, &state_.ensemble_data[0]);
+    ensemble.reduce(matrix1, &matrix2);
 }
 
 
@@ -72,8 +70,6 @@ gmx::PotentialPointData EnsembleTimer::calculate(gmx::Vector v,
 std::unique_ptr<ensemble_timer_param_type>
 makeTimerParams() {
     auto params = std::make_unique<ensemble_timer_param_type>();
-    auto matrix = Matrix<double>(1, 1);
-    params->ensemble_data.emplace_back(std::move(matrix));
     return params;
 };
 

@@ -80,7 +80,6 @@ std::unique_ptr<EnsembleTimerBuilder> createTimerBuilder(const py::object& eleme
     using std::make_unique;
     using data_t = EnsembleTimer::input_param_type;
     auto builder = make_unique<EnsembleTimerBuilder>(element);
-    (*builder).add_input("data", &data_t::ensemble_data);
     return builder;
 }
 
