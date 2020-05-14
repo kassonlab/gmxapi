@@ -182,7 +182,6 @@ void RestraintForceProvider::calculateForces(const ForceProviderInput& forceProv
         //        decltype(entry_time)::duration::period::num * 1000000000
         //        / decltype(entry_time)::duration::period::den;
         outfile_ << "RestraintForceProvider::calculateForces:" << t << ":" << elapsed_time.count() << "ns\n";
-        outfile_ << std::flush;
     }
 #endif
 }
