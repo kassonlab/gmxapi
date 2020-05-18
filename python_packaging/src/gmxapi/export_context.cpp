@@ -151,6 +151,12 @@ static void setMDArgs(std::vector<std::string>* mdargs, const py::dict& params)
             throw;
         }
     }
+    if (params.contains("pin"))
+    {
+        auto val = py::cast<std::string>(py::str(params["pin"]));
+        mdargs->emplace_back("-pin");
+        mdargs->emplace_back(val);
+    }
 }
 
 void export_context(py::module& m)
