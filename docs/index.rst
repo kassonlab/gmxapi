@@ -2,8 +2,8 @@
 gmxapi Python package
 =====================
 
-gmxapi 0.0.7 is hosted at https://www.github.com/kassonlab/gmxapi and is
-based on `GROMACS 2019 <http://manual.gromacs.org/2019-current/index.html>`_.
+gmxapi 0.0.7 is hosted at https://github.com/kassonlab/gmxapi/tree/release-0_0_7 and is
+built on `GROMACS 2019 <http://manual.gromacs.org/2019-current/index.html>`_.
 
 Refer to `ReadTheDocs <https://gmxapi.readthedocs.io/en/release-0_0_7/>`_
 for documentation, or download the source code from
