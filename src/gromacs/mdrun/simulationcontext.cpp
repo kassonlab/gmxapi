@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -50,17 +50,23 @@
 namespace gmx
 {
 //! \cond libapi
-SimulationContext::SimulationContext(MPI_Comm                          communicator,
-                                     const ArrayRef<const std::string> multiSimDirectoryNames) :
-    communicator_(communicator)
+SimulationContext::SimulationContext(MPI_Comm                    communicator,
+                                     ArrayRef<const std::string> multiSimDirectoryNames) :
+    libraryWorldCommunicator_(communicator)
 {
     GMX_RELEASE_ASSERT((GMX_LIB_MPI && (communicator != MPI_COMM_NULL))
                                || (!GMX_LIB_MPI && (communicator == MPI_COMM_NULL)),
                        "With real MPI, a non-null communicator is required. "
                        "Without it, the communicator must be null.");
-    if (!multiSimDirectoryNames.empty())
+    if (multiSimDirectoryNames.empty())
     {
-        multiSimulation_ = std::make_unique<gmx_multisim_t>(communicator, multiSimDirectoryNames);
+        simulationCommunicator_ = communicator;
+    }
+    else
+    {
+        multiSimulation_ = buildMultiSimulation(communicator, multiSimDirectoryNames);
+        // Use the communicator resulting from the split for the multi-simulation.
+        simulationCommunicator_ = multiSimulation_->simulationComm_;
     }
 }
 

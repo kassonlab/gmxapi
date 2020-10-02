@@ -44,8 +44,8 @@
 #include <string>
 #include <vector>
 
-#include "gromacs/gpu_utils/gpu_utils.h"
 #include "gromacs/hardware/cpuinfo.h"
+#include "gromacs/hardware/device_management.h"
 #include "gromacs/hardware/hardwaretopology.h"
 #include "gromacs/hardware/hw_info.h"
 #include "gromacs/hardware/identifyavx512fmaunits.h"
@@ -61,19 +61,17 @@
 #include "gromacs/utility/sysinfo.h"
 
 //! Constant used to help minimize preprocessed code
-static const bool bGPUBinary = GMX_GPU != GMX_GPU_NONE;
+static constexpr bool bGPUBinary = (GMX_GPU != 0);
 
 /*! \internal \brief
  * Returns the GPU information text, one GPU per line.
  */
-static std::string sprint_gpus(const gmx_gpu_info_t& gpu_info)
+static std::string sprint_gpus(const std::vector<std::unique_ptr<DeviceInformation>>& deviceInfoList)
 {
-    char                     stmp[STRLEN];
-    std::vector<std::string> gpuStrings;
-    for (int i = 0; i < gpu_info.n_dev; i++)
+    std::vector<std::string> gpuStrings(0);
+    for (const auto& deviceInfo : deviceInfoList)
     {
-        get_gpu_device_info_string(stmp, gpu_info, i);
-        gpuStrings.push_back(gmx::formatString("    %s", stmp));
+        gpuStrings.emplace_back("    " + getDeviceInformationString(*deviceInfo));
     }
     return gmx::joinStrings(gpuStrings, "\n");
 }
@@ -82,7 +80,7 @@ static std::string sprint_gpus(const gmx_gpu_info_t& gpu_info)
    and runtime CPU do not match. */
 static void check_use_of_rdtscp_on_this_cpu(const gmx::MDLogger& mdlog, const gmx::CpuInfo& cpuInfo)
 {
-    bool binaryUsesRdtscp = HAVE_RDTSCP;
+    bool binaryUsesRdtscp = GMX_USE_RDTSCP;
 
     const char* programName = gmx::getProgramContext().displayName();
 
@@ -145,14 +143,21 @@ static std::string detected_hardware_string(const gmx_hw_info_t* hwinfo, bool bF
         s += gmx::formatString(" %d cores,", hwinfo->ncore_tot);
     }
     s += gmx::formatString(" %d logical cores", hwinfo->nhwthread_tot);
-    if (hwinfo->gpu_info.bDetectGPUs)
+    if (canPerformDeviceDetection(nullptr))
     {
         s += gmx::formatString(", %d compatible GPU%s", hwinfo->ngpu_compatible_tot,
                                hwinfo->ngpu_compatible_tot == 1 ? "" : "s");
     }
     else if (bGPUBinary)
     {
-        s += gmx::formatString(" (GPU detection deactivated)");
+        if (isDeviceDetectionEnabled())
+        {
+            s += gmx::formatString(" (GPU detection failed)");
+        }
+        else
+        {
+            s += gmx::formatString(" (GPU detection deactivated)");
+        }
     }
     s += gmx::formatString("\n");
 
@@ -344,11 +349,12 @@ static std::string detected_hardware_string(const gmx_hw_info_t* hwinfo, bool bF
         }
     }
 
-    if (bGPUBinary && hwinfo->gpu_info.n_dev > 0)
+    if (bGPUBinary && !hwinfo->deviceInfoList.empty())
     {
         s += gmx::formatString("  GPU info:\n");
-        s += gmx::formatString("    Number of GPUs detected: %d\n", hwinfo->gpu_info.n_dev);
-        s += sprint_gpus(hwinfo->gpu_info) + "\n";
+        s += gmx::formatString("    Number of GPUs detected: %d\n",
+                               static_cast<int>(hwinfo->deviceInfoList.size()));
+        s += sprint_gpus(hwinfo->deviceInfoList) + "\n";
     }
     return s;
 }

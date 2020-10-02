@@ -46,9 +46,12 @@
 #include "config.h"
 
 #include "gromacs/topology/ifunc.h"
-#include "gromacs/trajectory/energyframe.h"
 #include "gromacs/utility/stringutil.h"
 
+#include "testutils/mpitest.h"
+#include "testutils/simulationdatabase.h"
+
+#include "moduletest.h"
 #include "simulatorcomparison.h"
 
 namespace gmx
@@ -102,8 +105,61 @@ const TrajectoryFrameMatchSettings MdrunRerunTest::trajectoryMatchSettings = {
     true,
     ComparisonConditions::MustCompare,
     ComparisonConditions::NoComparison,
-    ComparisonConditions::MustCompare
+    ComparisonConditions::MustCompare,
+    MaxNumFrames::compareAllFrames()
 };
+
+void executeRerunTest(TestFileManager*            fileManager,
+                      SimulationRunner*           runner,
+                      const std::string&          simulationName,
+                      int                         numWarningsToTolerate,
+                      const MdpFieldValues&       mdpFieldValues,
+                      const EnergyTermsToCompare& energyTermsToCompare,
+                      const TrajectoryComparison& trajectoryComparison)
+{
+    // TODO At some point we should also test PME-only ranks.
+    int numRanksAvailable = getNumberOfTestMpiRanks();
+    if (!isNumberOfPpRanksSupported(simulationName, numRanksAvailable))
+    {
+        fprintf(stdout,
+                "Test system '%s' cannot run with %d ranks.\n"
+                "The supported numbers are: %s\n",
+                simulationName.c_str(), numRanksAvailable,
+                reportNumbersOfPpRanksSupported(simulationName).c_str());
+        return;
+    }
+
+    // Set file names
+    auto simulator1TrajectoryFileName = fileManager->getTemporaryFilePath("sim1.trr");
+    auto simulator1EdrFileName        = fileManager->getTemporaryFilePath("sim1.edr");
+    auto simulator2TrajectoryFileName = fileManager->getTemporaryFilePath("sim2.trr");
+    auto simulator2EdrFileName        = fileManager->getTemporaryFilePath("sim2.edr");
+
+    // Run grompp
+    runner->tprFileName_ = fileManager->getTemporaryFilePath("sim.tpr");
+    runner->useTopGroAndNdxFromDatabase(simulationName);
+    runner->useStringAsMdpFile(prepareMdpFileContents(mdpFieldValues));
+    auto options = std::vector<SimulationOptionTuple>();
+    if (numWarningsToTolerate > 0)
+    {
+        options.emplace_back(SimulationOptionTuple("-maxwarn", std::to_string(numWarningsToTolerate)));
+    }
+    runGrompp(runner, options);
+
+    // Do first mdrun
+    runner->fullPrecisionTrajectoryFileName_ = simulator1TrajectoryFileName;
+    runner->edrFileName_                     = simulator1EdrFileName;
+    runMdrun(runner);
+
+    // Do second mdrun
+    runner->fullPrecisionTrajectoryFileName_ = simulator2TrajectoryFileName;
+    runner->edrFileName_                     = simulator2EdrFileName;
+    runMdrun(runner, { SimulationOptionTuple("-rerun", simulator1TrajectoryFileName) });
+
+    // Compare simulation results
+    compareEnergies(simulator1EdrFileName, simulator2EdrFileName, energyTermsToCompare);
+    compareTrajectories(simulator1TrajectoryFileName, simulator2TrajectoryFileName, trajectoryComparison);
+}
 
 TEST_P(MdrunRerunTest, WithinTolerances)
 {
@@ -138,7 +194,7 @@ TEST_P(MdrunRerunTest, WithinTolerances)
 // TODO The time for OpenCL kernel compilation means these tests time
 // out. Once that compilation is cached for the whole process, these
 // tests can run in such configurations.
-#if GMX_GPU != GMX_GPU_OPENCL
+#if !GMX_GPU_OPENCL
 INSTANTIATE_TEST_CASE_P(
         NormalMdrunIsReproduced,
         MdrunRerunTest,
@@ -197,7 +253,7 @@ TEST_P(MdrunRerunFreeEnergyTest, WithinTolerances)
 // TODO The time for OpenCL kernel compilation means these tests time
 // out. Once that compilation is cached for the whole process, these
 // tests can run in such configurations.
-#if GMX_GPU != GMX_GPU_OPENCL
+#if !GMX_GPU_OPENCL
 INSTANTIATE_TEST_CASE_P(MdrunIsReproduced,
                         MdrunRerunFreeEnergyTest,
                         ::testing::Combine(::testing::Values("nonanol_vacuo"),

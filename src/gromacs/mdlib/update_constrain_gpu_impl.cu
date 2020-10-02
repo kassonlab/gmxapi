@@ -66,6 +66,7 @@
 #include "gromacs/mdlib/lincs_gpu.cuh"
 #include "gromacs/mdlib/settle_gpu.cuh"
 #include "gromacs/mdlib/update_constrain_gpu.h"
+#include "gromacs/mdtypes/mdatom.h"
 
 namespace gmx
 {
@@ -166,6 +167,25 @@ void UpdateConstrainGpu::Impl::scaleCoordinates(const matrix scalingMatrix)
     deviceStream_.synchronize();
 }
 
+void UpdateConstrainGpu::Impl::scaleVelocities(const matrix scalingMatrix)
+{
+    ScalingMatrix mu;
+    mu.xx = scalingMatrix[XX][XX];
+    mu.yy = scalingMatrix[YY][YY];
+    mu.zz = scalingMatrix[ZZ][ZZ];
+    mu.yx = scalingMatrix[YY][XX];
+    mu.zx = scalingMatrix[ZZ][XX];
+    mu.zy = scalingMatrix[ZZ][YY];
+
+    const auto kernelArgs = prepareGpuKernelArguments(
+            scaleCoordinates_kernel, coordinateScalingKernelLaunchConfig_, &numAtoms_, &d_v_, &mu);
+    launchGpuKernel(scaleCoordinates_kernel, coordinateScalingKernelLaunchConfig_, deviceStream_,
+                    nullptr, "scaleCoordinates_kernel", kernelArgs);
+    // TODO: Although this only happens on the pressure coupling steps, this synchronization
+    //       can affect the perfornamce if nstpcouple is small.
+    deviceStream_.synchronize();
+}
+
 UpdateConstrainGpu::Impl::Impl(const t_inputrec&     ir,
                                const gmx_mtop_t&     mtop,
                                const DeviceContext&  deviceContext,
@@ -213,9 +233,9 @@ void UpdateConstrainGpu::Impl::set(DeviceBuffer<RVec>            d_x,
                            &numInverseMassesAlloc_, deviceContext_);
 
     // Integrator should also update something, but it does not even have a method yet
-    integrator_->set(md, numTempScaleValues, md.cTC);
-    lincsGpu_->set(idef, md);
-    settleGpu_->set(idef, md);
+    integrator_->set(numAtoms_, md.invmass, numTempScaleValues, md.cTC);
+    lincsGpu_->set(idef, numAtoms_, md.invmass);
+    settleGpu_->set(idef);
 
     coordinateScalingKernelLaunchConfig_.gridSize[0] =
             (numAtoms_ + c_threadsPerBlock - 1) / c_threadsPerBlock;
@@ -260,6 +280,11 @@ void UpdateConstrainGpu::integrate(GpuEventSynchronizer*             fReadyOnDev
 void UpdateConstrainGpu::scaleCoordinates(const matrix scalingMatrix)
 {
     impl_->scaleCoordinates(scalingMatrix);
+}
+
+void UpdateConstrainGpu::scaleVelocities(const matrix scalingMatrix)
+{
+    impl_->scaleVelocities(scalingMatrix);
 }
 
 void UpdateConstrainGpu::set(DeviceBuffer<RVec>            d_x,

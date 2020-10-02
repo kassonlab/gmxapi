@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -48,6 +48,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "gromacs/utility/arrayref.h"
+#include "gromacs/utility/real.h"
+
 #include "testutils/testasserts.h"
 #include "testutils/testmatchers.h"
 
@@ -69,6 +72,17 @@ protected:
                                        { 1e10, 1e1, 1e-2 },
                                        { 3, -6, 2.5 } };
 };
+
+class AffineTransformationTest : public ::testing::Test
+{
+protected:
+    std::vector<RVec> testVectors_ = { { 0, 0, 0 },
+                                       { 1, 0, 0 },
+                                       { 0, -1, -1 },
+                                       { 1e10, 1e1, 1e-2 },
+                                       { 3, -6, 2.5 } };
+};
+
 
 TEST_F(TranslateAndScaleTest, identityTransformation)
 {
@@ -108,6 +122,17 @@ TEST_F(TranslateAndScaleTest, translationAndScalingNonTrivial)
     EXPECT_THAT(expected, Pointwise(RVecEq(defaultFloatTolerance()), testVectors_));
 }
 
+TEST_F(TranslateAndScaleTest, translationAndScalingNonTrivialSingeVector)
+{
+    TranslateAndScale translateAndScale({ -1e10, 2, 0 }, { 1, -1, 2 });
+    RVec              test(0, 0, 0);
+    translateAndScale(&test);
+
+    EXPECT_REAL_EQ(-1e+10, test[XX]);
+    EXPECT_REAL_EQ(-2, test[YY]);
+    EXPECT_REAL_EQ(0, test[ZZ]);
+}
+
 TEST_F(TranslateAndScaleTest, scalingIdentity)
 {
     ScaleCoordinates scale(identityScale_);
@@ -126,6 +151,18 @@ TEST_F(TranslateAndScaleTest, scalingNonTrivial)
     EXPECT_THAT(expected, Pointwise(RVecEq(defaultFloatTolerance()), testVectors_));
 }
 
+TEST_F(TranslateAndScaleTest, scalingNonTrivialSingleVector)
+{
+    ScaleCoordinates scale({ -100, 0.1, 0 });
+    RVec             test(3, -6, 2.5);
+    scale(&test);
+
+    EXPECT_REAL_EQ(-300, test[XX]);
+    EXPECT_REAL_EQ(-0.6, test[YY]);
+    EXPECT_REAL_EQ(0, test[ZZ]);
+}
+
+
 TEST_F(TranslateAndScaleTest, scalingInverseNoZero)
 {
     ScaleCoordinates scale({ -100, 0.1, 3 });
@@ -142,6 +179,61 @@ TEST_F(TranslateAndScaleTest, scalingInverseWithOneScaleDimensionZero)
     scale(testVectors_);
     scale.inverseIgnoringZeroScale(testVectors_);
     EXPECT_THAT(expected, Pointwise(RVecEq(defaultFloatTolerance()), testVectors_));
+}
+
+TEST_F(TranslateAndScaleTest, scalingInverseWithOneScaleDimensionZeroSingleVector)
+{
+    ScaleCoordinates scale({ -100, 0.1, 0 });
+    RVec             test(3, -6, 2.5);
+
+    scale(&test);
+    scale.inverseIgnoringZeroScale(&test);
+
+    EXPECT_REAL_EQ(3, test[XX]);
+    EXPECT_REAL_EQ(-6, test[YY]);
+    EXPECT_REAL_EQ(0, test[ZZ]);
+}
+
+TEST_F(AffineTransformationTest, identityTransformYieldsSameVectors)
+{
+    const AffineTransformation identityTransformation(identityMatrix<real, 3>(), { 0, 0, 0 });
+    for (const auto& vector : testVectors_)
+    {
+        RVec vectorTransformed = vector;
+        identityTransformation(&vectorTransformed);
+        EXPECT_REAL_EQ(vector[XX], vectorTransformed[XX]);
+        EXPECT_REAL_EQ(vector[YY], vectorTransformed[YY]);
+        EXPECT_REAL_EQ(vector[ZZ], vectorTransformed[ZZ]);
+    }
+}
+
+TEST_F(AffineTransformationTest, applyTransformationToVectors)
+{
+    const Matrix3x3 transformMatrix({ 0.1, 1, 0.1, 0.4, 1, 0.6, 0.7, 0.8, 0.9 });
+    const RVec      transformVector = { 1, -1e5, 1e4 };
+
+    const AffineTransformation affineTransformation(transformMatrix, transformVector);
+
+    const std::vector<RVec> expectedResult = { { 1, -100'000, 10'000 },
+                                               { 1.1, -99999.6, 10000.7 },
+                                               { -0.1, -100'002, 9998.3 },
+                                               { 1e9, 3.9999e9, 7.00001e9 },
+                                               { -4.45, -100'003, 9'999.5 } };
+
+    auto expected = expectedResult.begin();
+    for (const auto& vector : testVectors_)
+    {
+        RVec vectorTransformed = vector;
+        affineTransformation(&vectorTransformed);
+        // need relaxed tolerance here, due to the number of operations involved
+        EXPECT_REAL_EQ_TOL((*expected)[XX], vectorTransformed[XX],
+                           relativeToleranceAsFloatingPoint((*expected)[XX], 1e-5));
+        EXPECT_REAL_EQ_TOL((*expected)[YY], vectorTransformed[YY],
+                           relativeToleranceAsFloatingPoint((*expected)[YY], 1e-5));
+        EXPECT_REAL_EQ_TOL((*expected)[ZZ], vectorTransformed[ZZ],
+                           relativeToleranceAsFloatingPoint((*expected)[ZZ], 1e-5));
+        ++expected;
+    }
 }
 
 } // namespace test

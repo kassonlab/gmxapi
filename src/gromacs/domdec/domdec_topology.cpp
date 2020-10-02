@@ -90,7 +90,9 @@
 #include "domdec_vsite.h"
 #include "dump.h"
 
+using gmx::ArrayRef;
 using gmx::ListOfLists;
+using gmx::RVec;
 
 /*! \brief The number of integer item in the local state, used for broadcasting of the state */
 #define NITEM_DD_INIT_LOCAL_STATE 5
@@ -119,11 +121,11 @@ struct thread_work_t
      */
     thread_work_t(const gmx_ffparams_t& ffparams) : idef(ffparams) {}
 
-    InteractionDefinitions    idef;       /**< Partial local topology */
-    std::unique_ptr<VsitePbc> vsitePbc;   /**< vsite PBC structure */
-    int                       nbonded;    /**< The number of bondeds in this struct */
-    ListOfLists<int>          excl;       /**< List of exclusions */
-    int                       excl_count; /**< The total exclusion count for \p excl */
+    InteractionDefinitions         idef;               /**< Partial local topology */
+    std::unique_ptr<gmx::VsitePbc> vsitePbc = nullptr; /**< vsite PBC structure */
+    int                            nbonded  = 0;       /**< The number of bondeds in this struct */
+    ListOfLists<int>               excl;               /**< List of exclusions */
+    int                            excl_count = 0;     /**< The total exclusion count for \p excl */
 };
 
 /*! \brief Struct for the reverse topology: links bonded interactions to atomsx */
@@ -184,95 +186,115 @@ static gmx_bool dd_check_ftype(int ftype, gmx_bool bBCheck, gmx_bool bConstr, gm
             || (bConstr && (ftype == F_CONSTR || ftype == F_CONSTRNC)) || (bSettle && ftype == F_SETTLE));
 }
 
-/*! \brief Help print error output when interactions are missing
+/*! \brief Checks whether interactions have been assigned for one function type
  *
- * \note This function needs to be called on all ranks (contains a global summation)
+ * Loops over a list of interactions in the local topology of one function type
+ * and flags each of the interactions as assigned in the global \p isAssigned list.
+ * Exits with an inconsistency error when an interaction is assigned more than once.
  */
-static std::string print_missing_interactions_mb(t_commrec*                    cr,
-                                                 const gmx_reverse_top_t*      rt,
-                                                 const char*                   moltypename,
-                                                 const reverse_ilist_t*        ril,
-                                                 int                           a_start,
-                                                 int                           a_end,
-                                                 int                           nat_mol,
-                                                 int                           nmol,
-                                                 const InteractionDefinitions* idef)
+static void flagInteractionsForType(const int                ftype,
+                                    const InteractionList&   il,
+                                    const reverse_ilist_t&   ril,
+                                    const gmx::Range<int>&   atomRange,
+                                    const int                numAtomsPerMolecule,
+                                    gmx::ArrayRef<const int> globalAtomIndices,
+                                    gmx::ArrayRef<int>       isAssigned)
 {
-    int* assigned;
-    int  nril_mol = ril->index[nat_mol];
-    snew(assigned, nmol * nril_mol);
-    gmx::StringOutputStream stream;
-    gmx::TextWriter         log(&stream);
+    const int nril_mol = ril.index[numAtomsPerMolecule];
+    const int nral     = NRAL(ftype);
 
-    gmx::ArrayRef<const int> gatindex = cr->dd->globalAtomIndices;
-    for (int ftype = 0; ftype < F_NRE; ftype++)
+    for (int i = 0; i < il.size(); i += 1 + nral)
     {
-        if (dd_check_ftype(ftype, rt->bBCheck, rt->bConstr, rt->bSettle))
+        // ia[0] is the interaction type, ia[1, ...] the atom indices
+        const int* ia = il.iatoms.data() + i;
+        // Extract the global atom index of the first atom in this interaction
+        const int a0 = globalAtomIndices[ia[1]];
+        /* Check if this interaction is in
+         * the currently checked molblock.
+         */
+        if (atomRange.isInRange(a0))
         {
-            int                    nral = NRAL(ftype);
-            const InteractionList* il   = &idef->il[ftype];
-            const int*             ia   = il->iatoms.data();
-            for (int i = 0; i < il->size(); i += 1 + nral)
+            // The molecule index in the list of this molecule type
+            const int moleculeIndex = (a0 - atomRange.begin()) / numAtomsPerMolecule;
+            const int atomOffset = (a0 - atomRange.begin()) - moleculeIndex * numAtomsPerMolecule;
+            const int globalAtomStartInMolecule = atomRange.begin() + moleculeIndex * numAtomsPerMolecule;
+            int       j_mol                     = ril.index[atomOffset];
+            bool found                          = false;
+            while (j_mol < ril.index[atomOffset + 1] && !found)
             {
-                int a0 = gatindex[ia[1]];
-                /* Check if this interaction is in
-                 * the currently checked molblock.
+                const int j       = moleculeIndex * nril_mol + j_mol;
+                const int ftype_j = ril.il[j_mol];
+                /* Here we need to check if this interaction has
+                 * not already been assigned, since we could have
+                 * multiply defined interactions.
                  */
-                if (a0 >= a_start && a0 < a_end)
+                if (ftype == ftype_j && ia[0] == ril.il[j_mol + 1] && isAssigned[j] == 0)
                 {
-                    int  mol    = (a0 - a_start) / nat_mol;
-                    int  a0_mol = (a0 - a_start) - mol * nat_mol;
-                    int  j_mol  = ril->index[a0_mol];
-                    bool found  = false;
-                    while (j_mol < ril->index[a0_mol + 1] && !found)
+                    /* Check the atoms */
+                    found = true;
+                    for (int a = 0; a < nral; a++)
                     {
-                        int j       = mol * nril_mol + j_mol;
-                        int ftype_j = ril->il[j_mol];
-                        /* Here we need to check if this interaction has
-                         * not already been assigned, since we could have
-                         * multiply defined interactions.
-                         */
-                        if (ftype == ftype_j && ia[0] == ril->il[j_mol + 1] && assigned[j] == 0)
+                        if (globalAtomIndices[ia[1 + a]]
+                            != globalAtomStartInMolecule + ril.il[j_mol + 2 + a])
                         {
-                            /* Check the atoms */
-                            found = true;
-                            for (int a = 0; a < nral; a++)
-                            {
-                                if (gatindex[ia[1 + a]] != a_start + mol * nat_mol + ril->il[j_mol + 2 + a])
-                                {
-                                    found = false;
-                                }
-                            }
-                            if (found)
-                            {
-                                assigned[j] = 1;
-                            }
+                            found = false;
                         }
-                        j_mol += 2 + nral_rt(ftype_j);
                     }
-                    if (!found)
+                    if (found)
                     {
-                        gmx_incons("Some interactions seem to be assigned multiple times");
+                        isAssigned[j] = 1;
                     }
                 }
-                ia += 1 + nral;
+                j_mol += 2 + nral_rt(ftype_j);
+            }
+            if (!found)
+            {
+                gmx_incons("Some interactions seem to be assigned multiple times");
             }
         }
     }
+}
 
-    gmx_sumi(nmol * nril_mol, assigned, cr);
+/*! \brief Help print error output when interactions are missing in a molblock
+ *
+ * \note This function needs to be called on all ranks (contains a global summation)
+ */
+static std::string printMissingInteractionsMolblock(t_commrec*               cr,
+                                                    const gmx_reverse_top_t& rt,
+                                                    const char*              moltypename,
+                                                    const reverse_ilist_t&   ril,
+                                                    const gmx::Range<int>&   atomRange,
+                                                    const int                numAtomsPerMolecule,
+                                                    const int                numMolecules,
+                                                    const InteractionDefinitions& idef)
+{
+    const int               nril_mol = ril.index[numAtomsPerMolecule];
+    std::vector<int>        isAssigned(numMolecules * nril_mol, 0);
+    gmx::StringOutputStream stream;
+    gmx::TextWriter         log(&stream);
 
-    int nprint = 10;
-    int i      = 0;
-    for (int mol = 0; mol < nmol; mol++)
+    for (int ftype = 0; ftype < F_NRE; ftype++)
+    {
+        if (dd_check_ftype(ftype, rt.bBCheck, rt.bConstr, rt.bSettle))
+        {
+            flagInteractionsForType(ftype, idef.il[ftype], ril, atomRange, numAtomsPerMolecule,
+                                    cr->dd->globalAtomIndices, isAssigned);
+        }
+    }
+
+    gmx_sumi(isAssigned.size(), isAssigned.data(), cr);
+
+    const int numMissingToPrint = 10;
+    int       i                 = 0;
+    for (int mol = 0; mol < numMolecules; mol++)
     {
         int j_mol = 0;
         while (j_mol < nril_mol)
         {
-            int ftype = ril->il[j_mol];
+            int ftype = ril.il[j_mol];
             int nral  = NRAL(ftype);
             int j     = mol * nril_mol + j_mol;
-            if (assigned[j] == 0 && !(interaction_function[ftype].flags & IF_VSITE))
+            if (isAssigned[j] == 0 && !(interaction_function[ftype].flags & IF_VSITE))
             {
                 if (DDMASTER(cr->dd))
                 {
@@ -280,13 +302,14 @@ static std::string print_missing_interactions_mb(t_commrec*                    c
                     {
                         log.writeLineFormatted("Molecule type '%s'", moltypename);
                         log.writeLineFormatted(
-                                "the first %d missing interactions, except for exclusions:", nprint);
+                                "the first %d missing interactions, except for exclusions:",
+                                numMissingToPrint);
                     }
                     log.writeStringFormatted("%20s atoms", interaction_function[ftype].longname);
                     int a;
                     for (a = 0; a < nral; a++)
                     {
-                        log.writeStringFormatted("%5d", ril->il[j_mol + 2 + a] + 1);
+                        log.writeStringFormatted("%5d", ril.il[j_mol + 2 + a] + 1);
                     }
                     while (a < 4)
                     {
@@ -296,13 +319,13 @@ static std::string print_missing_interactions_mb(t_commrec*                    c
                     log.writeString(" global");
                     for (a = 0; a < nral; a++)
                     {
-                        log.writeStringFormatted(
-                                "%6d", a_start + mol * nat_mol + ril->il[j_mol + 2 + a] + 1);
+                        log.writeStringFormatted("%6d", atomRange.begin() + mol * numAtomsPerMolecule
+                                                                + ril.il[j_mol + 2 + a] + 1);
                     }
                     log.ensureLineBreak();
                 }
                 i++;
-                if (i >= nprint)
+                if (i >= numMissingToPrint)
                 {
                     break;
                 }
@@ -311,28 +334,28 @@ static std::string print_missing_interactions_mb(t_commrec*                    c
         }
     }
 
-    sfree(assigned);
     return stream.toString();
 }
 
 /*! \brief Help print error output when interactions are missing */
-static void print_missing_interactions_atoms(const gmx::MDLogger&          mdlog,
-                                             t_commrec*                    cr,
-                                             const gmx_mtop_t*             mtop,
-                                             const InteractionDefinitions* idef)
+static void printMissingInteractionsAtoms(const gmx::MDLogger&          mdlog,
+                                          t_commrec*                    cr,
+                                          const gmx_mtop_t&             mtop,
+                                          const InteractionDefinitions& idef)
 {
-    const gmx_reverse_top_t* rt = cr->dd->reverse_top;
+    const gmx_reverse_top_t& rt = *cr->dd->reverse_top;
 
     /* Print the atoms in the missing interactions per molblock */
     int a_end = 0;
-    for (const gmx_molblock_t& molb : mtop->molblock)
+    for (const gmx_molblock_t& molb : mtop.molblock)
     {
-        const gmx_moltype_t& moltype = mtop->moltype[molb.type];
-        int                  a_start = a_end;
+        const gmx_moltype_t& moltype = mtop.moltype[molb.type];
+        const int            a_start = a_end;
         a_end                        = a_start + molb.nmol * moltype.atoms.nr;
+        const gmx::Range<int> atomRange(a_start, a_end);
 
-        auto warning = print_missing_interactions_mb(cr, rt, *(moltype.name), &rt->ril_mt[molb.type],
-                                                     a_start, a_end, moltype.atoms.nr, molb.nmol, idef);
+        auto warning = printMissingInteractionsMolblock(cr, rt, *(moltype.name), rt.ril_mt[molb.type],
+                                                        atomRange, moltype.atoms.nr, molb.nmol, idef);
 
         GMX_LOG(mdlog.warning).appendText(warning);
     }
@@ -407,7 +430,7 @@ void dd_print_missing_interactions(const gmx::MDLogger&           mdlog,
         }
     }
 
-    print_missing_interactions_atoms(mdlog, cr, top_global, &top_local->idef);
+    printMissingInteractionsAtoms(mdlog, cr, *top_global, top_local->idef);
     write_dd_pdb("dd_dump_err", 0, "dump", top_global, cr, -1, as_rvec_array(x.data()), box);
 
     std::string errorMessage;
@@ -710,12 +733,12 @@ static gmx_reverse_top_t make_reverse_top(const gmx_mtop_t* mtop,
     return rt;
 }
 
-void dd_make_reverse_top(FILE*              fplog,
-                         gmx_domdec_t*      dd,
-                         const gmx_mtop_t*  mtop,
-                         const gmx_vsite_t* vsite,
-                         const t_inputrec*  ir,
-                         gmx_bool           bBCheck)
+void dd_make_reverse_top(FILE*                           fplog,
+                         gmx_domdec_t*                   dd,
+                         const gmx_mtop_t*               mtop,
+                         const gmx::VirtualSitesHandler* vsite,
+                         const t_inputrec*               ir,
+                         gmx_bool                        bBCheck)
 {
     if (fplog)
     {
@@ -744,16 +767,16 @@ void dd_make_reverse_top(FILE*              fplog,
         }
     }
 
-    if (vsite && vsite->numInterUpdategroupVsites > 0)
+    if (vsite && vsite->numInterUpdategroupVirtualSites() > 0)
     {
         if (fplog)
         {
             fprintf(fplog,
                     "There are %d inter update-group virtual sites,\n"
                     "will an extra communication step for selected coordinates and forces\n",
-                    vsite->numInterUpdategroupVsites);
+                    vsite->numInterUpdategroupVirtualSites());
         }
-        init_domdec_vsites(dd, vsite->numInterUpdategroupVsites);
+        init_domdec_vsites(dd, vsite->numInterUpdategroupVirtualSites());
     }
 
     if (dd->comm->systemInfo.haveSplitConstraints || dd->comm->systemInfo.haveSplitSettles)
@@ -798,6 +821,7 @@ static inline void add_ifunc_for_vsites(t_iatom*           tiatoms,
         tiatoms[1] = -a_gl - 1;
     }
 
+    GMX_ASSERT(nral >= 2 && nral <= 5, "Invalid nral for vsites");
     for (int k = 2; k < 1 + nral; k++)
     {
         int ak_gl = a_gl + iatoms[k] - a_mol;
@@ -1064,7 +1088,6 @@ static inline void check_assign_interactions_atom(int                       i,
             {
                 add_vsite(*dd->ga2la, index, rtil, ftype, nral, TRUE, i, i_gl, i_mol, iatoms.data(), idef);
             }
-            j += 1 + nral + 2;
         }
         else
         {
@@ -1224,8 +1247,8 @@ static inline void check_assign_interactions_atom(int                       i,
                     (*nbonded_local)++;
                 }
             }
-            j += 1 + nral;
         }
+        j += 1 + nral_rt(ftype);
     }
 }
 
@@ -1804,11 +1827,11 @@ static void update_max_bonded_distance(real r2, int ftype, int a1, int a2, bonde
     }
 }
 
-/*! \brief Set the distance, function type and atom indices for the longest distance between charge-groups of molecule type \p molt for two-body and multi-body bonded interactions */
+/*! \brief Set the distance, function type and atom indices for the longest distance between atoms of molecule type \p molt for two-body and multi-body bonded interactions */
 static void bonded_cg_distance_mol(const gmx_moltype_t* molt,
                                    gmx_bool             bBCheck,
                                    gmx_bool             bExcl,
-                                   rvec*                cg_cm,
+                                   ArrayRef<const RVec> x,
                                    bonded_distance_t*   bd_2b,
                                    bonded_distance_t*   bd_mb)
 {
@@ -1830,7 +1853,7 @@ static void bonded_cg_distance_mol(const gmx_moltype_t* molt,
                             int atomJ = il.iatoms[i + 1 + aj];
                             if (atomI != atomJ)
                             {
-                                real rij2 = distance2(cg_cm[atomI], cg_cm[atomJ]);
+                                real rij2 = distance2(x[atomI], x[atomJ]);
 
                                 update_max_bonded_distance(rij2, ftype, atomI, atomJ,
                                                            (nral == 2) ? bd_2b : bd_mb);
@@ -1850,7 +1873,7 @@ static void bonded_cg_distance_mol(const gmx_moltype_t* molt,
             {
                 if (ai != aj)
                 {
-                    real rij2 = distance2(cg_cm[ai], cg_cm[aj]);
+                    real rij2 = distance2(x[ai], x[aj]);
 
                     /* There is no function type for exclusions, use -1 */
                     update_max_bonded_distance(rij2, -1, ai, aj, bd_2b);
@@ -1863,7 +1886,7 @@ static void bonded_cg_distance_mol(const gmx_moltype_t* molt,
 /*! \brief Set the distance, function type and atom indices for the longest atom distance involved in intermolecular interactions for two-body and multi-body bonded interactions */
 static void bonded_distance_intermol(const InteractionLists& ilists_intermol,
                                      gmx_bool                bBCheck,
-                                     const rvec*             x,
+                                     ArrayRef<const RVec>    x,
                                      PbcType                 pbcType,
                                      const matrix            box,
                                      bonded_distance_t*      bd_2b,
@@ -1929,22 +1952,22 @@ static void getWholeMoleculeCoordinates(const gmx_moltype_t*  molt,
                                         PbcType               pbcType,
                                         t_graph*              graph,
                                         const matrix          box,
-                                        const rvec*           x,
-                                        rvec*                 xs)
+                                        ArrayRef<const RVec>  x,
+                                        ArrayRef<RVec>        xs)
 {
     int n, i;
 
     if (pbcType != PbcType::No)
     {
-        mk_mshift(nullptr, graph, pbcType, box, x);
+        mk_mshift(nullptr, graph, pbcType, box, as_rvec_array(x.data()));
 
-        shift_x(graph, box, x, xs);
+        shift_x(graph, box, as_rvec_array(x.data()), as_rvec_array(xs.data()));
         /* By doing an extra mk_mshift the molecules that are broken
          * because they were e.g. imported from another software
          * will be made whole again. Such are the healing powers
          * of GROMACS.
          */
-        mk_mshift(nullptr, graph, pbcType, box, xs);
+        mk_mshift(nullptr, graph, pbcType, box, as_rvec_array(xs.data()));
     }
     else
     {
@@ -1961,15 +1984,14 @@ static void getWholeMoleculeCoordinates(const gmx_moltype_t*  molt,
 
     if (moltypeHasVsite(*molt))
     {
-        construct_vsites(nullptr, xs, 0.0, nullptr, ffparams->iparams, molt->ilist, PbcType::No,
-                         TRUE, nullptr, nullptr);
+        gmx::constructVirtualSites(xs, ffparams->iparams, molt->ilist);
     }
 }
 
 void dd_bonded_cg_distance(const gmx::MDLogger& mdlog,
                            const gmx_mtop_t*    mtop,
                            const t_inputrec*    ir,
-                           const rvec*          x,
+                           ArrayRef<const RVec> x,
                            const matrix         box,
                            gmx_bool             bBCheck,
                            real*                r_2b,
@@ -1977,7 +1999,6 @@ void dd_bonded_cg_distance(const gmx::MDLogger& mdlog,
 {
     gmx_bool          bExclRequired;
     int               at_offset;
-    rvec*             xs;
     bonded_distance_t bd_2b = { 0, -1, -1, -1 };
     bonded_distance_t bd_mb = { 0, -1, -1, -1 };
 
@@ -2001,11 +2022,11 @@ void dd_bonded_cg_distance(const gmx::MDLogger& mdlog,
                 graph = mk_graph_moltype(molt);
             }
 
-            snew(xs, molt.atoms.nr);
+            std::vector<RVec> xs(molt.atoms.nr);
             for (int mol = 0; mol < molb.nmol; mol++)
             {
                 getWholeMoleculeCoordinates(&molt, &mtop->ffparams, ir->pbcType, &graph, box,
-                                            x + at_offset, xs);
+                                            x.subArray(at_offset, molt.atoms.nr), xs);
 
                 bonded_distance_t bd_mol_2b = { 0, -1, -1, -1 };
                 bonded_distance_t bd_mol_mb = { 0, -1, -1, -1 };
@@ -2020,7 +2041,6 @@ void dd_bonded_cg_distance(const gmx::MDLogger& mdlog,
 
                 at_offset += molt.atoms.nr;
             }
-            sfree(xs);
         }
     }
 

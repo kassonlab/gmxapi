@@ -51,7 +51,6 @@
 #include "gromacs/mdtypes/locality.h"
 
 struct NbnxmGpu;
-struct gmx_gpu_info_t;
 struct DeviceInformation;
 struct gmx_wallclock_gpu_nbnxn_t;
 struct nbnxn_atomdata_t;
@@ -123,7 +122,7 @@ int gpu_min_ci_balanced(NbnxmGpu gmx_unused* nb) GPU_FUNC_TERM_WITH_RETURN(-1);
 
 /** Returns if analytical Ewald GPU kernels are used. */
 GPU_FUNC_QUALIFIER
-gmx_bool gpu_is_kernel_ewald_analytical(const NbnxmGpu gmx_unused* nb) GPU_FUNC_TERM_WITH_RETURN(FALSE);
+bool gpu_is_kernel_ewald_analytical(const NbnxmGpu gmx_unused* nb) GPU_FUNC_TERM_WITH_RETURN(FALSE);
 
 /** Returns an opaque pointer to the GPU command stream
  *  Note: CUDA only.

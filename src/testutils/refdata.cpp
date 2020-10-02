@@ -53,6 +53,7 @@
 
 #include <gtest/gtest.h>
 
+#include "gromacs/math/vectypes.h"
 #include "gromacs/options/basicoptions.h"
 #include "gromacs/options/ioptionscontainer.h"
 #include "gromacs/utility/any.h"
@@ -420,19 +421,19 @@ public:
     std::string appendPath(const char* id) const;
 
     //! Creates an entry with given parameters and fills it with \p checker.
-    ReferenceDataEntry::EntryPointer createEntry(const char*                       type,
-                                                 const char*                       id,
-                                                 const IReferenceDataEntryChecker& checker) const
+    static ReferenceDataEntry::EntryPointer createEntry(const char*                       type,
+                                                        const char*                       id,
+                                                        const IReferenceDataEntryChecker& checker)
     {
         ReferenceDataEntry::EntryPointer entry(new ReferenceDataEntry(type, id));
         checker.fillEntry(entry.get());
         return entry;
     }
     //! Checks an entry for correct type and using \p checker.
-    ::testing::AssertionResult checkEntry(const ReferenceDataEntry&         entry,
-                                          const std::string&                fullId,
-                                          const char*                       type,
-                                          const IReferenceDataEntryChecker& checker) const
+    static ::testing::AssertionResult checkEntry(const ReferenceDataEntry&         entry,
+                                                 const std::string&                fullId,
+                                                 const char*                       type,
+                                                 const IReferenceDataEntryChecker& checker)
     {
         if (entry.type() != type)
         {
@@ -756,6 +757,14 @@ void TestReferenceChecker::checkUnusedEntries()
     }
 }
 
+void TestReferenceChecker::disableUnusedEntriesCheck()
+{
+    if (impl_->compareRootEntry_)
+    {
+        impl_->compareRootEntry_->setCheckedIncludingChildren();
+    }
+}
+
 
 bool TestReferenceChecker::checkPresent(bool bPresent, const char* id)
 {
@@ -945,7 +954,7 @@ void TestReferenceChecker::checkRealFromString(const std::string& value, const c
 }
 
 
-void TestReferenceChecker::checkVector(const int value[3], const char* id)
+void TestReferenceChecker::checkVector(const BasicVector<int>& value, const char* id)
 {
     TestReferenceChecker compound(checkCompound(Impl::cVectorType, id));
     compound.checkInteger(value[0], "X");
@@ -954,7 +963,7 @@ void TestReferenceChecker::checkVector(const int value[3], const char* id)
 }
 
 
-void TestReferenceChecker::checkVector(const float value[3], const char* id)
+void TestReferenceChecker::checkVector(const BasicVector<float>& value, const char* id)
 {
     TestReferenceChecker compound(checkCompound(Impl::cVectorType, id));
     compound.checkReal(value[0], "X");
@@ -963,12 +972,30 @@ void TestReferenceChecker::checkVector(const float value[3], const char* id)
 }
 
 
-void TestReferenceChecker::checkVector(const double value[3], const char* id)
+void TestReferenceChecker::checkVector(const BasicVector<double>& value, const char* id)
 {
     TestReferenceChecker compound(checkCompound(Impl::cVectorType, id));
     compound.checkReal(value[0], "X");
     compound.checkReal(value[1], "Y");
     compound.checkReal(value[2], "Z");
+}
+
+
+void TestReferenceChecker::checkVector(const int value[3], const char* id)
+{
+    checkVector(BasicVector<int>(value), id);
+}
+
+
+void TestReferenceChecker::checkVector(const float value[3], const char* id)
+{
+    checkVector(BasicVector<float>(value), id);
+}
+
+
+void TestReferenceChecker::checkVector(const double value[3], const char* id)
+{
+    checkVector(BasicVector<double>(value), id);
 }
 
 

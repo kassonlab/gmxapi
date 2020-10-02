@@ -79,6 +79,15 @@ class ArrayRef;
  * The public interface of SimulationContext is not yet well-specified.
  * Client code can create an instance with gmx::createSimulationContext()
  *
+ * \warning The SimulationContext does not yet encapsulate the resources allocated
+ * to the simulator. See https://gitlab.com/gromacs/gromacs/-/issues/3650
+ *
+ * \warning On thread-MPI code paths, the SimulationContext *does not* represent
+ * constraints on the number of simulation ranks, nor does it represent initialized
+ * communication resources.
+ *
+ * \todo Clarify and strengthen the invariant represented by SimulationContext.
+ *
  * \todo This class should also handle aspects of simulation
  * environment such as working directory and environment variables.
  *
@@ -106,37 +115,69 @@ public:
      */
     SimulationContext() = delete;
     /*!
-     * \brief Construct
+     * \brief Initialize from borrowed communicator.
      *
-     * \param communicator            MPI communicator for this (set of) simulations
+     * \param communicator Communicator for all collaborating simulation processes.
      * \param multiSimDirectoryNames  Names of any directories used with -multidir
+     *
+     * Caller is responsible for keeping *communicator* valid for the life of SimulationContext,
+     * and then freeing the communicator, if appropriate.
+     *
+     * With an external MPI library (non-thread-MPI chosen when configuring with CMake),
+     * the client promises that MPI has been initialized (such as by calling gmx::init()).
+     * This communicator is "borrowed" (not duplicated) from the caller.
+     * Additional communicators may be split from the provided communicator
+     * during the life of the SimulationContext or its consumers.
+     *
+     * With thread-MPI, *communicator* must be MPI_COMM_NULL.
+     * The communicator is set up later
+     * during the process of spawning the threads that will be the MPI
+     * ranks. (Multi-simulation is not supported with thread-MPI.)
+     *
+     * \todo Refine distribution of environment management.
+     *       There should be a context level at which only the current simulator directory matters,
+     *       and a level above which encapsulates multisim details in a specialized type.
      */
     explicit SimulationContext(MPI_Comm communicator, ArrayRef<const std::string> multiSimDirectoryNames);
 
     /*!
-     * \brief MPI communicator object for this simulation object.
+     * \brief MPI resources for the entire simulation context.
      *
-     * With real MPI,
-     *   the gmx wrapper binary has called MPI_Init, thus
-     *     MPI_COMM_WORLD is now valid to use, and
-     *   (in future) the gmxapi runner will handle such details
-     *     (e.g. via mpi4py) before creating its SimulationContext.
-     * In both cases, if a multi-simulation is in use, then its
-     * communicator(s) are found in multiSimulation_. This
-     * communicator is that of all ranks from all simulations, and
-     * will later be split into one for each simulation.
-     * TODO Perhaps (for simplicity) that communicator splitting
-     * task can be undertaken during multi-sim setup.
+     * With an external MPI library (non-thread-MPI chosen when configuring with CMake),
+     * gmx::init() has called MPI_Init and the provided communicator is valid to use.
+     * The communicator is "borrowed" (not duplicated) from the caller.
      *
-     * With thread-MPI in both cases, the communicator is set up later
+     * With thread-MPI, the communicator is set up later
      * during the process of spawning the threads that will be the MPI
-     * ranks. (Multi-simulation is not supported with thread-MPI.)
+     * ranks.
      */
-    MPI_Comm communicator_ = MPI_COMM_NULL;
+    MPI_Comm libraryWorldCommunicator_ = MPI_COMM_NULL;
+
+    /*!
+     * \brief MPI communicator object for this simulation.
+     *
+     * With an external MPI library (non-thread-MPI chosen when configuring with CMake),
+     * gmx::init() has called MPI_Init and the provided communicator is valid to use.
+     * The communicator is "borrowed" (not duplicated) from the caller.
+     *
+     * With thread-MPI, the communicator is set up later
+     * during the process of spawning the threads that will be the MPI
+     * ranks.
+     */
+    MPI_Comm simulationCommunicator_ = MPI_COMM_NULL;
 
     /*!
      * \brief Multi-sim handler (if required by e.g. gmx mdrun
      * -multidir; only supported with real MPI)
+     *
+     * If a multi-simulation is in use, then its
+     * communicator(s) are found in multiSimulation_. This
+     * communicator is that of all ranks from all simulations, and
+     * will later be split into one for each simulation.
+     * TODO: Perhaps (for simplicity) communicator splitting
+     *       can be undertaken during multi-sim setup (acquisition of the multisim resource).
+     *
+     * Multi-simulation is not supported with thread-MPI.
      */
     std::unique_ptr<gmx_multisim_t> multiSimulation_;
 };

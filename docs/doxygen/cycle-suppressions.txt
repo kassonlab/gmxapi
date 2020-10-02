@@ -2,11 +2,6 @@
 # "moduleA -> moduleB" means that moduleA should not depend on moduleB, and is
 # a problem to be addressed at some point.
 
-# Compat wants assertions and string code from utility, and other string code
-# in utility wants to use string_view from compat. If we fix this, it might be
-# best to implement the compat namespace within the utility module.
-compat -> utility
-
 domdec -> imd
 domdec -> ewald
 domdec -> mdlib
@@ -30,3 +25,6 @@ modularsimulator -> mdrun
 # Cycle counters in timing use comrec for the set up, which is in the mdtypes. This introduces
 # cyclic dependencies if the cycle counting is used anywhere in mdtypes.
 timing -> mdtypes
+
+# awh has dependencies in mdlib and pulling that need resolving.
+mdlib -> applied_forces

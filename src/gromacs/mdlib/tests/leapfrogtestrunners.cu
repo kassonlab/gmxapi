@@ -53,7 +53,7 @@
 #include <vector>
 
 #include "gromacs/gpu_utils/devicebuffer.cuh"
-#include "gromacs/gpu_utils/gpu_utils.h"
+#include "gromacs/hardware/device_information.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/leapfrog_gpu.cuh"
 #include "gromacs/mdlib/stat.h"
@@ -91,7 +91,8 @@ void integrateLeapFrogGpu(LeapFrogTestData* testData, int numSteps)
 
     auto integrator = std::make_unique<LeapFrogGpu>(deviceContext, deviceStream);
 
-    integrator->set(testData->mdAtoms_, testData->numTCoupleGroups_, testData->mdAtoms_.cTC);
+    integrator->set(testData->numAtoms_, testData->inverseMasses_.data(),
+                    testData->numTCoupleGroups_, testData->mdAtoms_.cTC);
 
     bool doTempCouple = testData->numTCoupleGroups_ > 0;
     for (int step = 0; step < numSteps; step++)

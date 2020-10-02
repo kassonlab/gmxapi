@@ -40,17 +40,21 @@
  */
 #include "gmxpre.h"
 
-#include <vector>
+#include "config.h"
 
-#include <gtest/gtest.h>
+#if GMX_GPU_CUDA
 
-#include "gromacs/gpu_utils/gpu_utils.h"
-#include "gromacs/gpu_utils/hostallocator.h"
-#include "gromacs/gpu_utils/pmalloc_cuda.h"
-#include "gromacs/utility/real.h"
-#include "gromacs/utility/smalloc.h"
+#    include <vector>
 
-#include "gputest.h"
+#    include <gtest/gtest.h>
+
+#    include "gromacs/gpu_utils/gpu_utils.h"
+#    include "gromacs/gpu_utils/hostallocator.h"
+#    include "gromacs/gpu_utils/pmalloc_cuda.h"
+#    include "gromacs/utility/real.h"
+#    include "gromacs/utility/smalloc.h"
+
+#    include "testutils/test_hardware_environment.h"
 
 namespace gmx
 {
@@ -62,69 +66,72 @@ namespace
 {
 
 //! Test fixture
-using PinnedMemoryCheckerTest = GpuTest;
+using PinnedMemoryCheckerTest = ::testing::Test;
 
 TEST_F(PinnedMemoryCheckerTest, DefaultContainerIsRecognized)
 {
-    if (!haveCompatibleGpus())
+    /* Note that this tests can be executed even on hosts with no GPUs.
+     * However, the checks for pending CUDA errors run cudaGetLastError(...),
+     * which itself returns cudaErrorNoDevice in this case. This causes the
+     * tests to crash. The conditionals in these tests should be removed
+     * when a proper work-around for this problem is in place.
+     */
+    if (getTestHardwareEnvironment()->hasCompatibleDevices())
     {
-        return;
+        HostVector<real> dummy(3, 1.5);
+        changePinningPolicy(&dummy, PinningPolicy::CannotBePinned);
+        EXPECT_FALSE(isHostMemoryPinned(dummy.data()));
     }
-
-    std::vector<real> dummy(3, 1.5);
-    EXPECT_FALSE(isHostMemoryPinned(dummy.data()));
-}
-
-TEST_F(PinnedMemoryCheckerTest, NonpinnedContainerIsRecognized)
-{
-    if (!haveCompatibleGpus())
-    {
-        return;
-    }
-
-    HostVector<real> dummy(3, 1.5);
-    changePinningPolicy(&dummy, PinningPolicy::CannotBePinned);
-    EXPECT_FALSE(isHostMemoryPinned(dummy.data()));
 }
 
 TEST_F(PinnedMemoryCheckerTest, PinnedContainerIsRecognized)
 {
-    if (!haveCompatibleGpus())
+    if (getTestHardwareEnvironment()->hasCompatibleDevices())
     {
-        return;
+        HostVector<real> dummy(3, 1.5);
+        changePinningPolicy(&dummy, PinningPolicy::PinnedIfSupported);
+        EXPECT_TRUE(isHostMemoryPinned(dummy.data()));
     }
+}
 
-    HostVector<real> dummy(3, 1.5);
-    changePinningPolicy(&dummy, PinningPolicy::PinnedIfSupported);
-    EXPECT_TRUE(isHostMemoryPinned(dummy.data()));
+TEST_F(PinnedMemoryCheckerTest, PinningChangesAreRecognized)
+{
+    if (getTestHardwareEnvironment()->hasCompatibleDevices())
+    {
+        HostVector<real> dummy(3, 1.5);
+        changePinningPolicy(&dummy, PinningPolicy::PinnedIfSupported);
+        EXPECT_TRUE(isHostMemoryPinned(dummy.data())) << "memory starts pinned";
+        changePinningPolicy(&dummy, PinningPolicy::CannotBePinned);
+        EXPECT_FALSE(isHostMemoryPinned(dummy.data())) << "memory is now unpinned";
+        changePinningPolicy(&dummy, PinningPolicy::PinnedIfSupported);
+        EXPECT_TRUE(isHostMemoryPinned(dummy.data())) << "memory is pinned again";
+    }
 }
 
 TEST_F(PinnedMemoryCheckerTest, DefaultCBufferIsRecognized)
 {
-    if (!haveCompatibleGpus())
+    if (getTestHardwareEnvironment()->hasCompatibleDevices())
     {
-        return;
+        real* dummy;
+        snew(dummy, 3);
+        EXPECT_FALSE(isHostMemoryPinned(dummy));
+        sfree(dummy);
     }
-
-    real* dummy;
-    snew(dummy, 3);
-    EXPECT_FALSE(isHostMemoryPinned(dummy));
-    sfree(dummy);
 }
 
 TEST_F(PinnedMemoryCheckerTest, PinnedCBufferIsRecognized)
 {
-    if (!haveCompatibleGpus())
+    if (getTestHardwareEnvironment()->hasCompatibleDevices())
     {
-        return;
+        real* dummy = nullptr;
+        pmalloc(reinterpret_cast<void**>(&dummy), 3 * sizeof(real));
+        EXPECT_TRUE(isHostMemoryPinned(dummy));
+        pfree(dummy);
     }
-
-    real* dummy = nullptr;
-    pmalloc(reinterpret_cast<void**>(&dummy), 3 * sizeof(real));
-    EXPECT_TRUE(isHostMemoryPinned(dummy));
-    pfree(dummy);
 }
 
 } // namespace
 } // namespace test
 } // namespace gmx
+
+#endif // GMX_GPU_CUDA

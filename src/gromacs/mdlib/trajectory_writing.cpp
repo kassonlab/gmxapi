@@ -44,6 +44,7 @@
 #include "gromacs/mdlib/mdoutf.h"
 #include "gromacs/mdlib/stat.h"
 #include "gromacs/mdlib/update.h"
+#include "gromacs/mdtypes/checkpointdata.h"
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/forcerec.h"
 #include "gromacs/mdtypes/inputrec.h"
@@ -54,28 +55,28 @@
 #include "gromacs/topology/topology.h"
 #include "gromacs/utility/smalloc.h"
 
-void do_md_trajectory_writing(FILE*                    fplog,
-                              t_commrec*               cr,
-                              int                      nfile,
-                              const t_filenm           fnm[],
-                              int64_t                  step,
-                              int64_t                  step_rel,
-                              double                   t,
-                              t_inputrec*              ir,
-                              t_state*                 state,
-                              t_state*                 state_global,
-                              ObservablesHistory*      observablesHistory,
-                              const gmx_mtop_t*        top_global,
-                              t_forcerec*              fr,
-                              gmx_mdoutf_t             outf,
-                              const gmx::EnergyOutput& energyOutput,
-                              gmx_ekindata_t*          ekind,
-                              gmx::ArrayRef<gmx::RVec> f,
-                              gmx_bool                 bCPT,
-                              gmx_bool                 bRerunMD,
-                              gmx_bool                 bLastStep,
-                              gmx_bool                 bDoConfOut,
-                              gmx_bool                 bSumEkinhOld)
+void do_md_trajectory_writing(FILE*                          fplog,
+                              t_commrec*                     cr,
+                              int                            nfile,
+                              const t_filenm                 fnm[],
+                              int64_t                        step,
+                              int64_t                        step_rel,
+                              double                         t,
+                              t_inputrec*                    ir,
+                              t_state*                       state,
+                              t_state*                       state_global,
+                              ObservablesHistory*            observablesHistory,
+                              const gmx_mtop_t*              top_global,
+                              t_forcerec*                    fr,
+                              gmx_mdoutf_t                   outf,
+                              const gmx::EnergyOutput&       energyOutput,
+                              gmx_ekindata_t*                ekind,
+                              gmx::ArrayRef<const gmx::RVec> f,
+                              gmx_bool                       bCPT,
+                              gmx_bool                       bRerunMD,
+                              gmx_bool                       bLastStep,
+                              gmx_bool                       bDoConfOut,
+                              gmx_bool                       bSumEkinhOld)
 {
     int   mdof_flags;
     rvec* x_for_confout = nullptr;
@@ -160,11 +161,15 @@ void do_md_trajectory_writing(FILE*                    fplog,
                 energyOutput.fillEnergyHistory(observablesHistory->energyHistory.get());
             }
         }
+        // The current function is only called by legacy code, while
+        // mdoutf_write_to_trajectory_files is also called from modular simulator. Create a dummy
+        // modular simulator checkpointing object for compatibility.
+        gmx::WriteCheckpointDataHolder checkpointDataHolder;
         // Note that part of the following code is duplicated in StatePropagatorData::trajectoryWriterTeardown.
         // This duplication is needed while both legacy and modular code paths are in use.
         // TODO: Remove duplication asap, make sure to keep in sync in the meantime.
-        mdoutf_write_to_trajectory_files(fplog, cr, outf, mdof_flags, top_global->natoms, step, t,
-                                         state, state_global, observablesHistory, f);
+        mdoutf_write_to_trajectory_files(fplog, cr, outf, mdof_flags, top_global->natoms, step, t, state,
+                                         state_global, observablesHistory, f, &checkpointDataHolder);
         if (bLastStep && step_rel == ir->nsteps && bDoConfOut && MASTER(cr) && !bRerunMD)
         {
             if (fr->bMolPBC && state == state_global)

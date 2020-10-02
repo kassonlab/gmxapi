@@ -41,8 +41,11 @@
 #ifndef GMX_GPU_UTILS_GPUEVENTSYNCHRONIZER_CUH
 #define GMX_GPU_UTILS_GPUEVENTSYNCHRONIZER_CUH
 
+#include "gromacs/gpu_utils/device_stream.h"
 #include "gromacs/gpu_utils/gputraits.cuh"
 #include "gromacs/utility/gmxassert.h"
+
+#ifndef DOXYGEN
 
 /*! \libinternal \brief
  * A class which allows for CPU thread to mark and wait for certain GPU stream execution point.
@@ -101,5 +104,7 @@ public:
 private:
     cudaEvent_t event_;
 };
+
+#endif
 
 #endif

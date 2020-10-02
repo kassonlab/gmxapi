@@ -48,8 +48,9 @@
 #include "config.h"
 
 #include "gromacs/domdec/gpuhaloexchange.h"
+#include "gromacs/utility/gmxassert.h"
 
-#if GMX_GPU != GMX_GPU_CUDA
+#if !GMX_GPU_CUDA
 
 namespace gmx
 {
@@ -61,11 +62,13 @@ class GpuHaloExchange::Impl
 
 /*!\brief Constructor stub. */
 GpuHaloExchange::GpuHaloExchange(gmx_domdec_t* /* dd */,
+                                 int /* dimIndex */,
                                  MPI_Comm /* mpi_comm_mysim */,
                                  const DeviceContext& /* deviceContext */,
                                  const DeviceStream& /*streamLocal */,
                                  const DeviceStream& /*streamNonLocal */,
-                                 int /*pulse */) :
+                                 int /*pulse */,
+                                 gmx_wallcycle* /*wcycle*/) :
     impl_(nullptr)
 {
     GMX_ASSERT(false,
@@ -108,4 +111,4 @@ GpuEventSynchronizer* GpuHaloExchange::getForcesReadyOnDeviceEvent()
 
 } // namespace gmx
 
-#endif /* GMX_GPU != GMX_GPU_CUDA */
+#endif // !GMX_GPU_CUDA

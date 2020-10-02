@@ -86,8 +86,8 @@ endif()
 # If any of these manual override variables for target CUDA GPU architectures
 # or virtual architecture is set, parse the values and assemble the nvcc
 # command line for these. Otherwise use our defaults.
-# Note that the manual override variables require a semicolon separated
-# architectures codes.
+# Note that the manual override variables require a semicolon separating
+# architecture codes.
 if (GMX_CUDA_TARGET_SM OR GMX_CUDA_TARGET_COMPUTE)
     set(GMX_CUDA_NVCC_GENCODE_FLAGS)
     set(_target_sm_list ${GMX_CUDA_TARGET_SM})
@@ -104,9 +104,13 @@ else()
     #     => compile sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_61, sm_70 SASS, and compute_70 PTX
     # - with CUDA >=10.0        CC 7.5 is supported
     #     => compile sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_61, sm_70, sm_75 SASS, and compute_75 PTX
+    # - with CUDA >=11.0        CC 8.0 is supported
+    #     => compile sm_35, sm_37, sm_50, sm_52, sm_60, sm_61, sm_70, sm_75, sm_80 SASS, and compute_80 PTX
 
     # First add flags that trigger SASS (binary) code generation for physical arch
-    list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_30,code=sm_30")
+    if(CUDA_VERSION VERSION_LESS "11.0")
+        list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_30,code=sm_30")
+    endif()
     list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_35,code=sm_35")
     list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_37,code=sm_37")
     list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_50,code=sm_50")
@@ -114,6 +118,11 @@ else()
     list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_60,code=sm_60")
     list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_61,code=sm_61")
     list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_70,code=sm_70")
+    if(NOT CUDA_VERSION VERSION_LESS "11.0")
+        # Requesting sm or compute 35, 37, or 50 triggers deprecation messages with
+        # nvcc 11.0, which we need to suppress for use in CI
+        list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-Wno-deprecated-gpu-targets")
+    endif()
 
     # Next add flags that trigger PTX code generation for the newest supported virtual arch
     # that's useful to JIT to future architectures
@@ -126,6 +135,9 @@ else()
     if(NOT CUDA_VERSION VERSION_LESS "10.0")
         list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_75,code=compute_75")
     endif()
+    if(NOT CUDA_VERSION VERSION_LESS "11.0")
+        list (APPEND GMX_CUDA_NVCC_GENCODE_FLAGS "-gencode;arch=compute_80,code=compute_80")
+    endif()
 endif()
 
 if (GMX_CUDA_TARGET_SM)
@@ -137,29 +149,32 @@ if (GMX_CUDA_TARGET_COMPUTE)
     set_property(CACHE GMX_CUDA_TARGET_COMPUTE PROPERTY TYPE STRING)
 endif()
 
-# FindCUDA.cmake is unaware of the mechanism used by cmake to embed
-# the compiler flag for the required C++ standard in the generated
-# build files, so we have to pass it ourselves
-if (MSVC)
-    # We use C++14 on MSVC, but cmake does not understand the
-    # necessary compilation option for that until version 3.10, so we
-    # can remove this after we require that version.
-    if (NOT CMAKE_CXX14_STANDARD_COMPILE_OPTION)
-        set(GMX_CXX_STANDARD_COMPILE_OPTION "-std:c++14")
-    else()
-        set(GMX_CXX_STANDARD_COMPILE_OPTION "${CMAKE_CXX14_STANDARD_COMPILE_OPTION}")
-    endif()
-else()
-    set(GMX_CXX_STANDARD_COMPILE_OPTION "${CMAKE_CXX14_STANDARD_COMPILE_OPTION}")
-endif()
-list(APPEND GMX_CUDA_NVCC_FLAGS "${GMX_CXX_STANDARD_COMPILE_OPTION}")
-
 # assemble the CUDA flags
 list(APPEND GMX_CUDA_NVCC_FLAGS "${GMX_CUDA_NVCC_GENCODE_FLAGS}")
 list(APPEND GMX_CUDA_NVCC_FLAGS "-use_fast_math")
 
 # assemble the CUDA host compiler flags
 list(APPEND GMX_CUDA_NVCC_FLAGS "${CUDA_HOST_COMPILER_OPTIONS}")
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # CUDA header cuda_runtime_api.h in at least CUDA 10.1 uses 0
+    # where nullptr would be preferable. GROMACS can't fix these, so
+    # must suppress them.
+    GMX_TEST_CXXFLAG(CXXFLAGS_NO_ZERO_AS_NULL_POINTER_CONSTANT "-Wno-zero-as-null-pointer-constant" NVCC_CLANG_SUPPRESSIONS_CXXFLAGS)
+    if (CUDA_VERSION VERSION_LESS 11.0)
+        # CUDA header crt/math_functions.h before CUDA 11.0 used
+        # throw() specifications that are deprecated in more recent
+        # C++ versions. GROMACS can't fix these, so must suppress
+        # them.
+        GMX_TEST_CXXFLAG(CXXFLAGS_NO_DEPRECATED_DYNAMIC_EXCEPTION_SPEC "-Wno-deprecated-dynamic-exception-spec" NVCC_CLANG_SUPPRESSIONS_CXXFLAGS)
+    endif()
+    # Add these flags to those used for the host compiler. The
+    # "-Xcompiler" prefix directs nvcc to only use them for host
+    # compilation, which is all that is needed in this case.
+    foreach(_flag ${NVCC_CLANG_SUPPRESSIONS_CXXFLAGS})
+        list(APPEND GMX_CUDA_NVCC_FLAGS "-Xcompiler ${_flag}")
+    endforeach()
+endif()
 
 string(TOUPPER "${CMAKE_BUILD_TYPE}" _build_type)
 gmx_check_if_changed(_cuda_nvcc_executable_or_flags_changed CUDA_NVCC_EXECUTABLE CUDA_NVCC_FLAGS CUDA_NVCC_FLAGS_${_build_type})

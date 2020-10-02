@@ -45,10 +45,9 @@
 #define GMX_UTILITY_PATH_H
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
-
-#include "gromacs/compat/string_view.h"
 
 namespace gmx
 {
@@ -80,7 +79,7 @@ public:
     /*! \brief Returns whether the extension present in \c input
      * matches \c extension (which does not include the separator
      * character). */
-    static bool extensionMatches(compat::string_view input, compat::string_view extension);
+    static bool extensionMatches(std::string_view input, std::string_view extension);
     /*! \brief Returns a copy of the input without any trailing
      * extension found in the filename component. */
     static std::string stripExtension(const std::string& input);

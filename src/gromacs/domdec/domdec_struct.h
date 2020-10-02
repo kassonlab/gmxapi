@@ -99,7 +99,7 @@ struct DDPairInteractionRanges
     gmx::IVec shift1 = { 0, 0, 0 };
 };
 
-typedef struct
+typedef struct gmx_domdec_zone_size
 {
     /* Zone lower corner in triclinic coordinates         */
     gmx::RVec x0 = { 0, 0, 0 };
@@ -236,8 +236,8 @@ struct gmx_domdec_t
     /* gmx_pme_recv_f buffer */
     std::vector<gmx::RVec> pmeForceReceiveBuffer;
 
-    /* GPU halo exchange object */
-    std::vector<std::unique_ptr<gmx::GpuHaloExchange>> gpuHaloExchange;
+    /* GPU halo exchange objects: this structure supports a vector of pulses for each dimension */
+    std::vector<std::unique_ptr<gmx::GpuHaloExchange>> gpuHaloExchange[DIM];
 };
 
 //! Are we the master node for domain decomposition

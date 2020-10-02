@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -47,12 +47,18 @@
 #include <vector>
 
 #include "gromacs/math/vectypes.h"
-#include "gromacs/utility/arrayref.h"
+#include "gromacs/utility/gmxmpi.h"
 
+namespace gmx
+{
+template<typename>
+class ArrayRef;
+}
 struct gmx_ddbox_t;
 struct gmx_domdec_t;
 struct t_commrec;
 struct t_inputrec;
+enum class DDRole;
 
 /*! \brief Set the box and PBC data in \p ddbox */
 void set_ddbox(const gmx_domdec_t&            dd,
@@ -63,7 +69,8 @@ void set_ddbox(const gmx_domdec_t&            dd,
                gmx_ddbox_t*                   ddbox);
 
 /*! \brief Set the box and PBC data in \p ddbox */
-void set_ddbox_cr(const t_commrec&               cr,
+void set_ddbox_cr(DDRole                         ddRole,
+                  MPI_Comm                       communicator,
                   const ivec*                    dd_nc,
                   const t_inputrec&              ir,
                   const matrix                   box,

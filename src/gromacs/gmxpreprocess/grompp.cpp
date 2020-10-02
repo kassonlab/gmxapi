@@ -50,7 +50,7 @@
 
 #include <sys/types.h>
 
-#include "gromacs/awh/read_params.h"
+#include "gromacs/applied_forces/awh/read_params.h"
 #include "gromacs/commandline/pargs.h"
 #include "gromacs/ewald/ewald_utils.h"
 #include "gromacs/ewald/pme.h"
@@ -647,7 +647,7 @@ static void new_status(const char*                           topfile,
     /* Copy structures from msys to sys */
     molinfo2mtop(*mi, sys);
 
-    gmx_mtop_finalize(sys);
+    sys->finalize();
 
     /* Discourage using the, previously common, setup of applying constraints
      * to all bonds with force fields that have been parametrized with H-bond
@@ -1623,7 +1623,7 @@ static void set_verlet_buffer(const gmx_mtop_t*    mtop,
     ir->rlist = calcVerletBufferSize(*mtop, det(box), *ir, ir->nstlist, ir->nstlist - 1,
                                      buffer_temp, listSetup4x4);
 
-    const int n_nonlin_vsite = countNonlinearVsites(*mtop);
+    const int n_nonlin_vsite = gmx::countNonlinearVsites(*mtop);
     if (n_nonlin_vsite > 0)
     {
         std::string warningMessage = gmx::formatString(
@@ -1762,7 +1762,6 @@ int gmx_grompp(int argc, char* argv[])
         "interpret the output messages before attempting to bypass them with",
         "this option."
     };
-    t_gromppopts*                        opts;
     std::vector<MoleculeInformation>     mi;
     std::unique_ptr<MoleculeInformation> intermolecular_interactions;
     int                                  nvsite, comb;
@@ -1832,7 +1831,8 @@ int gmx_grompp(int argc, char* argv[])
     gmx::MDModules mdModules;
     t_inputrec     irInstance;
     t_inputrec*    ir = &irInstance;
-    snew(opts, 1);
+    t_gromppopts   optsInstance;
+    t_gromppopts*  opts = &optsInstance;
     snew(opts->include, STRLEN);
     snew(opts->define, STRLEN);
 
@@ -2303,8 +2303,10 @@ int gmx_grompp(int argc, char* argv[])
         {
             copy_mat(ir->compress, compressibility);
         }
-        setStateDependentAwhParams(ir->awhParams, ir->pull, pull, state.box, ir->pbcType,
-                                   compressibility, &ir->opts, wi);
+        setStateDependentAwhParams(
+                ir->awhParams, ir->pull, pull, state.box, ir->pbcType, compressibility, &ir->opts,
+                ir->efep != efepNO ? ir->fepvals->all_lambda[efptFEP][ir->fepvals->init_fep_state] : 0,
+                sys, wi);
     }
 
     if (ir->bPull)
@@ -2384,8 +2386,9 @@ int gmx_grompp(int argc, char* argv[])
     gmx::write_IMDgroup_to_file(ir->bIMD, ir, &state, &sys, NFILE, fnm);
 
     sfree(opts->define);
+    sfree(opts->wall_atomtype[0]);
+    sfree(opts->wall_atomtype[1]);
     sfree(opts->include);
-    sfree(opts);
     for (auto& mol : mi)
     {
         // Some of the contents of molinfo have been stolen, so

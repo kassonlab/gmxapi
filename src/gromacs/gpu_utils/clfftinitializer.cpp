@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -50,7 +50,7 @@
 #include "gromacs/utility/mutex.h"
 #include "gromacs/utility/stringutil.h"
 
-#if GMX_GPU == GMX_GPU_OPENCL
+#if GMX_GPU_OPENCL
 #    include <clFFT.h>
 #endif
 
@@ -60,21 +60,23 @@ namespace gmx
 namespace
 {
 
+#if GMX_GPU_OPENCL
 /*! \brief The clFFT library may only be initialized once per process,
  * and this is orchestrated by this shared value and mutex.
  *
  * This ensures that thread-MPI and OpenMP builds can't accidentally
  * initialize it more than once. */
 //! @{
-gmx_unused bool g_clfftInitialized = false;
-gmx::Mutex      g_clfftMutex;
+bool       g_clfftInitialized = false;
+gmx::Mutex g_clfftMutex;
 //! @}
+#endif
 
 } // namespace
 
 ClfftInitializer::ClfftInitializer()
 {
-#if GMX_GPU == GMX_GPU_OPENCL
+#if GMX_GPU_OPENCL
     gmx::lock_guard<gmx::Mutex> guard(g_clfftMutex);
     clfftSetupData              fftSetup;
     int                         initErrorCode = clfftInitSetupData(&fftSetup);
@@ -90,14 +92,12 @@ ClfftInitializer::ClfftInitializer()
                 "Failed to initialize the clFFT library, error code %d", initErrorCode)));
     }
     g_clfftInitialized = true;
-#else
-    GMX_UNUSED_VALUE(g_clfftInitialized);
 #endif
 }
 
 ClfftInitializer::~ClfftInitializer()
 {
-#if GMX_GPU == GMX_GPU_OPENCL
+#if GMX_GPU_OPENCL
     gmx::lock_guard<gmx::Mutex> guard(g_clfftMutex);
     if (g_clfftInitialized)
     {

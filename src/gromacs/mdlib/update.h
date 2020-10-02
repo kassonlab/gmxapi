@@ -51,7 +51,6 @@ class ekinstate_t;
 struct gmx_ekindata_t;
 struct gmx_enerdata_t;
 enum class PbcType;
-struct t_extmass;
 struct t_fcdata;
 struct t_graph;
 struct t_grpopts;
@@ -59,9 +58,6 @@ struct t_inputrec;
 struct t_mdatoms;
 struct t_nrnb;
 class t_state;
-
-/* Abstract type for update */
-struct gmx_stochd_t;
 
 namespace gmx
 {
@@ -74,18 +70,134 @@ class Constraints;
 class Update
 {
 public:
-    //! Constructor
-    Update(const t_inputrec* ir, BoxDeformation* boxDeformation);
+    /*! \brief Constructor
+     *
+     * \param[in] inputRecord     Input record, used to construct SD object.
+     * \param[in] boxDeformation  Periodic box deformation object.
+     */
+    Update(const t_inputrec& inputRecord, BoxDeformation* boxDeformation);
+    //! Destructor
     ~Update();
-    // TODO Get rid of getters when more free functions are incorporated as member methods
-    //! Returns handle to stochd_t struct
-    gmx_stochd_t* sd() const;
-    //! Returns pointer to PaddedVector xp
+    /*! \brief Get the pointer to updated coordinates
+     *
+     * Update saves the updated coordinates into separate buffer, so that constraints will have
+     * access to both updated and not update coordinates. For that, update owns a separate buffer.
+     * See finish_update(...) for details.
+     *
+     * \returns The pointer to the intermediate coordinates buffer.
+     */
     PaddedVector<gmx::RVec>* xp();
-    //! Returns handle to box deformation class
+    /*!\brief Getter to local copy of box deformation class.
+     *
+     * \returns handle to box deformation class
+     */
     BoxDeformation* deform() const;
-    //! Resizes xp
-    void setNumAtoms(int nAtoms);
+    /*! \brief Resizes buffer that stores intermediate coordinates.
+     *
+     * \param[in] numAtoms  Updated number of atoms.
+     */
+    void setNumAtoms(int numAtoms);
+
+    /*! \brief Perform numerical integration step.
+     *
+     * Selects the appropriate integrator, based on the input record and performs a numerical integration step.
+     *
+     * \param[in]  inputRecord      Input record.
+     * \param[in]  step             Current timestep.
+     * \param[in]  md               MD atoms data.
+     * \param[in]  state            System state object.
+     * \param[in]  f                Buffer with atomic forces for home particles.
+     * \param[in]  fcdata           Force calculation data to update distance and orientation restraints.
+     * \param[in]  ekind            Kinetic energy data (for temperature coupling, energy groups, etc.).
+     * \param[in]  M                Parrinello-Rahman velocity scaling matrix.
+     * \param[in]  updatePart       What should be updated, coordinates or velocities. This enum only used in VV integrator.
+     * \param[in]  cr               Comunication record  (Old comment: these shouldn't be here -- need to think about it).
+     * \param[in]  haveConstraints  If the system has constraints.
+     */
+    void update_coords(const t_inputrec&                                inputRecord,
+                       int64_t                                          step,
+                       const t_mdatoms*                                 md,
+                       t_state*                                         state,
+                       const gmx::ArrayRefWithPadding<const gmx::RVec>& f,
+                       const t_fcdata&                                  fcdata,
+                       const gmx_ekindata_t*                            ekind,
+                       const matrix                                     M,
+                       int                                              updatePart,
+                       const t_commrec*                                 cr,
+                       bool                                             haveConstraints);
+
+    /*! \brief Finalize the coordinate update.
+     *
+     * Copy the updated coordinates to the main coordinates buffer for the atoms that are not frozen.
+     *
+     * \param[in]  inputRecord      Input record.
+     * \param[in]  md               MD atoms data.
+     * \param[in]  state            System state object.
+     * \param[in]  wcycle           Wall-clock cycle counter.
+     * \param[in]  haveConstraints  If the system has constraints.
+     */
+    void finish_update(const t_inputrec& inputRecord,
+                       const t_mdatoms*  md,
+                       t_state*          state,
+                       gmx_wallcycle_t   wcycle,
+                       bool              haveConstraints);
+
+    /*! \brief Secong part of the SD integrator.
+     *
+     * The first part of integration is performed in the update_coords(...) method.
+     *
+     * \param[in]  inputRecord  Input record.
+     * \param[in]  step         Current timestep.
+     * \param[in]  dvdlambda    Free energy derivative. Contribution to be added to the bonded
+     * interactions. \param[in]  md           MD atoms data. \param[in]  state        System state
+     * object. \param[in]  cr           Comunication record. \param[in]  nrnb         Cycle
+     * counters. \param[in]  wcycle       Wall-clock cycle counter. \param[in]  constr Constraints
+     * object. The constraints are applied on coordinates after update. \param[in]  do_log       If
+     * this is logging step. \param[in]  do_ene       If this is an energy evaluation step.
+     */
+    void update_sd_second_half(const t_inputrec& inputRecord,
+                               int64_t           step,
+                               real*             dvdlambda,
+                               const t_mdatoms*  md,
+                               t_state*          state,
+                               const t_commrec*  cr,
+                               t_nrnb*           nrnb,
+                               gmx_wallcycle_t   wcycle,
+                               gmx::Constraints* constr,
+                               bool              do_log,
+                               bool              do_ene);
+
+    /*! \brief Performs a leap-frog update without updating \p state so the constrain virial
+     * can be computed.
+     */
+    void update_for_constraint_virial(const t_inputrec&                                inputRecord,
+                                      const t_mdatoms&                                 md,
+                                      const t_state&                                   state,
+                                      const gmx::ArrayRefWithPadding<const gmx::RVec>& f,
+                                      const gmx_ekindata_t&                            ekind);
+
+    /*! \brief Update pre-computed constants that depend on the reference temperature for coupling.
+     *
+     * This could change e.g. in simulated annealing.
+     *
+     * \param[in]  inputRecord  Input record.
+     */
+    void update_temperature_constants(const t_inputrec& inputRecord);
+
+    /*!\brief Getter for the list of the randomize groups.
+     *
+     *  Needed for Andersen temperature control.
+     *
+     * \returns Reference to the groups from the SD data object.
+     */
+    const std::vector<bool>& getAndersenRandomizeGroup() const;
+    /*!\brief Getter for the list of the Boltzmann factors.
+     *
+     *  Needed for Andersen temperature control.
+     *
+     * \returns Reference to the Boltzmann factors from the SD data object.
+     */
+    const std::vector<real>& getBoltzmanFactor() const;
 
 private:
     //! Implementation type.
@@ -96,121 +208,6 @@ private:
 
 }; // namespace gmx
 
-/* Update pre-computed constants that depend on the reference
- * temperature for coupling.
- *
- * This could change e.g. in simulated annealing. */
-void update_temperature_constants(gmx_stochd_t* sd, const t_inputrec* ir);
-
-/* Update the size of per-atom arrays (e.g. after DD re-partitioning,
-   which might increase the number of home atoms). */
-
-void update_tcouple(int64_t           step,
-                    const t_inputrec* inputrec,
-                    t_state*          state,
-                    gmx_ekindata_t*   ekind,
-                    const t_extmass*  MassQ,
-                    const t_mdatoms*  md);
-
-/* Update Parrinello-Rahman, to be called before the coordinate update */
-void update_pcouple_before_coordinates(FILE*             fplog,
-                                       int64_t           step,
-                                       const t_inputrec* inputrec,
-                                       t_state*          state,
-                                       matrix            parrinellorahmanMu,
-                                       matrix            M,
-                                       gmx_bool          bInitStep);
-
-/* Update the box, to be called after the coordinate update.
- * For Berendsen P-coupling, also calculates the scaling factor
- * and scales the coordinates.
- * When the deform option is used, scales coordinates and box here.
- */
-void update_pcouple_after_coordinates(FILE*             fplog,
-                                      int64_t           step,
-                                      const t_inputrec* inputrec,
-                                      const t_mdatoms*  md,
-                                      const matrix      pressure,
-                                      const matrix      forceVirial,
-                                      const matrix      constraintVirial,
-                                      matrix            pressureCouplingMu,
-                                      t_state*          state,
-                                      t_nrnb*           nrnb,
-                                      gmx::Update*      upd,
-                                      bool              scaleCoordinates);
-
-void update_coords(int64_t           step,
-                   const t_inputrec* inputrec, /* input record and box stuff	*/
-                   const t_mdatoms*  md,
-                   t_state*          state,
-                   gmx::ArrayRefWithPadding<const gmx::RVec> f, /* forces on home particles */
-                   const t_fcdata*                           fcd,
-                   const gmx_ekindata_t*                     ekind,
-                   const matrix                              M,
-                   gmx::Update*                              upd,
-                   int                                       bUpdatePart,
-                   const t_commrec* cr, /* these shouldn't be here -- need to think about it */
-                   const gmx::Constraints* constr);
-
-/* Return TRUE if OK, FALSE in case of Shake Error */
-
-extern gmx_bool update_randomize_velocities(const t_inputrec*        ir,
-                                            int64_t                  step,
-                                            const t_commrec*         cr,
-                                            const t_mdatoms*         md,
-                                            gmx::ArrayRef<gmx::RVec> v,
-                                            const gmx::Update*       upd,
-                                            const gmx::Constraints*  constr);
-
-void constrain_velocities(int64_t step,
-                          real* dvdlambda, /* the contribution to be added to the bonded interactions */
-                          t_state*          state,
-                          tensor            vir_part,
-                          gmx::Constraints* constr,
-                          gmx_bool          bCalcVir,
-                          bool              do_log,
-                          bool              do_ene);
-
-void constrain_coordinates(int64_t step,
-                           real* dvdlambda, /* the contribution to be added to the bonded interactions */
-                           t_state*          state,
-                           tensor            vir_part,
-                           gmx::Update*      upd,
-                           gmx::Constraints* constr,
-                           gmx_bool          bCalcVir,
-                           bool              do_log,
-                           bool              do_ene);
-
-void update_sd_second_half(int64_t step,
-                           real* dvdlambda, /* the contribution to be added to the bonded interactions */
-                           const t_inputrec* inputrec, /* input record and box stuff */
-                           const t_mdatoms*  md,
-                           t_state*          state,
-                           const t_commrec*  cr,
-                           t_nrnb*           nrnb,
-                           gmx_wallcycle_t   wcycle,
-                           gmx::Update*      upd,
-                           gmx::Constraints* constr,
-                           bool              do_log,
-                           bool              do_ene);
-
-void finish_update(const t_inputrec*       inputrec,
-                   const t_mdatoms*        md,
-                   t_state*                state,
-                   gmx_wallcycle_t         wcycle,
-                   gmx::Update*            upd,
-                   const gmx::Constraints* constr);
-
-/* Return TRUE if OK, FALSE in case of Shake Error */
-
-void calc_ke_part(gmx::ArrayRef<const gmx::RVec> x,
-                  gmx::ArrayRef<const gmx::RVec> v,
-                  const matrix                   box,
-                  const t_grpopts*               opts,
-                  const t_mdatoms*               md,
-                  gmx_ekindata_t*                ekind,
-                  t_nrnb*                        nrnb,
-                  gmx_bool                       bEkinAveVel);
 /*
  * Compute the partial kinetic energy for home particles;
  * will be accumulated in the calling routine.
@@ -236,104 +233,6 @@ void update_ekinstate(ekinstate_t* ekinstate, const gmx_ekindata_t* ekind);
    to the rest of the simulation */
 void restore_ekinstate_from_state(const t_commrec* cr, gmx_ekindata_t* ekind, const ekinstate_t* ekinstate);
 
-void berendsen_tcoupl(const t_inputrec*    ir,
-                      gmx_ekindata_t*      ekind,
-                      real                 dt,
-                      std::vector<double>& therm_integral); //NOLINT(google-runtime-references)
-
-void andersen_tcoupl(const t_inputrec*         ir,
-                     int64_t                   step,
-                     const t_commrec*          cr,
-                     const t_mdatoms*          md,
-                     gmx::ArrayRef<gmx::RVec>  v,
-                     real                      rate,
-                     const std::vector<bool>&  randomize,
-                     gmx::ArrayRef<const real> boltzfac);
-
-void nosehoover_tcoupl(const t_grpopts*      opts,
-                       const gmx_ekindata_t* ekind,
-                       real                  dt,
-                       double                xi[],
-                       double                vxi[],
-                       const t_extmass*      MassQ);
-
-void trotter_update(const t_inputrec*               ir,
-                    int64_t                         step,
-                    gmx_ekindata_t*                 ekind,
-                    const gmx_enerdata_t*           enerd,
-                    t_state*                        state,
-                    const tensor                    vir,
-                    const t_mdatoms*                md,
-                    const t_extmass*                MassQ,
-                    gmx::ArrayRef<std::vector<int>> trotter_seqlist,
-                    int                             trotter_seqno);
-
-std::array<std::vector<int>, ettTSEQMAX>
-init_npt_vars(const t_inputrec* ir, t_state* state, t_extmass* Mass, gmx_bool bTrotter);
-
-real NPT_energy(const t_inputrec* ir, const t_state* state, const t_extmass* MassQ);
-/* computes all the pressure/tempertature control energy terms to get a conserved energy */
-
-void vrescale_tcoupl(const t_inputrec* ir, int64_t step, gmx_ekindata_t* ekind, real dt, double therm_integral[]);
-/* Compute temperature scaling. For V-rescale it is done in update. */
-
-void rescale_velocities(const gmx_ekindata_t* ekind, const t_mdatoms* mdatoms, int start, int end, rvec v[]);
-/* Rescale the velocities with the scaling factor in ekind */
-
-//! Check whether we do simulated annealing.
-bool doSimulatedAnnealing(const t_inputrec* ir);
-
-//! Initialize simulated annealing.
-bool initSimulatedAnnealing(t_inputrec* ir, gmx::Update* upd);
-
-// TODO: This is the only function in update.h altering the inputrec
-void update_annealing_target_temp(t_inputrec* ir, real t, gmx::Update* upd);
-/* Set reference temp for simulated annealing at time t*/
-
-real calc_temp(real ekin, real nrdf);
-/* Calculate the temperature */
-
-real calc_pres(PbcType pbcType, int nwall, const matrix box, const tensor ekin, const tensor vir, tensor pres);
-/* Calculate the pressure tensor, returns the scalar pressure.
- * The unit of pressure is bar.
- */
-
-void parrinellorahman_pcoupl(FILE*             fplog,
-                             int64_t           step,
-                             const t_inputrec* ir,
-                             real              dt,
-                             const tensor      pres,
-                             const tensor      box,
-                             tensor            box_rel,
-                             tensor            boxv,
-                             tensor            M,
-                             matrix            mu,
-                             gmx_bool          bFirstStep);
-
-void berendsen_pcoupl(FILE*             fplog,
-                      int64_t           step,
-                      const t_inputrec* ir,
-                      real              dt,
-                      const tensor      pres,
-                      const matrix      box,
-                      const matrix      force_vir,
-                      const matrix      constraint_vir,
-                      matrix            mu,
-                      double*           baros_integral);
-
-void berendsen_pscale(const t_inputrec*    ir,
-                      const matrix         mu,
-                      matrix               box,
-                      matrix               box_rel,
-                      int                  start,
-                      int                  nr_atoms,
-                      rvec                 x[],
-                      const unsigned short cFREEZE[],
-                      t_nrnb*              nrnb,
-                      bool                 scaleCoordinates);
-
-void pleaseCiteCouplingAlgorithms(FILE* fplog, const t_inputrec& ir);
-
 /*! \brief Computes the atom range for a thread to operate on, ensuring SIMD aligned ranges
  *
  * \param[in]  numThreads   The number of threads to divide atoms over
@@ -343,25 +242,5 @@ void pleaseCiteCouplingAlgorithms(FILE* fplog, const t_inputrec& ir);
  * \param[out] endAtom      The end of the atom range, note that this is in general not a multiple of the SIMD width
  */
 void getThreadAtomRange(int numThreads, int threadIndex, int numAtoms, int* startAtom, int* endAtom);
-
-/*! \brief Generate a new kinetic energy for the v-rescale thermostat
- *
- * Generates a new value for the kinetic energy, according to
- * Bussi et al JCP (2007), Eq. (A7)
- *
- * This is used by update_tcoupl(), and by the VRescaleThermostat of the modular
- * simulator.
- * TODO: Move this to the VRescaleThermostat once the modular simulator becomes
- *       the default code path.
- *
- * @param kk     present value of the kinetic energy of the atoms to be thermalized (in arbitrary units)
- * @param sigma  target average value of the kinetic energy (ndeg k_b T/2)  (in the same units as kk)
- * @param ndeg   number of degrees of freedom of the atoms to be thermalized
- * @param taut   relaxation time of the thermostat, in units of 'how often this routine is called'
- * @param step   the time step this routine is called on
- * @param seed   the random number generator seed
- * @return  the new kinetic energy
- */
-real vrescale_resamplekin(real kk, real sigma, real ndeg, real taut, int64_t step, int64_t seed);
 
 #endif

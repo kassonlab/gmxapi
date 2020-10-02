@@ -39,6 +39,7 @@ gmx_add_unit_test_library(mdrun_test_infrastructure
     energyreader.cpp
     energycomparison.cpp
     moduletest.cpp
+    simulatorcomparison.cpp
     terminationhelper.cpp
     trajectorycomparison.cpp
     trajectoryreader.cpp
@@ -47,37 +48,84 @@ gmx_add_unit_test_library(mdrun_test_infrastructure
     )
 target_include_directories(mdrun_test_infrastructure SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/src/external)
 
-set(testname "MdrunTests")
-set(exename "mdrun-test")
+# To avoid running into test timeouts, some end-to-end tests of mdrun
+# functionality are split off. This can be rearranged in future as we
+# see fit.
+set(testname "MdrunOutputTests")
+set(exename "mdrun-output-test")
 
 gmx_add_gtest_executable(${exename}
     CPP_SOURCE_FILES
         compressed_x_output.cpp
-        densityfittingmodule.cpp
-        exactcontinuation.cpp
-        ewaldsurfaceterm.cpp
-        grompp.cpp
         helpwriting.cpp
-        initialconstraints.cpp
-        interactiveMD.cpp
-        orires.cpp
         outputfiles.cpp
-        pmetest.cpp
-        simulator.cpp
-        swapcoords.cpp
-        tabulated_bonded_interactions.cpp
-        termination.cpp
         trajectory_writing.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+    )
+target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
+gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST IGNORE_LEAKS)
+
+set(testname "MdrunModulesTests")
+set(exename "mdrun-modules-test")
+
+gmx_add_gtest_executable(${exename}
+    CPP_SOURCE_FILES
+        densityfittingmodule.cpp
+        interactiveMD.cpp
         mimic.cpp
         # pseudo-library for code for mdrun
         $<TARGET_OBJECTS:mdrun_objlib>
     )
 target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
-gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST)
+gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST IGNORE_LEAKS)
 
-# To avoid running into test timeouts, some end-to-end tests of mdrun
-# functionality are split off. This can be rearranged in future as we
-# see fit.
+set(testname "MdrunIOTests")
+set(exename "mdrun-io-test")
+
+gmx_add_gtest_executable(${exename}
+    CPP_SOURCE_FILES
+        exactcontinuation.cpp
+        grompp.cpp
+        initialconstraints.cpp
+        termination.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+    )
+target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
+gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST IGNORE_LEAKS)
+
+set(testname "MdrunTests")
+set(exename "mdrun-test")
+
+gmx_add_gtest_executable(${exename}
+    CPP_SOURCE_FILES
+        ewaldsurfaceterm.cpp
+        multiple_time_stepping.cpp
+        orires.cpp
+        simulator.cpp
+        swapcoords.cpp
+        tabulated_bonded_interactions.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+    )
+target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
+gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST IGNORE_LEAKS)
+
+
+set(testname "MdrunPmeTests")
+set(exename "mdrun-pme-test")
+
+gmx_add_gtest_executable(${exename}
+    CPP_SOURCE_FILES
+        pmetest.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+    )
+target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
+gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST IGNORE_LEAKS)
+
+
 set(testname "MdrunNonIntegratorTests")
 set(exename "mdrun-non-integrator-test")
 
@@ -93,7 +141,7 @@ gmx_add_gtest_executable(${exename}
         $<TARGET_OBJECTS:mdrun_objlib>
         )
 target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
-gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST)
+gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST IGNORE_LEAKS)
 
 # TPI does not support OpenMP, so we need a separate test binary
 set(testname "MdrunTpiTests")
@@ -107,7 +155,7 @@ gmx_add_gtest_executable(${exename}
         $<TARGET_OBJECTS:mdrun_objlib>
         )
 target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
-gmx_register_gtest_test(${testname} ${exename} INTEGRATION_TEST)
+gmx_register_gtest_test(${testname} ${exename} INTEGRATION_TEST IGNORE_LEAKS)
 
 # Tests that only make sense to run with multiple ranks and/or real
 # MPI are implemented here.
@@ -122,13 +170,28 @@ gmx_add_gtest_executable(${exename} MPI
         mimic.cpp
         multisim.cpp
         multisimtest.cpp
-        pmetest.cpp
         replicaexchange.cpp
+        pmetest.cpp
         # pseudo-library for code for mdrun
         $<TARGET_OBJECTS:mdrun_objlib>
         )
 target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
-gmx_register_gtest_test(${testname} ${exename} MPI_RANKS 2 OPENMP_THREADS 2 INTEGRATION_TEST)
+gmx_register_gtest_test(${testname} ${exename} MPI_RANKS 2 OPENMP_THREADS 2 INTEGRATION_TEST IGNORE_LEAKS)
+
+# Tests that only make sense to run with multiple ranks and/or real
+# MPI are implemented here. Special case for slow PME tests
+set(testname "MdrunMpiPmeTests")
+set(exename "mdrun-mpi-pme-test")
+
+gmx_add_gtest_executable(${exename} MPI
+    CPP_SOURCE_FILES
+        # files with code for tests
+        pmetest.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+        )
+target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
+gmx_register_gtest_test(${testname} ${exename} MPI_RANKS 2 OPENMP_THREADS 2 INTEGRATION_TEST IGNORE_LEAKS)
 
 # Slow-running tests that target testing multiple-rank coordination behaviors
 set(exename "mdrun-mpi-coordination-test")
@@ -146,7 +209,22 @@ target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
 # with OpenMP enabled.
 if (CMAKE_BUILD_TYPE MATCHES "Rel" AND GMX_OPENMP)
     set(testname "MdrunMpiCoordinationTestsOneRank")
-    gmx_register_gtest_test(${testname} ${exename} MPI_RANKS 1 SLOW_TEST)
+    gmx_register_gtest_test(${testname} ${exename} MPI_RANKS 1 SLOW_TEST IGNORE_LEAKS)
     set(testname "MdrunMpiCoordinationTestsTwoRanks")
-    gmx_register_gtest_test(${testname} ${exename} MPI_RANKS 2 SLOW_TEST)
+    gmx_register_gtest_test(${testname} ${exename} MPI_RANKS 2 SLOW_TEST IGNORE_LEAKS)
 endif()
+
+# Keeping the FEP tests separate for now to be able to judge runtime more easily
+# Can be included in mdrun tests later
+set(testname "MdrunFEPTests")
+set(exename "mdrunfep-test")
+
+gmx_add_gtest_executable(${exename}
+        CPP_SOURCE_FILES
+        # files with code for tests
+        freeenergy.cpp
+        # pseudo-library for code for mdrun
+        $<TARGET_OBJECTS:mdrun_objlib>
+)
+target_link_libraries(${exename} PRIVATE mdrun_test_infrastructure)
+gmx_register_gtest_test(${testname} ${exename} OPENMP_THREADS 2 INTEGRATION_TEST IGNORE_LEAKS)

@@ -47,11 +47,11 @@
 
 #include <vector>
 
-#if GMX_GPU == GMX_GPU_CUDA
+#if GMX_GPU_CUDA
 #    include <cufft.h>
 
 #    include "gromacs/gpu_utils/gputraits.cuh"
-#elif GMX_GPU == GMX_GPU_OPENCL
+#elif GMX_GPU_OPENCL
 #    include <clFFT.h>
 
 #    include "gromacs/gpu_utils/gmxopencl.h"
@@ -73,8 +73,9 @@ public:
      * Constructs CUDA/OpenCL FFT plans for performing 3D FFT on a PME grid.
      *
      * \param[in] pmeGpu                  The PME GPU structure.
+     * \param[in] gridIndex               The index of the grid on which to perform the calculations.
      */
-    GpuParallel3dFft(const PmeGpu* pmeGpu);
+    GpuParallel3dFft(const PmeGpu* pmeGpu, const int gridIndex);
     /*! \brief Destroys the FFT plans. */
     ~GpuParallel3dFft();
     /*! \brief Performs the FFT transform in given direction
@@ -85,12 +86,12 @@ public:
     void perform3dFft(gmx_fft_direction dir, CommandEvent* timingEvent);
 
 private:
-#if GMX_GPU == GMX_GPU_CUDA
+#if GMX_GPU_CUDA
     cufftHandle   planR2C_;
     cufftHandle   planC2R_;
     cufftReal*    realGrid_;
     cufftComplex* complexGrid_;
-#elif GMX_GPU == GMX_GPU_OPENCL
+#elif GMX_GPU_OPENCL
     clfftPlanHandle               planR2C_;
     clfftPlanHandle               planC2R_;
     std::vector<cl_command_queue> deviceStreams_;

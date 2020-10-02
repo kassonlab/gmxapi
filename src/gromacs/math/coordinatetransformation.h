@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -44,12 +44,15 @@
 #define GMX_MATH_COORDINATETRANSFORMATION_H
 
 #include "gromacs/math/vectypes.h"
-#include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/classhelpers.h"
+
+#include "matrix.h"
 
 namespace gmx
 {
 
+template<typename>
+class ArrayRef;
 class ScaleCoordinates
 {
 public:
@@ -70,10 +73,21 @@ public:
      * \param[in] coordinates to be transformed
      */
     void operator()(ArrayRef<RVec> coordinates) const;
+
+    /*! \brief Perform a coordinate transformation on an input coordinate.
+     * \param[in] coordinate to be transformed
+     */
+    void operator()(RVec* coordinate) const;
+
     /*! \brief Apply the inverse scale to coordinates, ignoring dimensions for which scale is zero.
      * \param[in] coordinates to be transformed
      */
     void inverseIgnoringZeroScale(ArrayRef<RVec> coordinates) const;
+
+    /*! \brief Apply the inverse scale to a coordinate, ignoring dimensions for which scale is zero.
+     * \param[in] coordinate to be transformed
+     */
+    void inverseIgnoringZeroScale(RVec* coordinate) const;
 
 private:
     class Impl;
@@ -109,6 +123,11 @@ public:
      */
     void operator()(ArrayRef<RVec> coordinates) const;
 
+    /*! \brief Perform a coordinate transformation on a coordinate.
+     * \param[in] coordinate to be transformed
+     */
+    void operator()(RVec* coordinate) const;
+
     /*! \brief Returns the scaling operation, discarding the translation.
      */
     ScaleCoordinates scaleOperationOnly() const;
@@ -117,5 +136,39 @@ private:
     class Impl;
     PrivateImplPointer<Impl> impl_;
 };
+
+/*! \libinternal
+ * \brief Affine transformation of three-dimensional coordinates.
+ *
+ * Perfoms in-place coordinate transformations.
+ *
+ * Coordinates are first multiplied by a matrix, then translated.
+ */
+class AffineTransformation
+{
+public:
+    /*! \brief Construct a three-dimensional affine transformation.
+     * \param[in] matrix to be applied to the vectors
+     * \param[in] translation to be performed on the vectors
+     */
+    AffineTransformation(Matrix3x3ConstSpan matrix, const RVec& translation);
+
+    /*! \brief Perform an affine transformation on input vectors.
+     * \param[in,out] vectors to be transformed in-place
+     */
+    void operator()(ArrayRef<RVec> vectors) const;
+
+    /*! \brief Perform an affine transformation on a vector.
+     * \param[in,out] vector to be transformed in-place
+     */
+    void operator()(RVec* vector) const;
+
+private:
+    //! The matrix describing the affine transformation A(x) = matrix_ * x + translation_
+    Matrix3x3 matrix_;
+    //! The translation vector describing the affine transformation A(x) = matrix * x + translation
+    RVec translation_;
+};
+
 } // namespace gmx
 #endif // CoordinateTransformation

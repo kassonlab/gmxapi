@@ -32,11 +32,13 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \libinternal \file
+/*! \internal \file
  * \brief Declares the constraint element for the modular simulator
  *
  * \author Pascal Merz <pascal.merz@me.com>
  * \ingroup module_modularsimulator
+ *
+ * This header is only used within the modular simulator module
  */
 
 #ifndef GMX_MODULARSIMULATOR_CONSTRAINTELEMENT_H
@@ -49,11 +51,14 @@
 namespace gmx
 {
 class Constraints;
-class EnergyElement;
-class FreeEnergyPerturbationElement;
+class EnergyData;
+class FreeEnergyPerturbationData;
+class GlobalCommunicationHelper;
+class LegacySimulatorData;
+class ModularSimulatorAlgorithmBuilderHelper;
 class StatePropagatorData;
 
-/*! \libinternal
+/*! \internal
  * \ingroup module_modularsimulator
  * \brief Constraints element
  *
@@ -62,7 +67,7 @@ class StatePropagatorData;
  * but uses the current constraints implementation and the data management
  * introduced with the modular simulator.
  *
- * @tparam variable  The constraining variable
+ * \tparam variable  The constraining variable
  */
 template<ConstraintVariable variable>
 class ConstraintsElement final :
@@ -73,14 +78,14 @@ class ConstraintsElement final :
 {
 public:
     //! Constructor
-    ConstraintsElement(Constraints*                   constr,
-                       StatePropagatorData*           statePropagatorData,
-                       EnergyElement*                 energyElement,
-                       FreeEnergyPerturbationElement* freeEnergyPerturbationElement,
-                       bool                           isMaster,
-                       FILE*                          fplog,
-                       const t_inputrec*              inputrec,
-                       const t_mdatoms*               mdAtoms);
+    ConstraintsElement(Constraints*                constr,
+                       StatePropagatorData*        statePropagatorData,
+                       EnergyData*                 energyData,
+                       FreeEnergyPerturbationData* freeEnergyPerturbationData,
+                       bool                        isMaster,
+                       FILE*                       fplog,
+                       const t_inputrec*           inputrec,
+                       const t_mdatoms*            mdAtoms);
 
     /*! \brief Register constraining function for step / time
      *
@@ -88,11 +93,11 @@ public:
      * Under VV, this is expected to be run twice, once contraining velocities only,
      * a second time constraining positions and velocities.
      *
-     * @param step                 The step number
-     * @param time                 The time
-     * @param registerRunFunction  Function allowing to register a run function
+     * \param step                 The step number
+     * \param time                 The time
+     * \param registerRunFunction  Function allowing to register a run function
      */
-    void scheduleTask(Step step, Time time, const RegisterRunFunctionPtr& registerRunFunction) override;
+    void scheduleTask(Step step, Time time, const RegisterRunFunction& registerRunFunction) override;
 
     /*! \brief Performs inital constraining
      *  \todo Should this rather happen at grompp time? Right position of this operation is currently
@@ -103,16 +108,34 @@ public:
     //! No element teardown needed
     void elementTeardown() override {}
 
+    /*! \brief Factory method implementation
+     *
+     * \param legacySimulatorData  Pointer allowing access to simulator level data
+     * \param builderHelper  ModularSimulatorAlgorithmBuilder helper object
+     * \param statePropagatorData  Pointer to the \c StatePropagatorData object
+     * \param energyData  Pointer to the \c EnergyData object
+     * \param freeEnergyPerturbationData  Pointer to the \c FreeEnergyPerturbationData object
+     * \param globalCommunicationHelper  Pointer to the \c GlobalCommunicationHelper object
+     *
+     * \return  Pointer to the element to be added. Element needs to have been stored using \c storeElement
+     */
+    static ISimulatorElement* getElementPointerImpl(LegacySimulatorData* legacySimulatorData,
+                                                    ModularSimulatorAlgorithmBuilderHelper* builderHelper,
+                                                    StatePropagatorData*        statePropagatorData,
+                                                    EnergyData*                 energyData,
+                                                    FreeEnergyPerturbationData* freeEnergyPerturbationData,
+                                                    GlobalCommunicationHelper* globalCommunicationHelper);
+
 private:
     //! The actual constraining computation
     void apply(Step step, bool calculateVirial, bool writeLog, bool writeEnergy);
 
     //! IEnergySignallerClient implementation
-    SignallerCallbackPtr registerEnergyCallback(EnergySignallerEvent event) override;
+    std::optional<SignallerCallback> registerEnergyCallback(EnergySignallerEvent event) override;
     //! ITrajectorySignallerClient implementation
-    SignallerCallbackPtr registerTrajectorySignallerCallback(TrajectoryEvent event) override;
+    std::optional<SignallerCallback> registerTrajectorySignallerCallback(TrajectoryEvent event) override;
     //! ILoggingSignallerClient implementation
-    SignallerCallbackPtr registerLoggingCallback() override;
+    std::optional<SignallerCallback> registerLoggingCallback() override;
 
     //! The next energy calculation step
     Step nextVirialCalculationStep_;
@@ -124,12 +147,13 @@ private:
     //! Whether we're master rank
     const bool isMasterRank_;
 
+    // TODO: Clarify relationship to data objects and find a more robust alternative to raw pointers (#3583)
     //! Pointer to the micro state
     StatePropagatorData* statePropagatorData_;
-    //! Pointer to the energy element
-    EnergyElement* energyElement_;
-    //! Pointer to the free energy perturbation element
-    FreeEnergyPerturbationElement* freeEnergyPerturbationElement_;
+    //! Pointer to the energy data
+    EnergyData* energyData_;
+    //! Pointer to the free energy perturbation data
+    FreeEnergyPerturbationData* freeEnergyPerturbationData_;
 
     // Access to ISimulator data
     //! Handles constraints.

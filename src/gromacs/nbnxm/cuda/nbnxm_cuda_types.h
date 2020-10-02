@@ -49,6 +49,7 @@
 #include "gromacs/gpu_utils/cuda_arch_utils.cuh"
 #include "gromacs/gpu_utils/cudautils.cuh"
 #include "gromacs/gpu_utils/devicebuffer.h"
+#include "gromacs/gpu_utils/devicebuffer_datatype.h"
 #include "gromacs/gpu_utils/gputraits.cuh"
 #include "gromacs/mdtypes/interaction_const.h"
 #include "gromacs/nbnxm/gpu_types_common.h"
@@ -75,57 +76,10 @@ const int c_cudaPruneKernelJ4Concurrency = GMX_NBNXN_PRUNE_KERNEL_J4_CONCURRENCY
 /*! \brief cluster size = number of atoms per cluster. */
 static constexpr int c_clSize = c_nbnxnGpuClusterSize;
 
-/*! \brief Electrostatic CUDA kernel flavors.
- *
- *  Types of electrostatics implementations available in the CUDA non-bonded
- *  force kernels. These represent both the electrostatics types implemented
- *  by the kernels (cut-off, RF, and Ewald - a subset of what's defined in
- *  enums.h) as well as encode implementation details analytical/tabulated
- *  and single or twin cut-off (for Ewald kernels).
- *  Note that the cut-off and RF kernels have only analytical flavor and unlike
- *  in the CPU kernels, the tabulated kernels are ATM Ewald-only.
- *
- *  The row-order of pointers to different electrostatic kernels defined in
- *  nbnxn_cuda.cu by the nb_*_kfunc_ptr function pointer table
- *  should match the order of enumerated types below.
- */
-enum eelCu
-{
-    eelCuCUT,
-    eelCuRF,
-    eelCuEWALD_TAB,
-    eelCuEWALD_TAB_TWIN,
-    eelCuEWALD_ANA,
-    eelCuEWALD_ANA_TWIN,
-    eelCuNR
-};
-
-/*! \brief VdW CUDA kernel flavors.
- *
- * The enumerates values correspond to the LJ implementations in the CUDA non-bonded
- * kernels.
- *
- * The column-order of pointers to different electrostatic kernels defined in
- * nbnxn_cuda.cu by the nb_*_kfunc_ptr function pointer table
- * should match the order of enumerated types below.
- */
-enum evdwCu
-{
-    evdwCuCUT,
-    evdwCuCUTCOMBGEOM,
-    evdwCuCUTCOMBLB,
-    evdwCuFSWITCH,
-    evdwCuPSWITCH,
-    evdwCuEWALDGEOM,
-    evdwCuEWALDLB,
-    evdwCuNR
-};
-
 /* All structs prefixed with "cu_" hold data used in GPU calculations and
  * are passed to the kernels, except cu_timers_t. */
 /*! \cond */
 typedef struct cu_atomdata cu_atomdata_t;
-typedef struct cu_nbparam  cu_nbparam_t;
 /*! \endcond */
 
 
@@ -158,101 +112,30 @@ struct cu_atomdata
     int nalloc;
 
     //! atom coordinates + charges, size natoms
-    float4* xq;
+    DeviceBuffer<float4> xq;
     //! force output array, size natoms
-    float3* f;
+    DeviceBuffer<float3> f;
 
     //! LJ energy output, size 1
-    float* e_lj;
+    DeviceBuffer<float> e_lj;
     //! Electrostatics energy input, size 1
-    float* e_el;
+    DeviceBuffer<float> e_el;
 
     //! shift forces
-    float3* fshift;
+    DeviceBuffer<float3> fshift;
 
     //! number of atom types
     int ntypes;
     //! atom type indices, size natoms
-    int* atom_types;
+    DeviceBuffer<int> atom_types;
     //! sqrt(c6),sqrt(c12) size natoms
-    float2* lj_comb;
+    DeviceBuffer<float2> lj_comb;
 
     //! shifts
-    float3* shift_vec;
+    DeviceBuffer<float3> shift_vec;
     //! true if the shift vector has been uploaded
     bool bShiftVecUploaded;
 };
-
-/** \internal
- * \brief Parameters required for the CUDA nonbonded calculations.
- */
-struct cu_nbparam
-{
-
-    //! type of electrostatics, takes values from #eelCu
-    int eeltype;
-    //! type of VdW impl., takes values from #evdwCu
-    int vdwtype;
-
-    //! charge multiplication factor
-    float epsfac;
-    //! Reaction-field/plain cutoff electrostatics const.
-    float c_rf;
-    //! Reaction-field electrostatics constant
-    float two_k_rf;
-    //! Ewald/PME parameter
-    float ewald_beta;
-    //! Ewald/PME correction term substracted from the direct-space potential
-    float sh_ewald;
-    //! LJ-Ewald/PME correction term added to the correction potential
-    float sh_lj_ewald;
-    //! LJ-Ewald/PME coefficient
-    float ewaldcoeff_lj;
-
-    //! Coulomb cut-off squared
-    float rcoulomb_sq;
-
-    //! VdW cut-off squared
-    float rvdw_sq;
-    //! VdW switched cut-off
-    float rvdw_switch;
-    //! Full, outer pair-list cut-off squared
-    float rlistOuter_sq;
-    //! Inner, dynamic pruned pair-list cut-off squared
-    float rlistInner_sq;
-    //! True if we use dynamic pair-list pruning
-    bool useDynamicPruning;
-
-    //! VdW shift dispersion constants
-    shift_consts_t dispersion_shift;
-    //! VdW shift repulsion constants
-    shift_consts_t repulsion_shift;
-    //! VdW switch constants
-    switch_consts_t vdw_switch;
-
-    /* LJ non-bonded parameters - accessed through texture memory */
-    //! nonbonded parameter table with C6/C12 pairs per atom type-pair, 2*ntype^2 elements
-    float* nbfp;
-    //! texture object bound to nbfp
-    cudaTextureObject_t nbfp_texobj;
-    //! nonbonded parameter table per atom type, 2*ntype elements
-    float* nbfp_comb;
-    //! texture object bound to nbfp_texobj
-    cudaTextureObject_t nbfp_comb_texobj;
-
-    /* Ewald Coulomb force table data - accessed through texture memory */
-    //! table scale/spacing
-    float coulomb_tab_scale;
-    //! pointer to the table in the device memory
-    float* coulomb_tab;
-    //! texture object bound to coulomb_tab
-    cudaTextureObject_t coulomb_tab_texobj;
-};
-
-/** \internal
- * \brief Pair list data.
- */
-using cu_plist_t = Nbnxm::gpu_plist;
 
 /** \internal
  * \brief Typedef of actual timer type.
@@ -275,12 +158,6 @@ struct NbnxmGpu
     bool bUseTwoStreams = false;
     /*! \brief atom data */
     cu_atomdata_t* atdat = nullptr;
-    /*! \brief f buf ops cell index mapping */
-    int* cell = nullptr;
-    /*! \brief number of indices in cell buffer */
-    int ncell = 0;
-    /*! \brief number of indices allocated in cell buffer */
-    int ncell_alloc = 0;
     /*! \brief array of atom indices */
     int* atomIndices = nullptr;
     /*! \brief size of atom indices */
@@ -300,9 +177,9 @@ struct NbnxmGpu
     /*! \brief number of elements allocated allocated in device buffer */
     int ncxy_ind_alloc = 0;
     /*! \brief parameters required for the non-bonded calc. */
-    cu_nbparam_t* nbparam = nullptr;
+    NBParamGpu* nbparam = nullptr;
     /*! \brief pair-list data structures (local and non-local) */
-    gmx::EnumerationArray<Nbnxm::InteractionLocality, cu_plist_t*> plist = { { nullptr } };
+    gmx::EnumerationArray<Nbnxm::InteractionLocality, Nbnxm::gpu_plist*> plist = { { nullptr } };
     /*! \brief staging area where fshift/energies get downloaded */
     nb_staging_t nbst;
     /*! \brief local and non-local GPU streams */
@@ -330,14 +207,6 @@ struct NbnxmGpu
      * local/nonlocal, if there is bonded GPU work, both flags
      * will be true. */
     gmx::EnumerationArray<Nbnxm::InteractionLocality, bool> haveWork = { { false } };
-
-    /*! \brief Pointer to event synchronizer triggered when the local
-     * GPU buffer ops / reduction is complete
-     *
-     * \note That the synchronizer is managed outside of this module
-     * in StatePropagatorDataGpu.
-     */
-    GpuEventSynchronizer* localFReductionDone = nullptr;
 
     /*! \brief Event triggered when non-local coordinate buffer
      * has been copied from device to host. */

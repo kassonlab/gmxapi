@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -44,14 +44,20 @@
 #define GMX_DOMDEC_COLLECT_H
 
 #include "gromacs/math/vectypes.h"
-#include "gromacs/utility/arrayref.h"
 
+namespace gmx
+{
+template<typename>
+class ArrayRef;
+}
 struct gmx_domdec_t;
 class t_state;
 
 /*! \brief Gathers rvec arrays \p localVector to \p globalVector on the master rank */
 void dd_collect_vec(gmx_domdec_t*                  dd,
-                    const t_state*                 localState,
+                    int                            ddpCount,
+                    int                            ddpCountCgGl,
+                    gmx::ArrayRef<const int>       localCGNumbers,
                     gmx::ArrayRef<const gmx::RVec> localVector,
                     gmx::ArrayRef<gmx::RVec>       globalVector);
 

@@ -42,17 +42,14 @@
 
 #include "typecasts_runner.h"
 
-#include "config.h"
-
 #include <vector>
 
 #include "gromacs/gpu_utils/cudautils.cuh"
 #include "gromacs/gpu_utils/devicebuffer.h"
 #include "gromacs/gpu_utils/typecasts.cuh"
+#include "gromacs/hardware/device_information.h"
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/stringutil.h"
-
-#if GMX_GPU == GMX_GPU_CUDA
 
 namespace gmx
 {
@@ -108,11 +105,14 @@ static __global__ void convertRVecToFloat3OnDevice_kernel(DeviceBuffer<float3> g
     }
 }
 
-void convertRVecToFloat3OnDevice(std::vector<gmx::RVec>& h_rVecOutput, const std::vector<gmx::RVec>& h_rVecInput)
+void convertRVecToFloat3OnDevice(std::vector<gmx::RVec>&       h_rVecOutput,
+                                 const std::vector<gmx::RVec>& h_rVecInput,
+                                 const TestDevice*             testDevice)
 {
-    DeviceInformation   deviceInfo;
-    const DeviceContext deviceContext(deviceInfo);
-    const DeviceStream  deviceStream(deviceContext, DeviceStreamPriority::Normal, false);
+    const DeviceContext& deviceContext = testDevice->deviceContext();
+    const DeviceStream&  deviceStream  = testDevice->deviceStream();
+
+    setActiveDevice(testDevice->deviceInfo());
 
     const int numElements = h_rVecInput.size();
 
@@ -150,5 +150,3 @@ void convertRVecToFloat3OnDevice(std::vector<gmx::RVec>& h_rVecOutput, const std
 
 } // namespace test
 } // namespace gmx
-
-#endif // GMX_GPU == GMX_GPU_CUDA

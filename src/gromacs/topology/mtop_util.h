@@ -43,6 +43,8 @@
 #include <array>
 #include <vector>
 
+#include <boost/stl_interfaces/iterator_interface.hpp>
+
 #include "gromacs/topology/topology.h"
 #include "gromacs/utility/basedefinitions.h"
 
@@ -55,12 +57,6 @@ struct t_symtab;
 // TODO All of the functions taking a const gmx_mtop * are deprecated
 // and should be replaced by versions taking const gmx_mtop & when
 // their callers are refactored similarly.
-
-/* Should be called after generating or reading mtop,
- * to set some compute intesive variables to avoid
- * N^2 operations later on.
- */
-void gmx_mtop_finalize(gmx_mtop_t* mtop);
 
 /* Counts the number of atoms of each type. State should be 0 for
  * state A and 1 for state B types.  typecount should have at
@@ -104,43 +100,28 @@ private:
     const AtomIterator* it_;
 };
 
-//! Wrapper around proxy object to implement operator->
-template<typename T>
-class ProxyPtr
-{
-public:
-    //! Construct with proxy object.
-    ProxyPtr(T t) : t_(t) {}
-    //! Member of pointer operator.
-    T* operator->() { return &t_; }
-
-private:
-    T t_;
-};
-
 /*! \brief
  * Object that allows looping over all atoms in an mtop.
  */
-class AtomIterator
+class AtomIterator :
+    public boost::stl_interfaces::proxy_iterator_interface<AtomIterator, std::forward_iterator_tag, t_atom, AtomProxy>
 {
+    using Base =
+            boost::stl_interfaces::proxy_iterator_interface<AtomIterator, std::forward_iterator_tag, t_atom, AtomProxy>;
+
 public:
     //! Construct from topology and optionalally a global atom number.
     explicit AtomIterator(const gmx_mtop_t& mtop, int globalAtomNumber = 0);
 
     //! Prefix increment.
     AtomIterator& operator++();
-    //! Postfix increment.
-    AtomIterator operator++(int);
+    using Base::  operator++;
 
     //! Equality comparison.
     bool operator==(const AtomIterator& o) const;
-    //! Non-equal comparison.
-    bool operator!=(const AtomIterator& o) const;
 
     //! Dereference operator. Returns proxy.
     AtomProxy operator*() const { return { this }; }
-    //! Member of pointer operator.
-    ProxyPtr<AtomProxy> operator->() const { return { this }; }
 
 private:
     //! Global topology.
@@ -254,6 +235,15 @@ void gmx_mtop_generate_local_top(const gmx_mtop_t& mtop, gmx_localtop_t* top, bo
  */
 gmx::RangePartitioning gmx_mtop_molecules(const gmx_mtop_t& mtop);
 
+/*! \brief
+ * Returns the index range from residue begin to end for each residue in a molecule block.
+ *
+ * Note that residues will always have consecutive atoms numbers internally.
+ *
+ * \param[in] moltype  Molecule Type to parse for start and end.
+ * \returns Vector of ranges for all residues.
+ */
+std::vector<gmx::Range<int>> atomRangeOfEachResidue(const gmx_moltype_t& moltype);
 
 /* Converts a gmx_mtop_t struct to t_topology.
  *
@@ -287,11 +277,13 @@ std::vector<int> get_atom_index(const gmx_mtop_t* mtop);
  */
 void convertAtomsToMtop(t_symtab* symtab, char** name, t_atoms* atoms, gmx_mtop_t* mtop);
 
-/*! \brief Checks if the non-bonded FEP should be performed in this run.
- *
- * \param[in]  mtop  Molecular topology.
- * \returns Whether FEP non-bonded is requested.
- */
-bool haveFepPerturbedNBInteractions(const gmx_mtop_t* mtop);
+//! Checks and returns whether non-bonded interactions are perturbed for free-energy calculations
+bool haveFepPerturbedNBInteractions(const gmx_mtop_t& mtop);
+
+//! Checks whether masses are perturbed for free-energy calculations
+bool haveFepPerturbedMasses(const gmx_mtop_t& mtop);
+
+//! Checks whether constraints are perturbed for free-energy calculations
+bool havePerturbedConstraints(const gmx_mtop_t& mtop);
 
 #endif

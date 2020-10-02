@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2015,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2015,2017,2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -53,8 +53,10 @@
 #include "gromacs/hardware/hw_info.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdrun/mdmodules.h"
+#include "gromacs/mdrun/simulationinputhandle.h"
 #include "gromacs/mdrunutility/handlerestart.h"
 #include "gromacs/mdtypes/mdrunoptions.h"
+#include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/basedefinitions.h"
 #include "gromacs/utility/gmxmpi.h"
 #include "gromacs/utility/real.h"
@@ -75,9 +77,6 @@ class IRestraintPotential; // defined in restraint/restraintpotential.h
 class RestraintManager;
 class SimulationContext;
 class StopHandlerBuilder;
-
-//! Work-around for GCC bug 58265
-constexpr bool BUGFREE_NOEXCEPT_STRING = std::is_nothrow_move_assignable<std::string>::value;
 
 /*! \libinternal \brief Runner object for supporting setup and execution of mdrun.
  *
@@ -144,8 +143,7 @@ public:
      * \{
      */
     Mdrunner(Mdrunner&& handle) noexcept;
-    //NOLINTNEXTLINE(performance-noexcept-move-constructor) working around GCC bug 58265
-    Mdrunner& operator=(Mdrunner&& handle) noexcept(BUGFREE_NOEXCEPT_STRING);
+    Mdrunner& operator=(Mdrunner&& handle) noexcept;
     /* \} */
 
     /*! \brief Driver routine, that calls the different simulation methods. */
@@ -263,12 +261,19 @@ private:
     //! \brief Non-owning handle to file used for logging.
     t_fileio* logFileHandle = nullptr;
 
-    /*! \brief Non-owning handle to communication data structure.
+    /*! \brief Non-owning handle to world communication data structure for task assigment.
      *
      * With real MPI, gets a value from the SimulationContext
      * supplied to the MdrunnerBuilder. With thread-MPI gets a
      * value after threads have been spawned. */
-    MPI_Comm communicator = MPI_COMM_NULL;
+    MPI_Comm libraryWorldCommunicator = MPI_COMM_NULL;
+
+    /*! \brief Non-owning handle to communication data structure for the current simulation.
+     *
+     * With real MPI, gets a value from the SimulationContext
+     * supplied to the MdrunnerBuilder. With thread-MPI gets a
+     * value after threads have been spawned. */
+    MPI_Comm simulationCommunicator = MPI_COMM_NULL;
 
     //! \brief Non-owning handle to multi-simulation handler.
     gmx_multisim_t* ms = nullptr;
@@ -300,6 +305,14 @@ private:
     std::unique_ptr<StopHandlerBuilder> stopHandlerBuilder_;
     //! The modules that comprise mdrun.
     std::unique_ptr<MDModules> mdModules_;
+
+    /*!
+     * \brief Holds simulation input specification provided by client, if any.
+     *
+     * If present on any instance (rank) of a simulation runner, an identical
+     * (or compatible) SimulationInput must be held on all cooperating instances.
+     */
+    SimulationInputHandle inputHolder_;
 };
 
 /*! \libinternal
@@ -587,6 +600,18 @@ public:
      * \param builder
      */
     MdrunnerBuilder& addStopHandlerBuilder(std::unique_ptr<StopHandlerBuilder> builder);
+
+    /*!
+     * \brief Acquire a handle to the SimulationInput.
+     *
+     * Required. SimulationInput will be taking responsibility for some of the
+     * input provided through other methods, such as addFilenames.
+     *
+     * See also issue https://gitlab.com/gromacs/gromacs/-/issues/3374
+     *
+     * \param input Shared ownership of a SimulationInput.
+     */
+    MdrunnerBuilder& addInput(SimulationInputHandle input);
 
     ~MdrunnerBuilder();
 

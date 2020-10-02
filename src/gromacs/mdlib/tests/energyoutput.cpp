@@ -145,8 +145,6 @@ public:
     t_inputrec inputrec_;
     //! Topology
     gmx_mtop_t mtop_;
-    //! MD atoms
-    t_mdatoms mdatoms_;
     //! Simulation time
     double time_;
     //! Total mass
@@ -175,8 +173,6 @@ public:
     std::vector<char*> groupNameHandles_;
     //! Total dipole momentum
     rvec muTotal_;
-    //! Distance and orientation restraints data
-    t_fcdata fcd_;
     //! Communication record
     t_commrec cr_;
     //! Constraints object (for constraints RMSD output in case of LINCS)
@@ -378,12 +374,8 @@ public:
         // TODO EnergyOutput should not take Constraints object
         // TODO This object will always return zero as RMSD value.
         //      It is more relevant to have non-zero value for testing.
-        constraints_ = makeConstraints(mtop_, inputrec_, nullptr, false, nullptr, mdatoms_, &cr_,
-                                       nullptr, nullptr, nullptr, false);
-
-        // No position/orientation restraints
-        fcd_.disres.npair = 0;
-        fcd_.orires.nr    = 0;
+        constraints_ = makeConstraints(mtop_, inputrec_, nullptr, false, nullptr, &cr_, nullptr,
+                                       nullptr, nullptr, false);
     }
 
     /*! \brief Helper function to generate synthetic data to output
@@ -642,9 +634,12 @@ TEST_P(EnergyOutputTest, CheckOutput)
     for (int frame = 0; frame < parameters.numFrames; frame++)
     {
         setStepData(&testValue);
-        energyOutput->addDataAtEnergyStep(false, true, time_, tmass_, enerdata_.get(), &state_, nullptr,
-                                          nullptr, box_, constraintsVirial_, forceVirial_, totalVirial_,
-                                          pressure_, &ekindata_, muTotal_, constraints_.get());
+        energyOutput->addDataAtEnergyStep(
+                false, true, time_, tmass_, enerdata_.get(), nullptr, nullptr, box_,
+                PTCouplingArrays({ state_.boxv, state_.nosehoover_xi, state_.nosehoover_vxi,
+                                   state_.nhpres_xi, state_.nhpres_vxi }),
+                state_.fep_state, constraintsVirial_, forceVirial_, totalVirial_, pressure_,
+                &ekindata_, muTotal_, constraints_.get());
 
         energyOutput->printAnnealingTemperatures(log_, &mtop_.groups, &inputrec_.opts);
         energyOutput->printStepToEnergyFile(energyFile_, true, false, false, log_, 100 * frame,

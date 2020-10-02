@@ -63,9 +63,10 @@ void applySettle(SettleTestData*    testData,
                  const bool         calcVirial,
                  const std::string& testDescription)
 {
-    settledata* settled = settle_init(testData->mtop_);
+    SettleData settled(testData->mtop_);
 
-    settle_set_constraints(settled, testData->idef_->il[F_SETTLE], testData->mdatoms_);
+    settled.setConstraints(testData->idef_->il[F_SETTLE], testData->numAtoms_,
+                           testData->masses_.data(), testData->inverseMasses_.data());
 
     bool errorOccured;
     int  numThreads  = 1;
@@ -74,11 +75,10 @@ void applySettle(SettleTestData*    testData,
             testData->xPrime_.arrayRefWithPadding(), testData->reciprocalTimeStep_,
             updateVelocities ? testData->v_.arrayRefWithPadding() : ArrayRefWithPadding<RVec>(),
             calcVirial, testData->virial_, &errorOccured);
-    settle_free(settled);
     EXPECT_FALSE(errorOccured) << testDescription;
 }
 
-#if GMX_GPU != GMX_GPU_CUDA
+#if !GMX_GPU_CUDA
 
 void applySettleGpu(gmx_unused SettleTestData* testData,
                     gmx_unused const t_pbc pbc,

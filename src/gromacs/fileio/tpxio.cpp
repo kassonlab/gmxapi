@@ -58,6 +58,7 @@
 #include "gromacs/mdtypes/awh_params.h"
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/md_enums.h"
+#include "gromacs/mdtypes/multipletimestepping.h"
 #include "gromacs/mdtypes/pull_params.h"
 #include "gromacs/mdtypes/state.h"
 #include "gromacs/pbcutil/boxutilities.h"
@@ -131,6 +132,8 @@ enum tpxv
     tpxv_VSite2FD,                  /**< Added 2FD type virtual site */
     tpxv_AddSizeField, /**< Added field with information about the size of the serialized tpr file in bytes, excluding the header */
     tpxv_StoreNonBondedInteractionExclusionGroup, /**< Store the non bonded interaction exclusion group in the topology */
+    tpxv_VSite1,                                  /**< Added 1 type virtual site */
+    tpxv_MTS,                                     /**< Added multiple time stepping */
     tpxv_Count                                    /**< the total number of tpxv versions */
 };
 
@@ -205,10 +208,13 @@ static const t_ftupd ftupd[] = {
     { 72, F_GBPOL_NOLONGERUSED },
     { 72, F_NPSOLVATION_NOLONGERUSED },
     { 93, F_LJ_RECIP },
+    { 76, F_ANHARM_POL },
     { 90, F_FBPOSRES },
+    { tpxv_VSite1, F_VSITE1 },
+    { tpxv_VSite2FD, F_VSITE2FD },
+    { tpxv_GenericInternalParameters, F_DENSITYFITTING },
     { 69, F_VTEMP_NOLONGERUSED },
     { 66, F_PDISPCORR },
-    { 76, F_ANHARM_POL },
     { 79, F_DVDL_COUL },
     {
             79,
@@ -220,8 +226,6 @@ static const t_ftupd ftupd[] = {
     },
     { 79, F_DVDL_RESTRAINT },
     { 79, F_DVDL_TEMPERATURE },
-    { tpxv_GenericInternalParameters, F_DENSITYFITTING },
-    { tpxv_VSite2FD, F_VSITE2FD },
 };
 #define NFTUPD asize(ftupd)
 
@@ -1079,6 +1083,29 @@ static void do_inputrec(gmx::ISerializer* serializer, t_inputrec* ir, int file_v
     }
 
     serializer->doInt(&ir->simulation_part);
+
+    if (file_version >= tpxv_MTS)
+    {
+        serializer->doBool(&ir->useMts);
+        int numLevels = ir->mtsLevels.size();
+        if (ir->useMts)
+        {
+            serializer->doInt(&numLevels);
+        }
+        ir->mtsLevels.resize(numLevels);
+        for (auto& mtsLevel : ir->mtsLevels)
+        {
+            int forceGroups = mtsLevel.forceGroups.to_ulong();
+            serializer->doInt(&forceGroups);
+            mtsLevel.forceGroups = std::bitset<static_cast<int>(gmx::MtsForceGroups::Count)>(forceGroups);
+            serializer->doInt(&mtsLevel.stepFactor);
+        }
+    }
+    else
+    {
+        ir->useMts = false;
+        ir->mtsLevels.clear();
+    }
 
     if (file_version >= 67)
     {
@@ -1940,6 +1967,7 @@ static void do_iparams(gmx::ISerializer* serializer, t_functype ftype, t_iparams
             serializer->doReal(&iparams->settle.doh);
             serializer->doReal(&iparams->settle.dhh);
             break;
+        case F_VSITE1: break; // VSite1 has 0 parameters
         case F_VSITE2:
         case F_VSITE2FD: serializer->doReal(&iparams->vsite.a); break;
         case F_VSITE3:
@@ -2834,7 +2862,7 @@ static void do_tpx_mtop(gmx::ISerializer* serializer, TpxFileHeader* tpx, gmx_mt
         {
             do_mtop(serializer, mtop, tpx->fileVersion);
             set_disres_npair(mtop);
-            gmx_mtop_finalize(mtop);
+            mtop->finalize();
         }
         else
         {

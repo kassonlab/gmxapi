@@ -42,11 +42,16 @@
 #ifndef GMX_DOMDEC_DOMDEC_UTILITY_H
 #define GMX_DOMDEC_DOMDEC_UTILITY_H
 
-#include "gromacs/mdtypes/forcerec.h"
-#include "gromacs/utility/arrayref.h"
 #include "gromacs/math/vectypes.h"
+#include "gromacs/mdtypes/forcerec.h"
 
 #include "domdec_internal.h"
+
+namespace gmx
+{
+template<typename>
+class ArrayRef;
+}
 
 /*! \brief Returns true if the DLB state indicates that the balancer is on. */
 static inline bool isDlbOn(const gmx_domdec_comm_t* comm)

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -60,6 +60,7 @@ PairlistParams::PairlistParams(const Nbnxm::KernelType kernelType,
     rlistInner(rlist),
     haveMultipleDomains(haveMultipleDomains),
     useDynamicPruning(false),
+    mtsFactor(1),
     nstlistPrune(-1),
     numRollingPruningParts(1),
     lifetime(-1)

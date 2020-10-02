@@ -54,10 +54,11 @@
 
 #include "nbnxm_cuda.h"
 
-#include "gromacs/gpu_utils/cudautils.cuh"
+#include "gromacs/gpu_utils/gpu_utils.h"
 #include "gromacs/gpu_utils/gpueventsynchronizer.cuh"
 #include "gromacs/gpu_utils/typecasts.cuh"
 #include "gromacs/gpu_utils/vectype_ops.cuh"
+#include "gromacs/hardware/device_information.h"
 #include "gromacs/mdtypes/simulation_workload.h"
 #include "gromacs/nbnxm/atomdata.h"
 #include "gromacs/nbnxm/gpu_common.h"
@@ -121,7 +122,7 @@ namespace Nbnxm
 constexpr static int c_bufOpsThreadsPerBlock = 128;
 
 /*! Nonbonded kernel function pointer type */
-typedef void (*nbnxn_cu_kfunc_ptr_t)(const cu_atomdata_t, const cu_nbparam_t, const cu_plist_t, bool);
+typedef void (*nbnxn_cu_kfunc_ptr_t)(const cu_atomdata_t, const NBParamGpu, const gpu_plist, bool);
 
 /*********************************/
 
@@ -163,7 +164,7 @@ static inline int calc_nb_kernel_nblock(int nwork_units, const DeviceInformation
  */
 
 /*! Force-only kernel function pointers. */
-static const nbnxn_cu_kfunc_ptr_t nb_kfunc_noener_noprune_ptr[eelCuNR][evdwCuNR] = {
+static const nbnxn_cu_kfunc_ptr_t nb_kfunc_noener_noprune_ptr[eelTypeNR][evdwTypeNR] = {
     { nbnxn_kernel_ElecCut_VdwLJ_F_cuda, nbnxn_kernel_ElecCut_VdwLJCombGeom_F_cuda,
       nbnxn_kernel_ElecCut_VdwLJCombLB_F_cuda, nbnxn_kernel_ElecCut_VdwLJFsw_F_cuda,
       nbnxn_kernel_ElecCut_VdwLJPsw_F_cuda, nbnxn_kernel_ElecCut_VdwLJEwCombGeom_F_cuda,
@@ -191,7 +192,7 @@ static const nbnxn_cu_kfunc_ptr_t nb_kfunc_noener_noprune_ptr[eelCuNR][evdwCuNR]
 };
 
 /*! Force + energy kernel function pointers. */
-static const nbnxn_cu_kfunc_ptr_t nb_kfunc_ener_noprune_ptr[eelCuNR][evdwCuNR] = {
+static const nbnxn_cu_kfunc_ptr_t nb_kfunc_ener_noprune_ptr[eelTypeNR][evdwTypeNR] = {
     { nbnxn_kernel_ElecCut_VdwLJ_VF_cuda, nbnxn_kernel_ElecCut_VdwLJCombGeom_VF_cuda,
       nbnxn_kernel_ElecCut_VdwLJCombLB_VF_cuda, nbnxn_kernel_ElecCut_VdwLJFsw_VF_cuda,
       nbnxn_kernel_ElecCut_VdwLJPsw_VF_cuda, nbnxn_kernel_ElecCut_VdwLJEwCombGeom_VF_cuda,
@@ -219,7 +220,7 @@ static const nbnxn_cu_kfunc_ptr_t nb_kfunc_ener_noprune_ptr[eelCuNR][evdwCuNR] =
 };
 
 /*! Force + pruning kernel function pointers. */
-static const nbnxn_cu_kfunc_ptr_t nb_kfunc_noener_prune_ptr[eelCuNR][evdwCuNR] = {
+static const nbnxn_cu_kfunc_ptr_t nb_kfunc_noener_prune_ptr[eelTypeNR][evdwTypeNR] = {
     { nbnxn_kernel_ElecCut_VdwLJ_F_prune_cuda, nbnxn_kernel_ElecCut_VdwLJCombGeom_F_prune_cuda,
       nbnxn_kernel_ElecCut_VdwLJCombLB_F_prune_cuda, nbnxn_kernel_ElecCut_VdwLJFsw_F_prune_cuda,
       nbnxn_kernel_ElecCut_VdwLJPsw_F_prune_cuda, nbnxn_kernel_ElecCut_VdwLJEwCombGeom_F_prune_cuda,
@@ -249,7 +250,7 @@ static const nbnxn_cu_kfunc_ptr_t nb_kfunc_noener_prune_ptr[eelCuNR][evdwCuNR] =
 };
 
 /*! Force + energy + pruning kernel function pointers. */
-static const nbnxn_cu_kfunc_ptr_t nb_kfunc_ener_prune_ptr[eelCuNR][evdwCuNR] = {
+static const nbnxn_cu_kfunc_ptr_t nb_kfunc_ener_prune_ptr[eelTypeNR][evdwTypeNR] = {
     { nbnxn_kernel_ElecCut_VdwLJ_VF_prune_cuda, nbnxn_kernel_ElecCut_VdwLJCombGeom_VF_prune_cuda,
       nbnxn_kernel_ElecCut_VdwLJCombLB_VF_prune_cuda, nbnxn_kernel_ElecCut_VdwLJFsw_VF_prune_cuda,
       nbnxn_kernel_ElecCut_VdwLJPsw_VF_prune_cuda, nbnxn_kernel_ElecCut_VdwLJEwCombGeom_VF_prune_cuda,
@@ -289,9 +290,9 @@ static inline nbnxn_cu_kfunc_ptr_t select_nbnxn_kernel(int                     e
 {
     nbnxn_cu_kfunc_ptr_t res;
 
-    GMX_ASSERT(eeltype < eelCuNR,
+    GMX_ASSERT(eeltype < eelTypeNR,
                "The electrostatics type requested is not implemented in the CUDA kernels.");
-    GMX_ASSERT(evdwtype < evdwCuNR,
+    GMX_ASSERT(evdwtype < evdwTypeNR,
                "The VdW type requested is not implemented in the CUDA kernels.");
 
     /* assert assumptions made by the kernels */
@@ -330,7 +331,7 @@ static inline nbnxn_cu_kfunc_ptr_t select_nbnxn_kernel(int                     e
 /*! \brief Calculates the amount of shared memory required by the nonbonded kernel in use. */
 static inline int calc_shmem_required_nonbonded(const int               num_threads_z,
                                                 const DeviceInformation gmx_unused* deviceInfo,
-                                                const cu_nbparam_t*                 nbp)
+                                                const NBParamGpu*                   nbp)
 {
     int shmem;
 
@@ -343,7 +344,7 @@ static inline int calc_shmem_required_nonbonded(const int               num_thre
     /* cj in shared memory, for each warp separately */
     shmem += num_threads_z * c_nbnxnGpuClusterpairSplit * c_nbnxnGpuJgroupSize * sizeof(int);
 
-    if (nbp->vdwtype == evdwCuCUTCOMBGEOM || nbp->vdwtype == evdwCuCUTCOMBLB)
+    if (nbp->vdwtype == evdwTypeCUTCOMBGEOM || nbp->vdwtype == evdwTypeCUTCOMBLB)
     {
         /* i-atom LJ combination parameters in shared memory */
         shmem += c_nbnxnGpuNumClusterPerSupercluster * c_clSize * sizeof(float2);
@@ -403,7 +404,7 @@ void gpu_copy_xq_to_gpu(NbnxmGpu* nb, const nbnxn_atomdata_t* nbatom, const Atom
     int adat_begin, adat_len; /* local/nonlocal offset and length used for xq and f */
 
     cu_atomdata_t*      adat         = nb->atdat;
-    cu_plist_t*         plist        = nb->plist[iloc];
+    gpu_plist*          plist        = nb->plist[iloc];
     cu_timers_t*        t            = nb->timers;
     const DeviceStream& deviceStream = *nb->deviceStreams[iloc];
 
@@ -444,9 +445,10 @@ void gpu_copy_xq_to_gpu(NbnxmGpu* nb, const nbnxn_atomdata_t* nbatom, const Atom
         t->xf[atomLocality].nb_h2d.openTimingRegion(deviceStream);
     }
 
-    cu_copy_H2D_async(adat->xq + adat_begin,
-                      static_cast<const void*>(nbatom->x().data() + adat_begin * 4),
-                      adat_len * sizeof(*adat->xq), deviceStream.stream());
+    static_assert(sizeof(adat->xq[0]) == sizeof(float4),
+                  "The size of the xyzq buffer element should be equal to the size of float4.");
+    copyToDeviceBuffer(&adat->xq, reinterpret_cast<const float4*>(nbatom->x().data()) + adat_begin,
+                       adat_begin, adat_len, deviceStream, GpuApiCallBehavior::Async, nullptr);
 
     if (bDoTime)
     {
@@ -482,8 +484,8 @@ void gpu_copy_xq_to_gpu(NbnxmGpu* nb, const nbnxn_atomdata_t* nbatom, const Atom
 void gpu_launch_kernel(NbnxmGpu* nb, const gmx::StepWorkload& stepWork, const InteractionLocality iloc)
 {
     cu_atomdata_t*      adat         = nb->atdat;
-    cu_nbparam_t*       nbp          = nb->nbparam;
-    cu_plist_t*         plist        = nb->plist[iloc];
+    NBParamGpu*         nbp          = nb->nbparam;
+    gpu_plist*          plist        = nb->plist[iloc];
     cu_timers_t*        t            = nb->timers;
     const DeviceStream& deviceStream = *nb->deviceStreams[iloc];
 
@@ -595,8 +597,8 @@ static inline int calc_shmem_required_prune(const int num_threads_z)
 void gpu_launch_kernel_pruneonly(NbnxmGpu* nb, const InteractionLocality iloc, const int numParts)
 {
     cu_atomdata_t*      adat         = nb->atdat;
-    cu_nbparam_t*       nbp          = nb->nbparam;
-    cu_plist_t*         plist        = nb->plist[iloc];
+    NBParamGpu*         nbp          = nb->nbparam;
+    gpu_plist*          plist        = nb->plist[iloc];
     cu_timers_t*        t            = nb->timers;
     const DeviceStream& deviceStream = *nb->deviceStreams[iloc];
 
@@ -761,8 +763,11 @@ void gpu_launch_cpyback(NbnxmGpu*                nb,
      */
     if (!stepWork.useGpuFBufferOps)
     {
-        cu_copy_D2H_async(nbatom->out[0].f.data() + adat_begin * 3, adat->f + adat_begin,
-                          (adat_len) * sizeof(*adat->f), deviceStream.stream());
+        static_assert(
+                sizeof(adat->f[0]) == sizeof(float3),
+                "The size of the force buffer element should be equal to the size of float3.");
+        copyFromDeviceBuffer(reinterpret_cast<float3*>(nbatom->out[0].f.data()) + adat_begin, &adat->f,
+                             adat_begin, adat_len, deviceStream, GpuApiCallBehavior::Async, nullptr);
     }
 
     /* After the non-local D2H is launched the nonlocal_done event can be
@@ -781,15 +786,24 @@ void gpu_launch_cpyback(NbnxmGpu*                nb,
         /* DtoH fshift when virial is needed */
         if (stepWork.computeVirial)
         {
-            cu_copy_D2H_async(nb->nbst.fshift, adat->fshift, SHIFTS * sizeof(*nb->nbst.fshift),
-                              deviceStream.stream());
+            static_assert(sizeof(nb->nbst.fshift[0]) == sizeof(adat->fshift[0]),
+                          "Sizes of host- and device-side shift vectors should be the same.");
+            copyFromDeviceBuffer(nb->nbst.fshift, &adat->fshift, 0, SHIFTS, deviceStream,
+                                 GpuApiCallBehavior::Async, nullptr);
         }
 
         /* DtoH energies */
         if (stepWork.computeEnergy)
         {
-            cu_copy_D2H_async(nb->nbst.e_lj, adat->e_lj, sizeof(*nb->nbst.e_lj), deviceStream.stream());
-            cu_copy_D2H_async(nb->nbst.e_el, adat->e_el, sizeof(*nb->nbst.e_el), deviceStream.stream());
+            static_assert(sizeof(nb->nbst.e_lj[0]) == sizeof(adat->e_lj[0]),
+                          "Sizes of host- and device-side LJ energy terms should be the same.");
+            copyFromDeviceBuffer(nb->nbst.e_lj, &adat->e_lj, 0, 1, deviceStream,
+                                 GpuApiCallBehavior::Async, nullptr);
+            static_assert(sizeof(nb->nbst.e_el[0]) == sizeof(adat->e_el[0]),
+                          "Sizes of host- and device-side electrostatic energy terms should be the "
+                          "same.");
+            copyFromDeviceBuffer(nb->nbst.e_el, &adat->e_el, 0, 1, deviceStream,
+                                 GpuApiCallBehavior::Async, nullptr);
         }
     }
 
@@ -803,9 +817,9 @@ void cuda_set_cacheconfig()
 {
     cudaError_t stat;
 
-    for (int i = 0; i < eelCuNR; i++)
+    for (int i = 0; i < eelTypeNR; i++)
     {
-        for (int j = 0; j < evdwCuNR; j++)
+        for (int j = 0; j < evdwTypeNR; j++)
         {
             /* Default kernel 32/32 kB Shared/L1 */
             cudaFuncSetCacheConfig(nb_kfunc_ener_prune_ptr[i][j], cudaFuncCachePreferEqual);
@@ -880,78 +894,9 @@ void nbnxn_gpu_x_to_nbat_x(const Nbnxm::Grid&        grid,
     nbnxnInsertNonlocalGpuDependency(nb, interactionLoc);
 }
 
-/* F buffer operations on GPU: performs force summations and conversion from nb to rvec format.
- *
- * NOTE: When the total force device buffer is reallocated and its size increases, it is cleared in
- *       Local stream. Hence, if accumulateForce is true, NonLocal stream should start accumulating
- *       forces only after Local stream already done so.
- */
-void nbnxn_gpu_add_nbat_f_to_f(const AtomLocality                         atomLocality,
-                               DeviceBuffer<gmx::RVec>                    totalForcesDevice,
-                               NbnxmGpu*                                  nb,
-                               void*                                      pmeForcesDevice,
-                               gmx::ArrayRef<GpuEventSynchronizer* const> dependencyList,
-                               int                                        atomStart,
-                               int                                        numAtoms,
-                               bool                                       useGpuFPmeReduction,
-                               bool                                       accumulateForce)
+void* getGpuForces(NbnxmGpu* nb)
 {
-    GMX_ASSERT(nb, "Need a valid nbnxn_gpu object");
-    GMX_ASSERT(numAtoms != 0, "Cannot call function with no atoms");
-    GMX_ASSERT(totalForcesDevice, "Need a valid totalForcesDevice pointer");
-
-    const InteractionLocality iLocality    = gpuAtomToInteractionLocality(atomLocality);
-    const DeviceStream&       deviceStream = *nb->deviceStreams[iLocality];
-    cu_atomdata_t*            adat         = nb->atdat;
-
-    size_t gmx_used_in_debug numDependency = static_cast<size_t>((useGpuFPmeReduction == true))
-                                             + static_cast<size_t>((accumulateForce == true));
-    GMX_ASSERT(numDependency >= dependencyList.size(),
-               "Mismatching number of dependencies and call signature");
-
-    // Enqueue wait on all dependencies passed
-    for (auto const synchronizer : dependencyList)
-    {
-        synchronizer->enqueueWaitEvent(deviceStream);
-    }
-
-    /* launch kernel */
-
-    KernelLaunchConfig config;
-    config.blockSize[0] = c_bufOpsThreadsPerBlock;
-    config.blockSize[1] = 1;
-    config.blockSize[2] = 1;
-    config.gridSize[0]  = ((numAtoms + 1) + c_bufOpsThreadsPerBlock - 1) / c_bufOpsThreadsPerBlock;
-    config.gridSize[1]  = 1;
-    config.gridSize[2]  = 1;
-    config.sharedMemorySize = 0;
-
-    auto kernelFn = accumulateForce ? nbnxn_gpu_add_nbat_f_to_f_kernel<true, false>
-                                    : nbnxn_gpu_add_nbat_f_to_f_kernel<false, false>;
-
-    if (useGpuFPmeReduction)
-    {
-        GMX_ASSERT(pmeForcesDevice, "Need a valid pmeForcesDevice pointer");
-        kernelFn = accumulateForce ? nbnxn_gpu_add_nbat_f_to_f_kernel<true, true>
-                                   : nbnxn_gpu_add_nbat_f_to_f_kernel<false, true>;
-    }
-
-    const float3* d_fNB    = adat->f;
-    const float3* d_fPme   = static_cast<float3*>(pmeForcesDevice);
-    float3*       d_fTotal = asFloat3(totalForcesDevice);
-    const int*    d_cell   = nb->cell;
-
-    const auto kernelArgs = prepareGpuKernelArguments(kernelFn, config, &d_fNB, &d_fPme, &d_fTotal,
-                                                      &d_cell, &atomStart, &numAtoms);
-
-    launchGpuKernel(kernelFn, config, deviceStream, nullptr, "FbufferOps", kernelArgs);
-
-    if (atomLocality == AtomLocality::Local)
-    {
-        GMX_ASSERT(nb->localFReductionDone != nullptr,
-                   "localFReductionDone has to be a valid pointer");
-        nb->localFReductionDone->markEvent(deviceStream);
-    }
+    return nb->atdat->f;
 }
 
 } // namespace Nbnxm

@@ -1,8 +1,8 @@
 This directory contains source code for Google C++ Testing and Mocking
 Frameworks.
 
-The code has been copied nearly verbatim from the GoogleTest 1.8.0
-tarball by copying the following files/directories recursively:
+The code has been copied nearly verbatim from the GoogleTest 1.8.1
+git tag by copying the following files/directories recursively:
 
 README.md
 googletest
@@ -12,20 +12,15 @@ However, the following files/subdirectories were excluded because they
 are unneeded for GROMACS:
 
 *.pump
-travis.h
-appveyor.yml
-build-aux
-codegear
-configure.ac
-Makefile.am
-msvc
-m4
-xcode
-test
-scripts
-googletest/docs
+googletest/configure.ac
+googletest/Makefile.am
+googletest/codegear
+googletest/msvc
+googletest/m4
+googletest/xcode
+googletest/test
+googletest/scripts
 googletest/samples
-googlemock/docs
 
 This README.Gromacs file is new, of course.
 
@@ -58,3 +53,8 @@ use this feature, we'd just want to turn it off, but there's no
 interface for that. So, GTEST_CAN_STREAM_RESULTS is added in
 googletest/include/gtest/internal/gtest-port.h to allow the default
 behaviour to be applied only if the user hasn't gotten involved.
+
+Some compiler warnings cannot be suppressed through CMake machinery,
+such as for the clang static analyzer, and some lines are removed
+from consideration by wrapping with `#ifndef __clang_analyzer__`
+... `#endif`.

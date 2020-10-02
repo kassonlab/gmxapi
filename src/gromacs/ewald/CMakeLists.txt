@@ -54,7 +54,7 @@ gmx_add_libgromacs_sources(
     pme_coordinate_receiver_gpu_impl.cpp
     pme_force_sender_gpu_impl.cpp
     )
-if (GMX_USE_CUDA)
+if (GMX_GPU_CUDA)
     gmx_add_libgromacs_sources(
         # CUDA-specific sources
         pme_gather.cu
@@ -70,12 +70,7 @@ if (GMX_USE_CUDA)
         pme_gpu_internal.cpp
         pme_gpu_timings.cpp
         )
-    gmx_compile_cpp_as_cuda(
-        pme_gpu_internal.cpp
-        pme_gpu_program.cpp
-        pme_gpu_timings.cpp
-        )
-elseif (GMX_USE_OPENCL)
+elseif (GMX_GPU_OPENCL)
     gmx_add_libgromacs_sources(
         # OpenCL-specific sources
         pme_gpu_3dfft_ocl.cpp
@@ -84,6 +79,15 @@ elseif (GMX_USE_OPENCL)
         pme_gpu.cpp
         pme_gpu_internal.cpp
         pme_gpu_timings.cpp
+        )
+elseif (GMX_GPU_SYCL)
+    # SYCL-TODO: proper implementation
+    gmx_add_libgromacs_sources(
+        pme_gpu_program_impl.cpp
+        )
+    _gmx_add_files_to_property(SYCL_SOURCES
+        pme_gpu_program_impl.cpp
+        pme_gpu_program.cpp
         )
 else()
     gmx_add_libgromacs_sources(
@@ -98,7 +102,7 @@ endif()
 
 
 set(PME_OCL_KERNEL_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/pme_gpu_utils.clh"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pme_gpu_calculate_splines.clh"
     "${CMAKE_CURRENT_SOURCE_DIR}/pme_solve.clh"
     "${CMAKE_CURRENT_SOURCE_DIR}/pme_gather.clh"
     "${CMAKE_CURRENT_SOURCE_DIR}/pme_spread.clh")

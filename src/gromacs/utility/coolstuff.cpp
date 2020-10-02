@@ -773,7 +773,7 @@ std::string getCoolQuote()
           "it. Burn them, it's a great symbolic gesture.",
           "Linus Torvalds" },
         { "I invented the term 'Object-Oriented', and I can tell you I did not have C++ in mind.",
-          "Alay Kay, author of Smalltalk" },
+          "Alan Kay, author of Smalltalk" },
         { "FORTRAN, the infantile disorder, by now nearly 20 years old, is hopelessly inadequate "
           "for whatever computer application you have in mind today: it is now too clumsy, too "
           "risky, and too expensive to use.",
@@ -1522,6 +1522,12 @@ std::string getCoolQuote()
           "Niels Bohr" },
         { "We must be clear that when it comes to atoms, language can be used only as in poetry. ",
           "Niels Bohr" },
+        { "\"What are the biological implications of your research?\" - \"Well, I simulate "
+          "water.\" ",
+          "Petter Johansson" },
+        { "Everything what mathematicians were saying for the last 50 years is slowly catching up "
+          "with us.",
+          "David van der Spoel" },
     };
 
     if (beCool())

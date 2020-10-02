@@ -49,7 +49,9 @@
 #include "gromacs/gpu_utils/gmxopencl.h"
 #include "gromacs/gpu_utils/gputraits_ocl.h"
 #include "gromacs/utility/exceptions.h"
+#include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/gmxassert.h"
+#include "gromacs/utility/stringutil.h"
 
 enum class GpuApiCallBehavior;
 
@@ -69,54 +71,6 @@ struct gmx_device_runtime_data_t
     cl_program program;
 };
 
-/*! \brief Launches synchronous or asynchronous device to host memory copy.
- *
- *  If copy_event is not NULL, on return it will contain an event object
- *  identifying this particular device to host operation. The event can further
- *  be used to queue a wait for this operation or to query profiling information.
- */
-int ocl_copy_D2H(void*              h_dest,
-                 cl_mem             d_src,
-                 size_t             offset,
-                 size_t             bytes,
-                 GpuApiCallBehavior transferKind,
-                 cl_command_queue   command_queue,
-                 cl_event*          copy_event);
-
-
-/*! \brief Launches asynchronous device to host memory copy. */
-int ocl_copy_D2H_async(void*            h_dest,
-                       cl_mem           d_src,
-                       size_t           offset,
-                       size_t           bytes,
-                       cl_command_queue command_queue,
-                       cl_event*        copy_event);
-
-/*! \brief Launches synchronous or asynchronous host to device memory copy.
- *
- *  If copy_event is not NULL, on return it will contain an event object
- *  identifying this particular host to device operation. The event can further
- *  be used to queue a wait for this operation or to query profiling information.
- */
-int ocl_copy_H2D(cl_mem             d_dest,
-                 const void*        h_src,
-                 size_t             offset,
-                 size_t             bytes,
-                 GpuApiCallBehavior transferKind,
-                 cl_command_queue   command_queue,
-                 cl_event*          copy_event);
-
-/*! \brief Launches asynchronous host to device memory copy. */
-int ocl_copy_H2D_async(cl_mem           d_dest,
-                       const void*      h_src,
-                       size_t           offset,
-                       size_t           bytes,
-                       cl_command_queue command_queue,
-                       cl_event*        copy_event);
-
-/*! \brief Launches synchronous host to device memory copy. */
-int ocl_copy_H2D_sync(cl_mem d_dest, const void* h_src, size_t offset, size_t bytes, cl_command_queue command_queue);
-
 /*! \brief Allocate host memory in malloc style */
 void pmalloc(void** h_ptr, size_t nbytes);
 
@@ -125,19 +79,6 @@ void pfree(void* h_ptr);
 
 /*! \brief Convert error code to diagnostic string */
 std::string ocl_get_error_string(cl_int error);
-
-//! A debug checker to track cl_events being released correctly
-inline void ensureReferenceCount(const cl_event& event, unsigned int refCount)
-{
-#ifndef NDEBUG
-    cl_int clError = clGetEventInfo(event, CL_EVENT_REFERENCE_COUNT, sizeof(refCount), &refCount, nullptr);
-    GMX_ASSERT(CL_SUCCESS == clError, ocl_get_error_string(clError).c_str());
-    GMX_ASSERT(refCount == refCount, "Unexpected reference count");
-#else
-    GMX_UNUSED_VALUE(event);
-    GMX_UNUSED_VALUE(refCount);
-#endif
-}
 
 /*! \brief Pretend to synchronize an OpenCL stream (dummy implementation).
  *
@@ -197,11 +138,10 @@ void prepareGpuKernelArgument(cl_kernel                 kernel,
 
     // Assert on types not allowed to be passed to a kernel
     // (as per section 6.9 of the OpenCL spec).
-    static_assert(!std::is_same<CurrentArg, bool>::value && !std::is_same<CurrentArg, size_t>::value
-                          && !std::is_same<CurrentArg, ptrdiff_t>::value
-                          && !std::is_same<CurrentArg, intptr_t>::value
-                          && !std::is_same<CurrentArg, uintptr_t>::value,
-                  "Invalid type passed to OpenCL kernel functions (see OpenCL spec section 6.9).");
+    static_assert(
+            !std::is_same_v<CurrentArg,
+                            bool> && !std::is_same_v<CurrentArg, size_t> && !std::is_same_v<CurrentArg, ptrdiff_t> && !std::is_same_v<CurrentArg, intptr_t> && !std::is_same_v<CurrentArg, uintptr_t>,
+            "Invalid type passed to OpenCL kernel functions (see OpenCL spec section 6.9).");
 
     prepareGpuKernelArgument(kernel, config, argIndex + 1, otherArgsPtrs...);
 }

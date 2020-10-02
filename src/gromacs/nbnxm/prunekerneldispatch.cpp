@@ -42,6 +42,7 @@
 
 #include "clusterdistancekerneltype.h"
 #include "nbnxm_gpu.h"
+#include "nbnxm_simd.h"
 #include "pairlistset.h"
 #include "pairlistsets.h"
 #include "kernels_reference/kernel_ref_prune.h"
@@ -72,12 +73,16 @@ void PairlistSet::dispatchPruneKernel(const nbnxn_atomdata_t* nbat, const rvec* 
 
         switch (getClusterDistanceKernelType(params_.pairlistType, *nbat))
         {
+#ifdef GMX_NBNXN_SIMD_4XN
             case ClusterDistanceKernelType::CpuSimd_4xM:
                 nbnxn_kernel_prune_4xn(nbl, nbat, shift_vec, rlistInner);
                 break;
+#endif
+#ifdef GMX_NBNXN_SIMD_2XNN
             case ClusterDistanceKernelType::CpuSimd_2xMM:
                 nbnxn_kernel_prune_2xnn(nbl, nbat, shift_vec, rlistInner);
                 break;
+#endif
             case ClusterDistanceKernelType::CpuPlainC:
                 nbnxn_kernel_prune_ref(nbl, nbat, shift_vec, rlistInner);
                 break;
@@ -96,7 +101,8 @@ void nonbonded_verlet_t::dispatchPruneKernelGpu(int64_t step)
     wallcycle_start_nocount(wcycle_, ewcLAUNCH_GPU);
     wallcycle_sub_start_nocount(wcycle_, ewcsLAUNCH_GPU_NONBONDED);
 
-    const bool stepIsEven = (pairlistSets().numStepsWithPairlist(step) % 2 == 0);
+    const bool stepIsEven =
+            (pairlistSets().numStepsWithPairlist(step) % (2 * pairlistSets().params().mtsFactor) == 0);
 
     Nbnxm::gpu_launch_kernel_pruneonly(
             gpu_nbv, stepIsEven ? gmx::InteractionLocality::Local : gmx::InteractionLocality::NonLocal,

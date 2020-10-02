@@ -52,6 +52,8 @@
 #include "gromacs/gpu_utils/hostallocator.h"
 #include "gromacs/utility/gmxmpi.h"
 
+struct gmx_wallcycle;
+
 namespace gmx
 {
 
@@ -70,18 +72,22 @@ public:
     /*! \brief Creates GPU Halo Exchange object.
      *
      * \param [inout] dd                       domdec structure
+     * \param [in]    dimIndex                 the dimension index for this instance
      * \param [in]    mpi_comm_mysim           communicator used for simulation
      * \param [in]    deviceContext            GPU device context
      * \param [in]    localStream              local NB CUDA stream
      * \param [in]    nonLocalStream           non-local NB CUDA stream
      * \param [in]    pulse                    the communication pulse for this instance
+     * \param [in]    wcycle                   The wallclock counter
      */
     Impl(gmx_domdec_t*        dd,
+         int                  dimIndex,
          MPI_Comm             mpi_comm_mysim,
          const DeviceContext& deviceContext,
          const DeviceStream&  localStream,
          const DeviceStream&  nonLocalStream,
-         int                  pulse);
+         int                  pulse,
+         gmx_wallcycle*       wcycle);
     ~Impl();
 
     /*! \brief
@@ -194,10 +200,16 @@ private:
     float3* d_f_ = nullptr;
     //! An event recorded once the exchanged forces are ready on the GPU
     GpuEventSynchronizer fReadyOnDevice_;
+    //! The dimension index corresponding to this halo exchange instance
+    int dimIndex_ = 0;
     //! The pulse corresponding to this halo exchange instance
     int pulse_ = 0;
     //! Number of zones. Always 1 for 1-D case.
     const int nzone_ = 1;
+    //! The wallclock counter
+    gmx_wallcycle* wcycle_ = nullptr;
+    //! The atom offset for receive (x) or send (f) for dimension index and pulse corresponding to this halo exchange instance
+    int atomOffset_ = 0;
 };
 
 } // namespace gmx

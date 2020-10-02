@@ -1,3 +1,4 @@
+#
 # This file is part of the GROMACS molecular simulation package.
 #
 # Copyright (c) 2020, by the GROMACS development team, led by
@@ -39,6 +40,7 @@ Authors:
     * Paul Bauer <paul.bauer.q@gmail.com>
     * Eric Irrgang <ericirrgang@gmail.com>
     * Joe Jordan <e.jjordan12@gmail.com>
+    * Mark Abraham <mark.j.abraham@gmail.com>
 
 """
 
@@ -56,52 +58,45 @@ parsers for tools.
     Instead, inherit from it with the *parents* argument to :py:class:`argparse.ArgumentParser`
 """
 
-# TODO: Try using distutils.version.StrictVersion.
-parser.add_argument('--cmake', type=str, default='3.9.6',
-                    choices=['3.9.6', '3.11.4', '3.13.0', '3.14.7', '3.15.7'],
+parser.add_argument('--cmake', type=str, default='3.13.0',
                     help='Selection of CMake version to provide to base image')
 compiler_group = parser.add_mutually_exclusive_group()
 compiler_group.add_argument('--gcc', type=int, nargs='?', const=7, default=7,
-                            choices=[5, 6, 7, 8, 9],
                             help='Select GNU compiler tool chain. (Default) '
                                  'Some checking is implemented to avoid incompatible combinations')
-compiler_group.add_argument('--llvm', type=int, nargs='?', const=7, default=None,
-                            choices=[3, 6, 7, 8, 9],
+compiler_group.add_argument('--llvm', type=str, nargs='?', const='7', default=None,
                             help='Select LLVM compiler tool chain. '
                                  'Some checking is implemented to avoid incompatible combinations')
 compiler_group.add_argument('--icc', type=int, nargs='?', const=19, default=None,
-                            choices=[19, 20],
                             help='Select Intel compiler tool chain. '
                                  'Some checking is implemented to avoid incompatible combinations')
+# TODO currently the installation merely gets the latest beta version of oneAPI,
+# not a specific version. GROMACS probably doesn't need to address that until
+# oneAPI makes an official release.
+compiler_group.add_argument('--oneapi', type=str, nargs='?', const="2021.1-beta08", default=None,
+                            help='Select Intel oneAPI package version.')
 
 linux_group = parser.add_mutually_exclusive_group()
+# Ubuntu 20+ is not yet tested. See issue #3680
 linux_group.add_argument('--ubuntu', type=str, nargs='?', const='18.04', default='18.04',
-                         choices=['16.04', '18.04'],
                          help='Select Ubuntu Linux base image. (default: ubuntu 18.04)')
 linux_group.add_argument('--centos', type=str, nargs='?', const='7', default=None,
-                         choices=['6', '7'],
                          help='Select Centos Linux base image.')
 
 parser.add_argument('--cuda', type=str, nargs='?', const='10.2', default=None,
-                    choices=['9.0', '10.0', '10.1', '10.2'],
                     help='Select a CUDA version for a base Linux image from NVIDIA.')
 
 parser.add_argument('--mpi', type=str, nargs='?', const='openmpi', default=None,
-                    choices=['openmpi', 'impi'],
                     help='Enable MPI (default disabled) and optionally select distribution (default: openmpi)')
 
 parser.add_argument('--tsan', type=str, nargs='?', const='llvm', default=None,
-                    choices=['llvm'],
                     help='Build special compiler versions with TSAN OpenMP support')
 
 parser.add_argument('--opencl', type=str, nargs='?', const='nvidia', default=None,
-                    choices=['nvidia', 'intel', 'amd'],
                     help='Provide environment for OpenCL builds')
 
 parser.add_argument('--clfft', type=str, nargs='?', const='master', default=None,
-                    choices=['master', 'develop'],
                     help='Add external clFFT libraries to the build image')
 
 parser.add_argument('--doxygen', type=str, nargs='?', const='1.8.5', default=None,
-                    choices=['1.8.5', '1.8.11'],
                     help='Add doxygen environment for documentation builds. Also adds other requirements needed for final docs images.')

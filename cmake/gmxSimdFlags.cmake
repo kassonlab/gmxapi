@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2017,2018,2019, by the GROMACS development team, led by
+# Copyright (c) 2017,2018,2019,2020, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -239,7 +239,7 @@ function(gmx_find_simd_avx2_flags C_FLAGS_RESULT CXX_FLAGS_RESULT C_FLAGS_VARIAB
 int main(){__m256i x=_mm256_set1_epi32(5);x=_mm256_add_epi32(x,x);return _mm256_movemask_epi8(x);}"
         TOOLCHAIN_C_FLAGS TOOLCHAIN_CXX_FLAGS
         SIMD_AVX2_C_FLAGS SIMD_AVX2_CXX_FLAGS
-        "${TOOLCHAIN_FLAG_FOR_AVX2}" "-mavx2" "/arch:AVX" "-hgnu") # no AVX2-specific flag for MSVC yet
+        "${TOOLCHAIN_FLAG_FOR_AVX2}" "-mavx2" "/arch:AVX2" "-hgnu") 
 
     if(${SIMD_AVX2_C_FLAGS_RESULT})
         set(${C_FLAGS_VARIABLE} "${TOOLCHAIN_C_FLAGS} ${SIMD_AVX2_C_FLAGS}" CACHE INTERNAL "C flags required for AVX2 instructions")
@@ -266,7 +266,7 @@ function(gmx_find_simd_avx_512_flags C_FLAGS_RESULT CXX_FLAGS_RESULT C_FLAGS_VAR
           return idata[0]*(int)(_mm512_cmp_ps_mask(x,y,_CMP_LT_OS));}"
         TOOLCHAIN_C_FLAGS TOOLCHAIN_CXX_FLAGS
         SIMD_AVX_512_C_FLAGS SIMD_AVX_512_CXX_FLAGS
-        "-xCORE-AVX512 -qopt-zmm-usage=high" "-xCORE-AVX512" "-mavx512f -mfma" "-mavx512f" "/arch:AVX" "-hgnu") # no AVX_512F flags known for MSVC yet. ICC should use ZMM if code anyhow uses ZMM
+        "-xCORE-AVX512 -qopt-zmm-usage=high" "-xCORE-AVX512" "-mavx512f -mfma" "-mavx512f" "/arch:AVX512" "-hgnu") #ICC should use ZMM if code anyhow uses ZMM
 
     if(${SIMD_AVX_512_C_FLAGS_RESULT})
         set(${C_FLAGS_VARIABLE} "${TOOLCHAIN_C_FLAGS} ${SIMD_AVX_512_C_FLAGS}" CACHE INTERNAL "C flags required for AVX-512 instructions")
@@ -339,6 +339,28 @@ function(gmx_find_simd_arm_neon_asimd_flags C_FLAGS_RESULT CXX_FLAGS_RESULT C_FL
     endif()
     set(${C_FLAGS_RESULT} ${SIMD_ARM_NEON_ASIMD_C_FLAGS_RESULT} CACHE INTERNAL "Result of test for Arm Neon Asimd C flags" FORCE)
     set(${CXX_FLAGS_RESULT} ${SIMD_ARM_NEON_ASIMD_CXX_FLAGS_RESULT} CACHE INTERNAL "Result of test for Arm Neon Asimd C++ flags" FORCE)
+endfunction()
+
+# Arm SVE (64-bit ARM)
+function(gmx_find_simd_arm_sve_flags C_FLAGS_RESULT CXX_FLAGS_RESULT C_FLAGS_VARIABLE CXX_FLAGS_VARIABLE)
+
+    gmx_find_flags(SIMD_ARM_SVE_C_FLAGS_RESULT SIMD_ARM_SVE_CXX_FLAGS_RESULT
+        "#include<arm_sve.h>
+         int main(){float32_t x __attribute((vector_size(${GMX_SIMD_ARM_SVE_LENGTH}/8))) = svdup_f32(0.5f); return 0;}"
+        TOOLCHAIN_C_FLAGS TOOLCHAIN_CXX_FLAGS
+        SIMD_ARM_SVE_C_FLAGS SIMD_ARM_SVE_CXX_FLAGS
+        "-msve-vector-bits=${GMX_SIMD_ARM_SVE_LENGTH}"
+        "-march=armv8.2-a+sve -msve-vector-bits=${GMX_SIMD_ARM_SVE_LENGTH}"
+        "-march=armv8.2a+sve -msve-vector-bits=${GMX_SIMD_ARM_SVE_LENGTH}")
+
+    if(${SIMD_ARM_SVE_C_FLAGS_RESULT})
+        set(${C_FLAGS_VARIABLE} "${TOOLCHAIN_C_FLAGS} ${SIMD_ARM_SVE_C_FLAGS}" CACHE INTERNAL "C flags required for Arm SVE instructions")
+    endif()
+    if(${SIMD_ARM_SVE_CXX_FLAGS_RESULT})
+        set(${CXX_FLAGS_VARIABLE} "${TOOLCHAIN_CXX_FLAGS} ${SIMD_ARM_SVE_CXX_FLAGS}" CACHE INTERNAL "C++ flags required for Arm SVE instructions")
+    endif()
+    set(${C_FLAGS_RESULT} ${SIMD_ARM_SVE_C_FLAGS_RESULT} CACHE INTERNAL "Result of test for Arm SVE C flags" FORCE)
+    set(${CXX_FLAGS_RESULT} ${SIMD_ARM_SVE_CXX_FLAGS_RESULT} CACHE INTERNAL "Result of test for Arm SVE C++ flags" FORCE)
 endfunction()
 
 # IBM VMX (power6)

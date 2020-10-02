@@ -79,6 +79,7 @@
 #include <array>
 #include <type_traits>
 
+#include "gromacs/utility/basedefinitions.h"
 #include "gromacs/utility/classhelpers.h"
 #include "gromacs/utility/real.h"
 
@@ -151,6 +152,8 @@ struct SimdDInt32Tag
 #    include "impl_arm_neon/impl_arm_neon.h"
 #elif GMX_SIMD_ARM_NEON_ASIMD
 #    include "impl_arm_neon_asimd/impl_arm_neon_asimd.h"
+#elif GMX_SIMD_ARM_SVE
+#    include "impl_arm_sve/impl_arm_sve.h"
 #elif GMX_SIMD_IBM_VMX
 #    include "impl_ibm_vmx/impl_ibm_vmx.h"
 #elif GMX_SIMD_IBM_VSX
@@ -481,11 +484,12 @@ struct SimdTraits<SimdDInt32>
     using tag                  = SimdDInt32Tag;
 };
 #endif
-
+template<typename T>
+using SimdTraitsT = typename SimdTraits<T>::type;
 template<typename T>
 struct SimdTraits<const T>
 {
-    using type                 = const typename SimdTraits<T>::type;
+    using type                 = const SimdTraitsT<T>;
     static constexpr int width = SimdTraits<T>::width;
     using tag                  = typename SimdTraits<T>::tag;
 };
@@ -502,8 +506,7 @@ struct SimdTraits<const T>
  * \return   Loaded value
  */
 template<typename T>
-static inline std::remove_const_t<T>
-load(const typename internal::SimdTraits<T>::type* m) // disabled by SFINAE for non-SIMD types
+static inline std::remove_const_t<T> load(const internal::SimdTraitsT<T>* m) // disabled by SFINAE for non-SIMD types
 {
     return simdLoad(m, typename internal::SimdTraits<T>::tag());
 }
@@ -515,13 +518,13 @@ static inline T
  * 2) load(real*); template parameter is mandatory because otherwise ambiguity is
  *    created. The dependent type disables type deduction.
  */
-load(const std::enable_if_t<std::is_arithmetic<T>::value, T> *m)
+load(const std::enable_if_t<std::is_arithmetic_v<T>, T> *m)
 {
     return *m;
 }
 
 template<typename T, size_t N>
-static inline T gmx_simdcall load(const AlignedArray<typename internal::SimdTraits<T>::type, N>& m)
+static inline T gmx_simdcall load(const AlignedArray<internal::SimdTraitsT<T>, N>& m)
 {
     return simdLoad(m.data(), typename internal::SimdTraits<T>::tag());
 }
@@ -533,19 +536,19 @@ static inline T gmx_simdcall load(const AlignedArray<typename internal::SimdTrai
  * \return Loaded SimdFloat/Double/Int or basic scalar type
  */
 template<typename T>
-static inline T loadU(const typename internal::SimdTraits<T>::type* m)
+static inline T loadU(const internal::SimdTraitsT<T>* m)
 {
     return simdLoadU(m, typename internal::SimdTraits<T>::tag());
 }
 
 template<typename T>
-static inline T loadU(const std::enable_if_t<std::is_arithmetic<T>::value, T>* m)
+static inline T loadU(const std::enable_if_t<std::is_arithmetic_v<T>, T>* m)
 {
     return *m;
 }
 
 template<typename T, size_t N>
-static inline T gmx_simdcall loadU(const AlignedArray<typename internal::SimdTraits<T>::type, N>& m)
+static inline T gmx_simdcall loadU(const AlignedArray<internal::SimdTraitsT<T>, N>& m)
 {
     return simdLoadU(m.data(), typename internal::SimdTraits<T>::tag());
 }
@@ -620,16 +623,18 @@ struct Simd4Traits<Simd4Double>
     using type = double;
 };
 #endif
+template<typename T>
+using Simd4TraitsT = typename Simd4Traits<T>::type;
 } // namespace internal
 
 #if GMX_SIMD4_HAVE_REAL
 template<typename T>
-T load(const typename internal::Simd4Traits<T>::type* m)
+T load(const internal::Simd4TraitsT<T>* m)
 {
     return load4(m);
 }
 template<typename T>
-T loadU(const typename internal::Simd4Traits<T>::type* m)
+T loadU(const internal::Simd4TraitsT<T>* m)
 {
     return load4U(m);
 }

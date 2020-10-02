@@ -44,11 +44,13 @@
 #include <cstring>
 
 #include <algorithm>
+#include <numeric>
 
 #include "gromacs/math/veccompare.h"
 #include "gromacs/math/vecdump.h"
 #include "gromacs/mdtypes/awh_params.h"
 #include "gromacs/mdtypes/md_enums.h"
+#include "gromacs/mdtypes/multipletimestepping.h"
 #include "gromacs/mdtypes/pull_params.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/utility/compare.h"
@@ -65,12 +67,21 @@
 //! Macro to select a bool name
 #define EBOOL(e) gmx::boolToString(e)
 
+/* Default values for nstcalcenergy, used when the are no other restrictions. */
+constexpr int c_defaultNstCalcEnergy = 10;
+
 /* The minimum number of integration steps required for reasonably accurate
  * integration of first and second order coupling algorithms.
  */
 const int nstmin_berendsen_tcouple = 5;
 const int nstmin_berendsen_pcouple = 10;
 const int nstmin_harmonic          = 20;
+
+/* Default values for T- and P- coupling intervals, used when the are no other
+ * restrictions.
+ */
+constexpr int c_defaultNstTCouple = 10;
+constexpr int c_defaultNstPCouple = 10;
 
 t_inputrec::t_inputrec()
 {
@@ -87,21 +98,25 @@ t_inputrec::~t_inputrec()
     done_inputrec(this);
 }
 
-static int nst_wanted(const t_inputrec* ir)
+int ir_optimal_nstcalcenergy(const t_inputrec* ir)
 {
+    int nst;
+
     if (ir->nstlist > 0)
     {
-        return ir->nstlist;
+        nst = ir->nstlist;
     }
     else
     {
-        return 10;
+        nst = c_defaultNstCalcEnergy;
     }
-}
 
-int ir_optimal_nstcalcenergy(const t_inputrec* ir)
-{
-    return nst_wanted(ir);
+    if (ir->useMts)
+    {
+        nst = std::lcm(nst, ir->mtsLevels.back().stepFactor);
+    }
+
+    return nst;
 }
 
 int tcouple_min_integration_steps(int etc)
@@ -134,7 +149,7 @@ int ir_optimal_nsttcouple(const t_inputrec* ir)
 
     nmin = tcouple_min_integration_steps(ir->etc);
 
-    nwanted = nst_wanted(ir);
+    nwanted = c_defaultNstTCouple;
 
     tau_min = 1e20;
     if (ir->etc != etcNO)
@@ -175,7 +190,8 @@ int pcouple_min_integration_steps(int epc)
     switch (epc)
     {
         case epcNO: n = 0; break;
-        case etcBERENDSEN:
+        case epcBERENDSEN:
+        case epcCRESCALE:
         case epcISOTROPIC: n = nstmin_berendsen_pcouple; break;
         case epcPARRINELLORAHMAN:
         case epcMTTK: n = nstmin_harmonic; break;
@@ -187,27 +203,39 @@ int pcouple_min_integration_steps(int epc)
 
 int ir_optimal_nstpcouple(const t_inputrec* ir)
 {
-    int nmin, nwanted, n;
+    const int minIntegrationSteps = pcouple_min_integration_steps(ir->epc);
 
-    nmin = pcouple_min_integration_steps(ir->epc);
+    const int nwanted = c_defaultNstPCouple;
 
-    nwanted = nst_wanted(ir);
+    // With multiple time-stepping we can only compute the pressure at slowest steps
+    const int minNstPCouple = (ir->useMts ? ir->mtsLevels.back().stepFactor : 1);
 
-    if (nmin == 0 || ir->delta_t * nwanted <= ir->tau_p)
+    int n;
+    if (minIntegrationSteps == 0 || ir->delta_t * nwanted <= ir->tau_p)
     {
         n = nwanted;
     }
     else
     {
-        n = static_cast<int>(ir->tau_p / (ir->delta_t * nmin) + 0.001);
-        if (n < 1)
+        n = static_cast<int>(ir->tau_p / (ir->delta_t * minIntegrationSteps) + 0.001);
+        if (n < minNstPCouple)
         {
-            n = 1;
+            n = minNstPCouple;
         }
-        while (nwanted % n != 0)
+        // Without MTS we try to make nstpcouple a "nice" number
+        if (!ir->useMts)
         {
-            n--;
+            while (nwanted % n != 0)
+            {
+                n--;
+            }
         }
+    }
+
+    // With MTS, nstpcouple should be a multiple of the slowest MTS interval
+    if (ir->useMts)
+    {
+        n = n - (n % minNstPCouple);
     }
 
     return n;
@@ -281,6 +309,24 @@ static void done_lambdas(t_lambda* fep)
     sfree(fep->all_lambda);
 }
 
+static void done_t_rot(t_rot* rot)
+{
+    if (rot == nullptr)
+    {
+        return;
+    }
+    if (rot->grp != nullptr)
+    {
+        for (int i = 0; i < rot->ngrp; i++)
+        {
+            sfree(rot->grp[i].ind);
+            sfree(rot->grp[i].x_ref);
+        }
+        sfree(rot->grp);
+    }
+    sfree(rot);
+}
+
 void done_inputrec(t_inputrec* ir)
 {
     sfree(ir->opts.nrdf);
@@ -308,6 +354,7 @@ void done_inputrec(t_inputrec* ir)
         done_pull_params(ir->pull);
         sfree(ir->pull);
     }
+    done_t_rot(ir->rot);
     delete ir->params;
 }
 
@@ -791,6 +838,30 @@ void pr_inputrec(FILE* fp, int indent, const char* title, const t_inputrec* ir, 
         PSTEP("nsteps", ir->nsteps);
         PSTEP("init-step", ir->init_step);
         PI("simulation-part", ir->simulation_part);
+        PS("mts", EBOOL(ir->useMts));
+        if (ir->useMts)
+        {
+            for (int mtsIndex = 1; mtsIndex < static_cast<int>(ir->mtsLevels.size()); mtsIndex++)
+            {
+                const auto&       mtsLevel = ir->mtsLevels[mtsIndex];
+                const std::string forceKey = gmx::formatString("mts-level%d-forces", mtsIndex + 1);
+                std::string       forceGroups;
+                for (int i = 0; i < static_cast<int>(gmx::MtsForceGroups::Count); i++)
+                {
+                    if (mtsLevel.forceGroups[i])
+                    {
+                        if (!forceGroups.empty())
+                        {
+                            forceGroups += " ";
+                        }
+                        forceGroups += gmx::mtsForceGroupNames[i];
+                    }
+                }
+                PS(forceKey.c_str(), forceGroups.c_str());
+                const std::string factorKey = gmx::formatString("mts-level%d-factor", mtsIndex + 1);
+                PI(factorKey.c_str(), mtsLevel.stepFactor);
+            }
+        }
         PS("comm-mode", ECOM(ir->comm_mode));
         PI("nstcomm", ir->nstcomm);
 
@@ -1259,6 +1330,15 @@ void cmp_inputrec(FILE* fp, const t_inputrec* ir1, const t_inputrec* ir2, real f
     cmp_int64(fp, "inputrec->nsteps", ir1->nsteps, ir2->nsteps);
     cmp_int64(fp, "inputrec->init_step", ir1->init_step, ir2->init_step);
     cmp_int(fp, "inputrec->simulation_part", -1, ir1->simulation_part, ir2->simulation_part);
+    cmp_int(fp, "inputrec->mts", -1, static_cast<int>(ir1->useMts), static_cast<int>(ir2->useMts));
+    if (ir1->useMts && ir2->useMts)
+    {
+        cmp_int(fp, "inputrec->mts-levels", -1, ir1->mtsLevels.size(), ir2->mtsLevels.size());
+        cmp_int(fp, "inputrec->mts-level2-forces", -1, ir1->mtsLevels[1].forceGroups.to_ulong(),
+                ir2->mtsLevels[1].forceGroups.to_ulong());
+        cmp_int(fp, "inputrec->mts-level2-factor", -1, ir1->mtsLevels[1].stepFactor,
+                ir2->mtsLevels[1].stepFactor);
+    }
     cmp_int(fp, "inputrec->pbcType", -1, static_cast<int>(ir1->pbcType), static_cast<int>(ir2->pbcType));
     cmp_bool(fp, "inputrec->bPeriodicMols", -1, ir1->bPeriodicMols, ir2->bPeriodicMols);
     cmp_int(fp, "inputrec->cutoff_scheme", -1, ir1->cutoff_scheme, ir2->cutoff_scheme);

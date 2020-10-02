@@ -72,8 +72,8 @@ appropriate value instead of ``xxx`` :
 * ``-DCMAKE_C_COMPILER=xxx`` equal to the name of the C99 `Compiler`_ you wish to use (or the environment variable ``CC``)
 * ``-DCMAKE_CXX_COMPILER=xxx`` equal to the name of the C++98 `compiler`_ you wish to use (or the environment variable ``CXX``)
 * ``-DGMX_MPI=on`` to build using `MPI support`_ (generally good to combine with `building only mdrun`_)
-* ``-DGMX_GPU=on`` to build using nvcc to run using NVIDIA `CUDA GPU acceleration`_ or an OpenCL_ GPU
-* ``-DGMX_USE_OPENCL=on`` to build with OpenCL_ support enabled. ``GMX_GPU`` must also be set.
+* ``-DGMX_GPU=CUDA`` to build with NVIDIA CUDA support enabled.
+* ``-DGMX_GPU=OpenCL`` to build with OpenCL_ support enabled.
 * ``-DGMX_SIMD=xxx`` to specify the level of `SIMD support`_ of the node on which |Gromacs| will run
 * ``-DGMX_BUILD_MDRUN_ONLY=on`` for `building only mdrun`_, e.g. for compute cluster back-end nodes
 * ``-DGMX_DOUBLE=on`` to build |Gromacs| in double precision (slower, and not normally useful)
@@ -104,20 +104,20 @@ PowerPC including POWER8, ARM v8, and SPARC VIII.
 Compiler
 ^^^^^^^^
 
-|Gromacs| can be compiled on any platform with ANSI C99 and C++14
+|Gromacs| can be compiled on any platform with ANSI C99 and C++17
 compilers, and their respective standard C/C++ libraries. Good
 performance on an OS and architecture requires choosing a good
 compiler. We recommend gcc, because it is free, widely available and
 frequently provides the best performance.
 
 You should strive to use the most recent version of your
-compiler. Since we require full C++14 support the minimum supported
+compiler. Since we require full C++17 support the minimum supported
 compiler versions are
 
-* GNU (gcc) 5.1
-* Intel (icc) 17.0.1
-* LLVM (clang) 3.6
-* Microsoft (MSVC) 2017
+* GNU (gcc/libstdc++) 7
+* Intel (icc) 19.1
+* LLVM (clang/libc++) 5
+* Microsoft (MSVC) 2017 15.7
 
 Other compilers may work (Cray, Pathscale, older clang) but do
 not offer competitive performance. We recommend against PGI because
@@ -131,7 +131,7 @@ You may also need the most recent version of other compiler toolchain
 components beside the compiler itself (e.g. assembler or linker);
 these are often shipped by your OS distribution's binutils package.
 
-C++14 support requires adequate support in both the compiler and the
+C++17 support requires adequate support in both the compiler and the
 C++ library. The gcc and MSVC compilers include their own standard
 libraries and require no further configuration. If your vendor's
 compiler also manages the standard library library via compiler flags,
@@ -139,12 +139,12 @@ these will be honored. For configuration of other compilers, read on.
 
 On Linux, both the Intel and clang compiler use the libstdc++ which
 comes with gcc as the default C++ library. For |Gromacs|, we require
-the compiler to support libstc++ version 5.1 or higher. To select a
+the compiler to support libstc++ version 7.1 or higher. To select a
 particular libstdc++ library, provide the path to g++ with
 ``-DGMX_GPLUSPLUS_PATH=/path/to/g++``.
 
 On Windows with the Intel compiler, the MSVC standard library is used,
-and at least MSVC 2017 is required. Load the enviroment variables with
+and at least MSVC 2017 15.7 is required. Load the enviroment variables with
 vcvarsall.bat.
 
 To build with clang and llvm's libcxx standard library, use
@@ -348,7 +348,9 @@ Other optional build components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Run-time detection of hardware capabilities can be improved by
-  linking with hwloc, which is automatically enabled if detected.
+  linking with hwloc. By default this is turned off since it might
+  not be supported everywhere, but if you have hwloc installed it
+  should work by just setting ``-DGMX_HWLOC=ON``
 * Hardware-optimized BLAS and LAPACK libraries are useful
   for a few of the |Gromacs| utilities focused on normal modes and
   matrix manipulation, but they do not provide any benefits for normal
@@ -500,7 +502,7 @@ For example, the following command line
 
 ::
 
-    cmake .. -DGMX_GPU=ON -DGMX_MPI=ON -DCMAKE_INSTALL_PREFIX=/home/marydoe/programs
+    cmake .. -DGMX_GPU=CUDA -DGMX_MPI=ON -DCMAKE_INSTALL_PREFIX=/home/marydoe/programs
 
 can be used to build with CUDA GPUs, MPI and install in a custom
 location. You can even save that in a shell script to make it even
@@ -573,6 +575,10 @@ lead to performance loss, e.g. on Intel Skylake-X/SP and AMD Zen.
 12. ``IBM_VSX`` Power7, Power8, Power9 and later have this.
 13. ``ARM_NEON`` 32-bit ARMv7 with NEON support.
 14. ``ARM_NEON_ASIMD`` 64-bit ARMv8 and later.
+15. ``ARM_SVE`` 64-bit ARMv8 and later with the Scalable Vector Extensions (SVE).
+    The SVE vector length is fixed at CMake configure time. The default vector
+    length is 512 bits, and this can be changed via the ``GMX_SIMD_ARM_SVE_LENGTH``
+    CMake variable.
 
 The CMake configure system will check that the compiler you have
 chosen can target the architecture you have chosen. mdrun will check
@@ -648,7 +654,7 @@ If you have the CUDA_ Toolkit installed, you can use ``cmake`` with:
 
 ::
 
-    cmake .. -DGMX_GPU=ON -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda
+    cmake .. -DGMX_GPU=CUDA -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda
 
 (or whichever path has your installation). In some cases, you might
 need to specify manually which of your C++ compilers should be used,
@@ -723,7 +729,7 @@ To trigger an OpenCL_ build the following CMake flags must be set
 
 ::
 
-    cmake .. -DGMX_GPU=ON -DGMX_USE_OPENCL=ON
+    cmake .. -DGMX_GPU=OpenCL
 
 To build with support for Intel integrated GPUs, it is required
 to add ``-DGMX_OPENCL_NB_CLUSTER_SIZE=4`` to the cmake command line,
@@ -741,7 +747,7 @@ external library, use
 
 ::
 
-    cmake .. -DGMX_GPU=ON -DGMX_USE_OPENCL=ON -DclFFT_ROOT_DIR=/path/to/your/clFFT -DGMX_EXTERNAL_CLFFT=TRUE
+    cmake .. -DGMX_GPU=OpenCL -DclFFT_ROOT_DIR=/path/to/your/clFFT -DGMX_EXTERNAL_CLFFT=TRUE
 
 Static linking
 ~~~~~~~~~~~~~~
@@ -802,8 +808,9 @@ of the build host machine or otherwise specified to ``cmake`` during
 configuration.
 
 Often it is possible to ensure portability by choosing the least
-common denominator of SIMD support, e.g. SSE2 for x86, and ensuring
-the you use ``cmake -DGMX_USE_RDTSCP=off`` if any of the target CPU
+common denominator of SIMD support, e.g. SSE2 for x86. In rare cases
+of very old x86 machines, ensure that
+you use ``cmake -DGMX_USE_RDTSCP=off`` if any of the target CPU
 architectures does not support the ``RDTSCP`` instruction.  However, we
 discourage attempts to use a single |Gromacs| installation when the
 execution environment is heterogeneous, such as a mix of AVX and
@@ -1071,7 +1078,7 @@ directory:
     cd ..
     mkdir build-mdrun-only
     cd build-mdrun-only
-    cmake .. -DGMX_MPI=ON -DGMX_GPU=ON -DGMX_BUILD_MDRUN_ONLY=ON -DCMAKE_INSTALL_PREFIX=/your/installation/prefix/here
+    cmake .. -DGMX_MPI=ON -DGMX_GPU=CUDA -DGMX_BUILD_MDRUN_ONLY=ON -DCMAKE_INSTALL_PREFIX=/your/installation/prefix/here
     make -j 4
     make install
     cd /to/your/unpacked/regressiontests
@@ -1289,17 +1296,19 @@ Tested platforms
 
 While it is our best belief that |Gromacs| will build and run pretty
 much everywhere, it is important that we tell you where we really know
-it works because we have tested it. We do test on Linux, Windows, and
-Mac with a range of compilers and libraries for a range of our
-configuration options. Every commit in our git source code repository
-is currently tested on x86 with a number of gcc versions ranging from 5.1
-through 9.1, version 19 of the Intel compiler, and Clang
-versions 3.6 through 8. For this, we use a variety of GNU/Linux
-flavors and versions as well as Windows (where we test only MSVC 2017).
+it works because we have tested it.
+Every commit in our git source code repository
+is currently tested with a range of configuration options on x86 with
+gcc versions 7 and 8,
+clang versions 8 and 9,
+and
+a beta version of oneAPI containing Intel's compiler.
+For this testing, we use Ubuntu 18.04 or 20.04 operating system.
 Other compiler, library, and OS versions are tested less frequently.
 For details, you can
 have a look at the `continuous integration server used by GROMACS`_,
-which runs Jenkins_.
+which uses GitLab runner on a local k8s x86 cluster with NVIDIA and
+AMD GPU support.
 
 We test irregularly on ARM v8, Cray, Power8, Power9,
 Google Native Client and other environments, and

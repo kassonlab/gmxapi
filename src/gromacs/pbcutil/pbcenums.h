@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -49,7 +49,7 @@ namespace gmx
 /*! \brief
  * Helper enum class to define centering types.
  */
-enum class CenteringType
+enum class CenteringType : int
 {
     Triclinic,
     Rectangular,
@@ -58,9 +58,9 @@ enum class CenteringType
 };
 
 /*! \brief
- * Helper enum class to define unit cell representation types.
+ * Helper enum class to define Unit cell representation types.
  */
-enum class UnitCellType
+enum class UnitCellType : int
 {
     Triclinic,
     Rectangular,
@@ -71,14 +71,14 @@ enum class UnitCellType
 /*! \brief
  * Get names for the different centering types.
  *
- * \param[in] type Centering type to get a name for.
+ * \param[in] type What name needs to be provided.
  */
 const char* centerTypeNames(CenteringType type);
 
 /*! \brief
  * Get names for the different unit cell representation types.
  *
- * \param[in] type Unit cell type to get a name for.
+ * \param[in] type What name needs to be provided.
  */
 const char* unitCellTypeNames(UnitCellType type);
 

@@ -50,10 +50,12 @@
 #include "gromacs/utility/gmxassert.h"
 #include "gromacs/utility/smalloc.h" // TODO: this is only for over_alloc_large
 
-#if GMX_GPU == GMX_GPU_CUDA
+#if GMX_GPU_CUDA
 #    include "gromacs/gpu_utils/devicebuffer.cuh"
-#elif GMX_GPU == GMX_GPU_OPENCL
+#elif GMX_GPU_OPENCL
 #    include "gromacs/gpu_utils/devicebuffer_ocl.h"
+#elif GMX_GPU_SYCL
+#    include "gromacs/gpu_utils/devicebuffer_sycl.h"
 #else
 #    error "devicebuffer.h included on non-GPU build!"
 #endif

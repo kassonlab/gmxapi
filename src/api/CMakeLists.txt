@@ -32,46 +32,18 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 
-# Note: GROMACS releases have a single-integer monotonic version in GMX_API_VERSION
-# and LIBRARY_VERSION annotates the shared object for libgromacs. GMXAPI versioning
-# is not synchronized to releases and may increment faster or slower.
-#
-# Prior to 0.1, GMXAPI patch levels are used to mark short term development cycles
-# and allow compatibility checks for client software of the early releases.
-#
-# gmxapi 0.2 will be the first release candidate for gmxapi 1.0 and will attempt
-# to establish compatibility guarantees consistent with semantic versioning.
-# (https://semver.org). When the API is deemed suitably stable, gmxapi 1.0 should
-# be tagged. Official GROMACS releases should be mappable to a distinct gmxapi
-# release string. For roadmap details, see https://gitlab.com/gromacs/gromacs/-/issues/2585
-set(GMXAPI_MAJOR 0)
-set(GMXAPI_MINOR 1)
-set(GMXAPI_PATCH 0)
-set(GMXAPI_RELEASE ${GMXAPI_MAJOR}.${GMXAPI_MINOR}.${GMXAPI_PATCH})
+# Activate targets for new C++ API components and docs.
+if (GMXAPI)
+    if (GMX_BUILD_MDRUN_ONLY)
+        message(FATAL_ERROR "GMXAPI relies on libgromacs and is incompatible with GMX_BUILD_MDRUN_ONLY.")
+    endif()
+    if(NOT ${BUILD_SHARED_LIBS})
+        # Note: this conditional should check for the existence of a libgromacs target supporting PIC
+        # using the POSITION_INDEPENDENT_CODE property, but for now the only facility we have is the global
+        # variable, BUILD_SHARED_LIBS.
+        # TODO: gmxapi should gracefully build for dynamic linking or static linking for PIC or without.
+        message(FATAL_ERROR "GMXAPI requires position-independent code. Set -DGMXAPI=OFF or -DBUILD_SHARED_LIBS=ON.")
+    endif()
+    add_subdirectory(cpp)
+endif()
 
-###############################
-# New public C++ API components
-###############################
-
-# Define a list of the public headers to be installed and documented. Use
-# absolute paths in the build tree. Path component before `gmxapi` can be
-# stripped as appropriate by consumers of this list.
-set(GMXAPI_PUBLIC_HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/context.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/exceptions.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/gmxapi.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/gmxapicompat.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/gromacsfwd.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/md.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/session.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/status.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/system.h
-    ${CMAKE_CURRENT_BINARY_DIR}/cpp/include/gmxapi/version.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/compat/mdparams.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/compat/tpr.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/include/gmxapi/md/mdmodule.h
-    )
-
-add_subdirectory(cpp)
-
-add_subdirectory(docs)

@@ -49,7 +49,7 @@
 #include <algorithm>
 #include <memory>
 
-#include "gromacs/awh/awh.h"
+#include "gromacs/applied_forces/awh/awh.h"
 #include "gromacs/commandline/filenm.h"
 #include "gromacs/domdec/collect.h"
 #include "gromacs/domdec/dlbtiming.h"
@@ -65,7 +65,7 @@
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/gmxlib/nrnb.h"
 #include "gromacs/gpu_utils/gpu_utils.h"
-#include "gromacs/listed_forces/manage_threading.h"
+#include "gromacs/listed_forces/listed_forces.h"
 #include "gromacs/math/functions.h"
 #include "gromacs/math/utilities.h"
 #include "gromacs/math/vec.h"
@@ -80,6 +80,7 @@
 #include "gromacs/mdlib/force.h"
 #include "gromacs/mdlib/force_flags.h"
 #include "gromacs/mdlib/forcerec.h"
+#include "gromacs/mdlib/freeenergyparameters.h"
 #include "gromacs/mdlib/md_support.h"
 #include "gromacs/mdlib/mdatoms.h"
 #include "gromacs/mdlib/mdoutf.h"
@@ -102,7 +103,7 @@
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/df_history.h"
 #include "gromacs/mdtypes/energyhistory.h"
-#include "gromacs/mdtypes/fcdata.h"
+#include "gromacs/mdtypes/forcebuffers.h"
 #include "gromacs/mdtypes/forcerec.h"
 #include "gromacs/mdtypes/group.h"
 #include "gromacs/mdtypes/inputrec.h"
@@ -135,6 +136,7 @@
 #include "shellfc.h"
 
 using gmx::SimulationSignaller;
+using gmx::VirtualSitesHandler;
 
 /*! \brief Copy the state from \p rerunFrame to \p globalState and, if requested, construct vsites
  *
@@ -142,17 +144,13 @@ using gmx::SimulationSignaller;
  * \param[in,out] globalState     The global state container
  * \param[in]     constructVsites When true, vsite coordinates are constructed
  * \param[in]     vsite           Vsite setup, can be nullptr when \p constructVsites = false
- * \param[in]     idef            Topology parameters, used for constructing vsites
  * \param[in]     timeStep        Time step, used for constructing vsites
- * \param[in]     forceRec        Force record, used for constructing vsites
  */
-static void prepareRerunState(const t_trxframe&             rerunFrame,
-                              t_state*                      globalState,
-                              bool                          constructVsites,
-                              const gmx_vsite_t*            vsite,
-                              const InteractionDefinitions& idef,
-                              double                        timeStep,
-                              const t_forcerec&             forceRec)
+static void prepareRerunState(const t_trxframe&          rerunFrame,
+                              t_state*                   globalState,
+                              bool                       constructVsites,
+                              const VirtualSitesHandler* vsite,
+                              double                     timeStep)
 {
     auto x      = makeArrayRef(globalState->x);
     auto rerunX = arrayRefFromArray(reinterpret_cast<gmx::RVec*>(rerunFrame.x), globalState->natoms);
@@ -163,9 +161,7 @@ static void prepareRerunState(const t_trxframe&             rerunFrame,
     {
         GMX_ASSERT(vsite, "Need valid vsite for constructing vsites");
 
-        construct_vsites(vsite, globalState->x.rvec_array(), timeStep, globalState->v.rvec_array(),
-                         idef.iparams, idef.il, forceRec.pbcType, forceRec.bMolPBC, nullptr,
-                         globalState->box);
+        vsite->construct(globalState->x, timeStep, globalState->v, globalState->box);
     }
 }
 
@@ -177,20 +173,20 @@ void gmx::LegacySimulator::do_rerun()
     // alias to avoid a large ripple of nearly useless changes.
     // t_inputrec is being replaced by IMdpOptionsProvider, so this
     // will go away eventually.
-    t_inputrec*                 ir = inputrec;
-    int64_t                     step, step_rel;
-    double                      t, lam0[efptNR];
-    bool                        isLastStep               = false;
-    bool                        doFreeEnergyPerturbation = false;
-    unsigned int                force_flags;
-    tensor                      force_vir, shake_vir, total_vir, pres;
-    t_trxstatus*                status = nullptr;
-    rvec                        mu_tot;
-    t_trxframe                  rerun_fr;
-    gmx_localtop_t              top(top_global->ffparams);
-    PaddedHostVector<gmx::RVec> f{};
-    gmx_global_stat_t           gstat;
-    gmx_shellfc_t*              shellfc;
+    t_inputrec*       ir = inputrec;
+    int64_t           step, step_rel;
+    double            t;
+    bool              isLastStep               = false;
+    bool              doFreeEnergyPerturbation = false;
+    unsigned int      force_flags;
+    tensor            force_vir, shake_vir, total_vir, pres;
+    t_trxstatus*      status = nullptr;
+    rvec              mu_tot;
+    t_trxframe        rerun_fr;
+    gmx_localtop_t    top(top_global->ffparams);
+    ForceBuffers      f;
+    gmx_global_stat_t gstat;
+    gmx_shellfc_t*    shellfc;
 
     double cycles;
 
@@ -280,10 +276,12 @@ void gmx::LegacySimulator::do_rerun()
     const SimulationGroups* groups = &top_global->groups;
     if (ir->eI == eiMimic)
     {
-        top_global->intermolecularExclusionGroup = genQmmmIndices(*top_global);
+        auto nonConstGlobalTopology                          = const_cast<gmx_mtop_t*>(top_global);
+        nonConstGlobalTopology->intermolecularExclusionGroup = genQmmmIndices(*top_global);
     }
-
-    initialize_lambdas(fplog, *ir, MASTER(cr), &state_global->fep_state, state_global->lambda, lam0);
+    int*                fep_state = MASTER(cr) ? &state_global->fep_state : nullptr;
+    gmx::ArrayRef<real> lambda    = MASTER(cr) ? state_global->lambda : gmx::ArrayRef<real>();
+    initialize_lambdas(fplog, *ir, MASTER(cr), fep_state, lambda);
     const bool        simulationsShareState = false;
     gmx_mdoutf*       outf = init_mdoutf(fplog, nfile, fnm, mdrunOptions, cr, outputProvider,
                                    mdModulesNotifier, ir, top_global, oenv, wcycle,
@@ -352,9 +350,9 @@ void gmx::LegacySimulator::do_rerun()
         bool   bSumEkinhOld = false;
         t_vcm* vcm          = nullptr;
         compute_globals(gstat, cr, ir, fr, ekind, makeConstArrayRef(state->x),
-                        makeConstArrayRef(state->v), state->box, state->lambda[efptVDW], mdatoms, nrnb,
-                        vcm, nullptr, enerd, force_vir, shake_vir, total_vir, pres, constr, &nullSignaller,
-                        state->box, &totalNumberOfBondedInteractions, &bSumEkinhOld, cglo_flags);
+                        makeConstArrayRef(state->v), state->box, mdatoms, nrnb, vcm, nullptr, enerd,
+                        force_vir, shake_vir, total_vir, pres, constr, &nullSignaller, state->box,
+                        &totalNumberOfBondedInteractions, &bSumEkinhOld, cglo_flags);
     }
     checkNumberOfBondedInteractions(mdlog, cr, totalNumberOfBondedInteractions, top_global, &top,
                                     makeConstArrayRef(state->x), state->box,
@@ -445,6 +443,9 @@ void gmx::LegacySimulator::do_rerun()
         calc_shifts(rerun_fr.box, fr->shift_vec);
     }
 
+    step     = ir->init_step;
+    step_rel = 0;
+
     auto stopHandler = stopHandlerBuilder->getStopHandlerMD(
             compat::not_null<SimulationSignal*>(&signals[eglsSTOPCOND]), false, MASTER(cr),
             ir->nstlist, mdrunOptions.reproducible, nstglobalcomm, mdrunOptions.maximumHoursToRun,
@@ -454,9 +455,6 @@ void gmx::LegacySimulator::do_rerun()
     walltime_accounting_set_valid_finish(walltime_accounting);
 
     const DDBalanceRegionHandler ddBalanceRegionHandler(cr);
-
-    step     = ir->init_step;
-    step_rel = 0;
 
     /* and stop now if we should */
     isLastStep = (isLastStep || (ir->nsteps >= 0 && step_rel > ir->nsteps));
@@ -480,7 +478,19 @@ void gmx::LegacySimulator::do_rerun()
 
         if (ir->efep != efepNO && MASTER(cr))
         {
-            setCurrentLambdasRerun(step, ir->fepvals, &rerun_fr, lam0, state_global);
+            if (rerun_fr.bLambda)
+            {
+                ir->fepvals->init_lambda = rerun_fr.lambda;
+            }
+            else
+            {
+                if (rerun_fr.bFepState)
+                {
+                    state->fep_state = rerun_fr.fep_state;
+                }
+            }
+
+            state_global->lambda = currentLambdas(step, *(ir->fepvals), state->fep_state);
         }
 
         if (MASTER(cr))
@@ -493,7 +503,7 @@ void gmx::LegacySimulator::do_rerun()
                           "decomposition, "
                           "use a single rank");
             }
-            prepareRerunState(rerun_fr, state_global, constructVsites, vsite, top.idef, ir->delta_t, *fr);
+            prepareRerunState(rerun_fr, state_global, constructVsites, vsite, ir->delta_t);
         }
 
         isLastStep = isLastStep || stopHandler->stoppingAfterCurrentStep(bNS);
@@ -526,10 +536,10 @@ void gmx::LegacySimulator::do_rerun()
         {
             /* Now is the time to relax the shells */
             relax_shell_flexcon(fplog, cr, ms, mdrunOptions.verbose, enforcedRotation, step, ir,
-                                imdSession, pull_work, bNS, force_flags, &top, constr, enerd, fcd,
+                                imdSession, pull_work, bNS, force_flags, &top, constr, enerd,
                                 state->natoms, state->x.arrayRefWithPadding(),
-                                state->v.arrayRefWithPadding(), state->box, state->lambda, &state->hist,
-                                f.arrayRefWithPadding(), force_vir, mdatoms, nrnb, wcycle, shellfc,
+                                state->v.arrayRefWithPadding(), state->box, state->lambda,
+                                &state->hist, &f.view(), force_vir, mdatoms, nrnb, wcycle, shellfc,
                                 fr, runScheduleWork, t, mu_tot, vsite, ddBalanceRegionHandler);
         }
         else
@@ -543,9 +553,8 @@ void gmx::LegacySimulator::do_rerun()
             gmx_edsam* ed  = nullptr;
             do_force(fplog, cr, ms, ir, awh, enforcedRotation, imdSession, pull_work, step, nrnb,
                      wcycle, &top, state->box, state->x.arrayRefWithPadding(), &state->hist,
-                     f.arrayRefWithPadding(), force_vir, mdatoms, enerd, fcd, state->lambda, fr,
-                     runScheduleWork, vsite, mu_tot, t, ed, GMX_FORCE_NS | force_flags,
-                     ddBalanceRegionHandler);
+                     &f.view(), force_vir, mdatoms, enerd, state->lambda, fr, runScheduleWork,
+                     vsite, mu_tot, t, ed, GMX_FORCE_NS | force_flags, ddBalanceRegionHandler);
         }
 
         /* Now we have the energies and forces corresponding to the
@@ -557,8 +566,8 @@ void gmx::LegacySimulator::do_rerun()
             const bool bSumEkinhOld        = false;
             do_md_trajectory_writing(fplog, cr, nfile, fnm, step, step_rel, t, ir, state,
                                      state_global, observablesHistory, top_global, fr, outf,
-                                     energyOutput, ekind, f, isCheckpointingStep, doRerun,
-                                     isLastStep, mdrunOptions.writeConfout, bSumEkinhOld);
+                                     energyOutput, ekind, f.view().force(), isCheckpointingStep,
+                                     doRerun, isLastStep, mdrunOptions.writeConfout, bSumEkinhOld);
         }
 
         stopHandler->setSignal();
@@ -566,9 +575,7 @@ void gmx::LegacySimulator::do_rerun()
         if (vsite != nullptr)
         {
             wallcycle_start(wcycle, ewcVSITECONSTR);
-            construct_vsites(vsite, as_rvec_array(state->x.data()), ir->delta_t,
-                             as_rvec_array(state->v.data()), top.idef.iparams, top.idef.il,
-                             fr->pbcType, fr->bMolPBC, cr, state->box);
+            vsite->construct(state->x, ir->delta_t, state->v, state->box);
             wallcycle_stop(wcycle, ewcVSITECONSTR);
         }
 
@@ -580,9 +587,9 @@ void gmx::LegacySimulator::do_rerun()
             SimulationSignaller signaller(&signals, cr, ms, doInterSimSignal, doIntraSimSignal);
 
             compute_globals(gstat, cr, ir, fr, ekind, makeConstArrayRef(state->x),
-                            makeConstArrayRef(state->v), state->box, state->lambda[efptVDW], mdatoms,
-                            nrnb, vcm, wcycle, enerd, force_vir, shake_vir, total_vir, pres, constr,
-                            &signaller, state->box, &totalNumberOfBondedInteractions, &bSumEkinhOld,
+                            makeConstArrayRef(state->v), state->box, mdatoms, nrnb, vcm, wcycle,
+                            enerd, force_vir, shake_vir, total_vir, pres, constr, &signaller,
+                            state->box, &totalNumberOfBondedInteractions, &bSumEkinhOld,
                             CGLO_GSTAT | CGLO_ENERGY
                                     | (shouldCheckNumberOfBondedInteractions ? CGLO_CHECK_NUMBER_OF_BONDED_INTERACTIONS
                                                                              : 0));
@@ -596,21 +603,16 @@ void gmx::LegacySimulator::do_rerun()
            but what we actually need entering the new cycle is the new shake_vir value. Ideally, we could
            generate the new shake_vir, but test the veta value for convergence.  This will take some thought. */
 
-        if (ir->efep != efepNO)
-        {
-            /* Sum up the foreign energy and dhdl terms for md and sd.
-               Currently done every step so that dhdl is correct in the .edr */
-            sum_dhdl(enerd, state->lambda, *ir->fepvals);
-        }
-
         /* Output stuff */
         if (MASTER(cr))
         {
             const bool bCalcEnerStep = true;
-            energyOutput.addDataAtEnergyStep(doFreeEnergyPerturbation, bCalcEnerStep, t,
-                                             mdatoms->tmass, enerd, state, ir->fepvals,
-                                             ir->expandedvals, state->box, shake_vir, force_vir,
-                                             total_vir, pres, ekind, mu_tot, constr);
+            energyOutput.addDataAtEnergyStep(
+                    doFreeEnergyPerturbation, bCalcEnerStep, t, mdatoms->tmass, enerd, ir->fepvals,
+                    ir->expandedvals, state->box,
+                    PTCouplingArrays({ state->boxv, state->nosehoover_xi, state->nosehoover_vxi,
+                                       state->nhpres_xi, state->nhpres_vxi }),
+                    state->fep_state, shake_vir, force_vir, total_vir, pres, ekind, mu_tot, constr);
 
             const bool do_ene = true;
             const bool do_log = true;
@@ -620,7 +622,7 @@ void gmx::LegacySimulator::do_rerun()
 
             EnergyOutput::printAnnealingTemperatures(do_log ? fplog : nullptr, groups, &(ir->opts));
             energyOutput.printStepToEnergyFile(mdoutf_get_fp_ene(outf), do_ene, do_dr, do_or,
-                                               do_log ? fplog : nullptr, step, t, fcd, awh);
+                                               do_log ? fplog : nullptr, step, t, fr->fcdata.get(), awh);
 
             if (do_per_step(step, ir->nstlog))
             {

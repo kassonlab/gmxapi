@@ -45,8 +45,9 @@
 #include "config.h"
 
 #include "gromacs/mdlib/update_constrain_gpu.h"
+#include "gromacs/utility/gmxassert.h"
 
-#if GMX_GPU != GMX_GPU_CUDA
+#if !GMX_GPU_CUDA
 
 namespace gmx
 {
@@ -89,6 +90,12 @@ void UpdateConstrainGpu::scaleCoordinates(const matrix /* scalingMatrix */)
                "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
 }
 
+void UpdateConstrainGpu::scaleVelocities(const matrix /* scalingMatrix */)
+{
+    GMX_ASSERT(!impl_,
+               "A CPU stub for UpdateConstrain was called instead of the correct implementation.");
+}
+
 void UpdateConstrainGpu::set(DeviceBuffer<RVec> /* d_x */,
                              DeviceBuffer<RVec> /* d_v */,
                              const DeviceBuffer<RVec> /* d_f */,
@@ -120,4 +127,4 @@ bool UpdateConstrainGpu::isNumCoupledConstraintsSupported(const gmx_mtop_t& /* m
 
 } // namespace gmx
 
-#endif /* GMX_GPU != GMX_GPU_CUDA */
+#endif /* !GMX_GPU_CUDA */

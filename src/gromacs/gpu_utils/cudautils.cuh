@@ -41,6 +41,7 @@
 #include <array>
 #include <string>
 
+#include "gromacs/gpu_utils/device_stream.h"
 #include "gromacs/gpu_utils/gputraits.cuh"
 #include "gromacs/math/vec.h"
 #include "gromacs/math/vectypes.h"
@@ -142,68 +143,9 @@ enum class GpuApiCallBehavior;
 
 #endif /* CHECK_CUDA_ERRORS */
 
-/*! Launches synchronous or asynchronous device to host memory copy.
- *
- *  The copy is launched in stream s or if not specified, in stream 0.
- */
-int cu_copy_D2H(void* h_dest, void* d_src, size_t bytes, GpuApiCallBehavior transferKind, cudaStream_t /*s = nullptr*/);
-
-/*! Launches synchronous host to device memory copy in stream 0. */
-int cu_copy_D2H_sync(void* /*h_dest*/, void* /*d_src*/, size_t /*bytes*/);
-
-/*! Launches asynchronous host to device memory copy in stream s. */
-int cu_copy_D2H_async(void* /*h_dest*/, void* /*d_src*/, size_t /*bytes*/, cudaStream_t /*s = nullptr*/);
-
-/*! Launches synchronous or asynchronous host to device memory copy.
- *
- *  The copy is launched in stream s or if not specified, in stream 0.
- */
-int cu_copy_H2D(void* d_dest, const void* h_src, size_t bytes, GpuApiCallBehavior transferKind, cudaStream_t /*s = nullptr*/);
-
-/*! Launches synchronous host to device memory copy. */
-int cu_copy_H2D_sync(void* /*d_dest*/, const void* /*h_src*/, size_t /*bytes*/);
-
-/*! Launches asynchronous host to device memory copy in stream s. */
-int cu_copy_H2D_async(void* /*d_dest*/, const void* /*h_src*/, size_t /*bytes*/, cudaStream_t /*s = nullptr*/);
-
 // TODO: the 2 functions below are pretty much a constructor/destructor of a simple
 // GPU table object. There is also almost self-contained fetchFromParamLookupTable()
 // in cuda_kernel_utils.cuh. They could all live in a separate class/struct file.
-
-/*! \brief Initialize parameter lookup table.
- *
- * Initializes device memory, copies data from host and binds
- * a texture to allocated device memory to be used for parameter lookup.
- *
- * \tparam[in] T         Raw data type
- * \param[out] d_ptr     device pointer to the memory to be allocated
- * \param[out] texObj    texture object to be initialized
- * \param[in]  h_ptr     pointer to the host memory to be uploaded to the device
- * \param[in]  numElem   number of elements in the h_ptr
- */
-template<typename T>
-void initParamLookupTable(T*& d_ptr, cudaTextureObject_t& texObj, const T* h_ptr, int numElem);
-
-// Add extern declarations so each translation unit understands that
-// there will be a definition provided.
-extern template void initParamLookupTable<int>(int*&, cudaTextureObject_t&, const int*, int);
-extern template void initParamLookupTable<float>(float*&, cudaTextureObject_t&, const float*, int);
-
-/*! \brief Destroy parameter lookup table.
- *
- * Unbinds texture object, deallocates device memory.
- *
- * \tparam[in] T         Raw data type
- * \param[in]  d_ptr     Device pointer to the memory to be deallocated
- * \param[in]  texObj    Texture object to be deinitialized
- */
-template<typename T>
-void destroyParamLookupTable(T* d_ptr, cudaTextureObject_t texObj);
-
-// Add extern declarations so each translation unit understands that
-// there will be a definition provided.
-extern template void destroyParamLookupTable<int>(int*, cudaTextureObject_t);
-extern template void destroyParamLookupTable<float>(float*, cudaTextureObject_t);
 
 /*! \brief Add a triplets stored in a float3 to an rvec variable.
  *
@@ -232,7 +174,7 @@ static inline bool haveStreamTasksCompleted(const DeviceStream& deviceStream)
         return false;
     }
 
-    GMX_ASSERT(stat != cudaErrorInvalidResourceHandle, "Stream idnetifier not valid");
+    GMX_ASSERT(stat != cudaErrorInvalidResourceHandle, "Stream identifier not valid");
 
     // cudaSuccess and cudaErrorNotReady are the expected return values
     CU_RET_ERR(stat, "Unexpected cudaStreamQuery failure");

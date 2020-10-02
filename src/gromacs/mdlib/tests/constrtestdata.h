@@ -50,7 +50,7 @@
 #include <vector>
 
 #include "gromacs/gmxlib/nrnb.h"
-#include "gromacs/gpu_utils/gpu_testutils.h"
+#include "gromacs/hardware/device_management.h"
 #include "gromacs/math/paddedvector.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/math/vectypes.h"
@@ -58,7 +58,6 @@
 #include "gromacs/mdlib/lincs.h"
 #include "gromacs/mdlib/shake.h"
 #include "gromacs/mdtypes/inputrec.h"
-#include "gromacs/mdtypes/mdatom.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/topology/idef.h"
 #include "gromacs/topology/ifunc.h"
@@ -92,8 +91,6 @@ public:
     t_inputrec ir_;
     //! Local topology
     std::unique_ptr<InteractionDefinitions> idef_;
-    //! MD atoms
-    t_mdatoms md_;
     //! Computational time array (normally used to benchmark performance)
     t_nrnb nrnb_;
 
@@ -109,6 +106,10 @@ public:
     tensor virialScaledRef_;
     //! If the free energy is computed
     bool compute_dHdLambda_;
+    //! If there are atoms with perturbed mass
+    bool hasMassPerturbed_ = false;
+    //! Lambda value
+    real lambda_ = 0.0;
     //! For free energy computation
     real dHdLambda_;
     //! For free energy computation (reference value)

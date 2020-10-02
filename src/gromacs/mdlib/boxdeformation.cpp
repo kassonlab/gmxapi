@@ -58,13 +58,16 @@
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/md_enums.h"
+#include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/exceptions.h"
 
 namespace gmx
 {
 
 std::unique_ptr<BoxDeformation> prepareBoxDeformation(const matrix&     initialBox,
-                                                      t_commrec*        cr,
+                                                      DDRole            ddRole,
+                                                      NumRanks          numRanks,
+                                                      MPI_Comm          communicator,
                                                       const t_inputrec& inputrec)
 {
     if (!inputrecDeform(&inputrec))
@@ -80,13 +83,15 @@ std::unique_ptr<BoxDeformation> prepareBoxDeformation(const matrix&     initialB
     matrix box;
     // Only the rank that read the tpr has the global state, and thus
     // the initial box, so we pass that around.
-    if (SIMMASTER(cr))
+    // (numRanks != NumRanks::Multiple helps clang static analyzer to
+    // understand that box is defined in all cases)
+    if (ddRole == DDRole::Master || numRanks != NumRanks::Multiple)
     {
         copy_mat(initialBox, box);
     }
-    if (PAR(cr))
+    if (numRanks == NumRanks::Multiple)
     {
-        gmx_bcast(sizeof(box), box, cr->mpi_comm_mygroup);
+        gmx_bcast(sizeof(box), box, communicator);
     }
 
     return std::make_unique<BoxDeformation>(inputrec.delta_t, inputrec.init_step, inputrec.deform, box);

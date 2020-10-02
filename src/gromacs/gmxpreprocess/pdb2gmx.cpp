@@ -930,8 +930,8 @@ static void checkResidueTypeSanity(t_atoms* pdba, int r0, int r1, ResidueType* r
 
 static void find_nc_ter(t_atoms* pdba, int r0, int r1, int* r_start, int* r_end, ResidueType* rt, const gmx::MDLogger& logger)
 {
-    int                                i;
-    gmx::compat::optional<std::string> startrestype;
+    int                        i;
+    std::optional<std::string> startrestype;
 
     *r_start = -1;
     *r_end   = -1;
@@ -1047,7 +1047,7 @@ static void find_nc_ter(t_atoms* pdba, int r0, int r1, int* r_start, int* r_end,
         /* Go through the rest of the residues, check that they are the same class, and identify the ending terminus. */
         for (int i = *r_start; i < r1; i++)
         {
-            gmx::compat::optional<std::string> restype =
+            std::optional<std::string> restype =
                     rt->optionalTypeOfNamedDatabaseResidue(*pdba->resinfo[i].name);
             if (!restype)
             {
@@ -1345,6 +1345,10 @@ public:
         itp_file_(nullptr),
         mHmult_(0)
     {
+        gmx::LoggerBuilder builder;
+        builder.addTargetStream(gmx::MDLogger::LogLevel::Info, &gmx::TextOutputFile::standardOutput());
+        builder.addTargetStream(gmx::MDLogger::LogLevel::Warning, &gmx::TextOutputFile::standardError());
+        loggerOwner_ = std::make_unique<LoggerOwner>(builder.build());
     }
 
     // From ICommandLineOptionsModule
@@ -1405,15 +1409,15 @@ private:
     WaterType           waterType_;
     MergeType           mergeType_;
 
-    FILE*                          itp_file_;
-    char                           forcefield_[STRLEN];
-    char                           ffdir_[STRLEN];
-    char*                          ffname_;
-    char*                          watermodel_;
-    std::vector<std::string>       incls_;
-    std::vector<t_mols>            mols_;
-    real                           mHmult_;
-    std::unique_ptr<gmx::MDLogger> loggerPointer_;
+    FILE*                        itp_file_;
+    char                         forcefield_[STRLEN];
+    char                         ffdir_[STRLEN];
+    char*                        ffname_;
+    char*                        watermodel_;
+    std::vector<std::string>     incls_;
+    std::vector<t_mols>          mols_;
+    real                         mHmult_;
+    std::unique_ptr<LoggerOwner> loggerOwner_;
 };
 
 void pdb2gmx::initOptions(IOptionsContainer* options, ICommandLineOptionsModuleSettings* settings)
@@ -1693,7 +1697,7 @@ void pdb2gmx::optionsFinished()
 
     /* Force field selection, interactive or direct */
     choose_ff(strcmp(ff_.c_str(), "select") == 0 ? nullptr : ff_.c_str(), forcefield_,
-              sizeof(forcefield_), ffdir_, sizeof(ffdir_), *loggerPointer_);
+              sizeof(forcefield_), ffdir_, sizeof(ffdir_), loggerOwner_->logger());
 
     if (strlen(forcefield_) > 0)
     {
@@ -1726,12 +1730,7 @@ int pdb2gmx::run()
     int         this_chainstart;
     int         prev_chainstart;
 
-    gmx::LoggerBuilder builder;
-    builder.addTargetStream(gmx::MDLogger::LogLevel::Info, &gmx::TextOutputFile::standardOutput());
-    builder.addTargetStream(gmx::MDLogger::LogLevel::Warning, &gmx::TextOutputFile::standardError());
-    gmx::LoggerOwner logOwner(builder.build());
-    loggerPointer_              = std::make_unique<gmx::MDLogger>(logOwner.logger());
-    const gmx::MDLogger& logger = *loggerPointer_;
+    const gmx::MDLogger& logger = loggerOwner_->logger();
 
     GMX_LOG(logger.info)
             .asParagraph()
@@ -1754,7 +1753,7 @@ int pdb2gmx::run()
             bVsiteAromatics_ = true;
             break;
         case VSitesType::Count:
-            gmx_fatal(FARGS, "Internal inconsistency: VSitesType='%s'", c_vsitesTypeNames[vsitesType_]);
+            gmx_fatal(FARGS, "Internal inconsistency: VSitesType is out of range.");
     } /* end switch */
 
     /* Open the symbol table */
