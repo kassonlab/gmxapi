@@ -1,0 +1,73 @@
+# Mix-in job definitions.
+# The (hidden) job definitions in this file are available to the regular job
+# definitions in other files because this file is first in the *include* list
+# in the root `.gitlab-ci.yml` file.
+
+# Centralized definitions of common job parameter values.
+# Parameters with many optional configurations may be in separate files.
+# Refer to the Infrastructure section of the GROMACS Developer Guide.
+
+.variables:default:
+  variables:
+    KUBERNETES_CPU_LIMIT: 8
+    KUBERNETES_CPU_REQUEST: 4
+    KUBERNETES_MEMORY_REQUEST: 4Gi
+    KUBERNETES_MEMORY_LIMIT: 8Gi
+    KUBERNETES_EXTENDED_RESOURCE_NAME: ""
+    KUBERNETES_EXTENDED_RESOURCE_LIMIT: 0
+    CACHE_FALLBACK_KEY: "$CI_JOB_NAME-$CI_JOB_STAGE-release-2020"
+    BUILD_DIR: build
+    INSTALL_DIR: install
+    CMAKE_GMXAPI_OPTIONS: ""
+
+# Our generic before_script to install dependencies and prepare the ccache directory.
+.before_script:default:
+  before_script:
+    - mkdir -p ccache
+    - export CCACHE_BASEDIR=${PWD}
+    - export CCACHE_DIR=${PWD}/ccache
+
+# Behavioral templates
+
+# Use a persistent compiler cache to speed up rebuilds for a single job.
+.use-ccache:
+  cache:
+    key: "$CI_JOB_NAME-$CI_JOB_STAGE-$CI_COMMIT_REF_SLUG"
+    paths:
+      - ccache/
+
+# Tool chains
+
+.use-cuda:
+  variables:
+    CMAKE_PRECISION_OPTIONS: "-DGMX_DOUBLE=OFF"
+    CMAKE_GPU_OPTIONS: -DGMX_GPU=ON -DGMX_USE_CUDA=ON
+
+.use-mpi:
+  variables:
+    CMAKE_MPI_OPTIONS: "-DGMX_MPI=ON"
+
+.use-opencl:
+  variables:
+    CMAKE_PRECISION_OPTIONS: "-DGMX_DOUBLE=OFF"
+    CMAKE_GPU_OPTIONS: -DGMX_GPU=ON -DGMX_USE_OPENCL=ON
+
+# Base definition for using gcc.
+.use-gcc:base:
+  variables:
+    CMAKE_COMPILER_SCRIPT: -DCMAKE_C_COMPILER=gcc-$COMPILER_MAJOR_VERSION -DCMAKE_CXX_COMPILER=g++-$COMPILER_MAJOR_VERSION
+  before_script:
+    - mkdir -p ccache
+    - export CCACHE_BASEDIR=${PWD}
+    - export CCACHE_DIR=${PWD}/ccache
+
+# Base definition for using clang.
+.use-clang:base:
+  variables:
+    CMAKE_COMPILER_SCRIPT: -DCMAKE_C_COMPILER=clang-$COMPILER_MAJOR_VERSION -DCMAKE_CXX_COMPILER=clang++-$COMPILER_MAJOR_VERSION
+  before_script:
+    - mkdir -p ccache
+    - export CCACHE_BASEDIR=${PWD}
+    - export CCACHE_DIR=${PWD}/ccache
+    - export ASAN_SYMBOLIZER_PATH=/usr/local/bin/llvm-symbolizer
+

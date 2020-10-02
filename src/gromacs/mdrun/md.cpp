@@ -3,7 +3,7 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2011-2019, by the GROMACS development team, led by
+ * Copyright (c) 2011-2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -145,10 +145,6 @@
 #include "replicaexchange.h"
 #include "shellfc.h"
 
-#if GMX_FAHCORE
-#    include "corewrap.h"
-#endif
-
 using gmx::SimulationSignaller;
 
 void gmx::LegacySimulator::do_md()
@@ -257,12 +253,42 @@ void gmx::LegacySimulator::do_md()
     initialize_lambdas(fplog, *ir, MASTER(cr), &state_global->fep_state, state_global->lambda, lam0);
     Update     upd(ir, deform);
     const bool doSimulatedAnnealing = initSimulatedAnnealing(ir, &upd);
+    const bool useReplicaExchange   = (replExParams.exchangeInterval > 0);
+
+    bool simulationsShareState = false;
+    int  nstSignalComm         = nstglobalcomm;
+    {
+        // TODO This implementation of ensemble orientation restraints is nasty because
+        // a user can't just do multi-sim with single-sim orientation restraints.
+        bool usingEnsembleRestraints =
+                (fcd->disres.nsystems > 1) || ((ms != nullptr) && (fcd->orires.nr != 0));
+        bool awhUsesMultiSim = (ir->bDoAwh && ir->awhParams->shareBiasMultisim && (ms != nullptr));
+
+        // Replica exchange, ensemble restraints and AWH need all
+        // simulations to remain synchronized, so they need
+        // checkpoints and stop conditions to act on the same step, so
+        // the propagation of such signals must take place between
+        // simulations, not just within simulations.
+        // TODO: Make algorithm initializers set these flags.
+        simulationsShareState = useReplicaExchange || usingEnsembleRestraints || awhUsesMultiSim;
+
+        if (simulationsShareState)
+        {
+            // Inter-simulation signal communication does not need to happen
+            // often, so we use a minimum of 200 steps to reduce overhead.
+            const int c_minimumInterSimulationSignallingInterval = 200;
+            nstSignalComm = ((c_minimumInterSimulationSignallingInterval + nstglobalcomm - 1) / nstglobalcomm)
+                            * nstglobalcomm;
+        }
+    }
+
     if (startingBehavior != StartingBehavior::RestartWithAppending)
     {
         pleaseCiteCouplingAlgorithms(fplog, *ir);
     }
-    gmx_mdoutf*       outf = init_mdoutf(fplog, nfile, fnm, mdrunOptions, cr, outputProvider,
-                                   mdModulesNotifier, ir, top_global, oenv, wcycle, startingBehavior);
+    gmx_mdoutf* outf =
+            init_mdoutf(fplog, nfile, fnm, mdrunOptions, cr, outputProvider, mdModulesNotifier, ir,
+                        top_global, oenv, wcycle, startingBehavior, simulationsShareState, ms);
     gmx::EnergyOutput energyOutput(mdoutf_get_fp_ene(outf), top_global, ir, pull_work,
                                    mdoutf_get_fp_dhdl(outf), false, startingBehavior, mdModulesNotifier);
 
@@ -419,7 +445,6 @@ void gmx::LegacySimulator::do_md()
                                 startingBehavior != StartingBehavior::NewSimulation,
                                 shellfc != nullptr, opt2fn("-awh", nfile, fnm), pull_work);
 
-    const bool useReplicaExchange = (replExParams.exchangeInterval > 0);
     if (useReplicaExchange && MASTER(cr))
     {
         repl_ex = init_replica_exchange(fplog, ms, top_global->natoms, ir, replExParams);
@@ -639,15 +664,6 @@ void gmx::LegacySimulator::do_md()
     wallcycle_start(wcycle, ewcRUN);
     print_start(fplog, cr, walltime_accounting, "mdrun");
 
-#if GMX_FAHCORE
-    /* safest point to do file checkpointing is here.  More general point would be immediately before integrator call */
-    int chkpt_ret = fcCheckPointParallel(cr->nodeid, NULL, 0);
-    if (chkpt_ret == 0)
-    {
-        gmx_fatal(3, __FILE__, __LINE__, "Checkpoint error on step %d\n", 0);
-    }
-#endif
-
     /***********************************************************
      *
      *             Loop over MD steps
@@ -660,33 +676,6 @@ void gmx::LegacySimulator::do_md()
     bSumEkinhOld     = FALSE;
     bExchanged       = FALSE;
     bNeedRepartition = FALSE;
-
-    bool simulationsShareState = false;
-    int  nstSignalComm         = nstglobalcomm;
-    {
-        // TODO This implementation of ensemble orientation restraints is nasty because
-        // a user can't just do multi-sim with single-sim orientation restraints.
-        bool usingEnsembleRestraints =
-                (fcd->disres.nsystems > 1) || ((ms != nullptr) && (fcd->orires.nr != 0));
-        bool awhUsesMultiSim = (ir->bDoAwh && ir->awhParams->shareBiasMultisim && (ms != nullptr));
-
-        // Replica exchange, ensemble restraints and AWH need all
-        // simulations to remain synchronized, so they need
-        // checkpoints and stop conditions to act on the same step, so
-        // the propagation of such signals must take place between
-        // simulations, not just within simulations.
-        // TODO: Make algorithm initializers set these flags.
-        simulationsShareState = useReplicaExchange || usingEnsembleRestraints || awhUsesMultiSim;
-
-        if (simulationsShareState)
-        {
-            // Inter-simulation signal communication does not need to happen
-            // often, so we use a minimum of 200 steps to reduce overhead.
-            const int c_minimumInterSimulationSignallingInterval = 200;
-            nstSignalComm = ((c_minimumInterSimulationSignallingInterval + nstglobalcomm - 1) / nstglobalcomm)
-                            * nstglobalcomm;
-        }
-    }
 
     auto stopHandler = stopHandlerBuilder->getStopHandlerMD(
             compat::not_null<SimulationSignal*>(&signals[eglsSTOPCOND]), simulationsShareState,
@@ -722,10 +711,24 @@ void gmx::LegacySimulator::do_md()
         }
         if (!multisim_int_all_are_equal(ms, ir->init_step))
         {
-            GMX_LOG(mdlog.warning)
-                    .appendText(
-                            "Note: The initial step is not consistent across multi simulations,\n"
-                            "but we are proceeding anyway!");
+            if (simulationsShareState)
+            {
+                if (MASTER(cr))
+                {
+                    gmx_fatal(FARGS,
+                              "The initial step is not consistent across multi simulations which "
+                              "share the state");
+                }
+                gmx_barrier(cr);
+            }
+            else
+            {
+                GMX_LOG(mdlog.warning)
+                        .appendText(
+                                "Note: The initial step is not consistent across multi "
+                                "simulations,\n"
+                                "but we are proceeding anyway!");
+            }
         }
     }
 
@@ -766,7 +769,7 @@ void gmx::LegacySimulator::do_md()
             bDoDHDL     = do_per_step(step, ir->fepvals->nstdhdl);
             bDoFEP      = ((ir->efep != efepNO) && do_per_step(step, nstfep));
             bDoExpanded = (do_per_step(step, ir->expandedvals->nstexpanded) && (ir->bExpanded)
-                           && (step > 0) && (startingBehavior == StartingBehavior::NewSimulation));
+                           && (!bFirstStep));
         }
 
         bDoReplEx = (useReplicaExchange && (step > 0) && !bLastStep
@@ -1161,7 +1164,7 @@ void gmx::LegacySimulator::do_md()
         bInteractiveMDstep = imdSession->run(step, bNS, state->box, state->x.rvec_array(), t);
 
         /* kludge -- virial is lost with restart for MTTK NPT control. Must reload (saved earlier). */
-        if (startingBehavior != StartingBehavior::NewSimulation
+        if (startingBehavior != StartingBehavior::NewSimulation && bFirstStep
             && (inputrecNptTrotter(ir) || inputrecNphTrotter(ir)))
         {
             copy_mat(state->svir_prev, shake_vir);
@@ -1254,7 +1257,7 @@ void gmx::LegacySimulator::do_md()
 
         if (useGpuForUpdate)
         {
-            if (bNS)
+            if (bNS && (bFirstStep || DOMAINDECOMP(cr)))
             {
                 integrator->set(stateGpu->getCoordinates(), stateGpu->getVelocities(),
                                 stateGpu->getForces(), top.idef, *mdatoms, ekind->ngtc);
@@ -1428,6 +1431,11 @@ void gmx::LegacySimulator::do_md()
                         // force kernels that use the coordinates on the next steps is not implemented
                         // (not because of a race on state->x being modified on the CPU while H2D is in progress).
                         stateGpu->waitCoordinatesCopiedToDevice(AtomLocality::Local);
+                        // If the COM removal changed the velocities on the CPU, this has to be accounted for.
+                        if (vcm.mode != ecmNO)
+                        {
+                            stateGpu->copyVelocitiesToGpu(state->v, AtomLocality::Local);
+                        }
                     }
                 }
             }
@@ -1624,6 +1632,13 @@ void gmx::LegacySimulator::do_md()
         /* increase the MD step number */
         step++;
         step_rel++;
+
+#if GMX_FAHCORE
+        if (MASTER(cr))
+        {
+            fcReportProgress(ir->nsteps + ir->init_step, step);
+        }
+#endif
 
         resetHandler->resetCounters(step, step_rel, mdlog, fplog, cr, fr->nbv.get(), nrnb,
                                     fr->pmedata, pme_loadbal, wcycle, walltime_accounting);

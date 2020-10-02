@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -117,7 +117,7 @@ public:
     void elementTeardown() override;
 
     //! Whether either shells or flexible constraints are used
-    static bool doShellsOrFlexConstraints(const gmx_mtop_t* mtop, int nflexcon);
+    static bool doShellsOrFlexConstraints(const gmx_mtop_t& mtop, int nflexcon);
 
 private:
     //! ITopologyHolderClient implementation
@@ -127,7 +127,7 @@ private:
     //! IEnergySignallerClient implementation
     SignallerCallbackPtr registerEnergyCallback(EnergySignallerEvent event) override;
     //! The actual do_force call
-    void run(Step step, Time time, unsigned int flags);
+    void run(Step step, Time time, bool isNSStep, unsigned int flags);
 
     //! The shell / FC helper struct
     gmx_shellfc_t* shellfc_;

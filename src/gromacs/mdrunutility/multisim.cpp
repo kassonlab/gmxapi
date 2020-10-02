@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -196,7 +196,7 @@ static void gmx_sumf_comm(int nr, float r[], MPI_Comm mpi_comm)
 void gmx_sumd_sim(int gmx_unused nr, double gmx_unused r[], const gmx_multisim_t gmx_unused* ms)
 {
 #if !GMX_MPI
-    gmx_call("gmx_sumd_sim");
+    GMX_RELEASE_ASSERT(false, "Invalid call to gmx_sumd_sim");
 #else
     gmx_sumd_comm(nr, r, ms->mpi_comm_masters);
 #endif
@@ -205,7 +205,7 @@ void gmx_sumd_sim(int gmx_unused nr, double gmx_unused r[], const gmx_multisim_t
 void gmx_sumf_sim(int gmx_unused nr, float gmx_unused r[], const gmx_multisim_t gmx_unused* ms)
 {
 #if !GMX_MPI
-    gmx_call("gmx_sumf_sim");
+    GMX_RELEASE_ASSERT(false, "Invalid call to gmx_sumf_sim");
 #else
     gmx_sumf_comm(nr, r, ms->mpi_comm_masters);
 #endif
@@ -214,7 +214,7 @@ void gmx_sumf_sim(int gmx_unused nr, float gmx_unused r[], const gmx_multisim_t 
 void gmx_sumi_sim(int gmx_unused nr, int gmx_unused r[], const gmx_multisim_t gmx_unused* ms)
 {
 #if !GMX_MPI
-    gmx_call("gmx_sumi_sim");
+    GMX_RELEASE_ASSERT(false, "Invalid call to gmx_sumi_sim");
 #else
 #    if MPI_IN_PLACE_EXISTS
     MPI_Allreduce(MPI_IN_PLACE, r, nr, MPI_INT, MPI_SUM, ms->mpi_comm_masters);
@@ -239,7 +239,7 @@ void gmx_sumi_sim(int gmx_unused nr, int gmx_unused r[], const gmx_multisim_t gm
 void gmx_sumli_sim(int gmx_unused nr, int64_t gmx_unused r[], const gmx_multisim_t gmx_unused* ms)
 {
 #if !GMX_MPI
-    gmx_call("gmx_sumli_sim");
+    GMX_RELEASE_ASSERT(false, "Invalid call to gmx_sumli_sim");
 #else
 #    if MPI_IN_PLACE_EXISTS
     MPI_Allreduce(MPI_IN_PLACE, r, nr, MPI_INT64_T, MPI_SUM, ms->mpi_comm_masters);
@@ -264,7 +264,8 @@ void gmx_sumli_sim(int gmx_unused nr, int64_t gmx_unused r[], const gmx_multisim
 std::vector<int> gatherIntFromMultiSimulation(const gmx_multisim_t* ms, const int localValue)
 {
     std::vector<int> valuesFromAllRanks;
-    if (GMX_MPI && ms != nullptr)
+#if GMX_MPI
+    if (ms != nullptr)
     {
         valuesFromAllRanks.resize(ms->nsim);
         valuesFromAllRanks[ms->sim] = localValue;
@@ -274,6 +275,10 @@ std::vector<int> gatherIntFromMultiSimulation(const gmx_multisim_t* ms, const in
     {
         valuesFromAllRanks.emplace_back(localValue);
     }
+#else
+    GMX_UNUSED_VALUE(ms);
+    valuesFromAllRanks.emplace_back(localValue);
+#endif
     return valuesFromAllRanks;
 }
 
@@ -423,17 +428,4 @@ bool isMasterSim(const gmx_multisim_t* ms)
 bool isMasterSimMasterRank(const gmx_multisim_t* ms, const bool isMaster)
 {
     return (isMaster && isMasterSim(ms));
-}
-
-void multiSimBarrier(const gmx_multisim_t* ms)
-{
-    if (isMultiSim(ms))
-    {
-#if GMX_MPI
-        if (ms->mpi_comm_masters != MPI_COMM_NULL)
-        {
-            MPI_Barrier(ms->mpi_comm_masters);
-        }
-#endif
-    }
 }

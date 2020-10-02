@@ -1,7 +1,9 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2008,2009,2010,2011,2012 by the GROMACS development team.
+ * Copyright (c) 2013,2014,2015,2016,2017 by the GROMACS development team.
+ * Copyright (c) 2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -87,10 +89,6 @@
 #include "gromacs/utility/smalloc.h"
 #include "gromacs/utility/sysinfo.h"
 #include "gromacs/utility/txtdump.h"
-
-#if GMX_FAHCORE
-#    include "corewrap.h"
-#endif
 
 #define CPT_MAGIC1 171817
 #define CPT_MAGIC2 171819
@@ -2175,6 +2173,18 @@ static int do_cpt_files(XDR* xd, gmx_bool bRead, std::vector<gmx_file_position_t
     return 0;
 }
 
+static void mpiBarrierBeforeRename(const bool applyMpiBarrierBeforeRename, MPI_Comm mpiBarrierCommunicator)
+{
+    if (applyMpiBarrierBeforeRename)
+    {
+#if GMX_MPI
+        MPI_Barrier(mpiBarrierCommunicator);
+#else
+        GMX_RELEASE_ASSERT(false, "Should not request a barrier without MPI");
+        GMX_UNUSED_VALUE(mpiBarrierCommunicator);
+#endif
+    }
+}
 
 void write_checkpoint(const char*                   fn,
                       gmx_bool                      bNumberAndKeep,
@@ -2190,7 +2200,9 @@ void write_checkpoint(const char*                   fn,
                       double                        t,
                       t_state*                      state,
                       ObservablesHistory*           observablesHistory,
-                      const gmx::MdModulesNotifier& mdModulesNotifier)
+                      const gmx::MdModulesNotifier& mdModulesNotifier,
+                      bool                          applyMpiBarrierBeforeRename,
+                      MPI_Comm                      mpiBarrierCommunicator)
 {
     t_fileio* fp;
     char*     fntemp; /* the temporary checkpoint file name */
@@ -2417,6 +2429,8 @@ void write_checkpoint(const char*                   fn,
         if (gmx_fexist(fn))
         {
             /* Rename the previous checkpoint file */
+            mpiBarrierBeforeRename(applyMpiBarrierBeforeRename, mpiBarrierCommunicator);
+
             std::strcpy(buf, fn);
             buf[std::strlen(fn) - std::strlen(ftp2ext(fn2ftp(fn))) - 1] = '\0';
             std::strcat(buf, "_prev");
@@ -2438,6 +2452,10 @@ void write_checkpoint(const char*                   fn,
                 gmx_file_rename(fn, buf);
             }
         }
+
+        /* Rename the checkpoint file from the temporary to the final name */
+        mpiBarrierBeforeRename(applyMpiBarrierBeforeRename, mpiBarrierCommunicator);
+
         if (gmx_file_rename(fntemp, fn) != 0)
         {
             gmx_file("Cannot rename checkpoint file; maybe you are out of disk space?");
@@ -2448,14 +2466,21 @@ void write_checkpoint(const char*                   fn,
     sfree(fntemp);
 
 #if GMX_FAHCORE
-    /*code for alternate checkpointing scheme.  moved from top of loop over
-       steps */
-    fcRequestCheckPoint();
-    if (fcCheckPointParallel(cr->nodeid, NULL, 0) == 0)
-    {
-        gmx_fatal(3, __FILE__, __LINE__, "Checkpoint error on step %d\n", step);
-    }
-#endif /* end GMX_FAHCORE block */
+    /* Always FAH checkpoint immediately after a Gromacs checkpoint.
+     *
+     * Note that it is critical that we save a FAH checkpoint directly
+     * after writing a Gromacs checkpoint.  If the program dies, either
+     * by the machine powering off suddenly or the process being,
+     * killed, FAH can recover files that have only appended data by
+     * truncating them to the last recorded length.  The Gromacs
+     * checkpoint does not just append data, it is fully rewritten each
+     * time so a crash between moving the new Gromacs checkpoint file in
+     * to place and writing a FAH checkpoint is not recoverable.  Thus
+     * the time between these operations must be kept as short a
+     * possible.
+     */
+    fcCheckpoint();
+#endif
 }
 
 static void check_int(FILE* fplog, const char* type, int p, int f, gmx_bool* mm)
@@ -2820,26 +2845,31 @@ void load_checkpoint(const char*                   fn,
         mdModulesNotifier.notifier_.notify(broadcastCheckPointData);
     }
     ir->bContinuation = TRUE;
-    // TODO Should the following condition be <=? Currently if you
-    // pass a checkpoint written by an normal completion to a restart,
-    // mdrun will read all input, does some work but no steps, and
-    // write successful output. But perhaps that is not desirable.
-    if ((ir->nsteps >= 0) && (ir->nsteps < headerContents.step))
-    {
-        // Note that we do not intend to support the use of mdrun
-        // -nsteps to circumvent this condition.
-        char nstepsString[STEPSTRSIZE], stepString[STEPSTRSIZE];
-        gmx_step_str(ir->nsteps, nstepsString);
-        gmx_step_str(headerContents.step, stepString);
-        gmx_fatal(FARGS,
-                  "The input requested %s steps, however the checkpoint "
-                  "file has already reached step %s. The simulation will not "
-                  "proceed, because either your simulation is already complete, "
-                  "or your combination of input files don't match.",
-                  nstepsString, stepString);
-    }
     if (ir->nsteps >= 0)
     {
+        // TODO Should the following condition be <=? Currently if you
+        // pass a checkpoint written by an normal completion to a restart,
+        // mdrun will read all input, does some work but no steps, and
+        // write successful output. But perhaps that is not desirable.
+        // Note that we do not intend to support the use of mdrun
+        // -nsteps to circumvent this condition.
+        if (ir->nsteps + ir->init_step < headerContents.step)
+        {
+            char        buf[STEPSTRSIZE];
+            std::string message =
+                    gmx::formatString("The input requested %s steps, ", gmx_step_str(ir->nsteps, buf));
+            if (ir->init_step > 0)
+            {
+                message += gmx::formatString("starting from step %s, ", gmx_step_str(ir->init_step, buf));
+            }
+            message += gmx::formatString(
+                    "however the checkpoint "
+                    "file has already reached step %s. The simulation will not "
+                    "proceed, because either your simulation is already complete, "
+                    "or your combination of input files don't match.",
+                    gmx_step_str(headerContents.step, buf));
+            gmx_fatal(FARGS, "%s", message.c_str());
+        }
         ir->nsteps += ir->init_step - headerContents.step;
     }
     ir->init_step       = headerContents.step;

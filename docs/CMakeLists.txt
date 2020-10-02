@@ -362,6 +362,9 @@ if (SPHINX_FOUND)
         install-guide/index.rst
         release-notes/index.rst
         release-notes/2020/2020.1.rst
+        release-notes/2020/2020.2.rst
+        release-notes/2020/2020.3.rst
+        release-notes/2020/2020.4.rst
         release-notes/2020/major/highlights.rst
         release-notes/2020/major/features.rst
         release-notes/2020/major/performance.rst
@@ -507,8 +510,6 @@ if (SPHINX_FOUND)
     else()
         gmx_add_sphinx_source_files(FILES
             dev-manual/releng/index.rst
-            dev-manual/releng/jenkins-howto.rst
-            dev-manual/releng/jenkins-ui.rst
             )
     endif()
 

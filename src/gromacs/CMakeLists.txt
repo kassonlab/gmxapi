@@ -1,7 +1,8 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2010,2011,2012,2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+# Copyright (c) 2010,2011,2012,2013,2014,2015, The GROMACS development team.
+# Copyright (c) 2016,2017,2018,2019,2020, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -140,6 +141,10 @@ configure_file(version.h.cmakein version.h)
 if(GMX_INSTALL_LEGACY_API)
   install(FILES
           ${CMAKE_CURRENT_BINARY_DIR}/version.h
+	  analysisdata.h
+	  options.h
+	  selection.h
+	  trajectoryanalysis.h
           DESTINATION include/gromacs)
 endif()
 
@@ -265,11 +270,6 @@ endif()
 # TODO Perhaps generalize this for all headers from src/external
 target_include_directories(libgromacs SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/src/external)
 
-# Temporary fix to allow external access to restraintpotentail
-target_include_directories(libgromacs PUBLIC
-                           $<INSTALL_INTERFACE:include>
-                           )
-
 if(SIMD_AVX_512_CXX_SUPPORTED AND NOT ("${GMX_SIMD_ACTIVE}" STREQUAL "AVX_512_KNL"))
     # Since we might be overriding -march=core-avx2, add a flag so we don't warn for this specific file.
     # On KNL this can cause illegal instruction because the compiler might use non KNL AVX instructions
@@ -343,16 +343,28 @@ if (GMX_CLANG_TIDY)
        "${CLANG_TIDY_EXE};-warnings-as-errors=*")
 endif()
 
+# clang-3.6 warns about a number of issues that are not reported by more modern compilers
+# and we know they are not real issues. So we only check that it can compile without error
+# but ignore all warnings.
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION MATCHES "^3\.6")
+    target_compile_options(libgromacs PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-w>)
+endif()
+
 # Only install the library in mdrun-only mode if it is actually necessary
 # for the binary
 if (NOT GMX_BUILD_MDRUN_ONLY OR BUILD_SHARED_LIBS)
     install(TARGETS libgromacs
             EXPORT libgromacs
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            INCLUDES DESTINATION include
-            COMPONENT libraries)
+            LIBRARY
+                DESTINATION ${CMAKE_INSTALL_LIBDIR}
+                COMPONENT libraries
+            RUNTIME
+                DESTINATION ${CMAKE_INSTALL_BINDIR}
+                COMPONENT libraries
+            ARCHIVE
+                DESTINATION ${CMAKE_INSTALL_LIBDIR}
+                COMPONENT libraries
+            INCLUDES DESTINATION include)
 endif()
 
 if (NOT GMX_BUILD_MDRUN_ONLY)

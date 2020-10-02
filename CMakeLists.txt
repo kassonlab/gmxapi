@@ -1,7 +1,8 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+# Copyright (c) 2009,2010,2011,2012,2013,2014, The GROMACS development team.
+# Copyright (c) 2015,2016,2017,2018,2019,2020, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -396,7 +397,7 @@ check_cxx_source_compiles("int main(){ return __builtin_clz(1);}"   HAVE_BUILTIN
 check_cxx_source_compiles("int main(){ return __builtin_clzll(1);}" HAVE_BUILTIN_CLZLL)
 if(MSVC)
     check_cxx_source_compiles("#include <intrin.h>\n int main(){unsigned long r;unsigned long i=1;_BitScanReverse(&r,i);return r;}" HAVE_BITSCANREVERSE)
-    check_cxx_source_compiles("#include <intrin.h>\n int main(){unsigned long r;unsigned __int64 i=1;_BitScanReverse(&r,i);return r;}" HAVE_BITSCANREVERSE64)
+    check_cxx_source_compiles("#include <intrin.h>\n int main(){unsigned long r;unsigned __int64 i=1;_BitScanReverse64(&r,i);return r;}" HAVE_BITSCANREVERSE64)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "XL")
     check_cxx_source_compiles("int main(){ return __cntlz4(1);}" HAVE_CNTLZ4)
     check_cxx_source_compiles("int main(){ return __cntlz8(1);}" HAVE_CNTLZ8)
@@ -724,6 +725,12 @@ if (GMX_USE_PLUGINS)
         find_package(VMD)
     endif()
 endif()
+
+# People might want to customize the default location for the DSSP binary
+set(GMX_DSSP_PROGRAM_PATH "/usr/local/bin/dssp"
+    CACHE PATH
+    "The default location to use for the DSSP binary")
+mark_as_advanced(GMX_DSSP_PROGRAM_PATH)
 
 # Link real-time library for POSIX timers. The check for clock_gettime
 # confirms the linkability of rt.

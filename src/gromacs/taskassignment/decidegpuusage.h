@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2017,2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -71,6 +71,25 @@ enum class EmulateGpuNonbonded : bool
     //! Do emulate GPUs.
     Yes
 };
+
+/*! \libinternal
+ *  \brief Structure that holds boolean flags corresponding to the development
+ *        features present enabled through environment variables.
+ *
+ */
+struct DevelopmentFeatureFlags
+{
+    //! True if the Buffer ops development feature is enabled
+    // TODO: when the trigger of the buffer ops offload is fully automated this should go away
+    bool enableGpuBufferOps = false;
+    //! If true, forces 'mdrun -update auto' default to 'gpu'
+    bool forceGpuUpdateDefault = false;
+    //! True if the GPU halo exchange development feature is enabled
+    bool enableGpuHaloExchange = false;
+    //! True if the PME PP direct communication GPU development feature is enabled
+    bool enableGpuPmePPComm = false;
+};
+
 
 class MDAtoms;
 
@@ -209,6 +228,20 @@ bool decideWhetherToUseGpusForPme(bool                    useGpuForNonbonded,
                                   int                     numPmeRanksPerSimulation,
                                   bool                    gpusWereDetected);
 
+/*! \brief Determine PME run mode.
+ *
+ * Given the PME task assignment in \p useGpuForPme and the user-provided
+ * FFT task target in \p pmeFftTarget, returns a PME run mode for the
+ * current run. It also checks the compatibility of the two.
+ *
+ * \note Aborts the run upon incompatible values of \p useGpuForPme and \p pmeFftTarget.
+ *
+ * \param[in]  useGpuForPme              PME task assignment, true if PME task is mapped to the GPU.
+ * \param[in]  pmeFftTarget              The user's choice for -pmefft for where to assign the FFT
+ * work of the PME task. \param[in]  inputrec                  The user input record
+ * */
+PmeRunMode determinePmeRunMode(bool useGpuForPme, const TaskTarget& pmeFftTarget, const t_inputrec& inputrec);
+
 /*! \brief Decide whether the simulation will try to run bonded tasks on GPUs.
  *
  * \param[in]  useGpuForNonbonded        Whether GPUs will be used for nonbonded interactions.
@@ -235,7 +268,6 @@ bool decideWhetherToUseGpusForBonded(bool       useGpuForNonbonded,
 
 /*! \brief Decide whether to use GPU for update.
  *
- * \param[in]  forceGpuUpdateDefault        If update should run on GPU by default.
  * \param[in]  isDomainDecomposition        Whether there more than one domain.
  * \param[in]  useUpdateGroups              If the constraints can be split across domains.
  * \param[in]  pmeRunMode                   PME running mode: CPU, GPU or mixed.
@@ -249,27 +281,28 @@ bool decideWhetherToUseGpusForBonded(bool       useGpuForNonbonded,
  * \param[in]  doOrientationRestraints      If orientation restraints are enabled.
  * \param[in]  useReplicaExchange           If this is a REMD simulation.
  * \param[in]  doRerun                      It this is a rerun.
+ * \param[in]  devFlags                     GPU development / experimental feature flags.
  * \param[in]  mdlog                        MD logger.
  *
  * \returns    Whether complete simulation can be run on GPU.
  * \throws     std::bad_alloc            If out of memory
  *             InconsistentInputError    If the user requirements are inconsistent.
  */
-bool decideWhetherToUseGpuForUpdate(bool                 forceGpuUpdateDefault,
-                                    bool                 isDomainDecomposition,
-                                    bool                 useUpdateGroups,
-                                    PmeRunMode           pmeRunMode,
-                                    bool                 havePmeOnlyRank,
-                                    bool                 useGpuForNonbonded,
-                                    TaskTarget           updateTarget,
-                                    bool                 gpusWereDetected,
-                                    const t_inputrec&    inputrec,
-                                    const gmx_mtop_t&    mtop,
-                                    bool                 useEssentialDynamics,
-                                    bool                 doOrientationRestraints,
-                                    bool                 useReplicaExchange,
-                                    bool                 doRerun,
-                                    const gmx::MDLogger& mdlog);
+bool decideWhetherToUseGpuForUpdate(bool                           isDomainDecomposition,
+                                    bool                           useUpdateGroups,
+                                    PmeRunMode                     pmeRunMode,
+                                    bool                           havePmeOnlyRank,
+                                    bool                           useGpuForNonbonded,
+                                    TaskTarget                     updateTarget,
+                                    bool                           gpusWereDetected,
+                                    const t_inputrec&              inputrec,
+                                    const gmx_mtop_t&              mtop,
+                                    bool                           useEssentialDynamics,
+                                    bool                           doOrientationRestraints,
+                                    bool                           useReplicaExchange,
+                                    bool                           doRerun,
+                                    const DevelopmentFeatureFlags& devFlags,
+                                    const gmx::MDLogger&           mdlog);
 
 
 } // namespace gmx

@@ -3,7 +3,7 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2013,2014,2015,2016,2017,2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -47,6 +47,7 @@
 #include "gromacs/domdec/domdec.h"
 #include "gromacs/gmxlib/network.h"
 #include "gromacs/gmxlib/nrnb.h"
+#include "gromacs/math/utilities.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/dispersioncorrection.h"
 #include "gromacs/mdlib/simulationsignal.h"
@@ -315,8 +316,8 @@ void compute_globals(gmx_global_stat*          gstat,
 void setCurrentLambdasRerun(int64_t           step,
                             const t_lambda*   fepvals,
                             const t_trxframe* rerun_fr,
-                            const double*     lam0,
-                            t_state*          globalState)
+                            const double* /*lam0*/,
+                            t_state* globalState)
 {
     GMX_RELEASE_ASSERT(globalState != nullptr,
                        "setCurrentLambdasGlobalRerun should be called with a valid state object");
@@ -330,16 +331,59 @@ void setCurrentLambdasRerun(int64_t           step,
         else
         {
             /* find out between which two value of lambda we should be */
-            real frac      = step * fepvals->delta_lambda;
-            int  fep_state = static_cast<int>(std::floor(frac * fepvals->n_lambda));
-            /* interpolate between this state and the next */
-            /* this assumes that the initial lambda corresponds to lambda==0, which is verified in grompp */
-            frac = frac * fepvals->n_lambda - fep_state;
+            const real fracSimulationLambda = step * fepvals->delta_lambda;
+
+            // Set initial lambda value for the simulation either from initialFEPStateIndex or,
+            // if not set, from the initial lambda.
+            double initialGlobalLambda = 0;
+            if (fepvals->init_fep_state > -1)
+            {
+                if (fepvals->n_lambda > 1)
+                {
+                    initialGlobalLambda =
+                            static_cast<double>(fepvals->init_fep_state) / (fepvals->n_lambda - 1);
+                }
+            }
+            else
+            {
+                if (fepvals->init_lambda > -1)
+                {
+                    initialGlobalLambda = fepvals->init_lambda;
+                }
+            }
+
+            const double globalLambda = initialGlobalLambda + fracSimulationLambda;
+
+            // when there is no lambda value array, set all lambdas to steps * deltaLambdaPerStep
+            if (fepvals->n_lambda <= 0)
+            {
+                std::fill(std::begin(globalState->lambda), std::end(globalState->lambda), globalLambda);
+                return;
+            }
+
+            GMX_ASSERT(
+                    globalLambda <= 1 || gmx_within_tol(globalLambda, 1, 1e-5),
+                    "Lambda may not be larger than one when interpolating an array of multi-lambda "
+                    "values.");
+            GMX_ASSERT(globalLambda >= 0 || gmx_within_tol(globalLambda, 0, 1e-5),
+                       "Lambda may not be negative when interpolating an array of multi-lambda "
+                       "values.");
+
+            // find out between which two value lambda array elements to interpolate
+            // at the boundary of the lambda array, return the boundary array values
+            const int fepStateLeft =
+                    std::max(0, static_cast<int>(std::floor(globalLambda * (fepvals->n_lambda - 1))));
+
+            const int fepStateRight = std::min(fepvals->n_lambda - 1, fepStateLeft + 1);
+
+            // interpolate between this state and the next
+            const double fracBetween = globalLambda * (fepvals->n_lambda - 1) - fepStateLeft;
             for (int i = 0; i < efptNR; i++)
             {
-                globalState->lambda[i] =
-                        lam0[i] + (fepvals->all_lambda[i][fep_state])
-                        + frac * (fepvals->all_lambda[i][fep_state + 1] - fepvals->all_lambda[i][fep_state]);
+                globalState->lambda[i] = fepvals->all_lambda[i][fepStateLeft]
+                                         + fracBetween
+                                                   * (fepvals->all_lambda[i][fepStateRight]
+                                                      - fepvals->all_lambda[i][fepStateLeft]);
             }
         }
     }
@@ -353,9 +397,9 @@ void setCurrentLambdasRerun(int64_t           step,
     }
 }
 
-void setCurrentLambdasLocal(const int64_t       step,
-                            const t_lambda*     fepvals,
-                            const double*       lam0,
+void setCurrentLambdasLocal(const int64_t   step,
+                            const t_lambda* fepvals,
+                            const double* /*lam0*/,
                             gmx::ArrayRef<real> lambda,
                             const int           currentFEPState)
 /* find the current lambdas.  If rerunning, we either read in a state, or a lambda value,
@@ -364,25 +408,58 @@ void setCurrentLambdasLocal(const int64_t       step,
     if (fepvals->delta_lambda != 0)
     {
         /* find out between which two value of lambda we should be */
-        real frac = step * fepvals->delta_lambda;
-        if (fepvals->n_lambda > 0)
+        const real fracSimulationLambda = step * fepvals->delta_lambda;
+
+        // Set initial lambda value for the simulation either from initialFEPStateIndex or,
+        // if not set, from the initial lambda.
+        double initialGlobalLambda = 0;
+        if (fepvals->init_fep_state > -1)
         {
-            int fep_state = static_cast<int>(std::floor(frac * fepvals->n_lambda));
-            /* interpolate between this state and the next */
-            /* this assumes that the initial lambda corresponds to lambda==0, which is verified in grompp */
-            frac = frac * fepvals->n_lambda - fep_state;
-            for (int i = 0; i < efptNR; i++)
+            if (fepvals->n_lambda > 1)
             {
-                lambda[i] = lam0[i] + (fepvals->all_lambda[i][fep_state])
-                            + frac * (fepvals->all_lambda[i][fep_state + 1] - fepvals->all_lambda[i][fep_state]);
+                initialGlobalLambda =
+                        static_cast<double>(fepvals->init_fep_state) / (fepvals->n_lambda - 1);
             }
         }
         else
         {
-            for (int i = 0; i < efptNR; i++)
+            if (fepvals->init_lambda > -1)
             {
-                lambda[i] = lam0[i] + frac;
+                initialGlobalLambda = fepvals->init_lambda;
             }
+        }
+
+        const double globalLambda = initialGlobalLambda + fracSimulationLambda;
+
+        // when there is no lambda value array, set all lambdas to steps * deltaLambdaPerStep
+        if (fepvals->n_lambda <= 0)
+        {
+            std::fill(std::begin(lambda), std::end(lambda), globalLambda);
+            return;
+        }
+
+        GMX_ASSERT(globalLambda <= 1 || gmx_within_tol(globalLambda, 1, 1e-5),
+                   "Lambda may not be larger than one when interpolating an array of multi-lambda "
+                   "values.");
+        GMX_ASSERT(
+                globalLambda >= 0 || gmx_within_tol(globalLambda, 0, 1e-5),
+                "Lambda may not be negative when interpolating an array of multi-lambda values.");
+
+        // find out between which two value lambda array elements to interpolate
+        // at the boundary of the lambda array, return the boundary array values
+        const int fepStateLeft =
+                std::max(0, static_cast<int>(std::floor(globalLambda * (fepvals->n_lambda - 1))));
+
+        const int fepStateRight = std::min(fepvals->n_lambda - 1, fepStateLeft + 1);
+
+        // interpolate between this state and the next
+        const double fracBetween = globalLambda * (fepvals->n_lambda - 1) - fepStateLeft;
+        for (int i = 0; i < efptNR; i++)
+        {
+            lambda[i] = fepvals->all_lambda[i][fepStateLeft]
+                        + fracBetween
+                                  * (fepvals->all_lambda[i][fepStateRight]
+                                     - fepvals->all_lambda[i][fepStateLeft]);
         }
     }
     else
@@ -390,11 +467,26 @@ void setCurrentLambdasLocal(const int64_t       step,
         /* if < 0, fep_state was never defined, and we should not set lambda from the state */
         if (currentFEPState > -1)
         {
+            GMX_ASSERT(currentFEPState < fepvals->n_lambda,
+                       "Current FEP state may not be larger than number of given states.");
             for (int i = 0; i < efptNR; i++)
             {
                 lambda[i] = fepvals->all_lambda[i][currentFEPState];
             }
+            return;
         }
+
+        if (fepvals->init_fep_state > -1)
+        {
+            GMX_ASSERT(fepvals->init_fep_state < fepvals->n_lambda,
+                       "Initial FEP state may not be larger than number of given states.");
+            for (int i = 0; i < efptNR; i++)
+            {
+                lambda[i] = fepvals->all_lambda[i][fepvals->init_fep_state];
+            }
+            return;
+        }
+        std::fill(std::begin(lambda), std::end(lambda), fepvals->init_lambda);
     }
 }
 
@@ -499,7 +591,7 @@ void rerun_parallel_comm(t_commrec* cr, t_trxframe* fr, gmx_bool* bLastStep)
 }
 
 // TODO Most of this logic seems to belong in the respective modules
-void set_state_entries(t_state* state, const t_inputrec* ir)
+void set_state_entries(t_state* state, const t_inputrec* ir, bool useModularSimulator)
 {
     /* The entries in the state in the tpx file might not correspond
      * with what is needed, so we correct this here.
@@ -529,7 +621,10 @@ void set_state_entries(t_state* state, const t_inputrec* ir)
         if ((ir->epc == epcPARRINELLORAHMAN) || (ir->epc == epcMTTK))
         {
             state->flags |= (1 << estBOXV);
-            state->flags |= (1 << estPRES_PREV);
+            if (!useModularSimulator)
+            {
+                state->flags |= (1 << estPRES_PREV);
+            }
         }
         if (inputrecNptTrotter(ir) || (inputrecNphTrotter(ir)))
         {

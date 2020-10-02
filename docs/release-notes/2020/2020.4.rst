@@ -1,0 +1,108 @@
+GROMACS 2020.4 release notes
+----------------------------
+
+This version was released on TODO, 2020. These release notes
+document the changes that have taken place in GROMACS since the
+previous 2020.3 version, to fix known issues. It also incorporates all
+fixes made in version 2019.6 and earlier, which you can find described
+in the :ref:`release-notes`.
+
+.. Note to developers!
+   Please use """"""" to underline the individual entries for fixed issues in the subfolders,
+   otherwise the formatting on the webpage is messed up.
+   Also, please use the syntax :issue:`number` to reference issues on redmine, without the
+   a space between the colon and number!
+
+Fixes where mdrun could behave incorrectly
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Bug fix for the GPU version of LINCS in multiple domain case
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Increase in the maximum number of coupled constraints in the
+domain did not trigger memory re-allocation, which is now fixed.
+This can happen, e.g. when big molecule enters the domain, previously
+occupied by smaller molecules. The bug does not affect the single
+domain case.
+
+Fix index handling of N-body virtual sites with domain decomposition
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Incorrect indexing would be used to handle N-body virtual sites in
+the domain decomposition code. This would usually lead to crashes
+due to illegal or incorrect memory usage.
+
+:issue:`3635`
+
+Fix assertion failure with LJ-PME and dispersion correction
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+With vdw-type=PME and dispersion correction, mdrun would exit with
+an assertion failure during PME tuning.
+
+:issue:`3677`
+
+Bug fix for FEP calculations with modular simulator and domain decomposition
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+When using the modular simulator, domain decomposition and free energy
+calculations with perturbed masses, the simulation would always be
+performed using the masses at lambda=0 instead of the actual lambda value.
+
+Fixes for ``gmx`` tools
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Fix default output with gmx trjcat -demux
+"""""""""""""""""""""""""""""""""""""""""
+
+Files would not be written when using default file name output.
+
+:issue:`3653`
+
+Fixes that affect portability
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+CUDA 11.0 supported
+"""""""""""""""""""
+
+A build with CUDA 11.0 now configures and passes tests.
+Building with CUDA 11.0 means that hardware with CC 3.0 is no longer supported,
+while CC 8.0 can now be used.
+
+:issue:`3632`
+
+Fix building with MSVC
+""""""""""""""""""""""
+
+The build would fail due to a missing header.
+
+:issue:`3669`
+
+Only check for RDTSCP on x86 platforms
+""""""""""""""""""""""""""""""""""""""
+
+
+Miscellaneous
+^^^^^^^^^^^^^
+
+Fix crash of grompp when the whole system is frozen
+"""""""""""""""""""""""""""""""""""""""""""""""""""
+
+When the whole system would be frozen, grompp would crash with
+a segmentation fault.
+
+:issue:`3683`
+
+Fixes the unexpected change in molecule indexing in output after simulation
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Molecule indices of repeat molecules are now again numbered consecutively as
+expected (instead of all ``1``).
+
+:issue:`3575`
+
+Fix ``INTERFACE_INCLUDE_DIRECTORIES`` for ``libgromacs`` CMake target
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+:file:`libgromacs.cmake` was malformed, referencing non-existent directories.
+
+:issue:`3592`

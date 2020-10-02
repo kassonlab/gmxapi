@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -53,6 +53,7 @@
 #include "gromacs/mdlib/checkpointhandler.h"
 #include "gromacs/mdlib/constr.h"
 #include "gromacs/mdlib/energyoutput.h"
+#include "gromacs/mdlib/forcerec.h"
 #include "gromacs/mdlib/mdatoms.h"
 #include "gromacs/mdlib/resethandler.h"
 #include "gromacs/mdlib/stat.h"
@@ -69,6 +70,7 @@
 #include "gromacs/mdtypes/state.h"
 #include "gromacs/nbnxm/nbnxm.h"
 #include "gromacs/timing/walltime_accounting.h"
+#include "gromacs/topology/mtop_util.h"
 #include "gromacs/topology/topology.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
@@ -448,8 +450,9 @@ void ModularSimulator::constructElementsAndSignallers()
                    "interactions.");
         domDecHelper_ = std::make_unique<DomDecHelper>(
                 mdrunOptions.verbose, mdrunOptions.verboseStepPrintInterval, statePropagatorDataPtr,
-                topologyHolder_.get(), std::move(checkBondedInteractionsCallback), nstglobalcomm_, fplog,
-                cr, mdlog, constr, inputrec, mdAtoms, nrnb, wcycle, fr, vsite, imdSession, pull_work);
+                freeEnergyPerturbationElementPtr, topologyHolder_.get(),
+                std::move(checkBondedInteractionsCallback), nstglobalcomm_, fplog, cr, mdlog,
+                constr, inputrec, mdAtoms, nrnb, wcycle, fr, vsite, imdSession, pull_work);
         neighborSearchSignallerBuilder.registerSignallerClient(compat::make_not_null(domDecHelper_.get()));
     }
 
@@ -473,7 +476,7 @@ void ModularSimulator::constructElementsAndSignallers()
     loggingSignallerBuilder.registerSignallerClient(compat::make_not_null(energySignaller.get()));
     auto trajectoryElement = trajectoryElementBuilder.build(
             fplog, nfile, fnm, mdrunOptions, cr, outputProvider, mdModulesNotifier, inputrec,
-            top_global, oenv, wcycle, startingBehavior);
+            top_global, oenv, wcycle, startingBehavior, simulationsShareState);
     loggingSignallerBuilder.registerSignallerClient(compat::make_not_null(trajectoryElement.get()));
 
     // Add checkpoint helper here since we need a pointer to the trajectory element and
@@ -538,7 +541,7 @@ ModularSimulator::buildForces(SignallerBuilder<NeighborSearchSignaller>* neighbo
     const bool isVerbose    = mdrunOptions.verbose;
     const bool isDynamicBox = inputrecDynamicBox(inputrec);
     // Check for polarizable models and flexible constraints
-    if (ShellFCElement::doShellsOrFlexConstraints(&topologyHolder_->globalTopology(),
+    if (ShellFCElement::doShellsOrFlexConstraints(topologyHolder_->globalTopology(),
                                                   constr ? constr->numFlexibleConstraints() : 0))
     {
         auto shellFCElement = std::make_unique<ShellFCElement>(
@@ -777,14 +780,12 @@ std::unique_ptr<ISimulatorElement> ModularSimulator::buildIntegrator(
 bool ModularSimulator::isInputCompatible(bool                             exitOnFailure,
                                          const t_inputrec*                inputrec,
                                          bool                             doRerun,
-                                         const gmx_vsite_t*               vsite,
+                                         const gmx_mtop_t&                globalTopology,
                                          const gmx_multisim_t*            ms,
                                          const ReplicaExchangeParameters& replExParams,
                                          const t_fcdata*                  fcd,
-                                         int                              nfile,
-                                         const t_filenm*                  fnm,
-                                         ObservablesHistory*              observablesHistory,
-                                         const gmx_membed_t*              membed)
+                                         bool                             doEssentialDynamics,
+                                         bool                             doMembed)
 {
     auto conditionalAssert = [exitOnFailure](bool condition, const char* message) {
         if (exitOnFailure)
@@ -877,11 +878,20 @@ bool ModularSimulator::isInputCompatible(bool                             exitOn
                        "Deformation is not supported by the modular simulator.");
     isInputCompatible =
             isInputCompatible
-            && conditionalAssert(vsite == nullptr,
+            && conditionalAssert(gmx_mtop_interaction_count(globalTopology, IF_VSITE) == 0,
                                  "Virtual sites are not supported by the modular simulator.");
     isInputCompatible = isInputCompatible
                         && conditionalAssert(!inputrec->bDoAwh,
                                              "AWH is not supported by the modular simulator.");
+    isInputCompatible =
+            isInputCompatible
+            && conditionalAssert(gmx_mtop_ftype_count(globalTopology, F_DISRES) == 0,
+                                 "Distance restraints are not supported by the modular simulator.");
+    isInputCompatible =
+            isInputCompatible
+            && conditionalAssert(
+                       gmx_mtop_ftype_count(globalTopology, F_ORIRES) == 0,
+                       "Orientation restraints are not supported by the modular simulator.");
     isInputCompatible =
             isInputCompatible
             && conditionalAssert(ms == nullptr,
@@ -890,9 +900,23 @@ bool ModularSimulator::isInputCompatible(bool                             exitOn
             isInputCompatible
             && conditionalAssert(replExParams.exchangeInterval == 0,
                                  "Replica exchange is not supported by the modular simulator.");
+
+    int numEnsembleRestraintSystems;
+    if (fcd)
+    {
+        numEnsembleRestraintSystems = fcd->disres.nsystems;
+    }
+    else
+    {
+        auto distantRestraintEnsembleEnvVar = getenv("GMX_DISRE_ENSEMBLE_SIZE");
+        numEnsembleRestraintSystems =
+                (ms != nullptr && distantRestraintEnsembleEnvVar != nullptr)
+                        ? static_cast<int>(strtol(distantRestraintEnsembleEnvVar, nullptr, 10))
+                        : 0;
+    }
     isInputCompatible =
             isInputCompatible
-            && conditionalAssert(fcd->disres.nsystems <= 1,
+            && conditionalAssert(numEnsembleRestraintSystems <= 1,
                                  "Ensemble restraints are not supported by the modular simulator.");
     isInputCompatible =
             isInputCompatible
@@ -908,9 +932,8 @@ bool ModularSimulator::isInputCompatible(bool                             exitOn
                                              "the modular simulator.");
     isInputCompatible =
             isInputCompatible
-            && conditionalAssert(
-                       !(opt2bSet("-ei", nfile, fnm) || observablesHistory->edsamHistory != nullptr),
-                       "Essential dynamics is not supported by the modular simulator.");
+            && conditionalAssert(!doEssentialDynamics,
+                                 "Essential dynamics is not supported by the modular simulator.");
     isInputCompatible = isInputCompatible
                         && conditionalAssert(inputrec->eSwapCoords == eswapNO,
                                              "Ion / water position swapping is not supported by "
@@ -921,8 +944,12 @@ bool ModularSimulator::isInputCompatible(bool                             exitOn
                                  "Interactive MD is not supported by the modular simulator.");
     isInputCompatible =
             isInputCompatible
-            && conditionalAssert(membed == nullptr,
+            && conditionalAssert(!doMembed,
                                  "Membrane embedding is not supported by the modular simulator.");
+    const bool useGraph = !areMoleculesDistributedOverPbc(*inputrec, globalTopology, MDLogger());
+    isInputCompatible =
+            isInputCompatible
+            && conditionalAssert(!useGraph, "Graph is not supported by the modular simulator.");
     // TODO: Change this to the boolean passed when we merge the user interface change for the GPU update.
     isInputCompatible =
             isInputCompatible
@@ -944,8 +971,15 @@ bool ModularSimulator::isInputCompatible(bool                             exitOn
 
 void ModularSimulator::checkInputForDisabledFunctionality()
 {
-    isInputCompatible(true, inputrec, doRerun, vsite, ms, replExParams, fcd, nfile, fnm,
-                      observablesHistory, membed);
+    isInputCompatible(true, inputrec, doRerun, *top_global, ms, replExParams, fcd,
+                      opt2bSet("-ei", nfile, fnm), membed != nullptr);
+    if (observablesHistory->edsamHistory)
+    {
+        gmx_fatal(FARGS,
+                  "The checkpoint is from a run with essential dynamics sampling, "
+                  "but the current run did not specify the -ei option. "
+                  "Either specify the -ei option to mdrun, or do not use this checkpoint file.");
+    }
 }
 
 SignallerCallbackPtr ModularSimulator::SignalHelper::registerLastStepCallback()

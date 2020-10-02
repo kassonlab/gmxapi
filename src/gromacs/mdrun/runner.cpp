@@ -160,29 +160,9 @@
 #include "replicaexchange.h"
 #include "simulatorbuilder.h"
 
-#if GMX_FAHCORE
-#    include "corewrap.h"
-#endif
-
 namespace gmx
 {
 
-/*! \brief Structure that holds boolean flags corresponding to the development
- *        features present enabled through environment variables.
- *
- */
-struct DevelopmentFeatureFlags
-{
-    //! True if the Buffer ops development feature is enabled
-    // TODO: when the trigger of the buffer ops offload is fully automated this should go away
-    bool enableGpuBufferOps = false;
-    //! If true, forces 'mdrun -update auto' default to 'gpu'
-    bool forceGpuUpdateDefault = false;
-    //! True if the GPU halo exchange development feature is enabled
-    bool enableGpuHaloExchange = false;
-    //! True if the PME PP direct communication GPU development feature is enabled
-    bool enableGpuPmePPComm = false;
-};
 
 /*! \brief Manage any development feature flag variables encountered
  *
@@ -212,7 +192,7 @@ static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger& md
 #pragma GCC diagnostic ignored "-Wunused-result"
     devFlags.enableGpuBufferOps = (getenv("GMX_USE_GPU_BUFFER_OPS") != nullptr)
                                   && (GMX_GPU == GMX_GPU_CUDA) && useGpuForNonbonded;
-    devFlags.forceGpuUpdateDefault = (getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") != nullptr);
+    devFlags.forceGpuUpdateDefault = (getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") != nullptr) || GMX_FAHCORE;
     devFlags.enableGpuHaloExchange =
             (getenv("GMX_GPU_DD_COMMS") != nullptr && GMX_THREAD_MPI && (GMX_GPU == GMX_GPU_CUDA));
     devFlags.enableGpuPmePPComm =
@@ -729,12 +709,11 @@ int Mdrunner::mdrunner()
         userGpuTaskAssignment = parseUserTaskAssignmentString(hw_opt.userGpuTaskAssignment);
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
-    auto       nonbondedTarget = findTaskTarget(nbpu_opt);
-    auto       pmeTarget       = findTaskTarget(pme_opt);
-    auto       pmeFftTarget    = findTaskTarget(pme_fft_opt);
-    auto       bondedTarget    = findTaskTarget(bonded_opt);
-    auto       updateTarget    = findTaskTarget(update_opt);
-    PmeRunMode pmeRunMode      = PmeRunMode::None;
+    auto nonbondedTarget = findTaskTarget(nbpu_opt);
+    auto pmeTarget       = findTaskTarget(pme_opt);
+    auto pmeFftTarget    = findTaskTarget(pme_fft_opt);
+    auto bondedTarget    = findTaskTarget(bonded_opt);
+    auto updateTarget    = findTaskTarget(update_opt);
 
     FILE* fplog = nullptr;
     // If we are appending, we don't write log output because we need
@@ -884,28 +863,20 @@ int Mdrunner::mdrunner()
                 useGpuForNonbonded, useGpuForPme, bondedTarget, canUseGpuForBonded,
                 EVDW_PME(inputrec->vdwtype), EEL_PME_EWALD(inputrec->coulombtype),
                 domdecOptions.numPmeRanks, gpusWereDetected);
-
-        pmeRunMode = (useGpuForPme ? PmeRunMode::GPU : PmeRunMode::CPU);
-        if (pmeRunMode == PmeRunMode::GPU)
-        {
-            if (pmeFftTarget == TaskTarget::Cpu)
-            {
-                pmeRunMode = PmeRunMode::Mixed;
-            }
-        }
-        else if (pmeFftTarget == TaskTarget::Gpu)
-        {
-            gmx_fatal(FARGS,
-                      "Assigning FFTs to GPU requires PME to be assigned to GPU as well. With PME "
-                      "on CPU you should not be using -pmefft.");
-        }
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
+
+    const PmeRunMode pmeRunMode = determinePmeRunMode(useGpuForPme, pmeFftTarget, *inputrec);
 
     // Initialize development feature flags that enabled by environment variable
     // and report those features that are enabled.
     const DevelopmentFeatureFlags devFlags =
             manageDevelopmentFeatures(mdlog, useGpuForNonbonded, pmeRunMode);
+
+    const bool inputIsCompatibleWithModularSimulator = ModularSimulator::isInputCompatible(
+            false, inputrec, doRerun, mtop, ms, replExParams, nullptr, doEssentialDynamics, doMembed);
+    const bool useModularSimulator = inputIsCompatibleWithModularSimulator
+                                     && !(getenv("GMX_DISABLE_MODULAR_SIMULATOR") != nullptr);
 
     // Build restraints.
     // TODO: hide restraint implementation details from Mdrunner.
@@ -953,7 +924,7 @@ int Mdrunner::mdrunner()
         }
 
         /* now make sure the state is initialized and propagated */
-        set_state_entries(globalState.get(), inputrec);
+        set_state_entries(globalState.get(), inputrec, useModularSimulator);
     }
 
     /* NM and TPI parallelize over force/energy calculations, not atoms,
@@ -1029,13 +1000,6 @@ int Mdrunner::mdrunner()
         }
     }
 
-#if GMX_FAHCORE
-    if (MASTER(cr))
-    {
-        fcRegisterSteps(inputrec->nsteps, inputrec->init_step);
-    }
-#endif
-
     /* NMR restraints must be initialized before load_checkpoint,
      * since with time averaging the history is added to t_state.
      * For proper consistency check we therefore need to extend
@@ -1051,6 +1015,21 @@ int Mdrunner::mdrunner()
     init_orires(fplog, &mtop, inputrec, cr, ms, globalState.get(), &(fcd->orires));
 
     auto deform = prepareBoxDeformation(globalState->box, cr, *inputrec);
+
+#if GMX_FAHCORE
+    /* We have to remember the generation's first step before reading checkpoint.
+       This way, we can report to the F@H core both the generation's first step
+       and the restored first step, thus making it able to distinguish between
+       an interruption/resume and start of the n-th generation simulation.
+       Having this information, the F@H core can correctly calculate and report
+       the progress.
+     */
+    int gen_first_step = 0;
+    if (MASTER(cr))
+    {
+        gen_first_step = inputrec->init_step;
+    }
+#endif
 
     ObservablesHistory observablesHistory = {};
 
@@ -1081,6 +1060,13 @@ int Mdrunner::mdrunner()
             mdlog    = logOwner.logger();
         }
     }
+
+#if GMX_FAHCORE
+    if (MASTER(cr))
+    {
+        fcRegisterSteps(inputrec->nsteps + inputrec->init_step, gen_first_step);
+    }
+#endif
 
     if (mdrunOptions.numStepsCommandline > -2)
     {
@@ -1143,9 +1129,9 @@ int Mdrunner::mdrunner()
     // Produce the task assignment for this rank.
     GpuTaskAssignmentsBuilder gpuTaskAssignmentsBuilder;
     GpuTaskAssignments        gpuTaskAssignments = gpuTaskAssignmentsBuilder.build(
-            gpuIdsToUse, userGpuTaskAssignment, *hwinfo, cr, ms, physicalNodeComm, nonbondedTarget,
-            pmeTarget, bondedTarget, updateTarget, useGpuForNonbonded, useGpuForPme,
-            thisRankHasDuty(cr, DUTY_PP),
+            gpuIdsToUse, userGpuTaskAssignment, *hwinfo, communicator, physicalNodeComm,
+            nonbondedTarget, pmeTarget, bondedTarget, updateTarget, useGpuForNonbonded,
+            useGpuForPme, thisRankHasDuty(cr, DUTY_PP),
             // TODO cr->duty & DUTY_PME should imply that a PME
             // algorithm is active, but currently does not.
             EEL_PME(inputrec->coulombtype) && thisRankHasDuty(cr, DUTY_PME));
@@ -1181,10 +1167,10 @@ int Mdrunner::mdrunner()
         const bool useUpdateGroups = cr->dd ? ddUsesUpdateGroups(*cr->dd) : false;
 
         useGpuForUpdate = decideWhetherToUseGpuForUpdate(
-                devFlags.forceGpuUpdateDefault, useDomainDecomposition, useUpdateGroups, pmeRunMode,
-                domdecOptions.numPmeRanks > 0, useGpuForNonbonded, updateTarget, gpusWereDetected,
-                *inputrec, mtop, doEssentialDynamics, gmx_mtop_ftype_count(mtop, F_ORIRES) > 0,
-                replExParams.exchangeInterval > 0, doRerun, mdlog);
+                useDomainDecomposition, useUpdateGroups, pmeRunMode, domdecOptions.numPmeRanks > 0,
+                useGpuForNonbonded, updateTarget, gpusWereDetected, *inputrec, mtop,
+                doEssentialDynamics, gmx_mtop_ftype_count(mtop, F_ORIRES) > 0,
+                replExParams.exchangeInterval > 0, doRerun, devFlags, mdlog);
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
 
@@ -1554,13 +1540,6 @@ int Mdrunner::mdrunner()
             dd_init_bondeds(fplog, cr->dd, &mtop, vsite.get(), inputrec,
                             domdecOptions.checkBondedInteractions, fr->cginfo_mb);
         }
-
-        const bool inputIsCompatibleWithModularSimulator = ModularSimulator::isInputCompatible(
-                false, inputrec, doRerun, vsite.get(), ms, replExParams, fcd,
-                static_cast<int>(filenames.size()), filenames.data(), &observablesHistory, membed);
-
-        const bool useModularSimulator = inputIsCompatibleWithModularSimulator
-                                         && !(getenv("GMX_DISABLE_MODULAR_SIMULATOR") != nullptr);
 
         // TODO This is not the right place to manage the lifetime of
         // this data structure, but currently it's the easiest way to

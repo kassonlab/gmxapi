@@ -1,7 +1,8 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2011,2012,2013,2014,2015,2016,2017,2018,2019, by the GROMACS development team, led by
+# Copyright (c) 2011,2012,2013,2014,2015, The GROMACS development team.
+# Copyright (c) 2016,2017,2018,2019,2020, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -73,7 +74,7 @@ target_link_libraries(testutils PRIVATE libgromacs ${GMX_COMMON_LIBRARIES} gmock
 
 if(HAVE_TINYXML2)
     include_directories(SYSTEM ${TinyXML2_INCLUDE_DIR})
-    target_link_libraries(testutils ${TinyXML2_LIBRARIES})
+    target_link_libraries(testutils PRIVATE ${TinyXML2_LIBRARIES})
 else()
     include_directories(BEFORE SYSTEM "../external/tinyxml2")
 endif()
