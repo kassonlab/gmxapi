@@ -146,10 +146,19 @@ if gmxapi_DIR != os.path.commonpath([gmxapi_DIR, gmx_toolchain]):
     ))
 
 cmake_platform_hints = '-DCMAKE_TOOLCHAIN_FILE={}'.format(gmx_toolchain)
-# Note that <package>_ROOT is not standard until CMake 3.12
-# Reference https://cmake.org/cmake/help/latest/policy/CMP0074.html#policy:CMP0074
 cmake_gmxapi_hint = '-Dgmxapi_ROOT={}'.format(gmxapi_DIR)
 cmake_args = [cmake_platform_hints, cmake_gmxapi_hint]
+
+# Requirements for using the installed package.
+# (Setup requirements are in pyproject.toml)
+install_requires = [
+    'networkx>=2.0',
+    'numpy>=1']
+# TODO: `importlib_resources` is not required when our minimum Python is 3.7+
+try:
+    import importlib.resources
+except ImportError:
+    install_requires.append('importlib_resources')
 
 setup(
     name='gmxapi',
@@ -157,8 +166,7 @@ setup(
     # TODO: single-source version information (currently repeated in gmxapi/version.py)
     version='0.2.0a3',
     python_requires='>=3.6',
-    install_requires=['networkx>=2.0',
-                      'numpy>=1'],
+    install_requires=install_requires,
 
     packages=['gmxapi', 'gmxapi.simulation'],
     package_data={'gmxapi': ['gmxconfig.json']},
