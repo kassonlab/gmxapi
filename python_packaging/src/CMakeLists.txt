@@ -67,10 +67,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 cmake_policy(SET CMP0054 NEW)
 # honor the language standard settings for try_compile()
 cmake_policy(SET CMP0067 NEW)
-if(POLICY CMP0074) #3.12
-    # Allow gmxapi_ROOT hint.
-    cmake_policy(SET CMP0074 NEW)
-endif()
+# Allow gmxapi_ROOT hint.
+cmake_policy(SET CMP0074 NEW)
 
 if(GMXAPI_MASTER_PROJECT)
     find_package(gmxapi 0.0.8 REQUIRED
