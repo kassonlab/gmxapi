@@ -53,7 +53,7 @@ set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING
     "OS X should build Python package for 64-bit architecture"
     FORCE)
 
-project(gmxapi VERSION 0.1.0)
+project(gmxapi VERSION 0.2.0)
 
 # Check if Python package is being built directly or via add_subdirectory
 set(GMXAPI_MASTER_PROJECT OFF)
@@ -72,7 +72,7 @@ cmake_policy(SET CMP0067 NEW)
 cmake_policy(SET CMP0074 NEW)
 
 if(GMXAPI_MASTER_PROJECT)
-    find_package(gmxapi 0.0.8 REQUIRED
+    find_package(gmxapi 0.1.0 REQUIRED
                  HINTS "$ENV{GROMACS_DIR}"
                  )
 endif()
@@ -146,7 +146,7 @@ set_target_properties(_gmxapi PROPERTIES
                       LIBRARY_OUTPUT_DIRECTORY ${GMXAPI_PYTHON_STAGING_DIR}/gmxapi)
 
 if(GMXAPI_MASTER_PROJECT)
-    find_package(GROMACS 2021 REQUIRED
+    find_package(GROMACS 2020 REQUIRED
                  HINTS "$ENV{GROMACS_DIR}"
                  )
 endif()
