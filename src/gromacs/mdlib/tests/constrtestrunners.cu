@@ -52,7 +52,7 @@
 #include <vector>
 
 #include "gromacs/gpu_utils/devicebuffer.cuh"
-#include "gromacs/gpu_utils/gpu_utils.h"
+#include "gromacs/hardware/device_information.h"
 #include "gromacs/mdlib/lincs_gpu.cuh"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/utility/unique_cptr.h"
@@ -81,7 +81,7 @@ void applyLincsGpu(ConstraintsTestData* testData, t_pbc pbc)
     int     numAtoms         = testData->numAtoms_;
     float3 *d_x, *d_xp, *d_v;
 
-    lincsGpu->set(*testData->idef_, testData->md_);
+    lincsGpu->set(*testData->idef_, testData->numAtoms_, testData->invmass_.data());
     PbcAiuc pbcAiuc;
     setPbcAiuc(pbc.ndim_ePBC, pbc.box, &pbcAiuc);
 

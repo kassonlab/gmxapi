@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -44,9 +44,14 @@
 #include <vector>
 
 #include "gromacs/math/vec.h"
+#include "gromacs/mdspan/extensions.h"
+#include "gromacs/utility/arrayref.h"
+
+#include "matrix.h"
 
 namespace gmx
 {
+
 /********************************************************************
  * ScaleCoordinates::Impl
  */
@@ -99,9 +104,19 @@ void ScaleCoordinates::operator()(ArrayRef<RVec> coordinates) const
     impl_->scale(coordinates);
 }
 
+void ScaleCoordinates::operator()(RVec* coordinate) const
+{
+    impl_->scale({ coordinate, coordinate + 1 });
+}
+
 void ScaleCoordinates::inverseIgnoringZeroScale(ArrayRef<RVec> coordinates) const
 {
     impl_->inverseIgnoringZeroScale(coordinates);
+}
+
+void ScaleCoordinates::inverseIgnoringZeroScale(RVec* coordinate) const
+{
+    impl_->inverseIgnoringZeroScale({ coordinate, coordinate + 1 });
 }
 
 ScaleCoordinates::~ScaleCoordinates() = default;
@@ -163,6 +178,11 @@ void TranslateAndScale::operator()(ArrayRef<RVec> coordinates) const
     impl_->transform(coordinates);
 }
 
+void TranslateAndScale::operator()(RVec* coordinate) const
+{
+    impl_->transform({ coordinate, coordinate + 1 });
+}
+
 ScaleCoordinates TranslateAndScale::scaleOperationOnly() const
 {
     return ScaleCoordinates{ impl_->scale_ };
@@ -184,5 +204,28 @@ TranslateAndScale::TranslateAndScale(TranslateAndScale&&) noexcept = default;
 
 TranslateAndScale& TranslateAndScale::operator=(TranslateAndScale&&) noexcept = default;
 
+/********************************************************************
+ * AffineTransformation
+ */
+
+AffineTransformation::AffineTransformation(Matrix3x3ConstSpan matrix, const RVec& translation) :
+    translation_{ translation }
+{
+    std::copy(begin(matrix), end(matrix), begin(matrix_));
+}
+
+void AffineTransformation::operator()(ArrayRef<RVec> vectors) const
+{
+    for (RVec& vector : vectors)
+    {
+        matrixVectorMultiply(matrix_.asConstView(), &vector);
+        vector += translation_;
+    }
+}
+
+void AffineTransformation::operator()(RVec* vector) const
+{
+    (*this)({ vector, vector + 1 });
+}
 
 } // namespace gmx

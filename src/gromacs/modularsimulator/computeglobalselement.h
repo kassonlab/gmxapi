@@ -32,11 +32,13 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \libinternal \file
+/*! \internal \file
  * \brief Declares the global reduction element for the modular simulator
  *
  * \author Pascal Merz <pascal.merz@me.com>
  * \ingroup module_modularsimulator
+ *
+ * This header is only used within the modular simulator module
  */
 
 #ifndef GMX_MODULARSIMULATOR_COMPUTEGLOBALSELEMENT_H
@@ -45,7 +47,7 @@
 #include "gromacs/mdlib/simulationsignal.h"
 #include "gromacs/mdlib/vcm.h"
 
-#include "energyelement.h"
+#include "energydata.h"
 #include "modularsimulatorinterfaces.h"
 #include "statepropagatordata.h"
 #include "topologyholder.h"
@@ -56,7 +58,8 @@ struct t_nrnb;
 
 namespace gmx
 {
-class FreeEnergyPerturbationElement;
+class FreeEnergyPerturbationData;
+class LegacySimulatorData;
 class MDAtoms;
 class MDLogger;
 
@@ -72,10 +75,8 @@ enum class ComputeGlobalsAlgorithm
 
 //! The function type allowing to request a check of the number of bonded interactions
 typedef std::function<void()> CheckBondedInteractionsCallback;
-//! Pointer to the function type allowing to request a check of the number of bonded interactions
-typedef std::unique_ptr<CheckBondedInteractionsCallback> CheckBondedInteractionsCallbackPtr;
 
-/*! \libinternal
+/*! \internal
  * \brief Encapsulate the calls to `compute_globals`
  *
  * This element aims at offering an interface to the legacy
@@ -93,7 +94,7 @@ typedef std::unique_ptr<CheckBondedInteractionsCallback> CheckBondedInteractions
  * constraint virial after the second propagation of velocities (+dt/2) and of
  * the positions (+dt).
  *
- * @tparam algorithm  The global reduction scheme
+ * \tparam algorithm  The global reduction scheme
  */
 template<ComputeGlobalsAlgorithm algorithm>
 class ComputeGlobalsElement final :
@@ -104,22 +105,21 @@ class ComputeGlobalsElement final :
 {
 public:
     //! Constructor
-    ComputeGlobalsElement(StatePropagatorData*           statePropagatorData,
-                          EnergyElement*                 energyElement,
-                          FreeEnergyPerturbationElement* freeEnergyPerturbationElement,
-                          SimulationSignals*             signals,
-                          int                            nstglobalcomm,
-                          FILE*                          fplog,
-                          const MDLogger&                mdlog,
-                          t_commrec*                     cr,
-                          const t_inputrec*              inputrec,
-                          const MDAtoms*                 mdAtoms,
-                          t_nrnb*                        nrnb,
-                          gmx_wallcycle*                 wcycle,
-                          t_forcerec*                    fr,
-                          const gmx_mtop_t*              global_top,
-                          Constraints*                   constr,
-                          bool                           hasReadEkinState);
+    ComputeGlobalsElement(StatePropagatorData*        statePropagatorData,
+                          EnergyData*                 energyData,
+                          FreeEnergyPerturbationData* freeEnergyPerturbationData,
+                          SimulationSignals*          signals,
+                          int                         nstglobalcomm,
+                          FILE*                       fplog,
+                          const MDLogger&             mdlog,
+                          t_commrec*                  cr,
+                          const t_inputrec*           inputrec,
+                          const MDAtoms*              mdAtoms,
+                          t_nrnb*                     nrnb,
+                          gmx_wallcycle*              wcycle,
+                          t_forcerec*                 fr,
+                          const gmx_mtop_t*           global_top,
+                          Constraints*                constr);
 
     //! Destructor
     ~ComputeGlobalsElement() override;
@@ -133,25 +133,43 @@ public:
      *
      * This registers the call to compute_globals when needed.
      *
-     * @param step                 The step number
-     * @param time                 The time
-     * @param registerRunFunction  Function allowing to register a run function
+     * \param step                 The step number
+     * \param time                 The time
+     * \param registerRunFunction  Function allowing to register a run function
      */
-    void scheduleTask(Step step, Time time, const RegisterRunFunctionPtr& registerRunFunction) override;
+    void scheduleTask(Step step, Time time, const RegisterRunFunction& registerRunFunction) override;
 
     //! Get callback to request checking of bonded interactions
-    CheckBondedInteractionsCallbackPtr getCheckNumberOfBondedInteractionsCallback();
+    CheckBondedInteractionsCallback getCheckNumberOfBondedInteractionsCallback();
 
     //! No element teardown needed
     void elementTeardown() override {}
+
+    /*! \brief Factory method implementation
+     *
+     * \param legacySimulatorData  Pointer allowing access to simulator level data
+     * \param builderHelper  ModularSimulatorAlgorithmBuilder helper object
+     * \param statePropagatorData  Pointer to the \c StatePropagatorData object
+     * \param energyData  Pointer to the \c EnergyData object
+     * \param freeEnergyPerturbationData  Pointer to the \c FreeEnergyPerturbationData object
+     * \param globalCommunicationHelper  Pointer to the \c GlobalCommunicationHelper object
+     *
+     * \return  Pointer to the element to be added. Element needs to have been stored using \c storeElement
+     */
+    static ISimulatorElement* getElementPointerImpl(LegacySimulatorData* legacySimulatorData,
+                                                    ModularSimulatorAlgorithmBuilderHelper* builderHelper,
+                                                    StatePropagatorData*        statePropagatorData,
+                                                    EnergyData*                 energyData,
+                                                    FreeEnergyPerturbationData* freeEnergyPerturbationData,
+                                                    GlobalCommunicationHelper* globalCommunicationHelper);
 
 private:
     //! ITopologyClient implementation
     void setTopology(const gmx_localtop_t* top) override;
     //! IEnergySignallerClient implementation
-    SignallerCallbackPtr registerEnergyCallback(EnergySignallerEvent event) override;
+    std::optional<SignallerCallback> registerEnergyCallback(EnergySignallerEvent event) override;
     //! ITrajectorySignallerClient implementation
-    SignallerCallbackPtr registerTrajectorySignallerCallback(TrajectoryEvent event) override;
+    std::optional<SignallerCallback> registerTrajectorySignallerCallback(TrajectoryEvent event) override;
     //! The compute_globals call
     void compute(Step step, unsigned int flags, SimulationSignaller* signaller, bool useLastBox, bool isInit = false);
 
@@ -175,8 +193,6 @@ private:
     const Step initStep_;
     //! A dummy signaller (used for setup and VV)
     std::unique_ptr<SimulationSignaller> nullSignaller_;
-    //! Whether we read kinetic energy from checkpoint
-    const bool hasReadEkinState_;
 
     /*! \brief Check that DD doesn't miss bonded interactions
      *
@@ -187,10 +203,10 @@ private:
      * after a new DD is made. These variables handle whether the
      * check happens, and the result it returns.
      */
-    //! @{
+    //! \{
     int  totalNumberOfBondedInteractions_;
     bool shouldCheckNumberOfBondedInteractions_;
-    //! @}
+    //! \}
 
     /*! \brief Signal to ComputeGlobalsElement that it should check for DD errors
      *
@@ -208,14 +224,15 @@ private:
     //! Global reduction struct
     gmx_global_stat* gstat_;
 
+    // TODO: Clarify relationship to data objects and find a more robust alternative to raw pointers (#3583)
     //! Pointer to the microstate
     StatePropagatorData* statePropagatorData_;
-    //! Pointer to the energy element (needed for the tensors and mu_tot)
-    EnergyElement* energyElement_;
+    //! Pointer to the energy data (needed for the tensors and mu_tot)
+    EnergyData* energyData_;
     //! Pointer to the local topology (only needed for checkNumberOfBondedInteractions)
     const gmx_localtop_t* localTopology_;
-    //! Pointer to the free energy perturbation element
-    FreeEnergyPerturbationElement* freeEnergyPerturbationElement_;
+    //! Pointer to the free energy perturbation data
+    FreeEnergyPerturbationData* freeEnergyPerturbationData_;
 
     //! Center of mass motion removal
     t_vcm vcm_;

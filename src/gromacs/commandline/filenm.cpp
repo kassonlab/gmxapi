@@ -43,8 +43,10 @@
 #include <cstdio>
 #include <cstring>
 
-#include "gromacs/compat/string_view.h"
+#include <string_view>
+
 #include "gromacs/fileio/filetypes.h"
+#include "gromacs/utility/arrayref.h"
 #include "gromacs/utility/basedefinitions.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/gmxassert.h"
@@ -247,7 +249,7 @@ namespace
 
 /*! \brief Return the first position within \c filename of the ".partNNNN"
  * interior sequence produced by mdrun -noappend, or npos if not found. */
-size_t findSuffixFromNoAppendPosition(const gmx::compat::string_view filename)
+size_t findSuffixFromNoAppendPosition(const std::string_view filename)
 {
     size_t partPosition = filename.find(".part");
     if ((partPosition != decltype(filename)::npos) && (filename.length() - partPosition >= 10)
@@ -262,7 +264,7 @@ size_t findSuffixFromNoAppendPosition(const gmx::compat::string_view filename)
 
 } // namespace
 
-bool hasSuffixFromNoAppend(const gmx::compat::string_view filename)
+bool hasSuffixFromNoAppend(const std::string_view filename)
 {
     return (findSuffixFromNoAppendPosition(filename) != decltype(filename)::npos);
 }

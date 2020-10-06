@@ -45,7 +45,8 @@
 
 #include "bench_setup.h"
 
-#include "gromacs/compat/optional.h"
+#include <optional>
+
 #include "gromacs/gmxlib/nrnb.h"
 #include "gromacs/mdlib/dispersioncorrection.h"
 #include "gromacs/mdlib/force_flags.h"
@@ -80,7 +81,7 @@ namespace Nbnxm
  *
  * Returns an error string when the kernel is not available.
  */
-static gmx::compat::optional<std::string> checkKernelSetup(const KernelBenchOptions& options)
+static std::optional<std::string> checkKernelSetup(const KernelBenchOptions& options)
 {
     GMX_RELEASE_ASSERT(options.nbnxmSimd < BenchMarkKernels::Count
                                && options.nbnxmSimd != BenchMarkKernels::SimdAuto,
@@ -159,7 +160,7 @@ static interaction_const_t setupInteractionConst(const KernelBenchOptions& optio
         GMX_RELEASE_ASSERT(options.ewaldcoeff_q > 0, "Ewald coefficient should be > 0");
         ic.ewaldcoeff_q       = options.ewaldcoeff_q;
         ic.coulombEwaldTables = std::make_unique<EwaldCorrectionTables>();
-        init_interaction_const_tables(nullptr, &ic);
+        init_interaction_const_tables(nullptr, &ic, 0);
     }
 
     return ic;
@@ -226,11 +227,7 @@ static std::unique_ptr<nonbonded_verlet_t> setupNbnxmForBenchInstance(const Kern
 
     nbv->constructPairlist(gmx::InteractionLocality::Local, system.excls, 0, &nrnb);
 
-    t_mdatoms mdatoms;
-    // We only use (read) the atom type and charge from mdatoms
-    mdatoms.typeA   = const_cast<int*>(system.atomTypes.data());
-    mdatoms.chargeA = const_cast<real*>(system.charges.data());
-    nbv->setAtomProperties(mdatoms, atomInfo);
+    nbv->setAtomProperties(system.atomTypes, system.charges, atomInfo);
 
     return nbv;
 }
@@ -378,10 +375,6 @@ void bench(const int sizeFactor, const KernelBenchOptions& options)
                 gmx::EnumerationWrapper<BenchMarkCombRule> combRuleIter;
                 for (auto combRule : combRuleIter)
                 {
-                    if (combRule == BenchMarkCombRule::RuleNone)
-                    {
-                        continue;
-                    }
                     opt.ljCombinationRule = combRule;
 
                     expandSimdOptionAndPushBack(opt, &optionsList);

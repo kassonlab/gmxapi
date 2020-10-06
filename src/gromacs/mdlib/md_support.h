@@ -39,18 +39,17 @@
 #define GMX_MDLIB_MD_SUPPORT_H
 
 #include "gromacs/mdlib/vcm.h"
+#include "gromacs/mdtypes/md_enums.h"
 #include "gromacs/timing/wallcycle.h"
 
 struct gmx_ekindata_t;
 struct gmx_enerdata_t;
 struct gmx_global_stat;
-struct gmx_multisim_t;
 struct gmx_signalling_t;
 struct t_extmass;
 struct t_forcerec;
 struct t_grpopts;
 struct t_inputrec;
-struct t_lambda;
 struct t_nrnb;
 class t_state;
 struct t_trxframe;
@@ -97,33 +96,10 @@ class SimulationSignaller;
  * inputrec. */
 int computeGlobalCommunicationPeriod(const gmx::MDLogger& mdlog, t_inputrec* ir, const t_commrec* cr);
 
-/*! \brief Return true if the \p value is equal across the set of multi-simulations
- *
- * \todo This duplicates some of check_multi_int. Consolidate. */
-bool multisim_int_all_are_equal(const gmx_multisim_t* ms, int64_t value);
-
 void rerun_parallel_comm(t_commrec* cr, t_trxframe* fr, gmx_bool* bLastStep);
 
 //! \brief Allocate and initialize node-local state entries
 void set_state_entries(t_state* state, const t_inputrec* ir, bool useModularSimulator);
-
-/* Set the lambda values in the global state from a frame read with rerun */
-void setCurrentLambdasRerun(int64_t           step,
-                            const t_lambda*   fepvals,
-                            const t_trxframe* rerun_fr,
-                            const double*     lam0,
-                            t_state*          globalState);
-
-/* Set the lambda values at each step of mdrun when they change */
-void setCurrentLambdasLocal(int64_t             step,
-                            const t_lambda*     fepvals,
-                            const double*       lam0,
-                            gmx::ArrayRef<real> lambda,
-                            int                 currentFEPState);
-
-int multisim_min(const gmx_multisim_t* ms, int nmin, int n);
-/* Set an appropriate value for n across the whole multi-simulation */
-
 
 /* Compute global variables during integration
  *
@@ -139,7 +115,6 @@ void compute_globals(gmx_global_stat*               gstat,
                      gmx::ArrayRef<const gmx::RVec> x,
                      gmx::ArrayRef<const gmx::RVec> v,
                      const matrix                   box,
-                     real                           vdwLambda,
                      const t_mdatoms*               mdatoms,
                      t_nrnb*                        nrnb,
                      t_vcm*                         vcm,

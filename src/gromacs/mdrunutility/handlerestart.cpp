@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2015,2016,2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2015,2016,2017,2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -53,6 +53,7 @@
 
 #include "config.h"
 
+#include <cerrno>
 #include <cstring>
 
 #include <fcntl.h>
@@ -64,10 +65,10 @@
 #include <algorithm>
 #include <exception>
 #include <functional>
+#include <optional>
 #include <tuple>
 
 #include "gromacs/commandline/filenm.h"
-#include "gromacs/compat/optional.h"
 #include "gromacs/fileio/checkpoint.h"
 #include "gromacs/fileio/gmxfio.h"
 #include "gromacs/mdrunutility/multisim.h"
@@ -191,14 +192,14 @@ public:
      *                                (relevant only when restarting)
      *
      * Does not throw */
-    compat::optional<int> makeIndexOfNextPart(AppendingBehavior appendingBehavior) const;
+    std::optional<int> makeIndexOfNextPart(AppendingBehavior appendingBehavior) const;
 
     //! Describes how mdrun will (re)start
     StartingBehavior startingBehavior = StartingBehavior::NewSimulation;
     //! When restarting from a checkpoint, contains the contents of its header
-    compat::optional<CheckpointHeaderContents> headerContents;
+    std::optional<CheckpointHeaderContents> headerContents;
     //! When restarting from a checkpoint, contains the names of expected output files
-    compat::optional<std::vector<gmx_file_position_t>> outputFiles;
+    std::optional<std::vector<gmx_file_position_t>> outputFiles;
 };
 
 /*! \brief Choose the starting behaviour for this simulation
@@ -532,7 +533,7 @@ checkpoint file was written).
 To help you identify which directories need attention, the %d
 simulations wanted the following respective behaviors:
 )",
-                                           ms->nsim);
+                                           ms->numSimulations_);
         for (index simIndex = 0; simIndex != ssize(startingBehaviors); ++simIndex)
         {
             auto behavior = static_cast<StartingBehavior>(startingBehaviors[simIndex]);
@@ -572,7 +573,7 @@ To help you identify which directories need attention, the %d
 simulation checkpoint files were from the following respective
 simulation parts:
 )",
-                                           ms->nsim);
+                                           ms->numSimulations_);
         for (index partIndex = 0; partIndex != ssize(simulationParts); ++partIndex)
         {
             message += formatString("  Simulation %6zd: %d\n", partIndex, simulationParts[partIndex]);
@@ -581,9 +582,9 @@ simulation parts:
     }
 }
 
-compat::optional<int> StartingBehaviorHandler::makeIndexOfNextPart(const AppendingBehavior appendingBehavior) const
+std::optional<int> StartingBehaviorHandler::makeIndexOfNextPart(const AppendingBehavior appendingBehavior) const
 {
-    compat::optional<int> indexOfNextPart;
+    std::optional<int> indexOfNextPart;
 
     if (startingBehavior == StartingBehavior::RestartWithoutAppending)
     {
@@ -627,7 +628,7 @@ std::tuple<StartingBehavior, LogFilePtr> handleRestart(const bool              i
             handler.ensureMultiSimBehaviorsMatch(ms);
 
             // When not appending, prepare a suffix for the part number
-            compat::optional<int> indexOfNextPart = handler.makeIndexOfNextPart(appendingBehavior);
+            std::optional<int> indexOfNextPart = handler.makeIndexOfNextPart(appendingBehavior);
 
             // If a part suffix is used, change the file names accordingly.
             if (indexOfNextPart)

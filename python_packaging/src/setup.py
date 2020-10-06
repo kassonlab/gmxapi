@@ -155,12 +155,13 @@ setup(
     name='gmxapi',
 
     # TODO: single-source version information (currently repeated in gmxapi/version.py)
-    version='0.2.0a2',
-    python_requires='>=3.6, <3.9',
+    version='0.2.0a3',
+    python_requires='>=3.6',
     install_requires=['networkx>=2.0',
                       'numpy>=1'],
 
     packages=['gmxapi', 'gmxapi.simulation'],
+    package_data={'gmxapi': ['gmxconfig.json']},
 
     cmake_args=cmake_args,
 

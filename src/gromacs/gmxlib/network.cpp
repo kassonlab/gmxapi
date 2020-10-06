@@ -47,7 +47,6 @@
 #include <cstring>
 
 #include "gromacs/commandline/filenm.h"
-#include "gromacs/mdrunutility/multisim.h"
 #include "gromacs/mdtypes/commrec.h"
 #include "gromacs/utility/basenetwork.h"
 #include "gromacs/utility/cstringutil.h"
@@ -55,14 +54,13 @@
 #include "gromacs/utility/futil.h"
 #include "gromacs/utility/gmxassert.h"
 #include "gromacs/utility/gmxmpi.h"
-#include "gromacs/utility/mpiinplacebuffers.h"
 #include "gromacs/utility/real.h"
 #include "gromacs/utility/smalloc.h"
 
 /* The source code in this file should be thread-safe.
       Please keep it that way. */
 
-CommrecHandle init_commrec(MPI_Comm communicator, const gmx_multisim_t* ms)
+CommrecHandle init_commrec(MPI_Comm communicator)
 {
     CommrecHandle handle;
     t_commrec*    cr;
@@ -83,40 +81,20 @@ CommrecHandle init_commrec(MPI_Comm communicator, const gmx_multisim_t* ms)
     sizeOfCommunicator = 1;
 #endif
 
-    if (ms != nullptr)
-    {
-#if GMX_MPI
-        cr->nnodes = sizeOfCommunicator / ms->nsim;
-        MPI_Comm_split(communicator, ms->sim, rankInCommunicator, &cr->mpi_comm_mysim);
-        cr->mpi_comm_mygroup = cr->mpi_comm_mysim;
-        MPI_Comm_rank(cr->mpi_comm_mysim, &cr->sim_nodeid);
-        MPI_Comm_rank(cr->mpi_comm_mygroup, &cr->nodeid);
-#endif
-    }
-    else
-    {
-        cr->nnodes           = sizeOfCommunicator;
-        cr->nodeid           = rankInCommunicator;
-        cr->sim_nodeid       = cr->nodeid;
-        cr->mpi_comm_mysim   = communicator;
-        cr->mpi_comm_mygroup = communicator;
-    }
+    cr->mpiDefaultCommunicator    = communicator;
+    cr->sizeOfDefaultCommunicator = sizeOfCommunicator;
+    cr->rankInDefaultCommunicator = rankInCommunicator;
+
+    // For now, we want things to go horribly wrong if this is used too early...
+    // TODO: Remove when communicators are removed from commrec (#2395)
+    cr->nnodes           = -1;
+    cr->nodeid           = -1;
+    cr->sim_nodeid       = -1;
+    cr->mpi_comm_mysim   = MPI_COMM_NULL;
+    cr->mpi_comm_mygroup = MPI_COMM_NULL;
 
     // TODO cr->duty should not be initialized here
     cr->duty = (DUTY_PP | DUTY_PME);
-
-#if GMX_MPI && !MPI_IN_PLACE_EXISTS
-    /* initialize the MPI_IN_PLACE replacement buffers */
-    snew(cr->mpb, 1);
-    cr->mpb->ibuf        = nullptr;
-    cr->mpb->libuf       = nullptr;
-    cr->mpb->fbuf        = nullptr;
-    cr->mpb->dbuf        = nullptr;
-    cr->mpb->ibuf_alloc  = 0;
-    cr->mpb->libuf_alloc = 0;
-    cr->mpb->fbuf_alloc  = 0;
-    cr->mpb->dbuf_alloc  = 0;
-#endif
 
     return handle;
 }
@@ -130,7 +108,6 @@ void done_commrec(t_commrec* cr)
             // TODO: implement
             // done_domdec(cr->dd);
         }
-        done_mpi_in_place_buf(cr->mpb);
     }
 #if GMX_MPI
     // TODO We need to be able to free communicators, but the

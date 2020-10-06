@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2017,2018,2019, by the GROMACS development team, led by
+ * Copyright (c) 2017,2018,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -55,7 +55,7 @@ class SimdReference
 {
 private:
     using non_const_T = std::remove_const_t<T>;
-    using pointer     = typename SimdTraits<T>::type*;
+    using pointer     = SimdTraitsT<T>*;
 
 public:
     //! \brief Constructor
@@ -92,73 +92,30 @@ private:
 };
 
 template<typename T>
-class SimdIterator
+class SimdIterator :
+    public boost::stl_interfaces::iterator_interface<SimdIterator<T>, std::random_access_iterator_tag, T, SimdReference<T>>
 {
-public:
-    //! Type for representing size of the container.
-    using size_type = size_t;
-    //! Type for representing difference between two container indices.
-    using difference_type = std::ptrdiff_t;
-    //! Type of values stored in the container.
-    using value_type = T;
-    //! Pointer to a container element.
-    using pointer = typename SimdTraits<T>::type*;
-    //! Reference to a container element.
-    using reference = internal::SimdReference<T>;
+    using Base =
+            boost::stl_interfaces::iterator_interface<SimdIterator<T>, std::random_access_iterator_tag, T, SimdReference<T>>;
+    // pointer is T*
+    using DataPointer = SimdTraitsT<T>*;
 
-    explicit SimdIterator(pointer p = 0) : p_(p)
+public:
+    explicit SimdIterator(DataPointer p = 0) : p_(p)
     {
-        GMX_ASSERT((reinterpret_cast<size_type>(p) / sizeof(*p)) % simdWidth == 0,
+        GMX_ASSERT((reinterpret_cast<size_t>(p) / sizeof(*p)) % simdWidth == 0,
                    "Trying to create aligned iterator for non aligned address.");
     }
-    SimdIterator& operator++()
-    {
-        p_ += simdWidth;
-        return *this;
-    }
-    SimdIterator operator++(int)
-    {
-        SimdIterator retval = *this;
-        ++(*this);
-        return retval;
-    }
-    SimdIterator& operator--()
-    {
-        p_ -= simdWidth;
-        return *this;
-    }
-    SimdIterator operator--(int)
-    {
-        SimdIterator retval = *this;
-        --(*this);
-        return retval;
-    }
-    SimdIterator& operator+=(difference_type d)
+    SimdIterator& operator+=(typename Base::difference_type d)
     {
         p_ += simdWidth * d;
         return *this;
     }
-    SimdIterator& operator-=(difference_type d)
-    {
-        p_ -= simdWidth * d;
-        return *this;
-    }
-    SimdIterator operator+(difference_type d) { return SimdIterator(p_ + simdWidth * d); }
-    SimdIterator operator-(difference_type d) { return SimdIterator(p_ - simdWidth * d); }
-
-    difference_type operator-(SimdIterator o) { return (p_ - o.p_) / simdWidth; }
-
-    bool operator==(SimdIterator other) const { return p_ == other.p_; }
-    bool operator!=(SimdIterator other) const { return p_ != other.p_; }
-    bool operator<(SimdIterator other) const { return p_ < other.p_; }
-    bool operator>(SimdIterator other) const { return p_ > other.p_; }
-    bool operator<=(SimdIterator other) const { return p_ <= other.p_; }
-    bool operator>=(SimdIterator other) const { return p_ >= other.p_; }
-
-    reference operator*() const { return reference(p_); }
+    typename Base::difference_type operator-(SimdIterator o) { return (p_ - o.p_) / simdWidth; }
+    typename Base::reference       operator*() const { return typename Base::reference(p_); }
 
 private:
-    pointer              p_;
+    DataPointer          p_;
     static constexpr int simdWidth = SimdTraits<T>::width;
 };
 
@@ -187,7 +144,7 @@ public:
     //! Type of values stored in the container.
     using value_type = T;
     //! Pointer to a container element.
-    using pointer = typename SimdTraits<T>::type*;
+    using pointer = SimdTraitsT<T>*;
     //! Reference to a container element.
     using reference = internal::SimdReference<T>;
     //! Iterator type for the container.
@@ -205,7 +162,7 @@ public:
                    "Size of ArrayRef needs to be divisible by type size");
     }
     //! \copydoc ArrayRef::ArrayRef(U)
-    template<typename U, typename = std::enable_if_t<std::is_convertible<typename std::remove_reference_t<U>::pointer, pointer>::value>>
+    template<typename U, typename = std::enable_if_t<std::is_convertible_v<typename std::remove_reference_t<U>::pointer, pointer>>>
     SimdArrayRef(U&& o) :
         begin_(reinterpret_cast<pointer>(o.data())),
         end_(reinterpret_cast<pointer>(o.data() + o.size()))
@@ -233,7 +190,7 @@ public:
 
 private:
     static constexpr int simdWidth = SimdTraits<T>::width;
-    using pack_type                = typename SimdTraits<T>::type[simdWidth];
+    using pack_type                = SimdTraitsT<T>[simdWidth];
     // Private because dereferencing return value is undefined behavior (strict aliasing rule)
     // Only use is conversion constructor above which immediately casts it back.
     // Return type is not "pointer" because then data()+size() would be ill defined.

@@ -271,7 +271,9 @@ void gmx_print_version_info(gmx::TextWriter* writer)
     writer->writeLine(formatString("GPU support:        %s", getGpuImplementationString()));
     writer->writeLine(formatString("SIMD instructions:  %s", GMX_SIMD_STRING));
     writer->writeLine(formatString("FFT library:        %s", getFftDescriptionString()));
-    writer->writeLine(formatString("RDTSCP usage:       %s", HAVE_RDTSCP ? "enabled" : "disabled"));
+#if GMX_TARGET_X86
+    writer->writeLine(formatString("RDTSCP usage:       %s", GMX_USE_RDTSCP ? "enabled" : "disabled"));
+#endif
 #if GMX_USE_TNG
     writer->writeLine("TNG support:        enabled");
 #else
@@ -296,22 +298,25 @@ void gmx_print_version_info(gmx::TextWriter* writer)
      * them. Can wait for later, as the master branch has ready code to do all
      * that. */
     writer->writeLine(formatString("C compiler:         %s", BUILD_C_COMPILER));
-    writer->writeLine(formatString("C compiler flags:   %s", BUILD_CFLAGS));
+    writer->writeLine(formatString("C compiler flags:   %s %s", BUILD_CFLAGS,
+                                   CMAKE_BUILD_CONFIGURATION_C_FLAGS));
     writer->writeLine(formatString("C++ compiler:       %s", BUILD_CXX_COMPILER));
-    writer->writeLine(formatString("C++ compiler flags: %s", BUILD_CXXFLAGS));
+    writer->writeLine(formatString("C++ compiler flags: %s %s", BUILD_CXXFLAGS,
+                                   CMAKE_BUILD_CONFIGURATION_CXX_FLAGS));
 #ifdef HAVE_LIBMKL
     /* MKL might be used for LAPACK/BLAS even if FFTs use FFTW, so keep it separate */
     writer->writeLine(formatString("Linked with Intel MKL version %d.%d.%d.", __INTEL_MKL__,
                                    __INTEL_MKL_MINOR__, __INTEL_MKL_UPDATE__));
 #endif
-#if GMX_GPU == GMX_GPU_OPENCL
+#if GMX_GPU_OPENCL
     writer->writeLine(formatString("OpenCL include dir: %s", OPENCL_INCLUDE_DIR));
     writer->writeLine(formatString("OpenCL library:     %s", OPENCL_LIBRARY));
     writer->writeLine(formatString("OpenCL version:     %s", OPENCL_VERSION_STRING));
 #endif
-#if GMX_GPU == GMX_GPU_CUDA
+#if GMX_GPU_CUDA
     writer->writeLine(formatString("CUDA compiler:      %s", CUDA_COMPILER_INFO));
-    writer->writeLine(formatString("CUDA compiler flags:%s", CUDA_COMPILER_FLAGS));
+    writer->writeLine(formatString("CUDA compiler flags:%s %s", CUDA_COMPILER_FLAGS,
+                                   CMAKE_BUILD_CONFIGURATION_CXX_FLAGS));
     writer->writeLine("CUDA driver:        " + gmx::getCudaDriverVersionString());
     writer->writeLine("CUDA runtime:       " + gmx::getCudaRuntimeVersionString());
 #endif

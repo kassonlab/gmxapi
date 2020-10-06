@@ -45,6 +45,7 @@
 
 #include "pairsearch.h"
 
+#include "gromacs/mdtypes/nblist.h"
 #include "gromacs/utility/smalloc.h"
 
 #include "pairlist.h"
@@ -84,12 +85,7 @@ static void free_nblist(t_nblist* nl)
 
 #ifndef DOXYGEN
 
-PairsearchWork::PairsearchWork() :
-    cp0({ { 0 } }),
-    buffer_flags({ 0, nullptr, 0 }),
-    ndistc(0),
-    nbl_fep(new t_nblist),
-    cp1({ { 0 } })
+PairsearchWork::PairsearchWork() : cp0({ { 0 } }), ndistc(0), nbl_fep(new t_nblist), cp1({ { 0 } })
 {
     nbnxn_init_pairlist_fep(nbl_fep.get());
 }
@@ -98,8 +94,6 @@ PairsearchWork::PairsearchWork() :
 
 PairsearchWork::~PairsearchWork()
 {
-    sfree(buffer_flags.flag);
-
     free_nblist(nbl_fep.get());
 }
 

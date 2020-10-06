@@ -64,7 +64,6 @@ class MDLogger;
 struct NbnxmGpu;
 struct nbnxn_atomdata_t;
 struct nonbonded_verlet_t;
-struct t_mdatoms;
 struct tMPI_Atomic;
 
 class GpuEventSynchronizer;
@@ -155,17 +154,6 @@ struct nbnxn_atomdata_output_t
  */
 #define NBNXN_BUFFERFLAG_MAX_THREADS (BITMASK_SIZE)
 
-/*! \internal
- * \brief Flags for telling if threads write to force output buffers */
-typedef struct
-{
-    //! The number of flag blocks
-    int nflag;
-    //! Bit i is set when thread i writes to a cell-block
-    gmx_bitmask_t* flag;
-    //! Allocation size of cxy_flag
-    int flag_nalloc;
-} nbnxn_buffer_flags_t;
 
 /*! \brief LJ combination rules: geometric, Lorentz-Berthelot, none */
 enum
@@ -301,7 +289,7 @@ public:
     //! Use the flags or operate on all atoms
     gmx_bool bUseBufferFlags;
     //! Flags for buffer zeroing+reduc.
-    nbnxn_buffer_flags_t buffer_flags;
+    std::vector<gmx_bitmask_t> buffer_flags;
     //! Use tree for force reduction
     gmx_bool bUseTreeReduce;
     //! Synchronization step for tree reduce
@@ -340,10 +328,11 @@ void nbnxn_atomdata_init(const gmx::MDLogger&      mdlog,
                          int                       nout);
 
 //! Sets the atomdata after pair search
-void nbnxn_atomdata_set(nbnxn_atomdata_t*     nbat,
-                        const Nbnxm::GridSet& gridSet,
-                        const t_mdatoms*      mdatoms,
-                        const int*            atinfo);
+void nbnxn_atomdata_set(nbnxn_atomdata_t*         nbat,
+                        const Nbnxm::GridSet&     gridSet,
+                        gmx::ArrayRef<const int>  atomTypes,
+                        gmx::ArrayRef<const real> atomCharges,
+                        gmx::ArrayRef<const int>  atomInfo);
 
 //! Copy the shift vectors to nbat
 void nbnxn_atomdata_copy_shiftvec(gmx_bool dynamic_box, rvec* shift_vec, nbnxn_atomdata_t* nbat);
@@ -391,26 +380,6 @@ void nbnxn_atomdata_x_to_nbat_x_gpu(const Nbnxm::GridSet&   gridSet,
  * \param[out] totalForce  Buffer to accumulate resulting force
  */
 void reduceForces(nbnxn_atomdata_t* nbat, gmx::AtomLocality locality, const Nbnxm::GridSet& gridSet, rvec* totalForce);
-
-/*! \brief Reduce forces on the GPU
- *
- * \param[in]  locality             If the reduction should be performed on local or non-local atoms.
- * \param[out] totalForcesDevice    Device buffer to accumulate resulting force.
- * \param[in]  gridSet              The grids data.
- * \param[in]  pmeForcesDevice      Device buffer with PME forces.
- * \param[in]  dependencyList       List of synchronizers that represent the dependencies the reduction task needs to sync on.
- * \param[in]  gpu_nbv              The NBNXM GPU data structure.
- * \param[in]  useGpuFPmeReduction  Whether PME forces should be added.
- * \param[in]  accumulateForce      Whether there are usefull data already in the total force buffer.
- */
-void reduceForcesGpu(gmx::AtomLocality                          locality,
-                     DeviceBuffer<gmx::RVec>                    totalForcesDevice,
-                     const Nbnxm::GridSet&                      gridSet,
-                     void*                                      pmeForcesDevice,
-                     gmx::ArrayRef<GpuEventSynchronizer* const> dependencyList,
-                     NbnxmGpu*                                  gpu_nbv,
-                     bool                                       useGpuFPmeReduction,
-                     bool                                       accumulateForce);
 
 //! Add the fshift force stored in nbat to fshift
 void nbnxn_atomdata_add_nbat_fshift_to_fshift(const nbnxn_atomdata_t& nbat, gmx::ArrayRef<gmx::RVec> fshift);

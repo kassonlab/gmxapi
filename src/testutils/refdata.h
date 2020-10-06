@@ -61,6 +61,9 @@ class KeyValueTreeObject;
 class KeyValueTreeValue;
 class Any;
 
+template<typename ValueType>
+class BasicVector;
+
 namespace test
 {
 
@@ -168,6 +171,7 @@ class TestReferenceDataImpl;
        compound.checkInteger(function2ToTest(3), "ValueWith3");
        compound.checkInteger(function2ToTest(5), "ValueWith5");
        checker.checkInteger(functionToTest(4), "ValueWith4");
+       checker.checkVector(functionProducingRVec(), "Describe The RVec");
    }
    } // namespace test
    } // namespace gmx
@@ -226,7 +230,8 @@ private:
 /*! \libinternal \brief
  * Handles comparison to test reference data.
  *
- * Every check*() method takes an id string as the last parameter.  This id is
+ * Every check*() method takes an id string as th
+ * e last parameter.  This id is
  * used to uniquely identify the value in the reference data, and it makes the
  * output XML more human-friendly and more robust to errors.  The id can be
  * NULL; in this case, multiple elements with no id are created, and they will
@@ -301,6 +306,12 @@ public:
      * another assertion about the same values.
      */
     void checkUnusedEntries();
+
+    /*! \brief Disables checking for unused entries
+     *
+     * \see checkUnusedEntries()
+     */
+    void disableUnusedEntriesCheck();
 
     /*! \brief
      * Checks whether a data item is present.
@@ -385,6 +396,12 @@ public:
     void checkVector(const float value[3], const char* id);
     //! Check a vector of three double-precision floating point values.
     void checkVector(const double value[3], const char* id);
+    //! Check a BasicVector of ints, ie. IVec
+    void checkVector(const BasicVector<int>& value, const char* id);
+    //! Check a BasicVector of floats, ie. RVec
+    void checkVector(const BasicVector<float>& value, const char* id);
+    //! Check a BasicVector of doubles, ie. DVec
+    void checkVector(const BasicVector<double>& value, const char* id);
     //! Check a single floating-point value from a string.
     void checkRealFromString(const std::string& value, const char* id);
     //! Checks a any value that contains a supported simple type.
@@ -452,6 +469,12 @@ public:
     void checkValue(const float value[3], const char* id) { checkVector(value, id); }
     //! Check a vector of three double-precision floating point values.
     void checkValue(const double value[3], const char* id) { checkVector(value, id); }
+    //! Check a BasicVector of integer values, ie. IVec.
+    void checkValue(const BasicVector<int>& value, const char* id) { checkVector(value, id); }
+    //! Check a BasicVector of float values, ie. RVec.
+    void checkValue(const BasicVector<float>& value, const char* id) { checkVector(value, id); }
+    //! Check a BasicVector of double values, ie. DVec.
+    void checkValue(const BasicVector<double>& value, const char* id) { checkVector(value, id); }
     //! Check a generic key-value tree value.
     void checkValue(const KeyValueTreeValue& value, const char* id)
     {

@@ -170,14 +170,14 @@ static void push_ps(FILE* fp)
 #        undef gmx_ffclose
 #    endif
 #    if (!HAVE_PIPES && !defined(__native_client__))
-static FILE* popen(const char* nm, const char* mode)
+static FILE* popen(const char* /* nm */, const char* /* mode */)
 {
     gmx_impl("Sorry no pipes...");
 
     return NULL;
 }
 
-static int pclose(FILE* fp)
+static int pclose(FILE* /* fp */)
 {
     gmx_impl("Sorry no pipes...");
 
@@ -697,6 +697,7 @@ int gmx_fsync(FILE* fp)
 #    elif HAVE__FILENO
         fn = _fileno(fp);
 #    else
+        GMX_UNUSED_VALUE(fp);
         fn = -1;
 #    endif
 
@@ -742,7 +743,9 @@ void gmx_chdir(const char* directory)
 #endif
     if (rc != 0)
     {
-        gmx_fatal(FARGS, "Cannot change directory to '%s'. Reason: %s", directory, strerror(errno));
+        auto message = gmx::formatString("Cannot change directory to '%s'. Reason: %s", directory,
+                                         strerror(errno));
+        GMX_THROW(gmx::FileIOError(message));
     }
 }
 

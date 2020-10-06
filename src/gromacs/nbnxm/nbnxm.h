@@ -266,7 +266,9 @@ public:
                            t_nrnb*                      nrnb);
 
     //! Updates all the atom properties in Nbnxm
-    void setAtomProperties(const t_mdatoms& mdatoms, gmx::ArrayRef<const int> atomInfo);
+    void setAtomProperties(gmx::ArrayRef<const int>  atomTypes,
+                           gmx::ArrayRef<const real> atomCharges,
+                           gmx::ArrayRef<const int>  atomInfo);
 
     /*!\brief Convert the coordinates to NBNXM format for the given locality.
      *
@@ -329,7 +331,7 @@ public:
                                   gmx::ForceWithShiftForces* forceWithShiftForces,
                                   const t_mdatoms&           mdatoms,
                                   t_lambda*                  fepvals,
-                                  real*                      lambda,
+                                  gmx::ArrayRef<const real>  lambda,
                                   gmx_enerdata_t*            enerd,
                                   const gmx::StepWorkload&   stepWork,
                                   t_nrnb*                    nrnb);
@@ -356,14 +358,18 @@ public:
                                       bool useGpuFPmeReduction,
                                       bool accumulateForce);
 
-    /*! \brief Outer body of function to perform initialization for F buffer operations on GPU.
+    /*! \brief Get the number of atoms for a given locality
      *
-     * \param localReductionDone     Pointer to an event synchronizer that marks the completion of the local f buffer ops kernel.
+     * \param [in] locality   Local or non-local
+     * \returns               The number of atoms for given locality
      */
-    void atomdata_init_add_nbat_f_to_f_gpu(GpuEventSynchronizer* localReductionDone);
+    int getNumAtoms(gmx::AtomLocality locality);
 
-    /*! \brief return GPU pointer to f in rvec format */
-    void* get_gpu_frvec();
+    /*! \brief Get the pointer to the GPU nonbonded force buffer
+     *
+     * \returns A pointer to the force buffer in GPU memory
+     */
+    void* getGpuForces();
 
     //! Return the kernel setup
     const Nbnxm::KernelSetup& kernelSetup() const { return kernelSetup_; }

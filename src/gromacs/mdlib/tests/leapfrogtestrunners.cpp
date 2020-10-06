@@ -84,12 +84,12 @@ void integrateLeapFrogSimple(LeapFrogTestData* testData, int numSteps)
 
     for (int step = 0; step < numSteps; step++)
     {
-        update_coords(step, &testData->inputRecord_, &testData->mdAtoms_, &testData->state_,
-                      testData->f_, &testData->forceCalculationData_, &testData->kineticEnergyData_,
-                      testData->velocityScalingMatrix_, testData->update_.get(), etrtNONE, nullptr,
-                      nullptr);
-        finish_update(&testData->inputRecord_, &testData->mdAtoms_, &testData->state_, nullptr,
-                      testData->update_.get(), nullptr);
+        testData->update_->update_coords(
+                testData->inputRecord_, step, &testData->mdAtoms_, &testData->state_, testData->f_,
+                testData->forceCalculationData_, &testData->kineticEnergyData_,
+                testData->velocityScalingMatrix_, etrtNONE, nullptr, false);
+        testData->update_->finish_update(testData->inputRecord_, &testData->mdAtoms_,
+                                         &testData->state_, nullptr, false);
     }
     auto xp = makeArrayRef(*testData->update_->xp()).subArray(0, testData->numAtoms_);
     for (int i = 0; i < testData->numAtoms_; i++)
@@ -103,14 +103,14 @@ void integrateLeapFrogSimple(LeapFrogTestData* testData, int numSteps)
     }
 }
 
-#if GMX_GPU != GMX_GPU_CUDA
+#if !GMX_GPU_CUDA
 
 void integrateLeapFrogGpu(gmx_unused LeapFrogTestData* testData, gmx_unused int numSteps)
 {
     FAIL() << "Dummy Leap-Frog CUDA function was called instead of the real one.";
 }
 
-#endif // GMX_GPU != GMX_GPU_CUDA
+#endif // !GMX_GPU_CUDA
 
 } // namespace test
 } // namespace gmx

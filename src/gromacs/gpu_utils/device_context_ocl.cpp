@@ -43,9 +43,8 @@
  */
 #include "gmxpre.h"
 
-#include "device_context_ocl.h"
-
-#include "gromacs/gpu_utils/gputraits.h"
+#include "gromacs/gpu_utils/device_context.h"
+#include "gromacs/hardware/device_information.h"
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/gmxassert.h"
@@ -59,6 +58,8 @@
 #define CL_CONTEXT_DIAGNOSTICS_LEVEL_BAD_INTEL 0x2
 #define CL_CONTEXT_DIAGNOSTICS_LEVEL_NEUTRAL_INTEL 0x4
 /**@}*/
+
+#ifndef DOXYGEN
 
 DeviceContext::DeviceContext(const DeviceInformation& deviceInfo) : deviceInfo_(deviceInfo)
 {
@@ -105,3 +106,5 @@ cl_context DeviceContext::context() const
 {
     return context_;
 }
+
+#endif

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -45,52 +45,47 @@
 
 #include "gromacs/domdec/domdec.h"
 #include "gromacs/mdlib/mdoutf.h"
+#include "gromacs/mdtypes/checkpointdata.h"
 #include "gromacs/mdtypes/commrec.h"
+#include "gromacs/mdtypes/energyhistory.h"
+#include "gromacs/mdtypes/observableshistory.h"
+#include "gromacs/mdtypes/pullhistory.h"
 #include "gromacs/mdtypes/state.h"
+#include "gromacs/utility/stringutil.h"
 
 #include "trajectoryelement.h"
 
 namespace gmx
 {
-CheckpointHelper::CheckpointHelper(std::vector<ICheckpointHelperClient*> clients,
-                                   std::unique_ptr<CheckpointHandler>    checkpointHandler,
-                                   int                                   initStep,
-                                   TrajectoryElement*                    trajectoryElement,
-                                   int                                   globalNumAtoms,
-                                   FILE*                                 fplog,
-                                   t_commrec*                            cr,
-                                   ObservablesHistory*                   observablesHistory,
-                                   gmx_walltime_accounting*              walltime_accounting,
-                                   t_state*                              state_global,
-                                   bool                                  writeFinalCheckpoint) :
+CheckpointHelper::CheckpointHelper(std::vector<std::tuple<std::string, ICheckpointHelperClient*>>&& clients,
+                                   std::unique_ptr<CheckpointHandler> checkpointHandler,
+                                   int                                initStep,
+                                   TrajectoryElement*                 trajectoryElement,
+                                   FILE*                              fplog,
+                                   t_commrec*                         cr,
+                                   ObservablesHistory*                observablesHistory,
+                                   gmx_walltime_accounting*           walltime_accounting,
+                                   t_state*                           state_global,
+                                   bool                               writeFinalCheckpoint) :
     clients_(std::move(clients)),
     checkpointHandler_(std::move(checkpointHandler)),
     initStep_(initStep),
     lastStep_(-1),
-    globalNumAtoms_(globalNumAtoms),
     writeFinalCheckpoint_(writeFinalCheckpoint),
     trajectoryElement_(trajectoryElement),
-    localState_(nullptr),
     fplog_(fplog),
     cr_(cr),
     observablesHistory_(observablesHistory),
     walltime_accounting_(walltime_accounting),
     state_global_(state_global)
 {
-    // Get rid of nullptr in clients list
-    clients_.erase(std::remove_if(clients_.begin(), clients_.end(),
-                                  [](ICheckpointHelperClient* ptr) { return ptr == nullptr; }),
-                   clients_.end());
-    if (DOMAINDECOMP(cr))
+    if (!observablesHistory_->energyHistory)
     {
-        localState_ = std::make_unique<t_state>();
-        dd_init_local_state(cr->dd, state_global, localState_.get());
-        localStateInstance_ = localState_.get();
+        observablesHistory_->energyHistory = std::make_unique<energyhistory_t>();
     }
-    else
+    if (!observablesHistory_->pullHistory)
     {
-        state_change_natoms(state_global, state_global->natoms);
-        localStateInstance_ = state_global;
+        observablesHistory_->pullHistory = std::make_unique<PullHistory>();
     }
 }
 
@@ -107,34 +102,86 @@ void CheckpointHelper::run(Step step, Time time)
     checkpointHandler_->setSignal(walltime_accounting_);
 }
 
-void CheckpointHelper::scheduleTask(Step step, Time time, const RegisterRunFunctionPtr& registerRunFunction)
+void CheckpointHelper::scheduleTask(Step step, Time time, const RegisterRunFunction& registerRunFunction)
 {
     // Only last step checkpointing is done here
     if (step != lastStep_ || !writeFinalCheckpoint_)
     {
         return;
     }
-    (*registerRunFunction)(std::make_unique<SimulatorRunFunction>(
-            [this, step, time]() { writeCheckpoint(step, time); }));
+    registerRunFunction([this, step, time]() { writeCheckpoint(step, time); });
 }
 
 void CheckpointHelper::writeCheckpoint(Step step, Time time)
 {
-    localStateInstance_->flags = 0;
-    for (const auto& client : clients_)
+    WriteCheckpointDataHolder checkpointDataHolder;
+    for (const auto& [key, client] : clients_)
     {
-        client->writeCheckpoint(localStateInstance_, state_global_);
+        client->saveCheckpointState(
+                MASTER(cr_) ? std::make_optional(checkpointDataHolder.checkpointData(key)) : std::nullopt,
+                cr_);
     }
 
-    mdoutf_write_to_trajectory_files(fplog_, cr_, trajectoryElement_->outf_, MDOF_CPT,
-                                     globalNumAtoms_, step, time, localStateInstance_,
-                                     state_global_, observablesHistory_, ArrayRef<RVec>());
+    if (MASTER(cr_))
+    {
+        mdoutf_write_checkpoint(trajectoryElement_->outf_, fplog_, cr_, step, time, state_global_,
+                                observablesHistory_, &checkpointDataHolder);
+    }
 }
 
-SignallerCallbackPtr CheckpointHelper::registerLastStepCallback()
+std::optional<SignallerCallback> CheckpointHelper::registerLastStepCallback()
 {
-    return std::make_unique<SignallerCallback>(
-            [this](Step step, Time gmx_unused time) { this->lastStep_ = step; });
+    return [this](Step step, Time gmx_unused time) { this->lastStep_ = step; };
+}
+
+CheckpointHelperBuilder::CheckpointHelperBuilder(std::unique_ptr<ReadCheckpointDataHolder> checkpointDataHolder,
+                                                 StartingBehavior startingBehavior,
+                                                 t_commrec*       cr) :
+    resetFromCheckpoint_(startingBehavior != StartingBehavior::NewSimulation),
+    checkpointDataHolder_(std::move(checkpointDataHolder)),
+    checkpointHandler_(nullptr),
+    cr_(cr),
+    state_(ModularSimulatorBuilderState::AcceptingClientRegistrations)
+{
+}
+
+void CheckpointHelperBuilder::registerClient(ICheckpointHelperClient* client)
+{
+    if (!client)
+    {
+        return;
+    }
+    if (state_ == ModularSimulatorBuilderState::NotAcceptingClientRegistrations)
+    {
+        throw SimulationAlgorithmSetupError(
+                "Tried to register to CheckpointHelper after it was built.");
+    }
+    const auto& key = client->clientID();
+    if (clientsMap_.count(key) != 0)
+    {
+        throw SimulationAlgorithmSetupError("CheckpointHelper client key is not unique.");
+    }
+    clientsMap_[key] = client;
+    if (resetFromCheckpoint_)
+    {
+        if (MASTER(cr_) && !checkpointDataHolder_->keyExists(key))
+        {
+            throw SimulationAlgorithmSetupError(
+                    formatString(
+                            "CheckpointHelper client with key %s registered for checkpointing, "
+                            "but %s does not exist in the input checkpoint file.",
+                            key.c_str(), key.c_str())
+                            .c_str());
+        }
+        client->restoreCheckpointState(
+                MASTER(cr_) ? std::make_optional(checkpointDataHolder_->checkpointData(key)) : std::nullopt,
+                cr_);
+    }
+}
+
+void CheckpointHelperBuilder::setCheckpointHandler(std::unique_ptr<CheckpointHandler> checkpointHandler)
+{
+    checkpointHandler_ = std::move(checkpointHandler);
 }
 
 } // namespace gmx

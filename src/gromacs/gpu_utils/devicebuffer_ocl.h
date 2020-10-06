@@ -46,6 +46,7 @@
  */
 
 #include "gromacs/gpu_utils/device_context.h"
+#include "gromacs/gpu_utils/device_stream.h"
 #include "gromacs/gpu_utils/devicebuffer_datatype.h"
 #include "gromacs/gpu_utils/gpu_utils.h" //only for GpuApiCallBehavior
 #include "gromacs/gpu_utils/gputraits_ocl.h"
@@ -101,7 +102,8 @@ void freeDeviceBuffer(DeviceBuffer* buffer)
 /*! \brief
  * Performs the host-to-device data copy, synchronous or asynchronously on request.
  *
- * TODO: This is meant to gradually replace cu/ocl_copy_h2d.
+ * Note that synchronous copy will not synchronize the stream in case of zero \p numValues
+ * because of the early return.
  *
  * \tparam        ValueType            Raw value type of the \p buffer.
  * \param[in,out] buffer               Pointer to the device-side buffer
@@ -161,7 +163,8 @@ void copyToDeviceBuffer(DeviceBuffer<ValueType>* buffer,
 /*! \brief
  * Performs the device-to-host data copy, synchronous or asynchronously on request.
  *
- * TODO: This is meant to gradually replace cu/ocl_copy_d2h.
+ * Note that synchronous copy will not synchronize the stream in case of zero \p numValues
+ * because of the early return.
  *
  * \tparam        ValueType            Raw value type of the \p buffer.
  * \param[in,out] hostBuffer           Pointer to the raw host-side memory, also typed \p ValueType
@@ -183,6 +186,10 @@ void copyFromDeviceBuffer(ValueType*               hostBuffer,
                           GpuApiCallBehavior       transferKind,
                           CommandEvent*            timingEvent)
 {
+    if (numValues == 0)
+    {
+        return;
+    }
     GMX_ASSERT(buffer, "needs a buffer pointer");
     GMX_ASSERT(hostBuffer, "needs a host buffer pointer");
     cl_int       clError;
@@ -261,15 +268,63 @@ void clearDeviceBufferAsync(DeviceBuffer<ValueType>* buffer,
 template<typename T>
 static bool checkDeviceBuffer(DeviceBuffer<T> buffer, int requiredSize)
 {
-    size_t size;
-    int    retval = clGetMemObjectInfo(buffer, CL_MEM_SIZE, sizeof(size), &size, nullptr);
+    const size_t requiredSizeBytes = requiredSize * sizeof(T);
+    size_t       sizeBytes;
+    cl_int retval = clGetMemObjectInfo(buffer, CL_MEM_SIZE, sizeof(sizeBytes), &sizeBytes, nullptr);
     GMX_ASSERT(retval == CL_SUCCESS,
                gmx::formatString("clGetMemObjectInfo failed with error code #%d", retval).c_str());
-    GMX_ASSERT(static_cast<int>(size) >= requiredSize,
+    GMX_ASSERT(sizeBytes >= requiredSizeBytes,
                "Number of atoms in device buffer is smaller then required size.");
-    return retval == CL_SUCCESS && static_cast<int>(size) >= requiredSize;
+    return retval == CL_SUCCESS && sizeBytes >= requiredSizeBytes;
 }
 
+//! Device texture wrapper.
+using DeviceTexture = void*;
+
+/*! \brief Create a texture object for an array of type ValueType.
+ *
+ * Creates the device buffer and copies read-only data for an array of type ValueType.
+ *
+ * \todo Decide if using image2d is most efficient.
+ *
+ * \tparam      ValueType      Raw data type.
+ *
+ * \param[out]  deviceBuffer   Device buffer to store data in.
+ * \param[in]   hostBuffer     Host buffer to get date from.
+ * \param[in]   numValues      Number of elements in the buffer.
+ * \param[in]   deviceContext  GPU device context.
+ */
+template<typename ValueType>
+void initParamLookupTable(DeviceBuffer<ValueType>* deviceBuffer,
+                          DeviceTexture* /* deviceTexture */,
+                          const ValueType*     hostBuffer,
+                          int                  numValues,
+                          const DeviceContext& deviceContext)
+{
+    GMX_ASSERT(hostBuffer, "Host buffer pointer can not be null");
+    const size_t bytes = numValues * sizeof(ValueType);
+    cl_int       clError;
+    *deviceBuffer = clCreateBuffer(deviceContext.context(),
+                                   CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_COPY_HOST_PTR,
+                                   bytes, const_cast<ValueType*>(hostBuffer), &clError);
+
+    GMX_RELEASE_ASSERT(clError == CL_SUCCESS,
+                       gmx::formatString("Constant memory allocation failed (OpenCL error %d: %s)",
+                                         clError, ocl_get_error_string(clError).c_str())
+                               .c_str());
+}
+
+/*! \brief Release the OpenCL device buffer.
+ *
+ * \tparam        ValueType     Raw data type.
+ *
+ * \param[in,out] deviceBuffer  Device buffer to store data in.
+ */
+template<typename ValueType>
+void destroyParamLookupTable(DeviceBuffer<ValueType>* deviceBuffer, DeviceTexture& /* deviceTexture*/)
+{
+    freeDeviceBuffer(deviceBuffer);
+}
 #if defined(__clang__)
 #    pragma clang diagnostic pop
 #endif

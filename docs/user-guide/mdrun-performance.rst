@@ -213,6 +213,18 @@ of the better clock frequency available. Consider building :ref:`mdrun <gmx mdru
 configured with ``GMX_SIMD=AVX2_256`` instead of ``GMX_SIMD=AVX512`` for better
 performance in GPU accelerated or highly parallel MPI runs.
 
+Some of the latest ARM based CPU, such as the Fujitsu A64fx, support the Scalable Vector Extensions (SVE).
+Though SVE can be used to generate fairly efficient Vector Length Agnostic (VLA) code,
+this is not a good fit for |Gromacs| (as the SIMD vector length assumed to be known at
+CMake time). Consequently, the SVE vector length must be fixed at CMake time. The default
+value is 512 bits, and this can be changed with ``GMX_SIMD_ARM_SVE_LENGTH=<len>``.
+The supported vector lengths are 128, 256, 512 and 1024. Since the SIMD short-range non-bonded kernels
+only support up to 16 floating point numbers per SIMD vector, 1024 bits vector length is only
+valid in double precision (e.g. ``-DGMX_DOUBLE=on``).
+Note that even if `mdrun` does check the SIMD vector length at runtime, running with a different
+vector length than the one used at CMake time is undefined behavior, and `mdrun` might crash before reaching
+the check (that would abort with a user-friendly error message).
+
 Process(-or) level parallelization via OpenMP
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1093,9 +1105,6 @@ Known limitations
 
 - Only single precision is supported.
 
-- Free energy calculations where charges are perturbed are not supported,
-  because only single PME grids can be calculated.
-
 - Only dynamical integrators are supported (ie. leap-frog, Velocity Verlet,
   stochastic dynamics)
 
@@ -1359,7 +1368,7 @@ of 2. So it can be useful go through the checklist.
 * Make sure your compiler supports OpenMP (some versions of Clang don't).
 * If you have GPUs that support either CUDA or OpenCL, use them.
 
-  * Configure with ``-DGMX_GPU=ON`` (add ``-DGMX_USE_OPENCL=ON`` for OpenCL).
+  * Configure with ``-DGMX_GPU=CUDA `` or ``-DGMX_GPU=OpenCL``.
   * For CUDA, use the newest CUDA available for your GPU to take advantage of the
     latest performance enhancements.
   * Use a recent GPU driver.

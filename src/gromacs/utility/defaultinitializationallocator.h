@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -68,7 +68,10 @@ public:
 
     using A::A;
 
-    /*! \brief Constructs an object and default initializes */
+    /*! \brief Constructs an object and default initializes
+     *
+     * \todo Use std::is_nothrow_default_constructible_v when CUDA 11 is a requirement.
+     */
     template<typename U>
     void construct(U* ptr) noexcept(std::is_nothrow_default_constructible<U>::value)
     {

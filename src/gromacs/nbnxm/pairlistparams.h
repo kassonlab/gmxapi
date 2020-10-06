@@ -60,7 +60,7 @@ enum class KernelType;
 static constexpr int c_nbnxnCpuIClusterSize = 4;
 
 //! The i- and j-cluster size for GPU lists, 8 atoms for CUDA, set at compile time for OpenCL
-#if GMX_GPU == GMX_GPU_OPENCL
+#if GMX_GPU_OPENCL
 static constexpr int c_nbnxnGpuClusterSize = GMX_OPENCL_NB_CLUSTER_SIZE;
 #else
 static constexpr int c_nbnxnGpuClusterSize = 8;
@@ -130,6 +130,8 @@ struct PairlistParams
     bool haveMultipleDomains;
     //! Are we using dynamic pair-list pruning
     bool useDynamicPruning;
+    //! The interval in steps for computing non-bonded interactions, =1 without MTS
+    int mtsFactor;
     //! Pair-list dynamic pruning interval
     int nstlistPrune;
     //! The number parts to divide the pair-list into for rolling pruning, a value of 1 gives no rolling pruning

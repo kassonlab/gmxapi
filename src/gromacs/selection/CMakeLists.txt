@@ -54,10 +54,24 @@ else()
     gmx_target_warning_suppression(scanner -Wno-unused HAS_NO_UNUSED)
     gmx_target_warning_suppression(scanner -Wno-unused-parameter HAS_NO_UNUSED_PARAMETER)
     gmx_target_warning_suppression(scanner -Wno-missing-declarations HAS_NO_MISSING_DECLARATIONS)
-    gmx_target_warning_suppression(scanner -wd1419 HAS_DECL_IN_SOURCE)
+    gmx_target_warning_suppression(scanner -Wno-null-conversion HAS_NO_NULL_CONVERSIONS)
 endif()
 list(APPEND libgromacs_object_library_dependencies scanner)
 set(libgromacs_object_library_dependencies ${libgromacs_object_library_dependencies} PARENT_SCOPE)
+
+if(GMX_INSTALL_LEGACY_API)
+    install(FILES
+	    indexutil.h
+	    nbsearch.h
+	    position.h
+	    selectioncollection.h
+	    selectionenums.h
+	    selection.h
+	    selectionoptionbehavior.h
+	    selectionoption.h
+	    selectionoptionmanager.h
+            DESTINATION include/gromacs/selection)
+endif()
 
 if (BUILD_TESTING)
     add_subdirectory(tests)

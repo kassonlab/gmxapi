@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -106,7 +106,8 @@ public:
     //! Names for the output files from the reference mdrun call
     ReferenceFileNames referenceFileNames_ = { fileManager_.getTemporaryFilePath("reference.edr") };
     //! Functor for energy comparison
-    EnergyComparison energyComparison_{ EnergyComparison::s_defaultEnergyTermsToCompare };
+    EnergyComparison energyComparison_{ EnergyComparison::defaultEnergyTermsToCompare(),
+                                        MaxNumFrames::compareAllFrames() };
     //! Names of energies compared by energyComparison_
     std::vector<std::string> namesOfEnergiesToMatch_ = energyComparison_.getEnergyNames();
 };
@@ -314,18 +315,18 @@ std::vector<PropagationParameters> propagationParametersWithCoupling()
     std::string nstcomm    = "5";
 
     std::vector<PropagationParameters> parameterSets;
-    for (std::string simulationName : { "argon12" })
+    for (const std::string& simulationName : { "argon12" })
     {
-        for (std::string integrator : { "md", "sd", "md-vv" })
+        for (const std::string& integrator : { "md", "sd", "md-vv" })
         {
-            for (std::string tcoupl : { "no", "v-rescale", "Nose-Hoover" })
+            for (const std::string& tcoupl : { "no", "v-rescale", "Nose-Hoover" })
             {
                 // SD doesn't support temperature-coupling algorithms,
                 if (integrator == "sd" && tcoupl != "no")
                 {
                     continue;
                 }
-                for (std::string pcoupl : { "no", "Berendsen", "Parrinello-Rahman" })
+                for (std::string pcoupl : { "no", "Berendsen", "Parrinello-Rahman", "C-rescale" })
                 {
                     // VV supports few algorithm combinations
                     if (integrator == "md-vv")
@@ -381,18 +382,18 @@ std::vector<PropagationParameters> propagationParametersWithConstraints()
     std::string nstcomm    = "5";
 
     std::vector<PropagationParameters> parameterSets;
-    for (std::string simulationName : { "tip3p5" })
+    for (const std::string& simulationName : { "tip3p5" })
     {
-        for (std::string integrator : { "md", "sd", "md-vv" })
+        for (const std::string& integrator : { "md", "sd", "md-vv" })
         {
-            for (std::string tcoupl : { "no", "v-rescale" })
+            for (const std::string& tcoupl : { "no", "v-rescale" })
             {
                 // SD doesn't support temperature-coupling algorithms,
                 if (integrator == "sd" && tcoupl != "no")
                 {
                     continue;
                 }
-                for (std::string pcoupl : { "no", "Parrinello-Rahman" })
+                for (std::string pcoupl : { "no", "Parrinello-Rahman", "C-rescale" })
                 {
                     // VV supports few algorithm combinations
                     if (integrator == "md-vv")
@@ -439,7 +440,7 @@ using ::testing::ValuesIn;
 // TODO The time for OpenCL kernel compilation means these tests time
 // out. Once that compilation is cached for the whole process, these
 // tests can run in such configurations.
-#if GMX_GPU != GMX_GPU_OPENCL
+#if !GMX_GPU_OPENCL
 INSTANTIATE_TEST_CASE_P(BasicPropagators,
                         PeriodicActionsTest,
                         Combine(ValuesIn(simplePropagationParameters()), Values(outputParameters)));

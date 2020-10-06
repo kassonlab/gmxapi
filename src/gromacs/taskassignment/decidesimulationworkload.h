@@ -52,30 +52,32 @@ enum class PmeRunMode;
 namespace gmx
 {
 
+struct DevelopmentFeatureFlags;
+
 /*! \brief
  * Build datastructure that contains decisions whether to run different workload
  * task on GPUs.
  *
  * \param[in] inputrec           The input record
+ * \param[in] disableNonbondedCalculation  Disable calculation of nonbonded forces
+ * \param[in] devFlags           The development feature flags
  * \param[in] useGpuForNonbonded Whether we have short-range nonbonded interactions
  *                               calculations on GPU(s).
  * \param[in] pmeRunMode         Run mode indicating what resource is PME execured on.
  * \param[in] useGpuForBonded    Whether bonded interactions are calculated on GPU(s).
  * \param[in] useGpuForUpdate    Whether coordinate update and constraint solving is performed on
  *                               GPU(s).
- * \param[in] useGpuForBufferOps Whether buffer ops / reduction are calculated on GPU(s).
- * \param[in] useGpuHaloExchange Whether GPU direct communication is used in halo exchange.
- * \param[in] useGpuPmePpComm    Whether GPU direct communication is used in PME-PP communication.
+ * \param[in] useGpuDirectHalo   Whether halo exchange is performed directly between GPUs.
  * \returns Simulation lifetime constant workload description.
  */
 SimulationWorkload createSimulationWorkload(const t_inputrec& inputrec,
-                                            bool              useGpuForNonbonded,
-                                            PmeRunMode        pmeRunMode,
-                                            bool              useGpuForBonded,
-                                            bool              useGpuForUpdate,
-                                            bool              useGpuForBufferOps,
-                                            bool              useGpuHaloExchange,
-                                            bool              useGpuPmePpComm);
+                                            bool              disableNonbondedCalculation,
+                                            const DevelopmentFeatureFlags& devFlags,
+                                            bool                           useGpuForNonbonded,
+                                            PmeRunMode                     pmeRunMode,
+                                            bool                           useGpuForBonded,
+                                            bool                           useGpuForUpdate,
+                                            bool                           useGpuDirectHalo);
 
 } // namespace gmx
 

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2017,2019, by the GROMACS development team, led by
+ * Copyright (c) 2017,2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -45,11 +45,14 @@
 #include <algorithm>
 
 #include "gromacs/utility/arrayref.h"
+#include "gromacs/utility/gmxassert.h"
 
 namespace gmx
 {
 
-void doDeviceTransfers(const gmx_gpu_info_t& /*gpuInfo*/, ArrayRef<const char> input, ArrayRef<char> output)
+void doDeviceTransfers(const DeviceInformation& /* deviceInfo */,
+                       ArrayRef<const char> input,
+                       ArrayRef<char>       output)
 {
     GMX_RELEASE_ASSERT(input.size() == output.size(), "Input and output must have matching size");
     // We can't have any valid GPUs for this build configuration.

@@ -32,11 +32,13 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \libinternal \file
+/*! \internal \file
  * \brief Declares the Parrinello-Rahman barostat for the modular simulator
  *
  * \author Pascal Merz <pascal.merz@me.com>
  * \ingroup module_modularsimulator
+ *
+ * This header is only used within the modular simulator module
  */
 
 #ifndef GMX_MODULARSIMULATOR_PARRINELLORAHMANBAROSTAT_H
@@ -52,11 +54,13 @@ struct t_commrec;
 
 namespace gmx
 {
-class EnergyElement;
+enum class CheckpointDataOperation;
+class EnergyData;
+class LegacySimulatorData;
 class MDAtoms;
 class StatePropagatorData;
 
-/*! \libinternal
+/*! \internal
  * \ingroup module_modularsimulator
  * \brief Element implementing the Parrinello-Rahman barostat
  *
@@ -70,28 +74,23 @@ class ParrinelloRahmanBarostat final : public ISimulatorElement, public ICheckpo
 {
 public:
     //! Constructor
-    ParrinelloRahmanBarostat(int                   nstpcouple,
-                             int                   offset,
-                             real                  couplingTimeStep,
-                             Step                  initStep,
-                             ArrayRef<rvec>        scalingTensor,
-                             PropagatorCallbackPtr propagatorCallback,
-                             StatePropagatorData*  statePropagatorData,
-                             EnergyElement*        energyElement,
-                             FILE*                 fplog,
-                             const t_inputrec*     inputrec,
-                             const MDAtoms*        mdAtoms,
-                             const t_state*        globalState,
-                             t_commrec*            cr,
-                             bool                  isRestart);
+    ParrinelloRahmanBarostat(int                  nstpcouple,
+                             int                  offset,
+                             real                 couplingTimeStep,
+                             Step                 initStep,
+                             StatePropagatorData* statePropagatorData,
+                             EnergyData*          energyData,
+                             FILE*                fplog,
+                             const t_inputrec*    inputrec,
+                             const MDAtoms*       mdAtoms);
 
     /*! \brief Register run function for step / time
      *
-     * @param step                 The step number
-     * @param time                 The time
-     * @param registerRunFunction  Function allowing to register a run function
+     * \param step                 The step number
+     * \param time                 The time
+     * \param registerRunFunction  Function allowing to register a run function
      */
-    void scheduleTask(Step step, Time time, const RegisterRunFunctionPtr& registerRunFunction) override;
+    void scheduleTask(Step step, Time time, const RegisterRunFunction& registerRunFunction) override;
 
     //! Fix relative box shape
     void elementSetup() override;
@@ -99,7 +98,39 @@ public:
     void elementTeardown() override {}
 
     //! Getter for the box velocities
-    const rvec* boxVelocities() const;
+    [[nodiscard]] const rvec* boxVelocities() const;
+    //! Contribution to the conserved energy (called by energy data)
+    [[nodiscard]] real conservedEnergyContribution() const;
+
+    //! Connect this to propagator
+    void connectWithPropagator(const PropagatorBarostatConnection& connectionData);
+
+    //! ICheckpointHelperClient write checkpoint implementation
+    void saveCheckpointState(std::optional<WriteCheckpointData> checkpointData, const t_commrec* cr) override;
+    //! ICheckpointHelperClient read checkpoint implementation
+    void restoreCheckpointState(std::optional<ReadCheckpointData> checkpointData, const t_commrec* cr) override;
+    //! ICheckpointHelperClient key implementation
+    const std::string& clientID() override;
+
+    /*! \brief Factory method implementation
+     *
+     * \param legacySimulatorData  Pointer allowing access to simulator level data
+     * \param builderHelper  ModularSimulatorAlgorithmBuilder helper object
+     * \param statePropagatorData  Pointer to the \c StatePropagatorData object
+     * \param energyData  Pointer to the \c EnergyData object
+     * \param freeEnergyPerturbationData  Pointer to the \c FreeEnergyPerturbationData object
+     * \param globalCommunicationHelper  Pointer to the \c GlobalCommunicationHelper object
+     * \param offset  The step offset at which the barostat is applied
+     *
+     * \return  Pointer to the element to be added. Element needs to have been stored using \c storeElement
+     */
+    static ISimulatorElement* getElementPointerImpl(LegacySimulatorData* legacySimulatorData,
+                                                    ModularSimulatorAlgorithmBuilderHelper* builderHelper,
+                                                    StatePropagatorData*        statePropagatorData,
+                                                    EnergyData*                 energyData,
+                                                    FreeEnergyPerturbationData* freeEnergyPerturbationData,
+                                                    GlobalCommunicationHelper* globalCommunicationHelper,
+                                                    int                        offset);
 
 private:
     //! The frequency at which the barostat is applied
@@ -114,7 +145,7 @@ private:
     //! View on the velocity scaling tensor (owned by the propagator)
     ArrayRef<rvec> scalingTensor_;
     //! Callback to let propagator know that we updated lambda
-    PropagatorCallbackPtr propagatorCallback_;
+    PropagatorCallback propagatorCallback_;
 
     //! Relative change in box before - after barostatting
     matrix mu_;
@@ -123,18 +154,22 @@ private:
     //! Box velocity
     tensor boxVelocity_;
 
+    // TODO: Clarify relationship to data objects and find a more robust alternative to raw pointers (#3583)
     //! Pointer to the micro state
     StatePropagatorData* statePropagatorData_;
-    //! Pointer to the energy element
-    EnergyElement* energyElement_;
+    //! Pointer to the energy data
+    EnergyData* energyData_;
 
     //! Integrate the PR box vector equations of motion - does not alter state
     void integrateBoxVelocityEquations(Step step);
     //! Scale box and positions
     void scaleBoxAndPositions();
 
-    //! ICheckpointHelperClient implementation
-    void writeCheckpoint(t_state* localState, t_state* globalState) override;
+    //! CheckpointHelper identifier
+    const std::string identifier_ = "ParrinelloRahmanBarostat";
+    //! Helper function to read from / write to CheckpointData
+    template<CheckpointDataOperation operation>
+    void doCheckpointData(CheckpointData<operation>* checkpointData);
 
     // Access to ISimulator data
     //! Handles logging.

@@ -44,25 +44,30 @@
 #include "computeglobalselement.h"
 
 #include "gromacs/domdec/partition.h"
+#include "gromacs/gmxlib/network.h"
 #include "gromacs/gmxlib/nrnb.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/md_support.h"
 #include "gromacs/mdlib/mdatoms.h"
 #include "gromacs/mdlib/stat.h"
+#include "gromacs/mdlib/update.h"
+#include "gromacs/mdtypes/commrec.h"
 #include "gromacs/mdtypes/group.h"
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/md_enums.h"
 #include "gromacs/mdtypes/mdatom.h"
 #include "gromacs/topology/topology.h"
 
-#include "freeenergyperturbationelement.h"
+#include "freeenergyperturbationdata.h"
+#include "modularsimulator.h"
+#include "simulatoralgorithm.h"
 
 namespace gmx
 {
 template<ComputeGlobalsAlgorithm algorithm>
 ComputeGlobalsElement<algorithm>::ComputeGlobalsElement(StatePropagatorData* statePropagatorData,
-                                                        EnergyElement*       energyElement,
-                                                        FreeEnergyPerturbationElement* freeEnergyPerturbationElement,
+                                                        EnergyData*          energyData,
+                                                        FreeEnergyPerturbationData* freeEnergyPerturbationData,
                                                         SimulationSignals* signals,
                                                         int                nstglobalcomm,
                                                         FILE*              fplog,
@@ -74,8 +79,7 @@ ComputeGlobalsElement<algorithm>::ComputeGlobalsElement(StatePropagatorData* sta
                                                         gmx_wallcycle*     wcycle,
                                                         t_forcerec*        fr,
                                                         const gmx_mtop_t*  global_top,
-                                                        Constraints*       constr,
-                                                        bool               hasReadEkinState) :
+                                                        Constraints*       constr) :
     energyReductionStep_(-1),
     virialReductionStep_(-1),
     vvSchedulingStep_(-1),
@@ -85,13 +89,12 @@ ComputeGlobalsElement<algorithm>::ComputeGlobalsElement(StatePropagatorData* sta
     lastStep_(inputrec->nsteps + inputrec->init_step),
     initStep_(inputrec->init_step),
     nullSignaller_(std::make_unique<SimulationSignaller>(nullptr, nullptr, nullptr, false, false)),
-    hasReadEkinState_(hasReadEkinState),
     totalNumberOfBondedInteractions_(0),
     shouldCheckNumberOfBondedInteractions_(false),
     statePropagatorData_(statePropagatorData),
-    energyElement_(energyElement),
+    energyData_(energyData),
     localTopology_(nullptr),
-    freeEnergyPerturbationElement_(freeEnergyPerturbationElement),
+    freeEnergyPerturbationData_(freeEnergyPerturbationData),
     vcm_(global_top->groups, *inputrec),
     signals_(signals),
     fplog_(fplog),
@@ -139,7 +142,8 @@ void ComputeGlobalsElement<algorithm>::elementSetup()
         inc_nrnb(nrnb_, eNR_STOPCM, mdAtoms_->mdatoms()->homenr);
     }
 
-    unsigned int cglo_flags = (CGLO_TEMPERATURE | CGLO_GSTAT | (hasReadEkinState_ ? CGLO_READEKIN : 0));
+    unsigned int cglo_flags = (CGLO_TEMPERATURE | CGLO_GSTAT
+                               | (energyData_->hasReadEkinFromCheckpoint() ? CGLO_READEKIN : 0));
 
     if (algorithm == ComputeGlobalsAlgorithm::VelocityVerlet)
     {
@@ -151,15 +155,14 @@ void ComputeGlobalsElement<algorithm>::elementSetup()
     // Calculate the initial half step temperature, and save the ekinh_old
     for (int i = 0; (i < inputrec_->opts.ngtc); i++)
     {
-        copy_mat(energyElement_->ekindata()->tcstat[i].ekinh,
-                 energyElement_->ekindata()->tcstat[i].ekinh_old);
+        copy_mat(energyData_->ekindata()->tcstat[i].ekinh, energyData_->ekindata()->tcstat[i].ekinh_old);
     }
 }
 
 template<ComputeGlobalsAlgorithm algorithm>
 void ComputeGlobalsElement<algorithm>::scheduleTask(Step step,
-                                                    Time gmx_unused               time,
-                                                    const RegisterRunFunctionPtr& registerRunFunction)
+                                                    Time gmx_unused            time,
+                                                    const RegisterRunFunction& registerRunFunction)
 {
     const bool needComReduction    = doStopCM_ && do_per_step(step, nstcomm_);
     const bool needGlobalReduction = step == energyReductionStep_ || step == virialReductionStep_
@@ -202,10 +205,9 @@ void ComputeGlobalsElement<algorithm>::scheduleTask(Step step,
         auto signaller = std::make_shared<SimulationSignaller>(signals_, cr_, nullptr,
                                                                doInterSimSignal, doIntraSimSignal);
 
-        (*registerRunFunction)(std::make_unique<SimulatorRunFunction>(
-                [this, step, flags, signaller = std::move(signaller)]() {
-                    compute(step, flags, signaller.get(), true);
-                }));
+        registerRunFunction([this, step, flags, signaller = std::move(signaller)]() {
+            compute(step, flags, signaller.get(), true);
+        });
     }
     else if (algorithm == ComputeGlobalsAlgorithm::VelocityVerlet)
     {
@@ -231,8 +233,8 @@ void ComputeGlobalsElement<algorithm>::scheduleTask(Step step,
                         | (doTemperature ? CGLO_TEMPERATURE : 0) | CGLO_PRESSURE | CGLO_CONSTRAINT
                         | (needComReduction ? CGLO_STOPCM : 0) | CGLO_SCALEEKIN;
 
-            (*registerRunFunction)(std::make_unique<SimulatorRunFunction>(
-                    [this, step, flags]() { compute(step, flags, nullSignaller_.get(), false); }));
+            registerRunFunction(
+                    [this, step, flags]() { compute(step, flags, nullSignaller_.get(), false); });
         }
         else
         {
@@ -259,10 +261,9 @@ void ComputeGlobalsElement<algorithm>::scheduleTask(Step step,
             auto signaller = std::make_shared<SimulationSignaller>(
                     signals_, cr_, nullptr, doInterSimSignal, doIntraSimSignal);
 
-            (*registerRunFunction)(std::make_unique<SimulatorRunFunction>(
-                    [this, step, flags, signaller = std::move(signaller)]() {
-                        compute(step, flags, signaller.get(), true);
-                    }));
+            registerRunFunction([this, step, flags, signaller = std::move(signaller)]() {
+                compute(step, flags, signaller.get(), true);
+            });
         }
     }
 }
@@ -280,16 +281,12 @@ void ComputeGlobalsElement<algorithm>::compute(gmx::Step            step,
     auto lastbox = useLastBox ? statePropagatorData_->constPreviousBox()
                               : statePropagatorData_->constBox();
 
-    const real vdwLambda = freeEnergyPerturbationElement_
-                                   ? freeEnergyPerturbationElement_->constLambdaView()[efptVDW]
-                                   : 0;
-
     compute_globals(
-            gstat_, cr_, inputrec_, fr_, energyElement_->ekindata(), x, v, box, vdwLambda,
-            mdAtoms_->mdatoms(), nrnb_, &vcm_, step != -1 ? wcycle_ : nullptr, energyElement_->enerdata(),
-            energyElement_->forceVirial(step), energyElement_->constraintVirial(step),
-            energyElement_->totalVirial(step), energyElement_->pressure(step), constr_, signaller,
-            lastbox, &totalNumberOfBondedInteractions_, energyElement_->needToSumEkinhOld(),
+            gstat_, cr_, inputrec_, fr_, energyData_->ekindata(), x, v, box, mdAtoms_->mdatoms(),
+            nrnb_, &vcm_, step != -1 ? wcycle_ : nullptr, energyData_->enerdata(),
+            energyData_->forceVirial(step), energyData_->constraintVirial(step),
+            energyData_->totalVirial(step), energyData_->pressure(step), constr_, signaller,
+            lastbox, &totalNumberOfBondedInteractions_, energyData_->needToSumEkinhOld(),
             flags | (shouldCheckNumberOfBondedInteractions_ ? CGLO_CHECK_NUMBER_OF_BONDED_INTERACTIONS : 0));
     checkNumberOfBondedInteractions(mdlog_, cr_, totalNumberOfBondedInteractions_, top_global_,
                                     localTopology_, x, box, &shouldCheckNumberOfBondedInteractions_);
@@ -301,10 +298,9 @@ void ComputeGlobalsElement<algorithm>::compute(gmx::Step            step,
 }
 
 template<ComputeGlobalsAlgorithm algorithm>
-CheckBondedInteractionsCallbackPtr ComputeGlobalsElement<algorithm>::getCheckNumberOfBondedInteractionsCallback()
+CheckBondedInteractionsCallback ComputeGlobalsElement<algorithm>::getCheckNumberOfBondedInteractionsCallback()
 {
-    return std::make_unique<CheckBondedInteractionsCallback>(
-            [this]() { needToCheckNumberOfBondedInteractions(); });
+    return [this]() { needToCheckNumberOfBondedInteractions(); };
 }
 
 template<ComputeGlobalsAlgorithm algorithm>
@@ -320,35 +316,92 @@ void ComputeGlobalsElement<algorithm>::setTopology(const gmx_localtop_t* top)
 }
 
 template<ComputeGlobalsAlgorithm algorithm>
-SignallerCallbackPtr ComputeGlobalsElement<algorithm>::registerEnergyCallback(EnergySignallerEvent event)
+std::optional<SignallerCallback> ComputeGlobalsElement<algorithm>::registerEnergyCallback(EnergySignallerEvent event)
 {
     if (event == EnergySignallerEvent::EnergyCalculationStep)
     {
-        return std::make_unique<SignallerCallback>(
-                [this](Step step, Time /*unused*/) { energyReductionStep_ = step; });
+        return [this](Step step, Time /*unused*/) { energyReductionStep_ = step; };
     }
     if (event == EnergySignallerEvent::VirialCalculationStep)
     {
-        return std::make_unique<SignallerCallback>(
-                [this](Step step, Time /*unused*/) { virialReductionStep_ = step; });
+        return [this](Step step, Time /*unused*/) { virialReductionStep_ = step; };
     }
-    return nullptr;
+    return std::nullopt;
 }
 
 template<ComputeGlobalsAlgorithm algorithm>
-SignallerCallbackPtr ComputeGlobalsElement<algorithm>::registerTrajectorySignallerCallback(TrajectoryEvent event)
+std::optional<SignallerCallback>
+ComputeGlobalsElement<algorithm>::registerTrajectorySignallerCallback(TrajectoryEvent event)
 {
     if (event == TrajectoryEvent::EnergyWritingStep)
     {
-        return std::make_unique<SignallerCallback>(
-                [this](Step step, Time /*unused*/) { energyReductionStep_ = step; });
+        return [this](Step step, Time /*unused*/) { energyReductionStep_ = step; };
     }
-    return nullptr;
+    return std::nullopt;
 }
 
 //! Explicit template instantiation
-//! @{
+//! \{
 template class ComputeGlobalsElement<ComputeGlobalsAlgorithm::LeapFrog>;
 template class ComputeGlobalsElement<ComputeGlobalsAlgorithm::VelocityVerlet>;
-//! @}
+//! \}
+
+template<>
+ISimulatorElement* ComputeGlobalsElement<ComputeGlobalsAlgorithm::LeapFrog>::getElementPointerImpl(
+        LegacySimulatorData*                    legacySimulatorData,
+        ModularSimulatorAlgorithmBuilderHelper* builderHelper,
+        StatePropagatorData*                    statePropagatorData,
+        EnergyData*                             energyData,
+        FreeEnergyPerturbationData*             freeEnergyPerturbationData,
+        GlobalCommunicationHelper*              globalCommunicationHelper)
+{
+    auto* element = builderHelper->storeElement(
+            std::make_unique<ComputeGlobalsElement<ComputeGlobalsAlgorithm::LeapFrog>>(
+                    statePropagatorData, energyData, freeEnergyPerturbationData,
+                    globalCommunicationHelper->simulationSignals(),
+                    globalCommunicationHelper->nstglobalcomm(), legacySimulatorData->fplog,
+                    legacySimulatorData->mdlog, legacySimulatorData->cr,
+                    legacySimulatorData->inputrec, legacySimulatorData->mdAtoms,
+                    legacySimulatorData->nrnb, legacySimulatorData->wcycle, legacySimulatorData->fr,
+                    legacySimulatorData->top_global, legacySimulatorData->constr));
+
+    // TODO: Remove this when DD can reduce bonded interactions independently (#3421)
+    auto* castedElement = static_cast<ComputeGlobalsElement<ComputeGlobalsAlgorithm::LeapFrog>*>(element);
+    globalCommunicationHelper->setCheckBondedInteractionsCallback(
+            castedElement->getCheckNumberOfBondedInteractionsCallback());
+
+    return element;
+}
+
+template<>
+ISimulatorElement* ComputeGlobalsElement<ComputeGlobalsAlgorithm::VelocityVerlet>::getElementPointerImpl(
+        LegacySimulatorData*                    simulator,
+        ModularSimulatorAlgorithmBuilderHelper* builderHelper,
+        StatePropagatorData*                    statePropagatorData,
+        EnergyData*                             energyData,
+        FreeEnergyPerturbationData*             freeEnergyPerturbationData,
+        GlobalCommunicationHelper*              globalCommunicationHelper)
+{
+    // We allow this element to be added multiple times to the call list, but we only want one
+    // actual element built
+    static thread_local ISimulatorElement* vvComputeGlobalsElement = nullptr;
+    if (!builderHelper->elementIsStored(vvComputeGlobalsElement))
+    {
+        vvComputeGlobalsElement = builderHelper->storeElement(
+                std::make_unique<ComputeGlobalsElement<ComputeGlobalsAlgorithm::VelocityVerlet>>(
+                        statePropagatorData, energyData, freeEnergyPerturbationData,
+                        globalCommunicationHelper->simulationSignals(),
+                        globalCommunicationHelper->nstglobalcomm(), simulator->fplog, simulator->mdlog,
+                        simulator->cr, simulator->inputrec, simulator->mdAtoms, simulator->nrnb,
+                        simulator->wcycle, simulator->fr, simulator->top_global, simulator->constr));
+
+        // TODO: Remove this when DD can reduce bonded interactions independently (#3421)
+        auto* castedElement =
+                static_cast<ComputeGlobalsElement<ComputeGlobalsAlgorithm::VelocityVerlet>*>(
+                        vvComputeGlobalsElement);
+        globalCommunicationHelper->setCheckBondedInteractionsCallback(
+                castedElement->getCheckNumberOfBondedInteractionsCallback());
+    }
+    return vvComputeGlobalsElement;
+}
 } // namespace gmx

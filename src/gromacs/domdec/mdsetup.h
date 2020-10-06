@@ -43,14 +43,12 @@
 #ifndef GMX_DOMDEC_MDSETUP_H
 #define GMX_DOMDEC_MDSETUP_H
 
-#include "gromacs/gpu_utils/hostallocator.h"
 #include "gromacs/math/vectypes.h"
 
 struct bonded_threading_t;
 struct gmx_localtop_t;
 struct gmx_mtop_t;
 struct gmx_shellfc_t;
-struct gmx_vsite_t;
 struct t_commrec;
 struct t_forcerec;
 struct t_inputrec;
@@ -59,7 +57,9 @@ struct t_mdatoms;
 namespace gmx
 {
 class Constraints;
+class ForceBuffers;
 class MDAtoms;
+class VirtualSitesHandler;
 
 /*! \brief Gets the local shell with domain decomposition
  *
@@ -87,16 +87,16 @@ void make_local_shells(const t_commrec* cr, const t_mdatoms* md, gmx_shellfc_t* 
  * \param[in,out] vsite      The virtual site data, can be NULL
  * \param[in,out] shellfc    The shell/flexible-constraint data, can be NULL
  */
-void mdAlgorithmsSetupAtomData(const t_commrec*        cr,
-                               const t_inputrec*       ir,
-                               const gmx_mtop_t&       top_global,
-                               gmx_localtop_t*         top,
-                               t_forcerec*             fr,
-                               PaddedHostVector<RVec>* force,
-                               MDAtoms*                mdAtoms,
-                               Constraints*            constr,
-                               gmx_vsite_t*            vsite,
-                               gmx_shellfc_t*          shellfc);
+void mdAlgorithmsSetupAtomData(const t_commrec*     cr,
+                               const t_inputrec*    ir,
+                               const gmx_mtop_t&    top_global,
+                               gmx_localtop_t*      top,
+                               t_forcerec*          fr,
+                               ForceBuffers*        force,
+                               MDAtoms*             mdAtoms,
+                               Constraints*         constr,
+                               VirtualSitesHandler* vsite,
+                               gmx_shellfc_t*       shellfc);
 
 } // namespace gmx
 

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -83,6 +83,8 @@ public:
         computeVirial_(computeVirial),
         shiftForces_(computeVirial ? shiftForces : gmx::ArrayRef<gmx::RVec>())
     {
+        GMX_ASSERT(!computeVirial || !shiftForces.empty(),
+                   "We need a valid shift force buffer when computing the virial");
     }
 
     //! Returns an arrayref to the force buffer without padding
@@ -100,6 +102,9 @@ public:
     //! Returns a const shift forces buffer
     gmx::ArrayRef<const gmx::RVec> shiftForces() const { return shiftForces_; }
 
+    //! Returns a reference to the boolean which tells whether we have spread forces on vsites
+    bool& haveSpreadVsiteForces() { return haveSpreadVsiteForces_; }
+
 private:
     //! The force buffer
     gmx::ArrayRefWithPadding<gmx::RVec> force_;
@@ -107,6 +112,8 @@ private:
     bool computeVirial_;
     //! A buffer for storing the shift forces, size SHIFTS
     gmx::ArrayRef<gmx::RVec> shiftForces_;
+    //! Tells whether we have spread the vsite forces
+    bool haveSpreadVsiteForces_ = false;
 };
 
 /*! \libinternal \brief Container for force and virial for algorithms that provide their own virial tensor contribution
@@ -193,8 +200,11 @@ class ForceOutputs
 {
 public:
     //! Constructor
-    ForceOutputs(const ForceWithShiftForces& forceWithShiftForces, const ForceWithVirial& forceWithVirial) :
+    ForceOutputs(const ForceWithShiftForces& forceWithShiftForces,
+                 bool                        haveForceWithVirial,
+                 const ForceWithVirial&      forceWithVirial) :
         forceWithShiftForces_(forceWithShiftForces),
+        haveForceWithVirial_(haveForceWithVirial),
         forceWithVirial_(forceWithVirial)
     {
     }
@@ -202,12 +212,17 @@ public:
     //! Returns a reference to the force with shift forces object
     ForceWithShiftForces& forceWithShiftForces() { return forceWithShiftForces_; }
 
+    //! Return whether there are forces with direct virial contributions
+    bool haveForceWithVirial() const { return haveForceWithVirial_; }
+
     //! Returns a reference to the force with virial object
     ForceWithVirial& forceWithVirial() { return forceWithVirial_; }
 
 private:
     //! Force output buffer used by legacy modules (without SIMD padding)
     ForceWithShiftForces forceWithShiftForces_;
+    //! Whether we have forces with direct virial contributions
+    bool haveForceWithVirial_;
     //! Force with direct virial contribution (if there are any; without SIMD padding)
     ForceWithVirial forceWithVirial_;
 };

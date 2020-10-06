@@ -68,10 +68,11 @@
 #include "gromacs/gmxlib/nrnb.h"
 #include "gromacs/imd/imd.h"
 #include "gromacs/linearalgebra/sparsematrix.h"
-#include "gromacs/listed_forces/manage_threading.h"
+#include "gromacs/listed_forces/listed_forces.h"
 #include "gromacs/math/functions.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/constr.h"
+#include "gromacs/mdlib/coupling.h"
 #include "gromacs/mdlib/dispersioncorrection.h"
 #include "gromacs/mdlib/ebin.h"
 #include "gromacs/mdlib/enerdata_utils.h"
@@ -89,7 +90,9 @@
 #include "gromacs/mdlib/vsite.h"
 #include "gromacs/mdrunutility/handlerestart.h"
 #include "gromacs/mdrunutility/printtime.h"
+#include "gromacs/mdtypes/checkpointdata.h"
 #include "gromacs/mdtypes/commrec.h"
+#include "gromacs/mdtypes/forcebuffers.h"
 #include "gromacs/mdtypes/forcerec.h"
 #include "gromacs/mdtypes/inputrec.h"
 #include "gromacs/mdtypes/interaction_const.h"
@@ -114,14 +117,15 @@
 using gmx::ArrayRef;
 using gmx::MdrunScheduleWorkload;
 using gmx::RVec;
+using gmx::VirtualSitesHandler;
 
 //! Utility structure for manipulating states during EM
-typedef struct
+typedef struct em_state
 {
     //! Copy of the global state
     t_state s;
     //! Force array
-    PaddedHostVector<gmx::RVec> f;
+    gmx::ForceBuffers f;
     //! Potential energy
     real epot;
     //! Norm of the force
@@ -253,13 +257,13 @@ static void print_converged(FILE*             fp,
 }
 
 //! Compute the norm and max of the force array in parallel
-static void get_f_norm_max(const t_commrec* cr,
-                           t_grpopts*       opts,
-                           t_mdatoms*       mdatoms,
-                           const rvec*      f,
-                           real*            fnorm,
-                           real*            fmax,
-                           int*             a_fmax)
+static void get_f_norm_max(const t_commrec*               cr,
+                           t_grpopts*                     opts,
+                           t_mdatoms*                     mdatoms,
+                           gmx::ArrayRef<const gmx::RVec> f,
+                           real*                          fnorm,
+                           real*                          fmax,
+                           int*                           a_fmax)
 {
     double fnorm2, *sum;
     real   fmax2, fam;
@@ -353,7 +357,7 @@ static void get_f_norm_max(const t_commrec* cr,
 //! Compute the norm of the force
 static void get_state_f_norm_max(const t_commrec* cr, t_grpopts* opts, t_mdatoms* mdatoms, em_state_t* ems)
 {
-    get_f_norm_max(cr, opts, mdatoms, ems->f.rvec_array(), &ems->fnorm, &ems->fmax, &ems->a_fmax);
+    get_f_norm_max(cr, opts, mdatoms, ems->f.view().force(), &ems->fnorm, &ems->fmax, &ems->a_fmax);
 }
 
 //! Initialize the energy minimization
@@ -372,7 +376,7 @@ static void init_em(FILE*                fplog,
                     t_forcerec*          fr,
                     gmx::MDAtoms*        mdAtoms,
                     gmx_global_stat_t*   gstat,
-                    gmx_vsite_t*         vsite,
+                    VirtualSitesHandler* vsite,
                     gmx::Constraints*    constr,
                     gmx_shellfc_t**      shellfc)
 {
@@ -387,7 +391,9 @@ static void init_em(FILE*                fplog,
     {
         state_global->ngtc = 0;
     }
-    initialize_lambdas(fplog, *ir, MASTER(cr), &(state_global->fep_state), state_global->lambda, nullptr);
+    int*                fep_state = MASTER(cr) ? &state_global->fep_state : nullptr;
+    gmx::ArrayRef<real> lambda    = MASTER(cr) ? state_global->lambda : gmx::ArrayRef<real>();
+    initialize_lambdas(fplog, *ir, MASTER(cr), fep_state, lambda);
 
     if (ir->eI == eiNM)
     {
@@ -411,7 +417,6 @@ static void init_em(FILE*                fplog,
         }
     }
 
-    auto mdatoms = mdAtoms->mdatoms();
     if (DOMAINDECOMP(cr))
     {
         dd_init_local_state(cr->dd, state_global, &ems->s);
@@ -431,11 +436,6 @@ static void init_em(FILE*                fplog,
 
         mdAlgorithmsSetupAtomData(cr, ir, *top_global, top, fr, &ems->f, mdAtoms, constr, vsite,
                                   shellfc ? *shellfc : nullptr);
-
-        if (vsite)
-        {
-            set_vsite_top(vsite, top, mdatoms);
-        }
     }
 
     update_mdatoms(mdAtoms->mdatoms(), ems->s.lambda[efptMASS]);
@@ -452,11 +452,14 @@ static void init_em(FILE*                fplog,
         if (!ir->bContinuation)
         {
             /* Constrain the starting coordinates */
-            dvdl_constr = 0;
-            constr->apply(TRUE, TRUE, -1, 0, 1.0, ems->s.x.arrayRefWithPadding(),
+            bool needsLogging  = true;
+            bool computeEnergy = true;
+            bool computeVirial = false;
+            dvdl_constr        = 0;
+            constr->apply(needsLogging, computeEnergy, -1, 0, 1.0, ems->s.x.arrayRefWithPadding(),
                           ems->s.x.arrayRefWithPadding(), ArrayRef<RVec>(), ems->s.box,
                           ems->s.lambda[efptFEP], &dvdl_constr, gmx::ArrayRefWithPadding<RVec>(),
-                          nullptr, gmx::ConstraintVariable::Positions);
+                          computeVirial, nullptr, gmx::ConstraintVariable::Positions);
         }
     }
 
@@ -530,9 +533,10 @@ static void write_em_traj(FILE*               fplog,
         mdof_flags |= MDOF_IMD;
     }
 
+    gmx::WriteCheckpointDataHolder checkpointDataHolder;
     mdoutf_write_to_trajectory_files(fplog, cr, outf, mdof_flags, top_global->natoms, step,
                                      static_cast<double>(step), &state->s, state_global,
-                                     observablesHistory, state->f);
+                                     observablesHistory, state->f.view().force(), &checkpointDataHolder);
 
     if (confout != nullptr)
     {
@@ -542,7 +546,8 @@ static void write_em_traj(FILE*               fplog,
             if (!bX)
             {
                 auto globalXRef = MASTER(cr) ? state_global->x : gmx::ArrayRef<gmx::RVec>();
-                dd_collect_vec(cr->dd, &state->s, state->s.x, globalXRef);
+                dd_collect_vec(cr->dd, state->s.ddp_count, state->s.ddp_count_cg_gl, state->s.cg_gl,
+                               state->s.x, globalXRef);
             }
         }
         else
@@ -568,15 +573,15 @@ static void write_em_traj(FILE*               fplog,
 //! \brief Do one minimization step
 //
 // \returns true when the step succeeded, false when a constraint error occurred
-static bool do_em_step(const t_commrec*                   cr,
-                       t_inputrec*                        ir,
-                       t_mdatoms*                         md,
-                       em_state_t*                        ems1,
-                       real                               a,
-                       const PaddedHostVector<gmx::RVec>* force,
-                       em_state_t*                        ems2,
-                       gmx::Constraints*                  constr,
-                       int64_t                            count)
+static bool do_em_step(const t_commrec*                          cr,
+                       t_inputrec*                               ir,
+                       t_mdatoms*                                md,
+                       em_state_t*                               ems1,
+                       real                                      a,
+                       gmx::ArrayRefWithPadding<const gmx::RVec> force,
+                       em_state_t*                               ems2,
+                       gmx::Constraints*                         constr,
+                       int64_t                                   count)
 
 {
     t_state *s1, *s2;
@@ -599,7 +604,7 @@ static bool do_em_step(const t_commrec*                   cr,
     if (s2->natoms != s1->natoms)
     {
         state_change_natoms(s2, s1->natoms);
-        ems2->f.resizeWithPadding(s2->natoms);
+        ems2->f.resize(s2->natoms);
     }
     if (DOMAINDECOMP(cr) && s2->cg_gl.size() != s1->cg_gl.size())
     {
@@ -619,7 +624,7 @@ static bool do_em_step(const t_commrec*                   cr,
     {
         const rvec* x1 = s1->x.rvec_array();
         rvec*       x2 = s2->x.rvec_array();
-        const rvec* f  = force->rvec_array();
+        const rvec* f  = as_rvec_array(force.unpaddedArrayRef().data());
 
         int gf = 0;
 #pragma omp for schedule(static) nowait
@@ -682,7 +687,7 @@ static bool do_em_step(const t_commrec*                   cr,
         validStep   = constr->apply(
                 TRUE, TRUE, count, 0, 1.0, s1->x.arrayRefWithPadding(), s2->x.arrayRefWithPadding(),
                 ArrayRef<RVec>(), s2->box, s2->lambda[efptBONDED], &dvdl_constr,
-                gmx::ArrayRefWithPadding<RVec>(), nullptr, gmx::ConstraintVariable::Positions);
+                gmx::ArrayRefWithPadding<RVec>(), false, nullptr, gmx::ConstraintVariable::Positions);
 
         if (cr->nnodes > 1)
         {
@@ -721,7 +726,7 @@ static void em_dd_partition_system(FILE*                fplog,
                                    gmx_localtop_t*      top,
                                    gmx::MDAtoms*        mdAtoms,
                                    t_forcerec*          fr,
-                                   gmx_vsite_t*         vsite,
+                                   VirtualSitesHandler* vsite,
                                    gmx::Constraints*    constr,
                                    t_nrnb*              nrnb,
                                    gmx_wallcycle_t      wcycle)
@@ -784,11 +789,9 @@ public:
     //! Coordinates global reduction.
     gmx_global_stat_t gstat;
     //! Handles virtual sites.
-    gmx_vsite_t* vsite;
+    VirtualSitesHandler* vsite;
     //! Handles constraints.
     gmx::Constraints* constr;
-    //! Handles strange things.
-    t_fcdata* fcd;
     //! Per-atom data for this domain.
     gmx::MDAtoms* mdAtoms;
     //! Handles how to calculate the forces.
@@ -826,8 +829,7 @@ void EnergyEvaluator::run(em_state_t* ems, rvec mu_tot, tensor vir, tensor pres,
 
     if (vsite)
     {
-        construct_vsites(vsite, ems->s.x.rvec_array(), 1, nullptr, top->idef.iparams, top->idef.il,
-                         fr->pbcType, fr->bMolPBC, cr, ems->s.box);
+        vsite->construct(ems->s.x, 1, {}, ems->s.box);
     }
 
     if (DOMAINDECOMP(cr) && bNS)
@@ -842,9 +844,8 @@ void EnergyEvaluator::run(em_state_t* ems, rvec mu_tot, tensor vir, tensor pres,
      * We do not unshift, so molecules are always whole in congrad.c
      */
     do_force(fplog, cr, ms, inputrec, nullptr, nullptr, imdSession, pull_work, count, nrnb, wcycle,
-             top, ems->s.box, ems->s.x.arrayRefWithPadding(), &ems->s.hist,
-             ems->f.arrayRefWithPadding(), force_vir, mdAtoms->mdatoms(), enerd, fcd, ems->s.lambda,
-             fr, runScheduleWork, vsite, mu_tot, t, nullptr,
+             top, ems->s.box, ems->s.x.arrayRefWithPadding(), &ems->s.hist, &ems->f.view(), force_vir,
+             mdAtoms->mdatoms(), enerd, ems->s.lambda, fr, runScheduleWork, vsite, mu_tot, t, nullptr,
              GMX_FORCE_STATECHANGED | GMX_FORCE_ALLFORCES | GMX_FORCE_VIRIAL | GMX_FORCE_ENERGY
                      | (bNS ? GMX_FORCE_NS : 0),
              DDBalanceRegionHandler(cr));
@@ -885,11 +886,15 @@ void EnergyEvaluator::run(em_state_t* ems, rvec mu_tot, tensor vir, tensor pres,
     if (constr)
     {
         /* Project out the constraint components of the force */
-        dvdl_constr = 0;
-        auto f      = ems->f.arrayRefWithPadding();
-        constr->apply(FALSE, FALSE, count, 0, 1.0, ems->s.x.arrayRefWithPadding(), f,
+        bool needsLogging  = false;
+        bool computeEnergy = false;
+        bool computeVirial = true;
+        dvdl_constr        = 0;
+        auto f             = ems->f.view().forceWithPadding();
+        constr->apply(needsLogging, computeEnergy, count, 0, 1.0, ems->s.x.arrayRefWithPadding(), f,
                       f.unpaddedArrayRef(), ems->s.box, ems->s.lambda[efptBONDED], &dvdl_constr,
-                      gmx::ArrayRefWithPadding<RVec>(), &shake_vir, gmx::ConstraintVariable::ForceDispl);
+                      gmx::ArrayRefWithPadding<RVec>(), computeVirial, shake_vir,
+                      gmx::ConstraintVariable::ForceDispl);
         enerd->term[F_DVDL_CONSTR] += dvdl_constr;
         m_add(force_vir, shake_vir, vir);
     }
@@ -901,7 +906,10 @@ void EnergyEvaluator::run(em_state_t* ems, rvec mu_tot, tensor vir, tensor pres,
     clear_mat(ekin);
     enerd->term[F_PRES] = calc_pres(fr->pbcType, inputrec->nwall, ems->s.box, ekin, vir, pres);
 
-    sum_dhdl(enerd, ems->s.lambda, *inputrec->fepvals);
+    if (inputrec->efep != efepNO)
+    {
+        accumulateKineticLambdaComponents(enerd, ems->s.lambda, *inputrec->fepvals);
+    }
 
     if (EI_ENERGY_MINIMIZATION(inputrec->eI))
     {
@@ -915,16 +923,16 @@ void EnergyEvaluator::run(em_state_t* ems, rvec mu_tot, tensor vir, tensor pres,
 static double reorder_partsum(const t_commrec*  cr,
                               t_grpopts*        opts,
                               const gmx_mtop_t* top_global,
-                              em_state_t*       s_min,
-                              em_state_t*       s_b)
+                              const em_state_t* s_min,
+                              const em_state_t* s_b)
 {
     if (debug)
     {
         fprintf(debug, "Doing reorder_partsum\n");
     }
 
-    const rvec* fm = s_min->f.rvec_array();
-    const rvec* fb = s_b->f.rvec_array();
+    auto fm = s_min->f.view().force();
+    auto fb = s_b->f.view().force();
 
     /* Collect fm in a global vector fmg.
      * This conflicts with the spirit of domain decomposition,
@@ -977,8 +985,8 @@ static real pr_beta(const t_commrec*  cr,
                     t_grpopts*        opts,
                     t_mdatoms*        mdatoms,
                     const gmx_mtop_t* top_global,
-                    em_state_t*       s_min,
-                    em_state_t*       s_b)
+                    const em_state_t* s_min,
+                    const em_state_t* s_b)
 {
     double sum;
 
@@ -990,10 +998,10 @@ static real pr_beta(const t_commrec*  cr,
     if (!DOMAINDECOMP(cr)
         || (s_min->s.ddp_count == cr->dd->ddp_count && s_b->s.ddp_count == cr->dd->ddp_count))
     {
-        const rvec* fm = s_min->f.rvec_array();
-        const rvec* fb = s_b->f.rvec_array();
-        sum            = 0;
-        int gf         = 0;
+        auto fm = s_min->f.view().force();
+        auto fb = s_b->f.view().force();
+        sum     = 0;
+        int gf  = 0;
         /* This part of code can be incorrect with DD,
          * since the atom ordering in s_b and s_min might differ.
          */
@@ -1104,11 +1112,9 @@ void LegacySimulator::do_cg()
         sp_header(fplog, CG, inputrec->em_tol, number_steps);
     }
 
-    EnergyEvaluator energyEvaluator{
-        fplog, mdlog,  cr,    ms,    top_global, &top, inputrec, imdSession, pull_work,
-        nrnb,  wcycle, gstat, vsite, constr,     fcd,  mdAtoms,  fr,         runScheduleWork,
-        enerd
-    };
+    EnergyEvaluator energyEvaluator{ fplog,    mdlog,      cr,        ms,   top_global,      &top,
+                                     inputrec, imdSession, pull_work, nrnb, wcycle,          gstat,
+                                     vsite,    constr,     mdAtoms,   fr,   runScheduleWork, enerd };
     /* Call the force routine and some auxiliary (neighboursearching etc.) */
     /* do_force always puts the charge groups in the box and shifts again
      * We do not unshift, so molecules are always whole in congrad.c
@@ -1120,12 +1126,12 @@ void LegacySimulator::do_cg()
         /* Copy stuff to the energy bin for easy printing etc. */
         matrix nullBox = {};
         energyOutput.addDataAtEnergyStep(false, false, static_cast<double>(step), mdatoms->tmass,
-                                         enerd, nullptr, nullptr, nullptr, nullBox, nullptr,
-                                         nullptr, vir, pres, nullptr, mu_tot, constr);
+                                         enerd, nullptr, nullptr, nullBox, PTCouplingArrays(), 0,
+                                         nullptr, nullptr, vir, pres, nullptr, mu_tot, constr);
 
         EnergyOutput::printHeader(fplog, step, step);
         energyOutput.printStepToEnergyFile(mdoutf_get_fp_ene(outf), TRUE, FALSE, FALSE, fplog, step,
-                                           step, fcd, nullptr);
+                                           step, fr->fcdata.get(), nullptr);
     }
 
     /* Estimate/guess the initial stepsize */
@@ -1156,10 +1162,10 @@ void LegacySimulator::do_cg()
          */
 
         /* Calculate the new direction in p, and the gradient in this direction, gpa */
-        rvec*       pm  = s_min->s.cg_p.rvec_array();
-        const rvec* sfm = s_min->f.rvec_array();
-        double      gpa = 0;
-        int         gf  = 0;
+        gmx::ArrayRef<gmx::RVec>       pm  = s_min->s.cg_p;
+        gmx::ArrayRef<const gmx::RVec> sfm = s_min->f.view().force();
+        double                         gpa = 0;
+        int                            gf  = 0;
         for (int i = 0; i < mdatoms->homenr; i++)
         {
             if (mdatoms->cFREEZE)
@@ -1276,16 +1282,17 @@ void LegacySimulator::do_cg()
         }
 
         /* Take a trial step (new coords in s_c) */
-        do_em_step(cr, inputrec, mdatoms, s_min, c, &s_min->s.cg_p, s_c, constr, -1);
+        do_em_step(cr, inputrec, mdatoms, s_min, c, s_min->s.cg_p.constArrayRefWithPadding(), s_c,
+                   constr, -1);
 
         neval++;
         /* Calculate energy for the trial step */
         energyEvaluator.run(s_c, mu_tot, vir, pres, -1, FALSE);
 
         /* Calc derivative along line */
-        const rvec* pc  = s_c->s.cg_p.rvec_array();
-        const rvec* sfc = s_c->f.rvec_array();
-        double      gpc = 0;
+        const rvec*                    pc  = s_c->s.cg_p.rvec_array();
+        gmx::ArrayRef<const gmx::RVec> sfc = s_c->f.view().force();
+        double                         gpc = 0;
         for (int i = 0; i < mdatoms->homenr; i++)
         {
             for (m = 0; m < DIM; m++)
@@ -1377,7 +1384,8 @@ void LegacySimulator::do_cg()
                 }
 
                 /* Take a trial step to this new point - new coords in s_b */
-                do_em_step(cr, inputrec, mdatoms, s_min, b, &s_min->s.cg_p, s_b, constr, -1);
+                do_em_step(cr, inputrec, mdatoms, s_min, b,
+                           s_min->s.cg_p.constArrayRefWithPadding(), s_b, constr, -1);
 
                 neval++;
                 /* Calculate energy for the trial step */
@@ -1386,9 +1394,9 @@ void LegacySimulator::do_cg()
                 /* p does not change within a step, but since the domain decomposition
                  * might change, we have to use cg_p of s_b here.
                  */
-                const rvec* pb  = s_b->s.cg_p.rvec_array();
-                const rvec* sfb = s_b->f.rvec_array();
-                gpb             = 0;
+                const rvec*                    pb  = s_b->s.cg_p.rvec_array();
+                gmx::ArrayRef<const gmx::RVec> sfb = s_b->f.view().force();
+                gpb                                = 0;
                 for (int i = 0; i < mdatoms->homenr; i++)
                 {
                     for (m = 0; m < DIM; m++)
@@ -1527,8 +1535,8 @@ void LegacySimulator::do_cg()
             /* Store the new (lower) energies */
             matrix nullBox = {};
             energyOutput.addDataAtEnergyStep(false, false, static_cast<double>(step), mdatoms->tmass,
-                                             enerd, nullptr, nullptr, nullptr, nullBox, nullptr,
-                                             nullptr, vir, pres, nullptr, mu_tot, constr);
+                                             enerd, nullptr, nullptr, nullBox, PTCouplingArrays(), 0,
+                                             nullptr, nullptr, vir, pres, nullptr, mu_tot, constr);
 
             do_log = do_per_step(step, inputrec->nstlog);
             do_ene = do_per_step(step, inputrec->nstenergy);
@@ -1540,7 +1548,8 @@ void LegacySimulator::do_cg()
                 EnergyOutput::printHeader(fplog, step, step);
             }
             energyOutput.printStepToEnergyFile(mdoutf_get_fp_ene(outf), do_ene, FALSE, FALSE,
-                                               do_log ? fplog : nullptr, step, step, fcd, nullptr);
+                                               do_log ? fplog : nullptr, step, step,
+                                               fr->fcdata.get(), nullptr);
         }
 
         /* Send energies and positions to the IMD client if bIMD is TRUE. */
@@ -1583,7 +1592,8 @@ void LegacySimulator::do_cg()
         {
             /* Write final energy file entries */
             energyOutput.printStepToEnergyFile(mdoutf_get_fp_ene(outf), !do_ene, FALSE, FALSE,
-                                               !do_log ? fplog : nullptr, step, step, fcd, nullptr);
+                                               !do_log ? fplog : nullptr, step, step,
+                                               fr->fcdata.get(), nullptr);
         }
     }
 
@@ -1748,8 +1758,7 @@ void LegacySimulator::do_lbfgs()
 
     if (vsite)
     {
-        construct_vsites(vsite, state_global->x.rvec_array(), 1, nullptr, top.idef.iparams,
-                         top.idef.il, fr->pbcType, fr->bMolPBC, cr, state_global->box);
+        vsite->construct(state_global->x, 1, {}, state_global->box);
     }
 
     /* Call the force routine and some auxiliary (neighboursearching etc.) */
@@ -1757,11 +1766,9 @@ void LegacySimulator::do_lbfgs()
      * We do not unshift, so molecules are always whole
      */
     neval++;
-    EnergyEvaluator energyEvaluator{
-        fplog, mdlog,  cr,    ms,    top_global, &top, inputrec, imdSession, pull_work,
-        nrnb,  wcycle, gstat, vsite, constr,     fcd,  mdAtoms,  fr,         runScheduleWork,
-        enerd
-    };
+    EnergyEvaluator energyEvaluator{ fplog,    mdlog,      cr,        ms,   top_global,      &top,
+                                     inputrec, imdSession, pull_work, nrnb, wcycle,          gstat,
+                                     vsite,    constr,     mdAtoms,   fr,   runScheduleWork, enerd };
     energyEvaluator.run(&ems, mu_tot, vir, pres, -1, TRUE);
 
     if (MASTER(cr))
@@ -1769,12 +1776,12 @@ void LegacySimulator::do_lbfgs()
         /* Copy stuff to the energy bin for easy printing etc. */
         matrix nullBox = {};
         energyOutput.addDataAtEnergyStep(false, false, static_cast<double>(step), mdatoms->tmass,
-                                         enerd, nullptr, nullptr, nullptr, nullBox, nullptr,
-                                         nullptr, vir, pres, nullptr, mu_tot, constr);
+                                         enerd, nullptr, nullptr, nullBox, PTCouplingArrays(), 0,
+                                         nullptr, nullptr, vir, pres, nullptr, mu_tot, constr);
 
         EnergyOutput::printHeader(fplog, step, step);
         energyOutput.printStepToEnergyFile(mdoutf_get_fp_ene(outf), TRUE, FALSE, FALSE, fplog, step,
-                                           step, fcd, nullptr);
+                                           step, fr->fcdata.get(), nullptr);
     }
 
     /* Set the initial step.
@@ -1801,7 +1808,7 @@ void LegacySimulator::do_lbfgs()
     point = 0;
 
     // Set initial search direction to the force (-gradient), or 0 for frozen particles.
-    real* fInit = static_cast<real*>(ems.f.rvec_array()[0]);
+    real* fInit = static_cast<real*>(ems.f.view().force().data()[0]);
     for (i = 0; i < n; i++)
     {
         if (!frozen[i])
@@ -1852,9 +1859,10 @@ void LegacySimulator::do_lbfgs()
             mdof_flags |= MDOF_IMD;
         }
 
+        gmx::WriteCheckpointDataHolder checkpointDataHolder;
         mdoutf_write_to_trajectory_files(fplog, cr, outf, mdof_flags, top_global->natoms, step,
-                                         static_cast<real>(step), &ems.s, state_global,
-                                         observablesHistory, ems.f);
+                                         static_cast<real>(step), &ems.s, state_global, observablesHistory,
+                                         ems.f.view().force(), &checkpointDataHolder);
 
         /* Do the linesearching in the direction dx[point][0..(n-1)] */
 
@@ -1862,7 +1870,7 @@ void LegacySimulator::do_lbfgs()
         s = dx[point];
 
         real* xx = static_cast<real*>(ems.s.x.rvec_array()[0]);
-        real* ff = static_cast<real*>(ems.f.rvec_array()[0]);
+        real* ff = static_cast<real*>(ems.f.view().force().data()[0]);
 
         // calculate line gradient in position A
         for (gpa = 0, i = 0; i < n; i++)
@@ -1894,7 +1902,7 @@ void LegacySimulator::do_lbfgs()
         // Before taking any steps along the line, store the old position
         *last       = ems;
         real* lastx = static_cast<real*>(last->s.x.data()[0]);
-        real* lastf = static_cast<real*>(last->f.data()[0]);
+        real* lastf = static_cast<real*>(last->f.view().force().data()[0]);
         Epot0       = ems.epot;
 
         *sa = ems;
@@ -1966,7 +1974,7 @@ void LegacySimulator::do_lbfgs()
         energyEvaluator.run(sc, mu_tot, vir, pres, step, FALSE);
 
         // Calc line gradient in position C
-        real* fc = static_cast<real*>(sc->f.rvec_array()[0]);
+        real* fc = static_cast<real*>(sc->f.view().force()[0]);
         for (gpc = 0, i = 0; i < n; i++)
         {
             gpc -= s[i] * fc[i]; /* f is negative gradient, thus the sign */
@@ -2048,7 +2056,7 @@ void LegacySimulator::do_lbfgs()
                 fnorm = sb->fnorm;
 
                 // Calculate gradient in point B
-                real* fb = static_cast<real*>(sb->f.rvec_array()[0]);
+                real* fb = static_cast<real*>(sb->f.view().force()[0]);
                 for (gpb = 0, i = 0; i < n; i++)
                 {
                     gpb -= s[i] * fb[i]; /* f is negative gradient, thus the sign */
@@ -2253,8 +2261,8 @@ void LegacySimulator::do_lbfgs()
             /* Store the new (lower) energies */
             matrix nullBox = {};
             energyOutput.addDataAtEnergyStep(false, false, static_cast<double>(step), mdatoms->tmass,
-                                             enerd, nullptr, nullptr, nullptr, nullBox, nullptr,
-                                             nullptr, vir, pres, nullptr, mu_tot, constr);
+                                             enerd, nullptr, nullptr, nullBox, PTCouplingArrays(), 0,
+                                             nullptr, nullptr, vir, pres, nullptr, mu_tot, constr);
 
             do_log = do_per_step(step, inputrec->nstlog);
             do_ene = do_per_step(step, inputrec->nstenergy);
@@ -2266,7 +2274,8 @@ void LegacySimulator::do_lbfgs()
                 EnergyOutput::printHeader(fplog, step, step);
             }
             energyOutput.printStepToEnergyFile(mdoutf_get_fp_ene(outf), do_ene, FALSE, FALSE,
-                                               do_log ? fplog : nullptr, step, step, fcd, nullptr);
+                                               do_log ? fplog : nullptr, step, step,
+                                               fr->fcdata.get(), nullptr);
         }
 
         /* Send x and E to IMD client, if bIMD is TRUE. */
@@ -2308,7 +2317,8 @@ void LegacySimulator::do_lbfgs()
     if (!do_ene || !do_log) /* Write final energy file entries */
     {
         energyOutput.printStepToEnergyFile(mdoutf_get_fp_ene(outf), !do_ene, FALSE, FALSE,
-                                           !do_log ? fplog : nullptr, step, step, fcd, nullptr);
+                                           !do_log ? fplog : nullptr, step, step, fr->fcdata.get(),
+                                           nullptr);
     }
 
     /* Print some stuff... */
@@ -2403,11 +2413,9 @@ void LegacySimulator::do_steep()
     {
         sp_header(fplog, SD, inputrec->em_tol, nsteps);
     }
-    EnergyEvaluator energyEvaluator{
-        fplog, mdlog,  cr,    ms,    top_global, &top, inputrec, imdSession, pull_work,
-        nrnb,  wcycle, gstat, vsite, constr,     fcd,  mdAtoms,  fr,         runScheduleWork,
-        enerd
-    };
+    EnergyEvaluator energyEvaluator{ fplog,    mdlog,      cr,        ms,   top_global,      &top,
+                                     inputrec, imdSession, pull_work, nrnb, wcycle,          gstat,
+                                     vsite,    constr,     mdAtoms,   fr,   runScheduleWork, enerd };
 
     /**** HERE STARTS THE LOOP ****
      * count is the counter for the number of steps
@@ -2426,7 +2434,8 @@ void LegacySimulator::do_steep()
         bool validStep = true;
         if (count > 0)
         {
-            validStep = do_em_step(cr, inputrec, mdatoms, s_min, stepsize, &s_min->f, s_try, constr, count);
+            validStep = do_em_step(cr, inputrec, mdatoms, s_min, stepsize,
+                                   s_min->f.view().forceWithPadding(), s_try, constr, count);
         }
 
         if (validStep)
@@ -2464,16 +2473,17 @@ void LegacySimulator::do_steep()
             {
                 /* Store the new (lower) energies  */
                 matrix nullBox = {};
-                energyOutput.addDataAtEnergyStep(false, false, static_cast<double>(count), mdatoms->tmass,
-                                                 enerd, nullptr, nullptr, nullptr, nullBox, nullptr,
-                                                 nullptr, vir, pres, nullptr, mu_tot, constr);
+                energyOutput.addDataAtEnergyStep(false, false, static_cast<double>(count),
+                                                 mdatoms->tmass, enerd, nullptr, nullptr, nullBox,
+                                                 PTCouplingArrays(), 0, nullptr, nullptr, vir, pres,
+                                                 nullptr, mu_tot, constr);
 
                 imdSession->fillEnergyRecord(count, TRUE);
 
                 const bool do_dr = do_per_step(steps_accepted, inputrec->nstdisreout);
                 const bool do_or = do_per_step(steps_accepted, inputrec->nstorireout);
                 energyOutput.printStepToEnergyFile(mdoutf_get_fp_ene(outf), TRUE, do_dr, do_or,
-                                                   fplog, count, count, fcd, nullptr);
+                                                   fplog, count, count, fr->fcdata.get(), nullptr);
                 fflush(fplog);
             }
         }
@@ -2543,7 +2553,7 @@ void LegacySimulator::do_steep()
         }
 
         /* Send IMD energies and positions, if bIMD is TRUE. */
-        if (imdSession->run(count, TRUE, state_global->box,
+        if (imdSession->run(count, TRUE, MASTER(cr) ? state_global->box : nullptr,
                             MASTER(cr) ? state_global->x.rvec_array() : nullptr, 0)
             && MASTER(cr))
         {
@@ -2696,11 +2706,9 @@ void LegacySimulator::do_nm()
 
     /* Make evaluate_energy do a single node force calculation */
     cr->nnodes = 1;
-    EnergyEvaluator energyEvaluator{
-        fplog, mdlog,  cr,    ms,    top_global, &top, inputrec, imdSession, pull_work,
-        nrnb,  wcycle, gstat, vsite, constr,     fcd,  mdAtoms,  fr,         runScheduleWork,
-        enerd
-    };
+    EnergyEvaluator energyEvaluator{ fplog,    mdlog,      cr,        ms,   top_global,      &top,
+                                     inputrec, imdSession, pull_work, nrnb, wcycle,          gstat,
+                                     vsite,    constr,     mdAtoms,   fr,   runScheduleWork, enerd };
     energyEvaluator.run(&state_work, mu_tot, vir, pres, -1, TRUE);
     cr->nnodes = nnodes;
 
@@ -2730,7 +2738,7 @@ void LegacySimulator::do_nm()
     /* Steps are divided one by one over the nodes */
     bool bNS          = true;
     auto state_work_x = makeArrayRef(state_work.s.x);
-    auto state_work_f = makeArrayRef(state_work.f);
+    auto state_work_f = state_work.f.view().force();
     for (index aid = cr->nodeid; aid < ssize(atom_index); aid += nnodes)
     {
         size_t atom = atom_index[aid];
@@ -2758,13 +2766,13 @@ void LegacySimulator::do_nm()
                 if (shellfc)
                 {
                     /* Now is the time to relax the shells */
-                    relax_shell_flexcon(
-                            fplog, cr, ms, mdrunOptions.verbose, nullptr, step, inputrec, imdSession,
-                            pull_work, bNS, force_flags, &top, constr, enerd, fcd, state_work.s.natoms,
-                            state_work.s.x.arrayRefWithPadding(), state_work.s.v.arrayRefWithPadding(),
-                            state_work.s.box, state_work.s.lambda, &state_work.s.hist,
-                            state_work.f.arrayRefWithPadding(), vir, mdatoms, nrnb, wcycle, shellfc,
-                            fr, runScheduleWork, t, mu_tot, vsite, DDBalanceRegionHandler(nullptr));
+                    relax_shell_flexcon(fplog, cr, ms, mdrunOptions.verbose, nullptr, step, inputrec,
+                                        imdSession, pull_work, bNS, force_flags, &top, constr, enerd,
+                                        state_work.s.natoms, state_work.s.x.arrayRefWithPadding(),
+                                        state_work.s.v.arrayRefWithPadding(), state_work.s.box,
+                                        state_work.s.lambda, &state_work.s.hist, &state_work.f.view(),
+                                        vir, mdatoms, nrnb, wcycle, shellfc, fr, runScheduleWork, t,
+                                        mu_tot, vsite, DDBalanceRegionHandler(nullptr));
                     bNS = false;
                     step++;
                 }

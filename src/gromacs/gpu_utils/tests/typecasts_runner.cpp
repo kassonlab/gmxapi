@@ -48,7 +48,7 @@
 
 #include "testutils/testasserts.h"
 
-#if GMX_GPU != GMX_GPU_CUDA
+#if !GMX_GPU_CUDA
 
 namespace gmx
 {
@@ -63,7 +63,8 @@ void convertRVecToFloat3OnHost(std::vector<gmx::RVec>& /* rVecOutput */,
 }
 
 void convertRVecToFloat3OnDevice(std::vector<gmx::RVec>& /* rVecOutput */,
-                                 const std::vector<gmx::RVec>& /* rVecInput*/)
+                                 const std::vector<gmx::RVec>& /* rVecInput */,
+                                 const TestDevice* /* testDevice */)
 {
     FAIL() << "Can't test float3 and RVec compatibility without CUDA.";
 }
@@ -71,4 +72,4 @@ void convertRVecToFloat3OnDevice(std::vector<gmx::RVec>& /* rVecOutput */,
 } // namespace test
 } // namespace gmx
 
-#endif // GMX_GPU != GMX_GPU_CUDA
+#endif // !GMX_GPU_CUDA

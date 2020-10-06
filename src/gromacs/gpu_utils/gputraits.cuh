@@ -44,24 +44,10 @@
  * \inlibraryapi
  * \ingroup module_gpu_utils
  */
+#include <cuda_runtime.h>
 
-#include "gromacs/gpu_utils/device_stream.h"
-
-/*! \brief CUDA device information.
- *
- * The CUDA device information is queried and set at detection and contains
- * both information about the device/hardware returned by the runtime as well
- * as additional data like support status.
- */
-struct DeviceInformation
-{
-    //! ID of the CUDA device.
-    int id;
-    //! CUDA device properties.
-    cudaDeviceProp prop;
-    //! Result of the device check.
-    int stat;
-};
+//! Device texture for fast read-only data fetching
+using DeviceTexture = cudaTextureObject_t;
 
 //! \brief Single GPU call timing event - meaningless in CUDA
 using CommandEvent = void;

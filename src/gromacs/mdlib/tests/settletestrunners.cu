@@ -52,7 +52,7 @@
 #include <vector>
 
 #include "gromacs/gpu_utils/devicebuffer.cuh"
-#include "gromacs/gpu_utils/gpu_utils.h"
+#include "gromacs/hardware/device_information.h"
 #include "gromacs/mdlib/settle_gpu.cuh"
 #include "gromacs/utility/unique_cptr.h"
 
@@ -80,11 +80,7 @@ void applySettleGpu(SettleTestData*  testData,
 {
     // These should never fail since this function should only be called if CUDA is enabled and
     // there is a CUDA-capable device available.
-    GMX_RELEASE_ASSERT(GMX_GPU == GMX_GPU_CUDA,
-                       "CUDA version of SETTLE was called from non-CUDA build.");
-
-    // TODO: Here we should check that at least 1 suitable GPU is available
-    GMX_RELEASE_ASSERT(canPerformGpuDetection(), "Can't detect CUDA-capable GPUs.");
+    GMX_RELEASE_ASSERT(GMX_GPU_CUDA, "CUDA version of SETTLE was called from non-CUDA build.");
 
     DeviceInformation   deviceInfo;
     const DeviceContext deviceContext(deviceInfo);
@@ -92,11 +88,11 @@ void applySettleGpu(SettleTestData*  testData,
 
     auto settleGpu = std::make_unique<SettleGpu>(testData->mtop_, deviceContext, deviceStream);
 
-    settleGpu->set(*testData->idef_, testData->mdatoms_);
+    settleGpu->set(*testData->idef_);
     PbcAiuc pbcAiuc;
     setPbcAiuc(pbc.ndim_ePBC, pbc.box, &pbcAiuc);
 
-    int numAtoms = testData->mdatoms_.homenr;
+    int numAtoms = testData->numAtoms_;
 
     float3 *d_x, *d_xp, *d_v;
 

@@ -47,21 +47,21 @@
 
 #include "config.h"
 
-#if GMX_GPU == GMX_GPU_CUDA
+#if GMX_GPU_CUDA
 
 #    include "gromacs/gpu_utils/gputraits.cuh"
 
-#elif GMX_GPU == GMX_GPU_OPENCL
+#elif GMX_GPU_OPENCL
 
 #    include "gromacs/gpu_utils/gputraits_ocl.h"
 
+#elif GMX_GPU_SYCL
+
+#    include "gromacs/gpu_utils/gputraits_sycl.h"
+
 #else
 
-//! Stub for device information.
-struct DeviceInformation
-{
-    // No member needed
-};
+using DeviceTexture = void*;
 
 //! \brief Single GPU call timing event
 using CommandEvent = void*;

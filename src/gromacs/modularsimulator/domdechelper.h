@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -32,11 +32,13 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \libinternal \file
+/*! \internal \file
  * \brief Declares the domain decomposition helper for the modular simulator
  *
  * \author Pascal Merz <pascal.merz@me.com>
  * \ingroup module_modularsimulator
+ *
+ * This header is only used within the modular simulator module
  */
 
 #ifndef GMX_MODULARSIMULATOR_DOMDECHELPER_H
@@ -45,7 +47,6 @@
 #include "modularsimulatorinterfaces.h"
 
 struct gmx_localtop_t;
-struct gmx_vsite_t;
 struct gmx_wallcycle;
 struct pull_t;
 struct t_commrec;
@@ -56,21 +57,21 @@ struct t_nrnb;
 namespace gmx
 {
 class Constraints;
+class FreeEnergyPerturbationData;
 class ImdSession;
 class MDAtoms;
 class MDLogger;
 class StatePropagatorData;
 class TopologyHolder;
+class VirtualSitesHandler;
 
 //! \addtogroup module_modularsimulator
 //! \{
 
 //! The function type allowing to request a check of the number of bonded interactions
 typedef std::function<void()> CheckBondedInteractionsCallback;
-//! Pointer to the function type allowing to request a check of the number of bonded interactions
-typedef std::unique_ptr<CheckBondedInteractionsCallback> CheckBondedInteractionsCallbackPtr;
 
-/*! \libinternal
+/*! \internal
  * \brief Infrastructure element responsible for domain decomposition
  *
  * This encapsulates the function call to domain decomposition, which is
@@ -87,31 +88,32 @@ class DomDecHelper final : public INeighborSearchSignallerClient
 {
 public:
     //! Constructor
-    DomDecHelper(bool                               isVerbose,
-                 int                                verbosePrintInterval,
-                 StatePropagatorData*               statePropagatorData,
-                 TopologyHolder*                    topologyHolder,
-                 CheckBondedInteractionsCallbackPtr checkBondedInteractionsCallback,
-                 int                                nstglobalcomm,
-                 FILE*                              fplog,
-                 t_commrec*                         cr,
-                 const MDLogger&                    mdlog,
-                 Constraints*                       constr,
-                 t_inputrec*                        inputrec,
-                 MDAtoms*                           mdAtoms,
-                 t_nrnb*                            nrnb,
-                 gmx_wallcycle*                     wcycle,
-                 t_forcerec*                        fr,
-                 gmx_vsite_t*                       vsite,
-                 ImdSession*                        imdSession,
-                 pull_t*                            pull_work);
+    DomDecHelper(bool                            isVerbose,
+                 int                             verbosePrintInterval,
+                 StatePropagatorData*            statePropagatorData,
+                 FreeEnergyPerturbationData*     freeEnergyPerturbationData,
+                 TopologyHolder*                 topologyHolder,
+                 CheckBondedInteractionsCallback checkBondedInteractionsCallback,
+                 int                             nstglobalcomm,
+                 FILE*                           fplog,
+                 t_commrec*                      cr,
+                 const MDLogger&                 mdlog,
+                 Constraints*                    constr,
+                 t_inputrec*                     inputrec,
+                 MDAtoms*                        mdAtoms,
+                 t_nrnb*                         nrnb,
+                 gmx_wallcycle*                  wcycle,
+                 t_forcerec*                     fr,
+                 VirtualSitesHandler*            vsite,
+                 ImdSession*                     imdSession,
+                 pull_t*                         pull_work);
 
     /*! \brief Run domain decomposition
      *
      * Does domain decomposition partitioning at neighbor searching steps
      *
-     * @param step  The step number
-     * @param time  The time
+     * \param step  The step number
+     * \param time  The time
      */
     void run(Step step, Time time);
 
@@ -122,7 +124,7 @@ public:
 
 private:
     //! INeighborSearchSignallerClient implementation
-    SignallerCallbackPtr registerNSCallback() override;
+    std::optional<SignallerCallback> registerNSCallback() override;
 
     //! The next NS step
     Step nextNSStep_;
@@ -133,12 +135,23 @@ private:
     //! The global communication frequency
     const int nstglobalcomm_;
 
+    // TODO: Clarify relationship to data objects and find a more robust alternative to raw pointers (#3583)
     //! Pointer to the micro state
     StatePropagatorData* statePropagatorData_;
+    //! Pointer to the free energy data
+    FreeEnergyPerturbationData* freeEnergyPerturbationData_;
     //! Pointer to the topology
     TopologyHolder* topologyHolder_;
     //! Pointer to the ComputeGlobalsHelper object - to ask for # of bonded interaction checking
-    CheckBondedInteractionsCallbackPtr checkBondedInteractionsCallback_;
+    CheckBondedInteractionsCallback checkBondedInteractionsCallback_;
+
+    //! Helper function unifying the DD partitioning calls in setup() and run()
+    void partitionSystem(bool                     verbose,
+                         bool                     isMasterState,
+                         int                      nstglobalcomm,
+                         gmx_wallcycle*           wcycle,
+                         std::unique_ptr<t_state> localState,
+                         t_state*                 globalState);
 
     // Access to ISimulator data
     //! Handles logging.
@@ -160,7 +173,7 @@ private:
     //! Parameters for force calculations.
     t_forcerec* fr_;
     //! Handles virtual sites.
-    gmx_vsite_t* vsite_;
+    VirtualSitesHandler* vsite_;
     //! The Interactive Molecular Dynamics session.
     ImdSession* imdSession_;
     //! The pull work object.

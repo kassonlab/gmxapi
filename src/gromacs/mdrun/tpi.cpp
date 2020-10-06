@@ -50,7 +50,6 @@
 #include <ctime>
 
 #include <algorithm>
-
 #include <cfenv>
 
 #include "gromacs/commandline/filenm.h"
@@ -77,6 +76,7 @@
 #include "gromacs/mdlib/vsite.h"
 #include "gromacs/mdrunutility/printtime.h"
 #include "gromacs/mdtypes/commrec.h"
+#include "gromacs/mdtypes/forcebuffers.h"
 #include "gromacs/mdtypes/forcerec.h"
 #include "gromacs/mdtypes/group.h"
 #include "gromacs/mdtypes/inputrec.h"
@@ -165,33 +165,33 @@ void LegacySimulator::do_tpi()
 {
     GMX_RELEASE_ASSERT(gmx_omp_nthreads_get(emntDefault) == 1, "TPI does not support OpenMP");
 
-    gmx_localtop_t              top(top_global->ffparams);
-    PaddedHostVector<gmx::RVec> f{};
-    real                        lambda, t, temp, beta, drmax, epot;
-    double                      embU, sum_embU, *sum_UgembU, V, V_all, VembU_all;
-    t_trxstatus*                status;
-    t_trxframe                  rerun_fr;
-    gmx_bool                    bDispCorr, bCharge, bRFExcl, bNotLastFrame, bStateChanged, bNS;
-    tensor                      force_vir, shake_vir, vir, pres;
-    int                         a_tp0, a_tp1, ngid, gid_tp, nener, e;
-    rvec*                       x_mol;
-    rvec                        mu_tot, x_init, dx;
-    int                         nnodes, frame;
-    int64_t                     frame_step_prev, frame_step;
-    int64_t                     nsteps, stepblocksize = 0, step;
-    int64_t                     seed;
-    int                         i;
-    FILE*                       fp_tpi = nullptr;
-    char *                      ptr, *dump_pdb, **leg, str[STRLEN], str2[STRLEN];
-    double                      dbl, dump_ener;
-    gmx_bool                    bCavity;
-    int                         nat_cavity  = 0, d;
-    real *                      mass_cavity = nullptr, mass_tot;
-    int                         nbin;
-    double                      invbinw, *bin, refvolshift, logV, bUlogV;
-    gmx_bool                    bEnergyOutOfBounds;
-    const char*                 tpid_leg[2] = { "direct", "reweighted" };
-    auto                        mdatoms     = mdAtoms->mdatoms();
+    gmx_localtop_t    top(top_global->ffparams);
+    gmx::ForceBuffers f;
+    real              lambda, t, temp, beta, drmax, epot;
+    double            embU, sum_embU, *sum_UgembU, V, V_all, VembU_all;
+    t_trxstatus*      status;
+    t_trxframe        rerun_fr;
+    gmx_bool          bDispCorr, bCharge, bRFExcl, bNotLastFrame, bStateChanged, bNS;
+    tensor            force_vir, shake_vir, vir, pres;
+    int               a_tp0, a_tp1, ngid, gid_tp, nener, e;
+    rvec*             x_mol;
+    rvec              mu_tot, x_init, dx;
+    int               nnodes, frame;
+    int64_t           frame_step_prev, frame_step;
+    int64_t           nsteps, stepblocksize = 0, step;
+    int64_t           seed;
+    int               i;
+    FILE*             fp_tpi = nullptr;
+    char *            ptr, *dump_pdb, **leg, str[STRLEN], str2[STRLEN];
+    double            dbl, dump_ener;
+    gmx_bool          bCavity;
+    int               nat_cavity  = 0, d;
+    real *            mass_cavity = nullptr, mass_tot;
+    int               nbin;
+    double            invbinw, *bin, refvolshift, logV, bUlogV;
+    gmx_bool          bEnergyOutOfBounds;
+    const char*       tpid_leg[2] = { "direct", "reweighted" };
+    auto              mdatoms     = mdAtoms->mdatoms();
 
     GMX_UNUSED_VALUE(outputProvider);
 
@@ -298,10 +298,10 @@ void LegacySimulator::do_tpi()
         sscanf(dump_pdb, "%20lf", &dump_ener);
     }
 
-    atoms2md(top_global, inputrec, -1, nullptr, top_global->natoms, mdAtoms);
+    atoms2md(top_global, inputrec, -1, {}, top_global->natoms, mdAtoms);
     update_mdatoms(mdatoms, inputrec->fepvals->init_lambda);
 
-    f.resizeWithPadding(top_global->natoms);
+    f.resize(top_global->natoms);
 
     /* Print to log file  */
     walltime_accounting_start_time(walltime_accounting);
@@ -321,7 +321,7 @@ void LegacySimulator::do_tpi()
 
     if (EEL_PME(fr->ic->eeltype))
     {
-        gmx_pme_reinit_atoms(fr->pmedata, a_tp0, nullptr);
+        gmx_pme_reinit_atoms(fr->pmedata, a_tp0, nullptr, nullptr);
     }
 
     /* With reacion-field we have distance dependent potentials
@@ -678,7 +678,9 @@ void LegacySimulator::do_tpi()
                                   -1, fr->cginfo, x, 0, nullptr);
 
                 /* TODO: Avoid updating all atoms at every bNS step */
-                fr->nbv->setAtomProperties(*mdatoms, fr->cginfo);
+                fr->nbv->setAtomProperties(gmx::constArrayRefFromArray(mdatoms->typeA, mdatoms->nr),
+                                           gmx::constArrayRefFromArray(mdatoms->chargeA, mdatoms->nr),
+                                           fr->cginfo);
 
                 fr->nbv->constructPairlist(InteractionLocality::Local, top.excls, step, nrnb);
 
@@ -753,7 +755,7 @@ void LegacySimulator::do_tpi()
             std::feholdexcept(&floatingPointEnvironment);
             do_force(fplog, cr, ms, inputrec, nullptr, nullptr, imdSession, pull_work, step, nrnb,
                      wcycle, &top, state_global->box, state_global->x.arrayRefWithPadding(),
-                     &state_global->hist, f.arrayRefWithPadding(), force_vir, mdatoms, enerd, fcd,
+                     &state_global->hist, &f.view(), force_vir, mdatoms, enerd,
                      state_global->lambda, fr, runScheduleWork, nullptr, mu_tot, t, nullptr,
                      GMX_FORCE_NONBONDED | GMX_FORCE_ENERGY | (bStateChanged ? GMX_FORCE_STATECHANGED : 0),
                      DDBalanceRegionHandler(nullptr));

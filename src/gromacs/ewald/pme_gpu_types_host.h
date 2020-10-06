@@ -67,18 +67,18 @@ namespace gmx
 class PmeDeviceBuffers;
 } // namespace gmx
 
-#if GMX_GPU != GMX_GPU_NONE
+#if GMX_GPU
 struct PmeGpuSpecific;
 #else
 /*! \brief A dummy typedef for the GPU host data placeholder on non-GPU builds */
 typedef int PmeGpuSpecific;
 #endif
 
-#if GMX_GPU == GMX_GPU_CUDA
+#if GMX_GPU_CUDA
 struct PmeGpuCudaKernelParams;
 /*! \brief A typedef for including the GPU kernel arguments data by pointer */
 typedef PmeGpuCudaKernelParams PmeGpuKernelParams;
-#elif GMX_GPU == GMX_GPU_OPENCL
+#elif GMX_GPU_OPENCL
 struct PmeGpuKernelParamsBase;
 /*! \brief A typedef for including the GPU kernel arguments data by pointer */
 typedef PmeGpuKernelParamsBase PmeGpuKernelParams;
@@ -100,7 +100,7 @@ struct DeviceInformation;
  */
 struct PmeShared
 {
-    /*! \brief Grid count - currently always 1 on GPU */
+    /*! \brief Grid count */
     int ngrids;
     /*! \brief Grid dimensions - nkx, nky, nkz */
     int nk[DIM];

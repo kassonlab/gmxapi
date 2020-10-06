@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -32,19 +32,23 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-/*! \libinternal \file
+/*! \internal \file
  * \brief Declares the checkpoint helper for the modular simulator
  *
  * \author Pascal Merz <pascal.merz@me.com>
  * \ingroup module_modularsimulator
+ *
+ * This header is only used within the modular simulator module
  */
 
 #ifndef GMX_MODULARSIMULATOR_CHECKPOINTHELPER_H
 #define GMX_MODULARSIMULATOR_CHECKPOINTHELPER_H
 
+#include <map>
 #include <vector>
 
 #include "gromacs/mdlib/checkpointhandler.h"
+#include "gromacs/mdrunutility/handlerestart.h"
 
 #include "modularsimulatorinterfaces.h"
 
@@ -53,10 +57,11 @@ struct ObservablesHistory;
 
 namespace gmx
 {
+class KeyValueTreeObject;
 class MDLogger;
 class TrajectoryElement;
 
-/*! \libinternal
+/*! \internal
  * \ingroup module_modularsimulator
  * \brief Checkpoint helper
  *
@@ -78,40 +83,36 @@ class TrajectoryElement;
  * Checkpointing happens at the end of a simulation step, which gives a
  * straightforward re-entry point at the top of the simulator loop.
  *
- * In the current implementation, the clients of CheckpointHelper fill a
- * legacy t_state object (passed via pointer) with whatever data they need
- * to store. The CheckpointHelper then writes the t_state object to file.
- * This is an intermediate state of the code, as the long-term plan is for
- * modules to read and write from a checkpoint file directly, without the
- * need for a central object. The current implementation allows, however,
- * to define clearly which modules take part in checkpointing, while using
- * the current infrastructure for reading and writing to checkpoint.
+ * Checkpoint writing is done by passing sub-objects of a
+ * WriteCheckpointDataHolder object to the clients. Checkpoint reading is
+ * done by passing sub-objects of a ReadCheckpointDataHolder object (passed
+ * in from runner level) do the clients.
  *
- * \todo Develop this into a module solely providing a file handler to
- *       modules for checkpoint reading and writing.
+ * \see ReadCheckpointDataHolder
+ * \see WriteCheckpointDataHolder
+ * \see CheckpointData
  */
 class CheckpointHelper final : public ILastStepSignallerClient, public ISimulatorElement
 {
 public:
     //! Constructor
-    CheckpointHelper(std::vector<ICheckpointHelperClient*> clients,
-                     std::unique_ptr<CheckpointHandler>    checkpointHandler,
-                     int                                   initStep,
-                     TrajectoryElement*                    trajectoryElement,
-                     int                                   globalNumAtoms,
-                     FILE*                                 fplog,
-                     t_commrec*                            cr,
-                     ObservablesHistory*                   observablesHistory,
-                     gmx_walltime_accounting*              walltime_accounting,
-                     t_state*                              state_global,
-                     bool                                  writeFinalCheckpoint);
+    CheckpointHelper(std::vector<std::tuple<std::string, ICheckpointHelperClient*>>&& clients,
+                     std::unique_ptr<CheckpointHandler> checkpointHandler,
+                     int                                initStep,
+                     TrajectoryElement*                 trajectoryElement,
+                     FILE*                              fplog,
+                     t_commrec*                         cr,
+                     ObservablesHistory*                observablesHistory,
+                     gmx_walltime_accounting*           walltime_accounting,
+                     t_state*                           state_global,
+                     bool                               writeFinalCheckpoint);
 
     /*! \brief Run checkpointing
      *
      * Sets signal and / or performs checkpointing at neighbor searching steps
      *
-     * @param step  The step number
-     * @param time  The time
+     * \param step  The step number
+     * \param time  The time
      */
     void run(Step step, Time time);
 
@@ -121,11 +122,11 @@ public:
      * list, as the checkpoint helper need to be able to react to the last step
      * being signalled.
      *
-     * @param step                 The step number
-     * @param time                 The time
-     * @param registerRunFunction  Function allowing to register a run function
+     * \param step                 The step number
+     * \param time                 The time
+     * \param registerRunFunction  Function allowing to register a run function
      */
-    void scheduleTask(Step step, Time time, const RegisterRunFunctionPtr& registerRunFunction) override;
+    void scheduleTask(Step step, Time time, const RegisterRunFunction& registerRunFunction) override;
 
     //! No element setup needed
     void elementSetup() override {}
@@ -134,7 +135,7 @@ public:
 
 private:
     //! List of checkpoint clients
-    std::vector<ICheckpointHelperClient*> clients_;
+    std::vector<std::tuple<std::string, ICheckpointHelperClient*>> clients_;
 
     //! The checkpoint handler
     std::unique_ptr<CheckpointHandler> checkpointHandler_;
@@ -143,25 +144,17 @@ private:
     const Step initStep_;
     //! The last step of the simulation
     Step lastStep_;
-    //! The total number of atoms
-    const int globalNumAtoms_;
     //! Whether a checkpoint is written on the last step
     const bool writeFinalCheckpoint_;
 
     //! ILastStepSignallerClient implementation
-    SignallerCallbackPtr registerLastStepCallback() override;
+    std::optional<SignallerCallback> registerLastStepCallback() override;
 
     //! The actual checkpoint writing function
     void writeCheckpoint(Step step, Time time);
 
     //! Pointer to the trajectory element - to use file pointer
     TrajectoryElement* trajectoryElement_;
-
-    //! A local t_state object to gather data in
-    //! {
-    std::unique_ptr<t_state> localState_;
-    t_state*                 localStateInstance_;
-    //! }
 
     // Access to ISimulator data
     //! Handles logging.
@@ -175,6 +168,68 @@ private:
     //! Full simulation state (only non-nullptr on master rank).
     t_state* state_global_;
 };
+
+/*! \internal
+ * \ingroup module_modularsimulator
+ * \brief Builder for the checkpoint helper
+ */
+class CheckpointHelperBuilder
+{
+public:
+    //! Constructor
+    CheckpointHelperBuilder(std::unique_ptr<ReadCheckpointDataHolder> checkpointDataHolder,
+                            StartingBehavior                          startingBehavior,
+                            t_commrec*                                cr);
+
+    //! Register checkpointing client
+    void registerClient(ICheckpointHelperClient* client);
+
+    //! Set CheckpointHandler
+    void setCheckpointHandler(std::unique_ptr<CheckpointHandler> checkpointHandler);
+
+    //! Return CheckpointHelper
+    template<typename... Args>
+    std::unique_ptr<CheckpointHelper> build(Args&&... args);
+
+private:
+    //! Map of checkpoint clients
+    std::map<std::string, ICheckpointHelperClient*> clientsMap_;
+    //! Whether we are resetting from checkpoint
+    const bool resetFromCheckpoint_;
+    //! The input checkpoint data
+    std::unique_ptr<ReadCheckpointDataHolder> checkpointDataHolder_;
+    //! The checkpoint handler
+    std::unique_ptr<CheckpointHandler> checkpointHandler_;
+    //! Handles communication.
+    t_commrec* cr_;
+    //! Whether the builder accepts registrations.
+    ModularSimulatorBuilderState state_;
+};
+
+template<typename... Args>
+std::unique_ptr<CheckpointHelper> CheckpointHelperBuilder::build(Args&&... args)
+{
+    state_ = ModularSimulatorBuilderState::NotAcceptingClientRegistrations;
+    // Make sure that we don't have unused entries in checkpoint
+    if (resetFromCheckpoint_)
+    {
+        for (const auto& key : checkpointDataHolder_->keys())
+        {
+            if (clientsMap_.count(key) == 0)
+            {
+                // We have an entry in checkpointDataHolder_ which has no matching client
+                throw CheckpointError("Checkpoint entry " + key + " was not read. This "
+                                      "likely means that you are not using the same algorithm "
+                                      "that was used to create the checkpoint file.");
+            }
+        }
+    }
+
+    std::vector<std::tuple<std::string, ICheckpointHelperClient*>>&& clients = { clientsMap_.begin(),
+                                                                                 clientsMap_.end() };
+    return std::make_unique<CheckpointHelper>(std::move(clients), std::move(checkpointHandler_),
+                                              std::forward<Args>(args)...);
+}
 
 } // namespace gmx
 

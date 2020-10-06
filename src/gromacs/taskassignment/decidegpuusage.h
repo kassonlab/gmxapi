@@ -136,7 +136,6 @@ bool decideWhetherToUseGpusForNonbondedWithThreadMpi(TaskTarget              non
  * \param[in]  userGpuTaskAssignment     The user-specified assignment of GPU tasks to device IDs.
  * \param[in]  hardwareInfo              Hardware information
  * \param[in]  inputrec                  The user input
- * \param[in]  mtop                      Global system topology
  * \param[in]  numRanksPerSimulation     The number of ranks in each simulation.
  * \param[in]  numPmeRanksPerSimulation  The number of PME ranks in each simulation.
  *
@@ -150,7 +149,6 @@ bool decideWhetherToUseGpusForPmeWithThreadMpi(bool                    useGpuFor
                                                const std::vector<int>& userGpuTaskAssignment,
                                                const gmx_hw_info_t&    hardwareInfo,
                                                const t_inputrec&       inputrec,
-                                               const gmx_mtop_t&       mtop,
                                                int                     numRanksPerSimulation,
                                                int                     numPmeRanksPerSimulation);
 
@@ -209,7 +207,6 @@ bool decideWhetherToUseGpusForNonbonded(TaskTarget              nonbondedTarget,
  * \param[in]  userGpuTaskAssignment     The user-specified assignment of GPU tasks to device IDs.
  * \param[in]  hardwareInfo              Hardware information
  * \param[in]  inputrec                  The user input
- * \param[in]  mtop                      Global system topology
  * \param[in]  numRanksPerSimulation     The number of ranks in each simulation.
  * \param[in]  numPmeRanksPerSimulation  The number of PME ranks in each simulation.
  * \param[in]  gpusWereDetected          Whether compatible GPUs were detected on any node.
@@ -223,7 +220,6 @@ bool decideWhetherToUseGpusForPme(bool                    useGpuForNonbonded,
                                   const std::vector<int>& userGpuTaskAssignment,
                                   const gmx_hw_info_t&    hardwareInfo,
                                   const t_inputrec&       inputrec,
-                                  const gmx_mtop_t&       mtop,
                                   int                     numRanksPerSimulation,
                                   int                     numPmeRanksPerSimulation,
                                   bool                    gpusWereDetected);
@@ -304,6 +300,24 @@ bool decideWhetherToUseGpuForUpdate(bool                           isDomainDecom
                                     const DevelopmentFeatureFlags& devFlags,
                                     const gmx::MDLogger&           mdlog);
 
+
+/*! \brief Decide whether to use GPU for halo exchange.
+ *
+ * \param[in]  devFlags                     GPU development / experimental feature flags.
+ * \param[in]  havePPDomainDecomposition    Whether PP domain decomposition is in use.
+ * \param[in]  useGpuForNonbonded           Whether GPUs will be used for nonbonded interactions.
+ * \param[in]  useModularSimulator          Whether modularsimulator is in use.
+ * \param[in]  doRerun                      Whether this is a rerun.
+ * \param[in]  haveEnergyMinimization       Whether energy minimization is in use.
+ *
+ * \returns    Whether halo exchange can be run on GPU.
+ */
+bool decideWhetherToUseGpuForHalo(const DevelopmentFeatureFlags& devFlags,
+                                  bool                           havePPDomainDecomposition,
+                                  bool                           useGpuForNonbonded,
+                                  bool                           useModularSimulator,
+                                  bool                           doRerun,
+                                  bool                           haveEnergyMinimization);
 
 } // namespace gmx
 

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2019, by the GROMACS development team, led by
+ * Copyright (c) 2019,2020, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -46,13 +46,17 @@
 
 #include "config.h"
 
-#if GMX_GPU == GMX_GPU_CUDA
+#include <memory>
+
+#include "gromacs/math/vectypes.h"
+
+#if GMX_GPU_CUDA
 
 //! \brief A device-side buffer of ValueTypes
 template<typename ValueType>
 using DeviceBuffer = ValueType*;
 
-#elif GMX_GPU == GMX_GPU_OPENCL
+#elif GMX_GPU_OPENCL
 
 #    include "gromacs/gpu_utils/gputraits_ocl.h"
 
@@ -85,6 +89,34 @@ public:
 template<typename ValueType>
 using DeviceBuffer = TypedClMemory<ValueType>;
 
+#elif GMX_GPU_SYCL
+
+/*! \libinternal \brief
+ * A minimal wrapper around \c cl::sycl::buffer to hide it away and simplify compilation.
+ */
+template<typename ValueType>
+struct DeviceBuffer
+{
+    class ClSyclBufferWrapper;
+    std::unique_ptr<ClSyclBufferWrapper> buffer_;
+
+    DeviceBuffer();
+    ~DeviceBuffer();
+    DeviceBuffer(DeviceBuffer<ValueType> const& src);
+    DeviceBuffer(DeviceBuffer<ValueType>&& src) noexcept;
+    DeviceBuffer& operator=(DeviceBuffer<ValueType> const& src);
+    DeviceBuffer& operator=(DeviceBuffer<ValueType>&& src) noexcept;
+
+    //! Helper function to get the size in bytes of a single element
+    static constexpr size_t elementSize() { return sizeof(ValueType); }
+
+    // static_case<void*> is used in MPI+CUDA code, this stub is necessary for compilation.
+    explicit operator void*() const { throw; }
+};
+
+// Must explicitly instantiate for some types.
+extern template struct DeviceBuffer<gmx::RVec>;
+
 #else
 
 //! \brief A device-side buffer of ValueTypes
@@ -92,6 +124,5 @@ template<typename ValueType>
 using DeviceBuffer = void*;
 
 #endif
-
 
 #endif // GMX_GPU_UTILS_DEVICEBUFFER_DATATYPE_H

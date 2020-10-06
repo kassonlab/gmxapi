@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2015,2016,2017, by the GROMACS development team, led by
+# Copyright (c) 2015,2016,2017,2020, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -35,11 +35,35 @@
 gmx_add_libgromacs_sources(
     cpuinfo.cpp
     detecthardware.cpp
-    gpu_hw_info.cpp
+    device_management_common.cpp
     hardwaretopology.cpp
     printhardware.cpp
     identifyavx512fmaunits.cpp
     )
+
+if(GMX_GPU_OPENCL)
+    gmx_add_libgromacs_sources(
+        device_management_ocl.cpp
+        )
+elseif(GMX_GPU_CUDA)
+    gmx_add_libgromacs_sources(
+        device_management.cu
+        )
+elseif(GMX_GPU_SYCL)
+    gmx_add_libgromacs_sources(
+      device_management_sycl.cpp
+    )
+    _gmx_add_files_to_property(SYCL_SOURCES
+      device_management_sycl.cpp
+      # Must add these files so they can include device_information.h
+      device_management.cpp
+      device_management_common.cpp
+      detecthardware.cpp)
+else()
+    gmx_add_libgromacs_sources(
+        device_management.cpp
+    )
+endif()
 
 if (BUILD_TESTING)
     add_subdirectory(tests)

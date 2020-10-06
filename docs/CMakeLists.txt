@@ -374,6 +374,8 @@ if (SPHINX_FOUND)
         release-notes/2021/major/miscellaneous.rst
         release-notes/2020/2020.1.rst
         release-notes/2020/2020.2.rst
+        release-notes/2020/2020.3.rst
+        release-notes/2020/2020.4.rst
         release-notes/2020/major/highlights.rst
         release-notes/2020/major/features.rst
         release-notes/2020/major/performance.rst
@@ -550,6 +552,12 @@ if (SPHINX_FOUND)
     endif ()
 
     gmx_add_sphinx_source_files(
+            FILES
+            nblib/index.rst
+            nblib/guide-to-writing-MD-programs.rst
+    )
+
+    gmx_add_sphinx_source_files(
         FILES
         ${REFERENCEMANUAL_SPHINX_FILES_GENERAL})
     if (IMAGE_CONVERT_POSSIBLE)
@@ -704,7 +712,7 @@ set(HTML_BUILD_NOT_POSSIBLE_REASON)
 set(HTML_BUILD_WARNINGS)
 
 # Next, turn it off if any of the preconditions are unsatisified
-if (NOT PythonInterp_FOUND)
+if (NOT Python3_Interpreter_FOUND)
     set(HTML_BUILD_IS_POSSIBLE OFF)
     set(HTML_BUILD_NOT_POSSIBLE_REASON "Python is required")
 elseif (NOT SPHINX_FOUND)
