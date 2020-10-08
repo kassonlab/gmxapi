@@ -42,22 +42,9 @@
 
 #include "leapfrogtestrunners.h"
 
-#include "config.h"
-
-#include <assert.h>
-
-#include <cmath>
-
-#include <algorithm>
-#include <unordered_map>
-#include <vector>
-
-#include "gromacs/math/vec.h"
 #include "gromacs/math/vectypes.h"
 #include "gromacs/mdlib/gmx_omp_nthreads.h"
 #include "gromacs/mdlib/update.h"
-#include "gromacs/mdtypes/group.h"
-#include "gromacs/mdtypes/mdatom.h"
 #include "gromacs/utility/arrayref.h"
 
 #include "testutils/testasserts.h"
@@ -70,7 +57,7 @@ namespace gmx
 namespace test
 {
 
-void integrateLeapFrogSimple(LeapFrogTestData* testData, int numSteps)
+void LeapFrogHostTestRunner::integrate(LeapFrogTestData* testData, int numSteps)
 {
     testData->state_.x.resizeWithPadding(testData->numAtoms_);
     testData->state_.v.resizeWithPadding(testData->numAtoms_);
@@ -91,7 +78,7 @@ void integrateLeapFrogSimple(LeapFrogTestData* testData, int numSteps)
         testData->update_->finish_update(testData->inputRecord_, &testData->mdAtoms_,
                                          &testData->state_, nullptr, false);
     }
-    auto xp = makeArrayRef(*testData->update_->xp()).subArray(0, testData->numAtoms_);
+    const auto xp = makeArrayRef(*testData->update_->xp()).subArray(0, testData->numAtoms_);
     for (int i = 0; i < testData->numAtoms_; i++)
     {
         for (int d = 0; d < DIM; d++)
@@ -102,15 +89,6 @@ void integrateLeapFrogSimple(LeapFrogTestData* testData, int numSteps)
         }
     }
 }
-
-#if !GMX_GPU_CUDA
-
-void integrateLeapFrogGpu(gmx_unused LeapFrogTestData* testData, gmx_unused int numSteps)
-{
-    FAIL() << "Dummy Leap-Frog CUDA function was called instead of the real one.";
-}
-
-#endif // !GMX_GPU_CUDA
 
 } // namespace test
 } // namespace gmx

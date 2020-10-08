@@ -11,7 +11,8 @@
   variables:
     KUBERNETES_CPU_LIMIT: 8
     KUBERNETES_CPU_REQUEST: 4
-    KUBERNETES_MEMORY_REQUEST: 8Gi
+    KUBERNETES_MEMORY_REQUEST: 4Gi
+    KUBERNETES_MEMORY_LIMIT: 8Gi
     KUBERNETES_EXTENDED_RESOURCE_NAME: ""
     KUBERNETES_EXTENDED_RESOURCE_LIMIT: 0
     CACHE_FALLBACK_KEY: "$CI_JOB_NAME-$CI_JOB_STAGE-master"
@@ -51,6 +52,11 @@
     CMAKE_PRECISION_OPTIONS: "-DGMX_DOUBLE=OFF"
     CMAKE_GPU_OPTIONS: -DGMX_GPU=OpenCL
 
+.use-sycl:
+  variables:
+    CMAKE_PRECISION_OPTIONS: "-DGMX_DOUBLE=OFF"
+    CMAKE_GPU_OPTIONS: -DGMX_GPU=SYCL
+
 # Base definition for using gcc.
 .use-gcc:base:
   variables:
@@ -81,6 +87,7 @@
     # setvar.sh script
     - set +e
     - source /opt/intel/oneapi/setvars.sh
+    - set -e
     - mkdir -p ccache
     - export CCACHE_BASEDIR=${PWD}
     - export CCACHE_DIR=${PWD}/ccache
