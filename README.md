@@ -3,7 +3,7 @@ gmxapi functionality.
 The forked project lives on GitHub at 
 [https://github.com/kassonlab/gmxapi](https://github.com/kassonlab/gmxapi/).
 
-[![Build Status](https://travis-ci.org/kassonlab/gmxapi.svg?branch=master)](https://travis-ci.org/kassonlab/gmxapi)
+[![Build Status](https://travis-ci.com/kassonlab/gmxapi.svg?branch=master)](https://travis-ci.com/kassonlab/gmxapi)
 
 This README.md file supplants the main README file to avoid merge conflicts while 
 providing convenient documentation to the repository browser.
