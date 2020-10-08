@@ -46,8 +46,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # Providing a default value >=10.14 helps to find modern C++ compatibility,
     # such as by defaulting to the Clang libc++ instead of libstdc++.
     set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14 CACHE STRING
-        "OS X deployment target affects default SDK version and compiler flags."
-        FORCE)
+        "OS X deployment target affects default SDK version and compiler flags.")
     # By default, limit the binary architecture to a single 64-bit build.
     set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING
         "OS X architecture affects the compatibility of the (potentially fat) binaries produced."
@@ -370,7 +369,7 @@ check_cxx_source_compiles("int main(){ return __builtin_clz(1);}"   HAVE_BUILTIN
 check_cxx_source_compiles("int main(){ return __builtin_clzll(1);}" HAVE_BUILTIN_CLZLL)
 if(MSVC)
     check_cxx_source_compiles("#include <intrin.h>\n int main(){unsigned long r;unsigned long i=1;_BitScanReverse(&r,i);return r;}" HAVE_BITSCANREVERSE)
-    check_cxx_source_compiles("#include <intrin.h>\n int main(){unsigned long r;unsigned __int64 i=1;_BitScanReverse(&r,i);return r;}" HAVE_BITSCANREVERSE64)
+    check_cxx_source_compiles("#include <intrin.h>\n int main(){unsigned long r;unsigned __int64 i=1;_BitScanReverse64(&r,i);return r;}" HAVE_BITSCANREVERSE64)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "XL")
     check_cxx_source_compiles("int main(){ return __cntlz4(1);}" HAVE_CNTLZ4)
     check_cxx_source_compiles("int main(){ return __cntlz8(1);}" HAVE_CNTLZ8)
@@ -567,6 +566,8 @@ endif()
 include(gmxManageTNG)
 
 include(gmxManageLmfit)
+
+include(gmxManageMuparser)
 
 if(GMX_GPU)
 
