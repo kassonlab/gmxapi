@@ -171,10 +171,6 @@
 #include "replicaexchange.h"
 #include "simulatorbuilder.h"
 
-#if GMX_FAHCORE
-#    include "corewrap.h"
-#endif
-
 namespace gmx
 {
 
@@ -209,7 +205,7 @@ static DevelopmentFeatureFlags manageDevelopmentFeatures(const gmx::MDLogger& md
     devFlags.enableGpuBufferOps =
             GMX_GPU_CUDA && useGpuForNonbonded && (getenv("GMX_USE_GPU_BUFFER_OPS") != nullptr);
     devFlags.enableGpuHaloExchange = GMX_GPU_CUDA && GMX_THREAD_MPI && getenv("GMX_GPU_DD_COMMS") != nullptr;
-    devFlags.forceGpuUpdateDefault = (getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") != nullptr);
+    devFlags.forceGpuUpdateDefault = (getenv("GMX_FORCE_UPDATE_DEFAULT_GPU") != nullptr) || GMX_FAHCORE;
     devFlags.enableGpuPmePPComm =
             GMX_GPU_CUDA && GMX_THREAD_MPI && getenv("GMX_GPU_PME_PP_COMMS") != nullptr;
 
@@ -781,6 +777,7 @@ int Mdrunner::mdrunner()
     gmx_print_detected_hardware(fplog, isSimulationMasterRank && isMasterSim(ms), mdlog, hwinfo);
 
     std::vector<int> gpuIdsToUse = makeGpuIdsToUse(hwinfo->deviceInfoList, hw_opt.gpuIdsAvailable);
+    const int        numDevicesToUse = gmx::ssize(gpuIdsToUse);
 
     // Print citation requests after all software/hardware printing
     pleaseCiteGromacs(fplog);
@@ -823,12 +820,12 @@ int Mdrunner::mdrunner()
             // the number of GPUs to choose the number of ranks.
             auto canUseGpuForNonbonded = buildSupportsNonbondedOnGpu(nullptr);
             useGpuForNonbonded         = decideWhetherToUseGpusForNonbondedWithThreadMpi(
-                    nonbondedTarget, gpuIdsToUse, userGpuTaskAssignment, emulateGpuNonbonded,
+                    nonbondedTarget, numDevicesToUse, userGpuTaskAssignment, emulateGpuNonbonded,
                     canUseGpuForNonbonded,
                     gpuAccelerationOfNonbondedIsUseful(mdlog, *inputrec, GMX_THREAD_MPI),
                     hw_opt.nthreads_tmpi);
             useGpuForPme = decideWhetherToUseGpusForPmeWithThreadMpi(
-                    useGpuForNonbonded, pmeTarget, gpuIdsToUse, userGpuTaskAssignment, *hwinfo,
+                    useGpuForNonbonded, pmeTarget, numDevicesToUse, userGpuTaskAssignment, *hwinfo,
                     *inputrec, hw_opt.nthreads_tmpi, domdecOptions.numPmeRanks);
         }
         GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR
@@ -839,7 +836,7 @@ int Mdrunner::mdrunner()
          * prevent any possible subsequent checks from working
          * correctly. */
         hw_opt.nthreads_tmpi =
-                get_nthreads_mpi(hwinfo, &hw_opt, gpuIdsToUse, useGpuForNonbonded, useGpuForPme,
+                get_nthreads_mpi(hwinfo, &hw_opt, numDevicesToUse, useGpuForNonbonded, useGpuForPme,
                                  inputrec.get(), &mtop, mdlog, membedHolder.doMembed());
 
         // Now start the threads for thread MPI.
@@ -1045,13 +1042,6 @@ int Mdrunner::mdrunner()
         }
     }
 
-#if GMX_FAHCORE
-    if (MASTER(cr))
-    {
-        fcRegisterSteps(inputrec->nsteps, inputrec->init_step);
-    }
-#endif
-
     /* NMR restraints must be initialized before load_checkpoint,
      * since with time averaging the history is added to t_state.
      * For proper consistency check we therefore need to extend
@@ -1075,6 +1065,21 @@ int Mdrunner::mdrunner()
     auto deform = prepareBoxDeformation(
             globalState != nullptr ? globalState->box : box, MASTER(cr) ? DDRole::Master : DDRole::Agent,
             PAR(cr) ? NumRanks::Multiple : NumRanks::Single, cr->mpi_comm_mygroup, *inputrec);
+
+#if GMX_FAHCORE
+    /* We have to remember the generation's first step before reading checkpoint.
+       This way, we can report to the F@H core both the generation's first step
+       and the restored first step, thus making it able to distinguish between
+       an interruption/resume and start of the n-th generation simulation.
+       Having this information, the F@H core can correctly calculate and report
+       the progress.
+     */
+    int gen_first_step = 0;
+    if (MASTER(cr))
+    {
+        gen_first_step = inputrec->init_step;
+    }
+#endif
 
     ObservablesHistory observablesHistory = {};
 
@@ -1118,6 +1123,13 @@ int Mdrunner::mdrunner()
             mdlog    = logOwner.logger();
         }
     }
+
+#if GMX_FAHCORE
+    if (MASTER(cr))
+    {
+        fcRegisterSteps(inputrec->nsteps + inputrec->init_step, gen_first_step);
+    }
+#endif
 
     if (mdrunOptions.numStepsCommandline > -2)
     {
@@ -1285,7 +1297,7 @@ int Mdrunner::mdrunner()
     // where appropriate.
     if (!userGpuTaskAssignment.empty())
     {
-        gpuTaskAssignments.logPerformanceHints(mdlog, ssize(gpuIdsToUse));
+        gpuTaskAssignments.logPerformanceHints(mdlog, numDevicesToUse);
     }
 
     if (PAR(cr))

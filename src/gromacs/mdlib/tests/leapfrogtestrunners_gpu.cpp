@@ -33,7 +33,7 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 /*! \internal \file
- * \brief Runner for CUDA version of the integrator
+ * \brief Runner for GPU version of the integrator
  *
  * Handles GPU data management and actual numerical integration.
  *
@@ -42,33 +42,31 @@
  */
 #include "gmxpre.h"
 
+#include "config.h"
+
+#include <gtest/gtest.h>
+
 #include "leapfrogtestrunners.h"
 
-#include <assert.h>
+#if GMX_GPU_CUDA
+#    include "gromacs/gpu_utils/devicebuffer.cuh"
+#    include "gromacs/mdlib/leapfrog_gpu.h"
+#endif
 
-#include <cmath>
-
-#include <algorithm>
-#include <unordered_map>
-#include <vector>
-
-#include "gromacs/gpu_utils/devicebuffer.cuh"
 #include "gromacs/hardware/device_information.h"
-#include "gromacs/math/vec.h"
-#include "gromacs/mdlib/leapfrog_gpu.cuh"
 #include "gromacs/mdlib/stat.h"
-#include "gromacs/mdtypes/group.h"
 
 namespace gmx
 {
 namespace test
 {
 
-void integrateLeapFrogGpu(LeapFrogTestData* testData, int numSteps)
+#if HAVE_GPU_LEAPFROG
+void LeapFrogDeviceTestRunner::integrate(LeapFrogTestData* testData, int numSteps)
 {
-    DeviceInformation   deviceInfo;
-    const DeviceContext deviceContext(deviceInfo);
-    const DeviceStream  deviceStream(deviceContext, DeviceStreamPriority::Normal, false);
+    const DeviceContext& deviceContext = testDevice_.deviceContext();
+    const DeviceStream&  deviceStream  = testDevice_.deviceStream();
+    setActiveDevice(testDevice_.deviceInfo());
 
     int numAtoms = testData->numAtoms_;
 
@@ -77,7 +75,7 @@ void integrateLeapFrogGpu(LeapFrogTestData* testData, int numSteps)
     float3* h_v  = reinterpret_cast<float3*>(testData->v_.data());
     float3* h_f  = reinterpret_cast<float3*>(testData->f_.data());
 
-    float3 *d_x, *d_xp, *d_v, *d_f;
+    DeviceBuffer<float3> d_x, d_xp, d_v, d_f;
 
     allocateDeviceBuffer(&d_x, numAtoms, deviceContext);
     allocateDeviceBuffer(&d_xp, numAtoms, deviceContext);
@@ -114,6 +112,16 @@ void integrateLeapFrogGpu(LeapFrogTestData* testData, int numSteps)
     freeDeviceBuffer(&d_v);
     freeDeviceBuffer(&d_f);
 }
+
+#else // HAVE_GPU_LEAPFROG
+
+void LeapFrogDeviceTestRunner::integrate(LeapFrogTestData* /* testData */, int /* numSteps */)
+{
+    GMX_UNUSED_VALUE(testDevice_);
+    FAIL() << "Dummy Leap-Frog GPU function was called instead of the real one.";
+}
+
+#endif // HAVE_GPU_LEAPFROG
 
 } // namespace test
 } // namespace gmx

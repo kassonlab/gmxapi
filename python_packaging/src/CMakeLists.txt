@@ -47,8 +47,7 @@ cmake_minimum_required(VERSION 3.13.0)
 # Reference https://scikit-build.readthedocs.io/en/latest/generators.html#macosx
 # and https://github.com/MacPython/wiki/wiki/Spinning-wheels
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14 CACHE STRING
-    "OS X deployment target below 10.14 does not use modern standard library"
-    FORCE)
+    "OS X deployment target below 10.14 does not use modern standard library")
 set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING
     "OS X should build Python package for 64-bit architecture"
     FORCE)
@@ -150,6 +149,22 @@ if(GMXAPI_MASTER_PROJECT)
                  HINTS "$ENV{GROMACS_DIR}"
                  )
 endif()
+
+# Get details of GROMACS installation needed by the Python package at run time.
+
+# Get the MPI capability.
+get_target_property(_gmx_mpi Gromacs::gmxapi MPI)
+if (${_gmx_mpi} STREQUAL "library")
+    set(_gmx_mpi_type "\"library\"")
+elseif(${_gmx_mpi} STREQUAL "tmpi")
+    set(_gmx_mpi_type "\"tmpi\"")
+elseif(${_gmx_mpi} STREQUAL "none")
+    set(_gmx_mpi_type "null")
+else()
+    message(FATAL_ERROR "Unrecognized gmxapi MPI value: ${_gmx_mpi}")
+endif ()
+unset(_gmx_mpi)
+# Get the path of the command line entry point and binary install directory.
 if (NOT TARGET Gromacs::gmx)
     message(FATAL_ERROR "GROMACS command line tool not found.")
 endif ()
@@ -171,6 +186,7 @@ endif ()
 configure_file(gmxapi/gmxconfig.json.in ${GMXAPI_PYTHON_STAGING_DIR}/gmxapi/gmxconfig.json)
 unset(_gmx_executable)
 unset(_gmx_bindir)
+unset(_gmx_mpi_type)
 
 # scikit-build sets SKBUILD when running Python packaging tools through setup.py
 # (e.g. with pip)

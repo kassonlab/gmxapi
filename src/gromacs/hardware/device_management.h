@@ -60,6 +60,7 @@
 #include "gromacs/utility/iserializer.h"
 
 struct DeviceInformation;
+enum class DeviceVendor : int;
 
 /*! \brief Return whether GPUs can be detected.
  *
@@ -103,11 +104,11 @@ bool isDeviceDetectionEnabled();
  */
 bool isDeviceDetectionFunctional(std::string* errorMessage);
 
-/*! \brief Checks if one can compute on the GPU
+/*! \brief Returns an DeviceVendor value corresponding to the input OpenCL vendor name.
  *
- * \returns  True if the build supports GPUs and there are at least one available.
+ *  \returns               DeviceVendor value for the input vendor name
  */
-bool canComputeOnDevice();
+DeviceVendor getDeviceVendor(const char* vendorName);
 
 /*! \brief Find all GPUs in the system.
  *
@@ -131,7 +132,7 @@ bool canComputeOnDevice();
  */
 std::vector<std::unique_ptr<DeviceInformation>> findDevices();
 
-/*! \brief Return a container of the detected GPU ids that are compatible.
+/*! \brief Return a container of device-information handles that are compatible.
  *
  * This function filters the result of the detection for compatible
  * GPUs, based on the previously run compatibility tests.
@@ -142,6 +143,32 @@ std::vector<std::unique_ptr<DeviceInformation>> findDevices();
  */
 std::vector<std::reference_wrapper<DeviceInformation>>
 getCompatibleDevices(const std::vector<std::unique_ptr<DeviceInformation>>& deviceInfoList);
+
+/*! \brief Return a container of the IDs of the compatible GPU ids.
+ *
+ * This function filters the result of the detection for compatible
+ * GPUs, based on the previously run compatibility tests.
+ *
+ * \param[in] deviceInfoList An information on available devices.
+ *
+ * \return  Vector of compatible GPU ids.
+ */
+std::vector<int> getCompatibleDeviceIds(const std::vector<std::unique_ptr<DeviceInformation>>& deviceInfoList);
+
+/*! \brief Return whether \p deviceId is found in \p deviceInfoList and is compatible
+ *
+ * This function filters the result of the detection for compatible
+ * GPUs, based on the previously run compatibility tests.
+ *
+ * \param[in] deviceInfoList An information on available devices.
+ * \param[in] deviceId       The device ID to find in the list.
+ *
+ * \throws RangeError If \p deviceId does not match the id of any device in \c deviceInfoList
+ *
+ * \return  Whether \c deviceId is compatible.
+ */
+bool deviceIdIsCompatible(const std::vector<std::unique_ptr<DeviceInformation>>& deviceInfoList,
+                          int                                                    deviceId);
 
 /*! \brief Set the active GPU.
  *
