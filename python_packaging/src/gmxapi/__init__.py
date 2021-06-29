@@ -52,6 +52,7 @@ __all__ = ['commandline_operation',
            'modify_input',
            'ndarray',
            'read_tpr',
+           'scatter',
            'subgraph',
            'while_loop',
            'NDArray',
@@ -66,7 +67,7 @@ from .operation import computed_result, function_wrapper
 from .datamodel import NDArray
 # Import the public operations
 from .datamodel import ndarray
-from .operation import concatenate_lists, join_arrays, logical_not, make_constant
+from .operation import concatenate_lists, join_arrays, logical_not, make_constant, scatter
 from .commandline import commandline_operation
 from .simulation import mdrun, modify_input, read_tpr
 # TODO: decide where this lives

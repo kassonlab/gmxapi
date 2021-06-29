@@ -1,0 +1,55 @@
+@startuml
+participant client
+participant "namespace.operation" as operationFactory << OperationFactory >>
+participant "context"
+
+alt null context
+
+    client -> operationFactory: call(input)
+    note right
+        operation factory may accept call with no Context provided,
+        in which case it is free to use a module-default Context.
+    end note
+    ' operationFactory -> moduleContext: create
+
+else context provided
+
+    client -> operationFactory: call(context, input)
+    alt is_graph_context(context)
+
+        create graphDirector
+        operationFactory -> graphDirector: create
+        activate context
+        activate graphDirector
+        graphDirector -> context: newOperator()
+        activate context
+        create graphNodeBuilder
+        context -> graphNodeBuilder: create
+        graphDirector <-- context: graphNodeBuilder
+        activate graphNodeBuilder
+        deactivate context
+        graphDirector -> graphNodeBuilder: addResource(input, ...)
+        graphDirector -> graphNodeBuilder: addResource(output, ...)
+        graphDirector -> graphNodeBuilder: addDirectorFactory(functor)
+        graphDirector -> graphNodeBuilder: build()
+        activate graphNodeBuilder
+        graphNodeBuilder -> context: set up output proxy
+        activate context
+        context -> operationHandle: create
+        graphDirector <-- graphNodeBuilder: operationHandle
+        deactivate context
+        deactivate graphNodeBuilder
+        deactivate graphNodeBuilder
+
+        operationFactory <-- graphDirector: operationHandle
+        deactivate context
+        destroy graphDirector
+
+    else immediateContext
+    else remoteContext
+    end
+
+end
+
+client <-- operationFactory: operationHandle
+@enduml

@@ -109,7 +109,10 @@ def cli_bindir() -> pathlib.Path:
 #
 # TODO: Operation returns the output object when called with the shorter signature.
 #
-@gmx.function_wrapper(output={'stdout': str,
+@gmx.function_wrapper(
+    input={'command': NDArray,
+           'shell': bool},
+    output={'stdout': str,
                               'stderr': str,
                               'returncode': int})
 def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdin: str = ''):
@@ -156,7 +159,7 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdi
         that uses the next three arguments to define a vector.
 
             >>> my_filename = "somefilename"
-            >>> result = cli(('exe', '--origin', 1.0, 2.0, 3.0, '-f', my_filename), shell=False)
+            >>> result = cli(gmxapi.ndarray(['exe', '--origin', 1.0, 2.0, 3.0, '-f', my_filename]), shell=False)
             >>> assert hasattr(result, 'file')
             >>> assert hasattr(result, 'stdout')
             >>> assert hasattr(result, 'stderr')
@@ -258,21 +261,12 @@ def filemap_to_flag_list(filemap: dict = None):
     Returns:
         list of strings and/or gmxapi data references
     """
-    result = []
     if filemap is not None:
-        for key, value in filemap.items():
-            # Note that the value may be a string, a list, an ndarray, or a future
-            if not isinstance(value, (list, tuple, NDArray)):
-                if hasattr(value, 'result') and value.dtype == NDArray:
-                    pass
-                elif hasattr(value, 'result') and value.dtype != NDArray:
-                    # TODO: Fix this ugly hack when we have proper Future slicing and can make NDArray futures.
-                    result_function = value.result
-                    value.result = lambda function=result_function: [function()]
-                else:
-                    value = [value]
-            result = gmx.join_arrays(front=result, back=gmx.join_arrays(front=[key], back=value))
-    return result
+        sublists = [gmx.operation.as_gmx_ndarray(element) for key, value in filemap.items() for element in [key, value]]
+        logger.debug('Concatenating {}'.format(sublists))
+        return gmx.concatenate_lists(sublists=sublists)
+    else:
+        return gmx.ndarray([], dtype=str)
 
 
 # TODO: (FR4) Use generating function or decorator that can validate kwargs?
@@ -346,10 +340,13 @@ def commandline_operation(executable=None,
     #
     # TODO: (FR4+) Characterize the `file` dictionary key type:
     #  explicitly sequences rather than maybe-string/maybe-sequence-of-strings
-    @gmx.function_wrapper(output={'stdout': str,
+    @gmx.function_wrapper(
+        input={'erroroutput': str,
+               'returncode': int,
+               'file': dict},
+        output={'stdout': str,
                                   'stderr': str,
-                                  'returncode': int,
-                                  'file': dict})
+                'returncode': int, 'file': dict})
     def merged_ops(stdout: str = None,
                    stderr: str = None,
                    returncode: int = None,

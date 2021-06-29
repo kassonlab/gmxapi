@@ -112,6 +112,31 @@ import collections
 from typing import Type, Callable
 
 
+class DataDescription(object):
+    """Abstract description of data source or sink to help check compatibility.
+    """
+
+    @property
+    @abstractmethod
+    def dtype(self) -> type:
+        """Get class or type of data.
+
+        This is an immutable property of a DataDescription instance.
+        """
+        ...
+
+    @property
+    @abstractmethod
+    def width(self):
+        """Get the number of parallel streams of type *dtype*.
+
+        This is an immutable property of the DataDescription instance.
+
+        TODO: Return value typing. Allow flexible matching where appropriate.
+        """
+        ...
+
+
 class EnsembleDataSource(ABC):
     """A single source of data with ensemble data flow annotations.
 
@@ -133,12 +158,10 @@ class EnsembleDataSource(ABC):
         self.width = width
         self.dtype = dtype
 
-    @abstractmethod
     def member(self, member: int):
         """Extract a single ensemble member from the ensemble data source."""
         return self.source[member]
 
-    @abstractmethod
     def reset(self):
         """Reset the completion status of this data source.
 

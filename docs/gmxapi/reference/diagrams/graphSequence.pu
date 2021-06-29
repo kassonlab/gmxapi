@@ -1,0 +1,70 @@
+@startuml
+/' Illustrate client interaction with a graph Context.
+ Client creates an operation from a module that provides input to gromacs.mdrun,
+ then launches session. '/
+participant "Python Interpreter" as script << client >>
+participant opHandle << Operation >>
+participant mdrunHandle << Operation >>
+participant session << Operation >>
+
+box "mymodule" #LightBlue
+    participant "mymodule.mytool" as opFactory << OperationFactory >>
+    participant moduleDirector <<mymodule impl>>
+end box
+
+box "gmx package" #LightGreen
+    participant "gmx.mdrun" as mdrunFactory << OperationFactory >>
+    participant graphDirector <<OperationDirector>>
+    participant gmxContext <<graphContext>>
+    participant graphNodeBuilder <<OperationBuilder>>
+end box
+
+box "gromacs submodule"
+    participant "gmx._gromacs.mdrun" as mdrunImpl << Operation >>
+end box
+
+box "gmx context submodule" #Yellow
+end box
+
+activate opFactory
+    script -> opFactory: input args
+    opFactory -> moduleDirector: dispatch factory
+    activate moduleDirector
+        note left: module decides how to process input
+
+        moduleDirector -> opHandle: create
+        opFactory <-- moduleDirector: opHandle
+    deactivate moduleDirector
+    script <-- opFactory: opHandle
+deactivate opFactory
+
+activate mdrunFactory
+    script -> mdrunFactory: input args
+    mdrunFactory -> mdrunFactory: directorFactory(gmxContext, input)
+    activate mdrunFactory
+        mdrunFactory -> graphDirector: construct
+
+        activate graphDirector
+            graphDirector -> gmxContext: newOperator()
+            gmxContext -> graphNodeBuilder: create
+            activate graphNodeBuilder
+
+            graphDirector <-- gmxContext: return graphNodeBuilder
+            graphDirector -> graphNodeBuilder: registerResource(Input, ...)
+            graphDirector -> graphNodeBuilder: registerResource(Output, ...)
+            graphDirector -> graphNodeBuilder: addDirectorFactory(functor)
+            graphDirector -> graphNodeBuilder: build()
+            graphNodeBuilder -> gmxContext: setupOutputProxy
+                gmxContext -> mdrunHandle: create
+                graphDirector <-- graphNodeBuilder: return mdrunHandle
+            destroy graphNodeBuilder
+            mdrunFactory <-- graphDirector: mdrunHandle
+        destroy graphDirector
+    deactivate mdrunFactory
+
+    script <-- mdrunFactory: mdrunHandle
+deactivate mdrunFactory
+
+ref over script: launch
+
+@enduml

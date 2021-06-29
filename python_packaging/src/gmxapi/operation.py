@@ -42,11 +42,102 @@ a factory is a handle to the node in the work graph. It's ``output`` attribute
 is a collection of the Operation's results.
 
 function_wrapper(...) produces a wrapper that converts a function to an Operation
-factory. The Operation is defined when the wrapper is called. The Operation is
-instantiated when the factory is called. The function is executed when the Operation
-instance is run.
+factory. The Operation is *defined* (as a class) when the wrapper is called.
+The Operation is *instantiated* when the factory is called.
+The function is executed when the Operation instance is run.
 
 The framework ensures that an Operation instance is executed no more than once.
+
+Operation inputs
+----------------
+
+Native Python data provided as operation inputs is converted to gmxapi data
+objects before attempting to add a node to the work graph. Implicit conversions
+are simple for integer, floating point, strings, and dictionaries.
+
+.. versionchanged:: 0.1b2
+    Other sequence data types must be explicitly annotated to tell gmxapi whether
+    the input should be interpreted as array data or as ensemble input.
+    Unannotated iterables result in a gmxapi.exceptions.TypeError.
+
+.. versionchanged:: 0.1
+    .. todo:: Document implicit behavior, if any.
+
+Various functions in the package are more flexible with their inputs than the
+factory functions that instantiate operations. In some cases, you must use
+helper functions to annotate or convert input to be used by an operation. For
+instance, scatter() and ndarray() can accept various native Python objects to
+produce gmxapi data references.
+
+Data typing
+-----------
+
+
+Data flow topologies
+--------------------
+
+Operation inputs may expect either singular or array data.
+
+.. versionadded:: 0.1b1
+    Sequence input must be annotated to clarify whether it is to be interpreted
+    as either an NDArray or an EnsembleDataSource (gmx.ndarray or gmx.scatter).
+    Implicit behavior is under discussion for unannotated sequences or iterables
+    in future versions.
+
+
+Operation input binding
+-----------------------
+
+The operations and framework in this module employ a somewhat non-normative
+scheme for binding operation inputs to data sources.  It is helpful to document
+that scheme here.
+
+Arguments are provided to a helper function for creating a new operation instance.
+
+The operation director for the operation is retrieved from the OperationDetails.operation_director
+dispatcher. User arguments are passed to the operation director.
+
+The OperationDirector is called (__call__()) to produce the handle. This activates
+the director code for the NodeBuilder interface, which sets an InputDescription,
+resource factory, resource manager factory, runner director, handle factory, and output factory,
+and populates a DataSourceCollection.
+
+Additionally during OperationDirector.__call__(), the user input is converted
+to a DataSourceCollection by treating OperationDetails.signature().bind()
+(a.k.a InputDescription.signature().bind(), a.k.a. InputCollectionDescription.bind())
+as a "node input factory".
+*TODO: This should be abstracted to the input resource factory for a null Context to a NodeBuilder.*
+
+During InputCollectionDescription.bind(), some checking takes place. For NDArray
+inputs, a source value is normalized with as_gmx_ndarray(value). This is our
+first opportunity to throw errors for type mismatches.
+
+Then OperationDirector.__call__() passes each source to NodeBuilder.add_input().
+
+The NodeBuilder.build() method is called by the OperationDirector.
+
+build() calls InputDescription.signature() to get a InputCollectionDescription,
+which it passes to the initializer for a new SinkTerminal.
+
+SinkTerminal.update(DataSourceCollection) allows the sources to be checked for
+compatibility, and for the SinkTerminal to be updated according to the topology
+represented by the DataSourceCollection. SinkTerminal.update_width() is called,
+if necessary, to update the topology of the sink to accommodate the source.
+
+A DataEdge is created for the final DataSourceCollection and SinkTerminal.
+
+Along with other inputs, the DataEdge is passed to the resource manager factory.
+The builder assigns the resource manager to a new node, creates a handle, and
+returns. The Operation director passes along this handle to its caller.
+
+As the DataEdge is initialized, each input in the sink terminal is bound to an
+*adapter* that will be used by the resolve(key, member) method. This is the final
+place that conversions can be applied to match the DataSourceCollection with the
+SinkTerminal.
+
+When update_output() is being handled for an operation instance, the input
+localizer calls DataEdge.sink(member), which packages a dict of results of
+resolve(key, member) for all keys in the SinkTerminal inputs.
 """
 
 __all__ = ['computed_result',
@@ -65,7 +156,7 @@ import gmxapi as gmx
 from gmxapi import datamodel
 from gmxapi import exceptions
 from gmxapi import logger as root_logger
-from gmxapi.abc import OperationImplementation, MutableResource, Node
+from gmxapi.abc import OperationImplementation, MutableResource, Node, DataDescription, NDArray
 from gmxapi.typing import _Context, ResultTypeVar, SourceTypeVar, valid_result_types, valid_source_types
 from gmxapi.typing import Future as _Future
 
@@ -74,28 +165,126 @@ logger = root_logger.getChild('operation')
 logger.info('Importing {}'.format(__name__))
 
 
-class ResultDescription:
-    """Describe what will be returned when `result()` is called."""
+class BasicDataDescription(DataDescription):
+    """Description of data source or sink to help check compatibility.
+    """
+    def __repr__(self):
+        return '<EnsembleDataSource: width={width}, dtype={dtype}, source={source}>'.format(
+            dtype=repr(self.dtype),
+            source=repr(self.source),
+            width=self.width
+        )
 
-    def __init__(self, dtype=None, width=1):
-        assert isinstance(dtype, type)
-        assert issubclass(dtype, valid_result_types)
-        assert isinstance(width, int)
+    def __init__(self, dtype=None, width=1, subject=None):
         self._dtype = dtype
         self._width = width
+        assert isinstance(dtype, type)
+        assert isinstance(width, int)
+        if not issubclass(dtype, tuple(set(valid_result_types).union(valid_source_types))):
+            raise exceptions.TypeError('Invalid type: {}'.format(dtype))
+        # For debugging and introspection, we may try to hold a weak reference
+        # to the subject of the description.
+        try:
+            subject = weakref.proxy(subject)
+        except TypeError:
+            # Not all types support weak references
+            pass
+        self._subject = subject
 
     @property
     def dtype(self) -> type:
-        """node output type"""
+        """Get class or type of data.
+
+        This is an immutable property of a DataDescription instance.
+        """
         return self._dtype
 
     @property
-    def width(self) -> int:
-        """ensemble width"""
+    def width(self):
+        """Get the number of parallel streams of type *dtype*.
+
+        This is an immutable property of the DataDescription instance.
+
+        TODO: Return value typing. Allow flexible matching where appropriate.
+        """
         return self._width
 
     def __repr__(self):
         return '{}(dtype={}, width={})'.format(self.__class__.__name__, self.dtype, self.width)
+
+
+class ResultDescription(BasicDataDescription):
+    """Describe what will be returned when `result()` is called."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if 'dtype' in kwargs:
+            dtype = kwargs['dtype']
+            if isinstance(dtype, type):
+                if not issubclass(dtype, valid_result_types):
+                    raise exceptions.TypeError('Invalid result type: {}'.format(dtype))
+
+
+@functools.singledispatch
+def describe_data(data: object) -> DataDescription:
+    """Get a DataDescription instance for provided object.
+
+    Raises:
+        exceptions.TypeError if data description cannot be found or inferred.
+
+    Returns:
+        Instance of an object providing the DataDescription interface.
+
+    .. todo::
+        Provide better annotation for source versus sink descriptions.
+        Consider an optional *constraints* argument to mark known sources and sinks.
+
+    """
+    if hasattr(data, 'description') and isinstance(data.description, DataDescription):
+        return data.description
+    # In this implementation, let a NDArray be described as an NDArray.
+    # TODO: Normalize handling of data dimensionality.
+    if hasattr(data, 'dtype') and hasattr(data, 'shape'):
+        description = ResultDescription(dtype=datamodel.NDArray, width=1, subject=data)
+        return description
+    if hasattr(data, 'dtype') and hasattr(data, 'width'):
+        description = ResultDescription(dtype=data.dtype, width=data.width, subject=data)
+        return description
+    if isinstance(data, (tuple, list)):
+        # Implicitly handle ensemble data.
+        dtype = None
+        for item in data:
+            if dtype is None:
+                dtype = type(item)
+            else:
+                if not isinstance(item, dtype):
+                    raise exceptions.TypeError('Sequence must be of uniform type.')
+        width = len(data)
+        if isinstance(data, (tuple, list)):
+            # Lists nested in lists are implicitly treated as arrays, not ensembles.
+            # TODO: Consolidate such logic, and normalize the actual data handle.
+            dtype = datamodel.NDArray
+        description = ResultDescription(dtype=dtype, width=width)
+        return description
+    if isinstance(data, valid_result_types):
+        description = ResultDescription(dtype=type(data), width=1, subject=data)
+        return description
+    if isinstance(datamodel, valid_source_types):
+        description = BasicDataDescription(dtype=type(data), width=1, subject=data)
+        return description
+    raise exceptions.TypeError('Could not describe data of the form {}'.format(repr(data)))
+
+
+@describe_data.register(type)
+def _(type_object) -> DataDescription:
+    # TODO: Reconsider accepting `type` objects...
+    valid_types = set(gmx.typing.valid_result_types).union(gmx.typing.valid_source_types)
+    if issubclass(type_object, tuple(valid_types)):
+        if issubclass(type_object, collections.abc.Iterable) and not isinstance(type_object, (str, bytes)):
+            # TODO: NDArray and GmxMapping descriptions should be more annotatable
+            width = None
+        else:
+            width = 1
+        return BasicDataDescription(dtype=type_object, width=width)
 
 
 class OutputData(object):
@@ -160,13 +349,66 @@ class OutputData(object):
 class EnsembleDataSource(gmx.abc.EnsembleDataSource):
     """A single source of data with ensemble data flow annotations.
 
-    Note that data sources may be Futures.
-    """
+    When an operation is binding to an EnsembleDataSource, its resource management
+    must map elements of the EnsembleDataSource to separate parallel resources.
 
-    def __init__(self, source=None, width=1, dtype=None):
+    The member data sources of an EnsembleDataSource are each Futures, but the
+    EnsembleDataSource is a local interface.
+
+    .. todo::
+        EnsembleDataSource should become an annotation or use case of a
+        general gmxapi data reference.
+
+    Attributes:
+        source: a sequence object with elements of type *dtype*
+        dtype: a type value that characterizes elements of *source*
+        width: the number of elements in *source*
+
+    """
+    def __repr__(self):
+        return '<EnsembleDataSource: width={width}, dtype={dtype}, source={source}>'.format(
+            dtype=repr(self.dtype),
+            source=repr(self.source),
+            width=self.width
+        )
+
+    def __init__(self, source: typing.Union[typing.Sequence[_Future], _Future], dtype=None):
+        # TODO: Allow Futures of NDArray
+        input_error = 'source must be a Future or sequence of Futures.'
+        if not isinstance(source, (collections.abc.Sequence, Future)) \
+                or isinstance(source, (str, bytes)) \
+                or any([not isinstance(element, Future) for element in source]):
+            raise exceptions.TypeError(input_error)
         self.source = source
-        self.width = width
-        self.dtype = dtype
+        if isinstance(source, Future):
+            self.width = source.description.width
+            if dtype is None:
+                self.dtype = source.description.dtype
+            else:
+                self.dtype = dtype
+                if not isinstance(source.description.dtype, self.dtype):
+                    raise exceptions.TypeError(
+                        'Ensemble type {} cannot accept Future type {}'.format(
+                            self.dtype,
+                            source.description.dtype))
+        else:
+            self.width = len(source)
+            self.dtype = dtype
+            for element in self.source:
+                assert isinstance(element, Future)
+                assert hasattr(element, 'description')
+                description = typing.cast(Future, element).description
+                dtype = description.dtype
+                if self.dtype is not None:
+                    # TODO: Disallow None dtype.
+                    if dtype is not None:
+                        if not issubclass(dtype, self.dtype):
+                            raise exceptions.TypeError('Ensemble type {} cannot accept Future type {}'.format(self.dtype,
+                                                                                                              dtype))
+                else:
+                    self.dtype = dtype
+        if self.width < 1:
+            raise exceptions.ValueError('Ensemble must have at least one member.')
 
     def node(self, member: int):
         return self.source[member]
@@ -175,7 +417,15 @@ class EnsembleDataSource(gmx.abc.EnsembleDataSource):
         protocols = ('reset', '_reset')
         for protocol in protocols:
             if hasattr(self.source, protocol):
-                getattr(self.source, protocol)()
+                resetter = getattr(self.source, protocol)
+                assert callable(resetter)
+                resetter()
+            else:
+                for element in self.source:
+                    if hasattr(element, protocol):
+                        resetter = getattr(element, protocol)
+                        assert callable(resetter)
+                        resetter()
 
 
 class DataSourceCollection(collections.OrderedDict):
@@ -206,7 +456,7 @@ class DataSourceCollection(collections.OrderedDict):
     def __setitem__(self, key: str, value: SourceTypeVar) -> None:
         if not isinstance(key, str):
             raise exceptions.TypeError('Data must be named with str type.')
-        # TODO: Encapsulate handling of proferred data sources to Context details.
+        # TODO: Encapsulate handling of proffered data sources to Context details.
         # Preprocessed input should be self-describing gmxapi data types. Structured
         # input must be recursively (depth-first) converted to gmxapi data types.
         # TODO: Handle gmxapi Futures stored as dictionary elements!
@@ -215,10 +465,13 @@ class DataSourceCollection(collections.OrderedDict):
                 # Iterables here are treated as arrays, but we do not have a robust typing system.
                 # Warning: In the initial implementation, the iterable may contain Future objects.
                 # TODO: (#2993) Revisit as we sort out data shape and Future protocol.
-                try:
-                    value = datamodel.ndarray(value)
-                except (exceptions.ValueError, exceptions.TypeError) as e:
-                    raise exceptions.TypeError('Iterable could not be converted to NDArray: {}'.format(value)) from e
+                if gmx.version.has_feature('implicit_ndarray_from_iterable'):
+                    try:
+                        value = datamodel.ndarray(value)
+                    except (exceptions.ValueError, exceptions.TypeError) as e:
+                        raise exceptions.TypeError('Iterable could not be converted to NDArray: {}'.format(value)) from e
+                else:
+                    raise exceptions.TypeError('No implicit conversion for data source {}'.format(repr(value)))
             elif hasattr(value, 'result'):
                 # A Future object.
                 pass
@@ -350,15 +603,20 @@ class InputCollectionDescription(collections.OrderedDict):
         for name, param in parameters:
             if not isinstance(name, str):
                 raise exceptions.TypeError('Input descriptions are keyed by Python strings.')
+
             # Multidimensional inputs are explicitly NDArray
+            # TODO: Stronger specification for input type and width by replacing NDArray as an annotation.
+            #  We can use special values of "width" as placeholders for dimensional constraints.
             dtype = param.annotation
-            if issubclass(dtype, collections.abc.Iterable) \
-                    and not issubclass(dtype, (str, bytes, collections.abc.Mapping)):
-                # TODO: we can relax this with some more input conditioning.
-                if dtype != datamodel.NDArray:
-                    raise exceptions.UsageError(
-                        'Cannot accept input type {}. Sequence type inputs must use NDArray.'.format(param))
-            assert issubclass(dtype, valid_result_types)
+            if dtype is not None:
+                assert isinstance(dtype, type)
+                if issubclass(dtype, collections.abc.Iterable) \
+                        and not issubclass(dtype, (str, bytes, collections.abc.Mapping)):
+                    # TODO: we can relax this with some more input conditioning.
+                    if dtype != datamodel.NDArray:
+                        raise exceptions.UsageError(
+                            'Cannot accept input type {}. Sequence type inputs must use NDArray.'.format(param))
+                assert issubclass(dtype, valid_result_types)
             if hasattr(param, 'kind'):
                 disallowed = any([param.kind == param.POSITIONAL_ONLY,
                                   param.kind == param.VAR_POSITIONAL,
@@ -437,6 +695,8 @@ class InputCollectionDescription(collections.OrderedDict):
         described in the InputCollectionDescription.
 
         See wrapped_function_runner() and describe_function_input().
+
+        TODO: This helper function should be recast in terms of the dispatching resource factories.
         """
         # For convenience, accept *args, but convert to **kwargs to pass to Operation.
         # Factory accepts an unadvertised `input` keyword argument that is used as a default kwargs dict.
@@ -455,10 +715,76 @@ class InputCollectionDescription(collections.OrderedDict):
             bound_arguments = self.signature.bind_partial(*args, **input_kwargs)
         except TypeError as e:
             raise exceptions.UsageError('Could not bind operation parameters to function signature.') from e
+        # Note that this is not the final input binding. It is a temporary binding
+        # from which we can construct the DataSourceCollection object that will be
+        # bound into a data edge later.
         assert 'output' not in bound_arguments.arguments
         bound_arguments.apply_defaults()
         assert 'input' not in bound_arguments.arguments
-        input_kwargs = collections.OrderedDict([pair for pair in bound_arguments.arguments.items()])
+        input_kv_pairs = list()
+
+        # Note: previously, we only checked for compatibility, but for migration to
+        # the resource-factory model, it is reasonable to construct a DataSourceCollection that
+        # is a good match for the sink.
+        # TODO: Note where conversions take place in sequence for execution model docs.
+
+        # Update, annotate, or transform inputs to better match the sink terminal.
+        # TODO: Make sure implicit conversions are well documented. (Where?)
+        for pair in bound_arguments.arguments.items():
+            assert len(pair) == 2
+            key, value = pair
+            sink_parameter = self.signature.parameters[key]
+            sink_dtype = sink_parameter.annotation
+
+            if isinstance(value, collections.abc.Iterable) \
+                    and not isinstance(value, (str, bytes, dict, datamodel.NDArray)):
+                if not gmx.version.has_feature('implicit_ndarray_from_iterable'):
+                    message = 'Ambiguous sequence: {}. Use a helper function to clarify array or ensemble input.'
+                    message = message.format(repr(value))
+                    raise gmx.exceptions.TypeError(message)
+
+            # Implicitly convert scalar input to NDArray input, if appropriate.
+            if isinstance(sink_dtype, type) and issubclass(sink_dtype, datamodel.NDArray):
+                # Sink is NDArray
+                message = 'NDArray sink {} binding to {}'.format(key, value)
+                logger.debug(message)
+
+                # NOTE: When we arrive here, source may be a almost anything, including
+                # a string, tuple, list, NDArray, Future (of NDArray or other), or EnsembleDataSource.
+                value = as_gmx_ndarray(value)
+
+                if isinstance(value, (Future, EnsembleDataSource)):
+                    if isinstance(value.dtype, type) and issubclass(value.dtype, (datamodel.NDArray,)):
+                        # This is a match.
+                        pass
+                    else:
+                        raise exceptions.TypeError('Expected NDArray but got {}'.format(value))
+
+                # source_description = describe_data(value)
+                # if not isinstance(source_description.dtype, type) or not issubclass(source_description.dtype, datamodel.NDArray):
+                #     if isinstance()
+                #
+                #     # Source is either scalar or ensemble. Get ensemble.
+                #     if isinstance(value, EnsembleDataSource):
+                #         ensemble_source = value
+                #     else:
+                #         if isinstance(value, Future):
+                #             if not isinstance(value.dtype, type) or not issubclass(value.dtype, datamodel.NDArray):
+                #                 ensemble_source = EnsembleDataSource(source=[value],
+                #                                                      width=1,
+                #                                                      dtype=value.dtype)
+                #             else:
+                #                 ensemble_source = EnsembleDataSource(source=value,
+                #                                                      width=source_description.width,
+                #                                                      dtype=source_description.dtype)
+                #         else:
+                #             ensemble_source = EnsembleDataSource(source=[value],
+                #                                                  width=1,
+                #                                                  dtype=source_description.dtype)
+                #     value = gather(ensemble_source)
+                #     assert isinstance(value, Future) and value.description.width == 1
+            input_kv_pairs.append((key, value))
+        input_kwargs = collections.OrderedDict(input_kv_pairs)
         if 'output' in input_kwargs:
             input_kwargs.pop('output')
         return DataSourceCollection(**input_kwargs)
@@ -831,7 +1157,7 @@ class StaticSourceManager(SourceResource[_OutputDataProxyType, _PublishingDataPr
             if width != 1:
                 raise exceptions.ValueError('width must be an integer 1 or greater.')
             dtype = type(self._result)
-            if issubclass(dtype, (list, tuple)):
+            if issubclass(dtype, (list, tuple, datamodel.NDArray)):
                 dtype = datamodel.NDArray
                 data = [datamodel.ndarray(self._result)]
             elif isinstance(self._result, collections.abc.Iterable):
@@ -840,7 +1166,7 @@ class StaticSourceManager(SourceResource[_OutputDataProxyType, _PublishingDataPr
                         'Expecting width 1 but "function" produced iterable type {}.'.format(type(self._result)))
                 else:
                     dtype = str
-                    data = [str(self._result)]
+                    data = [dtype(self._result)]
             else:
                 data = [self._result]
         description = ResultDescription(dtype=dtype, width=width)
@@ -1523,6 +1849,9 @@ class SinkTerminal(object):
         return '<SinkTerminal: ensemble_width={}>'.format(self.ensemble_width)
 
     def update_width(self, width: int):
+        if width == 1:
+            # Width 1 is compatible with all topologies. Take no action.
+            return
         if not isinstance(width, int):
             try:
                 width = int(width)
@@ -1537,7 +1866,29 @@ class SinkTerminal(object):
         self.ensemble_width = width
 
     def update(self, data_source_collection: DataSourceCollection):
-        """Update the SinkTerminal with the proposed data provider."""
+        """Update the SinkTerminal with the proposed data provider.
+
+        In the original implementation, arrays of scalar input are distinguished
+        from ensemble input by using instances of NDArray or EnsembleDataSource.
+        In the near future, this explicit typing will be replaced with annotations
+        available on gmxapi data objects.
+
+        Cases:
+          1. If source is NDArray or Future[NDArray] and sink is NDArray, accept direct mapping.
+          2. If source is NDArray or Future[NDArray] but sink is not, implicitly scatter.
+             Warning! We cannot implicitly scatter Future[NDArray] properly because we don't know how
+             long it is!
+             TODO: Clarify / implement behavior for Future[NDArray[T]] -> [T]
+          3. If source is EnsembleDataSource, confirm data type compatibility and explicitly scatter.
+          4. If source has width == 1, confirm type compatibility and accept direct mapping.
+          5. If source has width > 1, confirm that source data type matches sink data type
+             and scatter. This behavior has potential overlap with the EnsembleDataSource
+             check.
+
+        These cases are handled partly here, and partly during the DataEdge creation.
+        Also note that we do not list a case for a NDArray sink with a non-NDArray input,
+        since that is handled during DataSourceCollection creation.
+        """
         for name, sink_dtype in self.inputs.items():
             if name not in data_source_collection:
                 # If/when we accept data from multiple sources, we'll need some additional sanity checking.
@@ -1546,31 +1897,74 @@ class SinkTerminal(object):
             else:
                 # With a single data source, we need data to be in the source or have a default
                 assert name in data_source_collection
-                assert issubclass(sink_dtype, valid_result_types)
+                if not isinstance(sink_dtype, type) or not issubclass(sink_dtype, valid_result_types):
+                    if sink_dtype is None:
+                        # In some cases (such as dynamically constructed helper functions
+                        # built from examining slices of Futures) we cannot know the intended
+                        # type of an operation.
+                        # TODO: Fix data model so we don't have unknown types!
+                        pass
+                    else:
+                        raise exceptions.ApiError('Encountered signature with invalid typing.')
+
                 source = data_source_collection[name]
                 logger.debug('Updating Sink for source {}: {}.'.format(name, source))
-                if isinstance(source, sink_dtype):
-                    logger.debug('Source matches sink. No update necessary.')
-                    continue
-                else:
-                    if isinstance(source, collections.abc.Iterable) and not isinstance(source, (
-                            str, bytes, collections.abc.Mapping)):
-                        assert isinstance(source, datamodel.NDArray)
-                        if sink_dtype != datamodel.NDArray:
-                            # Source is NDArray, but sink is not. Implicitly scatter.
-                            self.update_width(len(source))
+
+                if isinstance(sink_dtype, type) and isinstance(source, datamodel.NDArray) or (isinstance(source, Future) and source.dtype is datamodel.NDArray):
+                    if isinstance(sink_dtype, type) and issubclass(sink_dtype, NDArray):
+                        # Case 1
+                        if isinstance(source, Future):
+                            # Warning: Make sure this gets updated if Future semantics change.
+                            self.update_width(source.description.width)
+                            continue
+                        else:
+                            # Sending NDArray to NDArray
+                            # TODO: Check for compatible NDArray dtype
+                            continue
+                    else:
+                        # Case 2
+                        if isinstance(source, Future):
+                            raise exceptions.NotImplementedError(
+                                'This gmxapi version cannot implicitly scatter '
+                                'NDArray Futures to {} inputs.'.format(sink_dtype))
+                        self.update_width(len(source))
                         continue
-                    if hasattr(source, 'description'):
-                        source_description = typing.cast(ResultDescription, source.description)
-                        source_dtype = source_description.dtype
-                        assert isinstance(sink_dtype, type)
-                        # TODO: Handle typing of Future slices when we have a better data model.
-                        if source_dtype is not None:
-                            assert isinstance(source_dtype, type)
-                            if not issubclass(source_dtype, sink_dtype):
-                                raise exceptions.TypeError('Expected {} but got {}.'.format(sink_dtype, source_dtype))
-                        source_width = source.description.width
-                        self.update_width(source_width)
+                else:
+                    # Cases 3, 4, 5
+                    if isinstance(source, EnsembleDataSource):
+                        # Case 3
+                        if not isinstance(sink_dtype, type):
+                            assert sink_dtype is None
+                            # Accept None as a wild-card...
+                            self.update_width(source.width)
+                            continue
+                        else:
+                            if not issubclass(sink_dtype, NDArray):
+                                if isinstance(source.dtype, type) and issubclass(source.dtype, NDArray):
+                                    raise exceptions.DataShapeError('Ensembles are 1-dimensional in this gmxapi version.')
+                            if isinstance(source.dtype, type) and not issubclass(source.dtype, sink_dtype):
+                                raise exceptions.TypeError(
+                                    'Sink type {} cannot accept source type {}'.format(
+                                        sink_dtype,
+                                        source.dtype))
+                            self.update_width(source.width)
+                            continue
+                    else:
+                        # Cases 4 and 5
+                        description = describe_data(source)
+                        if not isinstance(sink_dtype, type):
+                            assert sink_dtype is None
+                        else:
+                            if description.dtype is not None:
+                                assert isinstance(description.dtype, type)
+                                if not issubclass(description.dtype, sink_dtype):
+                                    raise exceptions.TypeError(
+                                        'Source {} incompatible with sink {}.'.format(
+                                            description.dtype,
+                                            sink_dtype
+                                        ))
+                        self.update_width(description.width)
+
 
 
 class DataEdge(object):
@@ -1622,7 +2016,7 @@ class DataEdge(object):
 
     def __init__(self, source_collection: DataSourceCollection, sink_terminal: SinkTerminal):
         # Adapters are callables that transform a source and node ID to local data.
-        # Every key in the sink has an adapter.
+        # Every key in the sink has an adapter in the DataSourceCollection.
         self.adapters = {}
         self.source_collection = source_collection
         self.sink_terminal = sink_terminal
@@ -1665,7 +2059,7 @@ class DataEdge(object):
                         self.adapters[name] = lambda member, source=source: source.result()[member]
                 else:
                     assert isinstance(source, EnsembleDataSource)
-                    self.adapters[name] = lambda member, source=source: source.node(member)
+                    self.adapters[name] = lambda member, source=source: source.node(member).result()
 
     def __str__(self):
         return '<DataEdge: source_collection={}, sink_terminal={}>'.format(self.source_collection, self.sink_terminal)
@@ -2043,8 +2437,8 @@ class ResourceManager(SourceResource[_OutputDataProxyType, _PublishingDataProxyT
 
         # Check that we have real data
         for key, value in kwargs.items():
-            assert not hasattr(value, 'result')
-            assert not hasattr(value, 'run')
+            if hasattr(value, 'result') or hasattr(value, 'run'):
+                raise exceptions.ApiError('Bug detected: Data edge {} delivered a Future.'.format(self._input_edge))
             value_list = []
             if isinstance(value, list):
                 value_list = value
@@ -2630,20 +3024,36 @@ def _make_datastore(output_description: OutputCollectionDescription, ensemble_wi
 # TODO: For outputs, distinguish between "results" and "events".
 #  Both are published to the resource manager in the same way, but the relationship
 #  with subscribers is potentially different.
-def function_wrapper(output: dict = None):
+def function_wrapper(input: dict = None, output: dict = None):
     # Suppress warnings in the example code.
     # noinspection PyUnresolvedReferences
-    """Generate a decorator for wrapped functions with signature manipulation.
+    """Generate a decorator for wrapped functions.
 
-    New function accepts the same arguments, with additional arguments required by
-    the API.
-
-    The new function returns an object with an ``output`` attribute containing the named outputs.
+    Returns a function that can be used to transform a callable into a gmxapi
+    operation.
 
     Example:
 
-        >>> @function_wrapper(output={'spam': str, 'foo': str})
-        ... def myfunc(parameter: str = None, output=None):
+        >>> def myfunc(parameter=None) -> str:
+        ...     return str(parameter)
+        ...
+        >>> myoperation = function_wrapper(input={'parameter': str})(myfunc)
+        >>> assert myoperation('spam').output.result() == 'spam'
+
+    The new function returns an object with an `output` attribute containing the
+    named outputs. See AbstractOperation.
+
+    If an *output* dictionary is provided to the wrapper, a data structure will be passed to
+    the wrapped functions with the named attributes so that the function can easily
+    publish multiple named results. Otherwise, the `output` of the generated operation
+    will just capture the return value of the wrapped function as `data`.
+
+    Can also be used as a parameterized decorator.
+
+    Example:
+
+        >>> @function_wrapper(input={'parameter': str}, output={'spam': str, 'foo': str})
+        ... def myfunc(parameter=None, output=None):
         ...    output.spam = parameter
         ...    output.foo = parameter + ' ' + parameter
         ...
@@ -2658,6 +3068,23 @@ def function_wrapper(output: dict = None):
     the wrapped functions with the named attributes so that the function can easily
     publish multiple named results. Otherwise, the ``output`` of the generated operation
     will just capture the return value of the wrapped function.
+    The transformed callable accepts the same arguments as the original,
+    along with some additional arguments required by the API.
+
+    Arguments:
+        input (dict): Mapping of operation inputs to input types.
+        output (dict): Mapping of named outputs to output types.
+
+    If *output* is not specified, the wrapped function will be inspected to try
+    to deduce the return type. Deduction will fail if the function does not have
+    a return value annotation.
+
+    Note that Python dictionaries do not preserve the order of their keys, so
+    *input* may not be used to express positional parameters, and the operation
+    helper that is produced must be called with explicitly named arguments.
+
+    Raises:
+        exceptions.ValueError if *input* or *output* are invalid.
 
     .. todo:: gmxapi typing stub file(s).
               The way this wrapper uses parameter annotations is not completely
@@ -2667,8 +3094,13 @@ def function_wrapper(output: dict = None):
               stub file (.pyi) to support static type checking of the API.
     """
 
+    if input is not None:
+        if not isinstance(input, collections.abc.Mapping):
+            raise exceptions.ValueError('`input` must be a mapping of operation inputs to data types.')
+
     if output is not None and not isinstance(output, collections.abc.Mapping):
-        raise exceptions.TypeError('If provided, `output` argument must be a mapping of data names to types.')
+        # TODO: (#3134) Refine exception names and meanings.
+        raise exceptions.ValueError('If provided, `output` argument must be a mapping of data names to types.')
 
     # TODO: (FR5+) gmxapi operations need to allow a context-dependent way to generate an implementation with input.
     # This function wrapper reproduces the wrapped function's kwargs, but does not allow chaining a
@@ -2686,6 +3118,14 @@ def function_wrapper(output: dict = None):
         # Explicitly capture `function` and `output` references.
         provided_output_map = output
 
+        if input is None:
+            _input_signature = InputCollectionDescription.from_function(function)
+        else:
+            # Note: if input is a dictionary, it cannot imply argument sequence.
+            signature = [(name, inspect.Parameter(name, annotation=dtype, kind=inspect._KEYWORD_ONLY))
+                         for name, dtype in input.items()]
+            _input_signature = InputCollectionDescription(signature)
+
         # Note: Allow operations to be defined entirely in template headers to facilitate
         # compile-time optimization of fused operations. Consider what distinction, if any,
         # exists between a fused operation and a more basic operation. Probably it amounts
@@ -2697,7 +3137,7 @@ def function_wrapper(output: dict = None):
             # Suggest registering directly in the Context instead of in this local class definition.
             __basename = '.'.join((str(function.__module__), function.__qualname__))
             __last_uid = 0
-            _input_signature_description = InputCollectionDescription.from_function(function)
+            _input_signature_description = _input_signature
             # TODO: Separate the class and instance logic for the runner.
             # Logically, the runner is a detail of a context-specific implementation class,
             # though the output is not generally fully knowable until an instance is initialized
@@ -2834,13 +3274,14 @@ def function_wrapper(output: dict = None):
                 for name, value in resources.items():
                     if name != 'output':
                         expected = cls.signature()[name]
-                        got = type(value)
-                        if got != expected:
-                            raise exceptions.TypeError(
-                                'Expected {} but got {} for {} resource {}.'.format(expected,
-                                                                                    got,
-                                                                                    cls.__basename,
-                                                                                    name))
+                        if expected is not None:
+                            got = type(value)
+                            if got != expected:
+                                raise exceptions.TypeError(
+                                    'Expected {} but got {} for {} resource {}.'.format(expected,
+                                                                                        got,
+                                                                                        cls.__basename,
+                                                                                        name))
                 return resources
 
         # TODO: (FR4) Update annotations with gmxapi data types. E.g. return -> Future.
@@ -3284,6 +3725,8 @@ class SubgraphBuilder(object):
                 for name in self.update_sources:
                     self.futures[name].resource_manager = gmx.make_constant(self.values[name]).resource_manager
                 for name in self.update_sources:
+                    # TODO: Replace this pattern with a re-instantiation of operations
+                    #  following the chain of subscribed observers.
                     self.update_sources[name]._reset()
 
         subgraph = Subgraph(inputs, updates)
@@ -3446,38 +3889,42 @@ def join_arrays(*, front: datamodel.NDArray = (), back: datamodel.NDArray = ()) 
     # TODO: elaborate and clarify.
     # TODO: check type and shape.
     # TODO: figure out a better annotation.
+    # TODO: Determine behavior and checking for higher-dimensional arrays.
     """
     # TODO: (FR4) Returned list should be an NDArray.
     if isinstance(front, (str, bytes)) or isinstance(back, (str, bytes)):
         raise exceptions.ValueError('Input must be a pair of lists.')
     assert isinstance(front, datamodel.NDArray)
     assert isinstance(back, datamodel.NDArray)
-    new_list = list(front._values)
-    new_list.extend(back._values)
+    new_list = front.to_list()
+    new_list.extend(back.to_list())
     return datamodel.NDArray(new_list)
 
 
 # TODO: Constrain
 Scalar = typing.TypeVar('Scalar')
+ListLike = typing.Union[list, tuple, NDArray, _Future[NDArray]]
 
 
-def concatenate_lists(sublists: list = ()) -> _Future[gmx.datamodel.NDArray]:
+def concatenate_lists(sublists: typing.Sequence[ListLike] = ()) -> _Future[NDArray]:
     """Combine data sources into a single list.
 
-    A trivial data flow restructuring operation.
+    A trivial data restructuring operation.
     """
     if isinstance(sublists, (str, bytes)):
         raise exceptions.ValueError('Input must be a list of lists.')
     if len(sublists) == 0:
         return datamodel.ndarray([])
+    elif len(sublists) == 1:
+        return gmx.operation.as_gmx_ndarray(sublists[0])
     else:
         # TODO: Fix the data model so that this can type-check properly.
-        return join_arrays(front=sublists[0],
+        return join_arrays(front=gmx.operation.as_gmx_ndarray(sublists[0]),
                            back=typing.cast(datamodel.NDArray,
                                             concatenate_lists(sublists[1:])))
 
 
-def make_constant(value: Scalar) -> _Future:
+def make_constant(value: Scalar) -> Future:
     """Provide a predetermined value at run time.
 
     This is a trivial operation that provides a (typed) value, primarily for
@@ -3486,12 +3933,427 @@ def make_constant(value: Scalar) -> _Future:
     Accepts a value of any type. The object returned has a definite type and
     provides same interface as other gmxapi outputs. Additional constraints or
     guarantees on data type may appear in future versions.
+
+    # TODO: This should create a resource managed in the current Context.
     """
     dtype = type(value)
+    # TODO: Allow sensible implicit conversions.
+    if not isinstance(value, valid_result_types):
+        raise exceptions.TypeError('{} is not a valid gmxapi input data type.'.format(dtype))
     source = StaticSourceManager(name='data', proxied_data=value, width=1, function=lambda x: x)
     description = ResultDescription(dtype=dtype, width=1)
     future = Future(source, 'data', description=description)
     return future
+
+
+def as_gmx_ndarray(data, dtype: typing.Optional[SourceTypeVar] = None) -> _Future:
+    """Get an NDArray Future reference for the provided data.
+
+    This is primarily for internal use and should no longer be necessary once
+    the gmxapi data model is better established.
+
+    Raises:
+        gmxapi.exceptions.ValueError if a future cannot be generated for data.
+    """
+    # Handle case where input is a Future.
+    if isinstance(data, Future):
+        if dtype is None:
+            dtype = data.dtype
+        else:
+            if data.dtype is not None:
+                if not isinstance(data.dtype, type) or not issubclass(data.dtype, dtype):
+                    raise exceptions.TypeError('Future type {} incompatible with {}'.format(data.dtype, dtype))
+        if isinstance(dtype, type) and issubclass(data.dtype, datamodel.NDArray):
+            return data
+        else:
+            def make_array(data: dtype, output):
+                if isinstance(data, datamodel.NDArray):
+                    output.data = data
+                elif isinstance(data, collections.abc.Iterable) \
+                        and not isinstance(data, (str, bytes)):
+                    output.data = datamodel.NDArray(data)
+                else:
+                    output.data = datamodel.NDArray([data])
+            operation = function_wrapper(output={'data': datamodel.NDArray})(make_array)
+            return operation(data=data).output.data
+
+    # Handle cases where input is not a Future
+    if isinstance(data, collections.abc.Iterable) and not isinstance(data, (str, bytes)):
+        input_type = None
+        for element in data:
+            if not isinstance(input_type, type):
+                input_type = type(element)
+                break
+    elif isinstance(data, datamodel.NDArray):
+        input_type = data.dtype
+    else:
+        input_type = type(data)
+        data = [data]
+    if dtype is not None:
+        if input_type is not None:
+            if not isinstance(input_type, dtype):
+                raise exceptions.TypeError('Input of type {} not compatible with {}'.format(input_type, dtype))
+    else:
+        dtype = input_type
+
+    if not isinstance(dtype, type) or not issubclass(dtype, valid_result_types) and not issubclass(dtype, Future):
+        # TODO: Formally address cases for which dtype currently is None.
+        if dtype is not None:
+            raise exceptions.ValueError('Cannot make NDArray Future from {}'.format(repr(data)))
+
+    if isinstance(data, datamodel.NDArray):
+        source = StaticSourceManager(name='data', proxied_data=data, width=1, function=lambda x: x)
+    else:
+        source = StaticSourceManager(name='data', proxied_data=datamodel.NDArray(data), width=1, function=lambda x: x)
+    description = ResultDescription(dtype=datamodel.NDArray, width=1)
+    future = source.future(name='data', description=description)
+    return future
+
+
+def as_gmx_ndarray(data, dtype: typing.Optional[SourceTypeVar] = None) -> _Future:
+    """Get an NDArray Future reference for the provided data.
+
+    This is primarily for internal use and should no longer be necessary once
+    the gmxapi data model is better established.
+
+    Raises:
+        gmxapi.exceptions.ValueError if a future cannot be generated for data.
+    """
+    # Handle case where input is a Future.
+    if isinstance(data, Future):
+        if dtype is None:
+            dtype = data.dtype
+        else:
+            if data.dtype is not None:
+                if not isinstance(data.dtype, type) or not issubclass(data.dtype, dtype):
+                    raise exceptions.TypeError('Future type {} incompatible with {}'.format(data.dtype, dtype))
+        if isinstance(dtype, type) and issubclass(data.dtype, datamodel.NDArray):
+            return data
+        else:
+            def make_array(data: dtype, output):
+                if isinstance(data, datamodel.NDArray):
+                    output.data = data
+                elif isinstance(data, collections.abc.Iterable) \
+                        and not isinstance(data, (str, bytes)):
+                    output.data = datamodel.NDArray(data)
+                else:
+                    output.data = datamodel.NDArray([data])
+            operation = function_wrapper(output={'data': datamodel.NDArray})(make_array)
+            return operation(data=data).output.data
+
+    # Handle cases where input is not a Future
+    if isinstance(data, collections.abc.Iterable) and not isinstance(data, (str, bytes)):
+        input_type = None
+        for element in data:
+            if not isinstance(input_type, type):
+                input_type = type(element)
+                break
+    elif isinstance(data, datamodel.NDArray):
+        input_type = data.dtype
+    else:
+        input_type = type(data)
+        data = [data]
+    if dtype is not None:
+        if input_type is not None:
+            if not isinstance(input_type, dtype):
+                raise exceptions.TypeError('Input of type {} not compatible with {}'.format(input_type, dtype))
+    else:
+        dtype = input_type
+
+    if not isinstance(dtype, type) or not issubclass(dtype, valid_result_types) and not issubclass(dtype, Future):
+        # TODO: Formally address cases for which dtype currently is None.
+        if dtype is not None:
+            raise exceptions.ValueError('Cannot make NDArray Future from {}'.format(repr(data)))
+
+    if isinstance(data, datamodel.NDArray):
+        source = StaticSourceManager(name='data', proxied_data=data, width=1, function=lambda x: x)
+    else:
+        source = StaticSourceManager(name='data', proxied_data=datamodel.NDArray(data), width=1, function=lambda x: x)
+    description = ResultDescription(dtype=datamodel.NDArray, width=1)
+    future = source.future(name='data', description=description)
+    return future
+
+
+def scatter(array: typing.Union[datamodel.NDArray, Future]) -> EnsembleDataSource:
+    """Convert array data to parallel data.
+
+    Given data with shape (M,N), produce M parallel data sources of shape (N,).
+
+    The intention is to produce ensemble data flows from NDArray sources.
+
+    .. versionchanged:: 0.1b2
+        Currently, we only support zero and one dimensional data edge cross-sections.
+
+    In the future, it may be clearer if `scatter()` always converts a non-ensemble
+    dimension to an ensemble dimension or creates an error, but right now there
+    are cases where it is best just to raise a warning.
+
+    If provided data is a string, mapping, or scalar, there is no dimension to
+    scatter from, and DataShapeError is raised.
+
+    For data Futures, the Future *width* is used as the scattering dimension.
+    NDArray Futures do not scatter from the NDArray dimension.
+
+    Arguments:
+        array: gmxapi NDArray or Future from which to scatter.
+
+    Returns:
+        EnsembleDataSource with the data type of the NDArray or Future.
+
+    Raises:
+        ValueError if the input is not an object that can be scattered from.
+    """
+    if isinstance(array, EnsembleDataSource):
+        # Data source is already an EnsembleDataSource
+        return array
+    if isinstance(array, Future):
+        width = array.description.width
+        if width > 1:
+            # Treat as an EnsembleDataSource
+            return EnsembleDataSource(source=array)
+            # Recipient will need to call `result()`.
+        if width == 1:
+            # scatter if possible
+            dtype = array.description.dtype
+            if isinstance(dtype, type) and issubclass(dtype, NDArray):
+                # TODO: Support scattering from array futures.
+                assert not gmx.version.has_feature('dynamic_ensemble_topology')
+                raise exceptions.ValueError('Cannot scatter from array Future.')
+        # array is Future, but could not be handled.
+        raise exceptions.ValueError('No dimension to scatter from.')
+    if isinstance(array, (str, bytes)):
+        raise exceptions.ValueError(
+            'Strings are not treated as sequences of characters to automatically scatter from.')
+    if isinstance(array, (collections.abc.Iterable, datamodel.NDArray)):
+        dtype = getattr(array, 'dtype', None)
+        # scatter
+        if isinstance(array, datamodel.NDArray):
+            array = array.to_list()
+        array = tuple(array)
+        for element in array:
+            if hasattr(element, 'dtype'):
+                element_dtype = element.dtype
+            elif hasattr(element, 'description'):
+                element_dtype = element.description.dtype
+            else:
+                element_dtype = type(element)
+            if dtype is not None:
+                if not issubclass(element_dtype, dtype):
+                    raise exceptions.ValueError(
+                        'Inconsistent source data: Expected type {} but got {}'.format(
+                            dtype,
+                            repr(element)))
+            else:
+                dtype = element_dtype
+                # TODO: disallow None values as the data model matures.
+        array = [gmx.make_constant(element) for element in array]
+        return EnsembleDataSource(source=array, dtype=dtype)
+    raise exceptions.ValueError('Could not create EnsembleDataSource from {}'.format(repr(array)))
+
+
+def as_gmx_ndarray(data, dtype: typing.Optional[SourceTypeVar] = None) -> _Future:
+    """Get an NDArray Future reference for the provided data.
+
+    This is primarily for internal use and should no longer be necessary once
+    the gmxapi data model is better established.
+
+    Raises:
+        gmxapi.exceptions.ValueError if a future cannot be generated for data.
+    """
+    # Handle case where input is a Future.
+    if isinstance(data, Future):
+        if dtype is None:
+            dtype = data.dtype
+        else:
+            if data.dtype is not None:
+                if not isinstance(data.dtype, type) or not issubclass(data.dtype, dtype):
+                    raise exceptions.TypeError('Future type {} incompatible with {}'.format(data.dtype, dtype))
+        if isinstance(dtype, type) and issubclass(data.dtype, datamodel.NDArray):
+            return data
+        else:
+            def make_array(data: dtype, output):
+                if isinstance(data, datamodel.NDArray):
+                    output.data = data
+                elif isinstance(data, collections.abc.Iterable) \
+                            and not isinstance(data, (str, bytes)):
+                    output.data = datamodel.NDArray(data)
+                else:
+                    output.data = datamodel.NDArray([data])
+            operation = function_wrapper(output={'data': datamodel.NDArray})(make_array)
+            return operation(data=data).output.data
+
+    # Handle cases where input is not a Future
+    if isinstance(data, collections.abc.Iterable) and not isinstance(data, (str, bytes)):
+        input_type = None
+        for element in data:
+            if not isinstance(input_type, type):
+                input_type = type(element)
+                break
+    elif isinstance(data, datamodel.NDArray):
+        input_type = data.dtype
+    else:
+        input_type = type(data)
+        data = [data]
+    if dtype is not None:
+        if input_type is not None:
+            if not isinstance(input_type, dtype):
+                raise exceptions.TypeError('Input of type {} not compatible with {}'.format(input_type, dtype))
+    else:
+        dtype = input_type
+
+    if not isinstance(dtype, type) or not issubclass(dtype, valid_result_types) and not issubclass(dtype, Future):
+        # TODO: Formally address cases for which dtype currently is None.
+        if dtype is not None:
+            raise exceptions.ValueError('Cannot make NDArray Future from {}'.format(repr(data)))
+
+    if isinstance(data, datamodel.NDArray):
+        source = StaticSourceManager(name='data', proxied_data=data, width=1, function=lambda x: x)
+    else:
+        source = StaticSourceManager(name='data', proxied_data=datamodel.NDArray(data), width=1, function=lambda x: x)
+    description = ResultDescription(dtype=datamodel.NDArray, width=1)
+    future = source.future(name='data', description=description)
+    return future
+
+
+def as_gmx_ndarray(data, dtype: typing.Optional[SourceTypeVar] = None) -> _Future:
+    """Get an NDArray Future reference for the provided data.
+
+    This is primarily for internal use and should no longer be necessary once
+    the gmxapi data model is better established.
+
+    Raises:
+        gmxapi.exceptions.ValueError if a future cannot be generated for data.
+    """
+    # Handle case where input is a Future.
+    if isinstance(data, Future):
+        if dtype is None:
+            dtype = data.dtype
+        else:
+            if data.dtype is not None:
+                if not isinstance(data.dtype, type) or not issubclass(data.dtype, dtype):
+                    raise exceptions.TypeError('Future type {} incompatible with {}'.format(data.dtype, dtype))
+        if isinstance(dtype, type) and issubclass(data.dtype, datamodel.NDArray):
+            return data
+        else:
+            def make_array(data: dtype, output):
+                if isinstance(data, datamodel.NDArray):
+                    output.data = data
+                elif isinstance(data, collections.abc.Iterable) \
+                            and not isinstance(data, (str, bytes)):
+                    output.data = datamodel.NDArray(data)
+                else:
+                    output.data = datamodel.NDArray([data])
+            operation = function_wrapper(output={'data': datamodel.NDArray})(make_array)
+            return operation(data=data).output.data
+
+    # Handle cases where input is not a Future
+    if isinstance(data, collections.abc.Iterable) and not isinstance(data, (str, bytes)):
+        input_type = None
+        for element in data:
+            if not isinstance(input_type, type):
+                input_type = type(element)
+                break
+    elif isinstance(data, datamodel.NDArray):
+        input_type = data.dtype
+    else:
+        input_type = type(data)
+        data = [data]
+    if dtype is not None:
+        if input_type is not None:
+            if not isinstance(input_type, dtype):
+                raise exceptions.TypeError('Input of type {} not compatible with {}'.format(input_type, dtype))
+    else:
+        dtype = input_type
+
+    if not isinstance(dtype, type) or not issubclass(dtype, valid_result_types) and not issubclass(dtype, Future):
+        # TODO: Formally address cases for which dtype currently is None.
+        if dtype is not None:
+            raise exceptions.ValueError('Cannot make NDArray Future from {}'.format(repr(data)))
+
+    if isinstance(data, datamodel.NDArray):
+        source = StaticSourceManager(name='data', proxied_data=data, width=1, function=lambda x: x)
+    else:
+        source = StaticSourceManager(name='data', proxied_data=datamodel.NDArray(data), width=1, function=lambda x: x)
+    description = ResultDescription(dtype=datamodel.NDArray, width=1)
+    future = source.future(name='data', description=description)
+    return future
+
+
+def scatter(array: typing.Union[datamodel.NDArray, Future]) -> EnsembleDataSource:
+    """Convert array data to parallel data.
+
+    Given data with shape (M,N), produce M parallel data sources of shape (N,).
+
+    The intention is to produce ensemble data flows from NDArray sources.
+
+    .. versionchanged:: 0.1b2
+        Currently, we only support zero and one dimensional data edge cross-sections.
+
+    In the future, it may be clearer if `scatter()` always converts a non-ensemble
+    dimension to an ensemble dimension or creates an error, but right now there
+    are cases where it is best just to raise a warning.
+
+    If provided data is a string, mapping, or scalar, there is no dimension to
+    scatter from, and DataShapeError is raised.
+
+    For data Futures, the Future *width* is used as the scattering dimension.
+    NDArray Futures do not scatter from the NDArray dimension.
+
+    Arguments:
+        array: gmxapi NDArray or Future from which to scatter.
+
+    Returns:
+        EnsembleDataSource with the data type of the NDArray or Future.
+
+    Raises:
+        ValueError if the input is not an object that can be scattered from.
+    """
+    if isinstance(array, EnsembleDataSource):
+        # Data source is already an EnsembleDataSource
+        return array
+    if isinstance(array, Future):
+        width = array.description.width
+        if width > 1:
+            # Treat as an EnsembleDataSource
+            return EnsembleDataSource(source=array)
+            # Recipient will need to call `result()`.
+        if width == 1:
+            # scatter if possible
+            dtype = array.description.dtype
+            if isinstance(dtype, type) and issubclass(dtype, NDArray):
+                # TODO: Support scattering from array futures.
+                assert not gmx.version.has_feature('dynamic_ensemble_topology')
+                raise exceptions.ValueError('Cannot scatter from array Future.')
+        # array is Future, but could not be handled.
+        raise exceptions.ValueError('No dimension to scatter from.')
+    if isinstance(array, (str, bytes)):
+        raise exceptions.ValueError(
+            'Strings are not treated as sequences of characters to automatically scatter from.')
+    if isinstance(array, (collections.abc.Iterable, datamodel.NDArray)):
+        dtype = getattr(array, 'dtype', None)
+        # scatter
+        if isinstance(array, datamodel.NDArray):
+            array = array.to_list()
+        array = tuple(array)
+        for element in array:
+            if hasattr(element, 'dtype'):
+                element_dtype = element.dtype
+            elif hasattr(element, 'description'):
+                element_dtype = element.description.dtype
+            else:
+                element_dtype = type(element)
+            if dtype is not None:
+                if not issubclass(element_dtype, dtype):
+                    raise exceptions.ValueError(
+                        'Inconsistent source data: Expected type {} but got {}'.format(
+                            dtype,
+                            repr(element)))
+            else:
+                dtype = element_dtype
+                # TODO: disallow None values as the data model matures.
+        array = [gmx.make_constant(element) for element in array]
+        return EnsembleDataSource(source=array, dtype=dtype)
+    raise exceptions.ValueError('Could not create EnsembleDataSource from {}'.format(repr(array)))
 
 
 def logical_not(value: bool) -> _Future:
@@ -3507,5 +4369,7 @@ def logical_not(value: bool) -> _Future:
     # This could be essentially a data annotation that affects the resolver in a
     # DataEdge. As an API detail, coding for different Contexts and optimizations
     # within those Context implementations could be simplified.
-    operation = function_wrapper(output={'data': bool})(lambda data=bool(): not bool(data))
+    operation = function_wrapper(
+        input={'data': bool},
+        output={'data': bool})(lambda data=bool(): not bool(data))
     return operation(data=value).output.data

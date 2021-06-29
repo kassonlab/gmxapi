@@ -1,0 +1,117 @@
+/' Illustrate client interaction with a graph Context.
+ Client creates an operation from a module that provides input to gromacs.mdrun,
+ then launches session. '/
+@startuml
+
+title Optimized data access across API boundary
+
+participant "Python Interpreter" as script << client >>
+participant mdrunHandle << Operation >>
+
+ref over script, mdrunHandle
+    set up work graph
+end ref
+
+note right script
+    gmx.run() resolves all outputs for all operations in the current scope.
+    The client here requests just the resolution of the mdrun output
+    to illustrate the resolution of data dependencies.
+    Assume:
+        numpy.asarray(mdrunHandle.output.trajectory['position'].result())
+end note
+
+participant outputProxy <<property>>
+participant trajectoryResult as trajectory <<Result, gmxapiMap>>
+participant position <<gmxapiNDArray>>
+participant pyDataRef <<PyObject, BufferInterface>>
+participant gmxArray as gmxArray <<refCounted>>
+participant traj <<numpy arrayView>>
+
+script -> mdrunHandle: getattr(output)
+create outputProxy
+mdrunHandle -> outputProxy:
+note right
+    getter implementation is a detail of the context in which the handle
+    is serviced and can optionally hold references to additional resources
+    or dispatching behaviors.
+end note
+script -> outputProxy: getattr(trajectory)
+create trajectory
+outputProxy -> trajectory:
+note right
+    Result objects can have accessors with "futures" behavior,
+    but must allow translation to the context of the consumer.
+    See notes elsewhere.
+end note
+script -> trajectory: getitem(position)
+create position
+trajectory -> position:
+script -> position: result()
+
+
+ref over position
+    resolve data dependencies
+    copy data or inc ref count
+end ref
+
+position -> position: access local data
+activate position
+
+note right
+    When C++ API has a local array view, the GROMACS allocator template
+    determines whether to deep copy or just increase the reference count
+    of data. gmxapi implementation maps mdspan descriptor to Python
+    buffer protocol descriptor of memory layout. Note that client constraints
+    on memory layout of the requested buffer are expressed at run time.
+    Provider may dispatch to different allocators as an implementation
+    detail.
+end note
+
+create pyDataRef
+activate pyDataRef
+position -> pyDataRef: create
+pyDataRef -> gmxArray: acquire
+activate gmxArray
+
+note right
+    Implementation is simplest if the C++ data reference
+    is tied to the Python object providing the buffer
+    interface, but decisions on whether to deep copy data
+    could be deferred until the interface is actually used.
+end note
+
+script <-- position: gmxapi NDArray reference
+deactivate position
+
+create traj
+script -> traj: numpy.asarray(pyDataRef)
+traj -> pyDataRef: PyObject_GetBuffer()
+activate pyDataRef
+traj <-- gmxArray: *buf
+note right
+    API result includes metadata
+    on memory layout.
+end note
+script <-- traj: numpy object reference
+
+note right pyDataRef
+    Under the Python buffer protocol, the provider guarantees the validity of
+    the data handle while the buffer interface is open. In this case, that is
+    the lifetime of the numpy array view.
+end note
+
+...
+script -> traj: numpy API
+activate traj
+traj -> gmxArray: memory access
+deactivate traj
+...
+script -> traj: del
+traj -> pyDataRef: PyBuffer_Release()
+deactivate pyDataRef
+destroy traj
+pyDataRef -> gmxArray: release
+destroy pyDataRef
+destroy gmxArray
+
+@enduml

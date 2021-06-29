@@ -58,7 +58,7 @@ class SimpleCliTestCase(unittest.TestCase):
     def test_true(self):
         """Test a command known to produce a return code of 0."""
         command = shutil.which('true')
-        operation = commandline.cli(command=[command], shell=False)
+        operation = commandline.cli(command=command, shell=False)
 
         # Note: getitem not implemented.
         # assert 'stdout' in operation.output
@@ -75,21 +75,21 @@ class SimpleCliTestCase(unittest.TestCase):
     def test_false_explicit(self):
         """Test a command known to produce a return code of 1."""
         command = shutil.which('false')
-        operation = commandline.cli(command=[command], shell=False)
+        operation = commandline.cli(command=command, shell=False)
         # Explicitly run the operation.
         operation.run()
         assert operation.output.returncode.result() == 1
 
     def test_false_implicit(self):
         command = shutil.which('false')
-        operation = commandline.cli(command=[command], shell=False)
+        operation = commandline.cli(command=command, shell=False)
         # Allow the operation to be executed implicitly to satisfy data constraint.
         assert operation.output.returncode.result() == 1
 
     def test_command_with_arguments(self):
         """Test that cli() can wrap a command with arguments."""
         # TODO: (FR5+) do we want to pipeline or checkpoint stdout somehow?
-        operation = commandline.cli(command=[shutil.which('echo'), 'hi', 'there'], shell=False)
+        operation = commandline.cli(command=gmx.ndarray([shutil.which('echo'), 'hi', 'there']), shell=False)
         assert operation.output.returncode.result() == 0
 
     def test_command_with_stdin(self):
@@ -132,7 +132,7 @@ class CommandLineOperationSimpleTestCase(unittest.TestCase):
     def test_echo(self):
         # TODO: (#3549) Check stdout, stderr.
         operation = commandline.commandline_operation(executable='echo',
-                                                      arguments=['hi there'])
+                                                      arguments='hi there')
         assert operation.output.returncode.result() == 0
 
 
