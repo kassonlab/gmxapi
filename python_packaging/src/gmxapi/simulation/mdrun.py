@@ -41,6 +41,7 @@ Context or its own Context, also implemented in this module.
 
 __all__ = ['mdrun']
 
+import functools
 import inspect
 import os
 import typing
@@ -403,7 +404,10 @@ class SubscriptionPublishingRunner(object):
 _next_uid = 0
 
 
+@functools.lru_cache(maxsize=None)
 def _make_uid(input) -> str:
+    # Note that *input* is probably a DataEdge, which has an identity based hash (object default)
+    # rather than a content-based hash.
     # TODO: Use input fingerprint for more useful identification.
     salt = hash(input)
     global _next_uid

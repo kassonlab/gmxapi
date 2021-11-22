@@ -43,11 +43,14 @@ import os
 import pathlib
 import shutil
 import subprocess
+import typing
 
 import gmxapi as gmx
+import gmxapi.operation
 from gmxapi import exceptions
 from gmxapi import logger as root_logger
 from gmxapi.datamodel import NDArray
+from gmxapi.exceptions import UsageError
 from gmxapi.operation import OutputCollectionDescription
 
 # Module-level logger
@@ -90,6 +93,7 @@ def cli_bindir() -> pathlib.Path:
             return path
     raise exceptions.FeatureNotAvailableError('GROMACS installation unavailable.')
 
+_seen = set()
 
 # Create an Operation that consumes a list and a boolean to produce a string and an integer.
 #
@@ -106,18 +110,24 @@ def cli_bindir() -> pathlib.Path:
 # the keys of the map are not implicit or set by the wrapped function.
 # For the map to be non-empty, it must be defined before the resulting helper
 # function is called.
-#
-# TODO: Operation returns the output object when called with the shorter signature.
-#
-@gmx.function_wrapper(output={'stdout': str,
-                              'stderr': str,
-                              'returncode': int})
-def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdin: str = ''):
+@gmx.function_wrapper(
+    output={
+        'directory': str,
+        'returncode': int,
+        'stderr': str,
+        'stdout': str,
+    })
+def cli(command: NDArray, shell: bool, output, stdin: str = ''):
     """Execute a command line program in a subprocess.
 
     Configure an executable in a subprocess. Executes when run in an execution
-    Context, as part of a work graph or via gmx.run(). Runs in the current
-    working directory.
+    Context, as part of a work graph or via gmx.run().
+
+    Subprocesses should be run in separate working directories. gmxapi 0.3.0 provisionally
+    introduces a *_cwd* input to specify the working directory. The directory name should be the
+    responsibility of the workflow manager and execution manager (and derived from the operation
+    id, tied to fingerprinting information), but we do not currently expose resource management
+    facilities to the Operation implementations.
 
     Shell processing is not enabled, but can be considered for a future version.
     This means that shell expansions such as environment variables, globbing (`*`),
@@ -127,7 +137,7 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdi
     think this disallows important use cases, please let us know.
 
     Arguments:
-         command: a tuple (or list) to be the subprocess arguments, including `executable`
+         command: a tuple (or list) to be the subprocess arguments, including *executable*
          output: mapping of command line flags to output filename arguments
          shell: unused (provides forward-compatibility)
          stdin (str): String input to send to STDIN (terminal input) of the executable.
@@ -147,11 +157,8 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdi
     `... "a" "s" "d" "f"`. To pass a single string argument, `arguments=("asdf")`
     or `arguments=["asdf"]`.
 
-    `input` and `output` should be a dictionary with string keys, where the keys
-    name command line "flags" or options.
-
     Example:
-        Execute a command named `exe` that takes a flagged option for file name
+        Execute a command named ``exe`` that takes a flagged option for file name
         (stored in a local Python variable `my_filename`) and an `origin` flag
         that uses the next three arguments to define a vector.
 
@@ -163,15 +170,14 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdi
             >>> assert hasattr(result, 'returncode')
 
     Returns:
-        A data structure with attributes for each of the results `file`, `stdout`, `stderr`, and `returncode`
+        A data structure with attributes for each of the results.
 
     Result object attributes:
-        * `file`: the mapping of CLI flags to filename strings resulting from the `output` kwarg
-        * `stdout`: A string mapping from process STDOUT.
-        * `stderr`: A string mapping from process STDERR; it will be the
+        * file: the mapping of CLI flags to filename strings resulting from the `output` kwarg
+        * returncode: return code of the subprocess.
+        * stderr: A string mapping from process STDERR; it will be the
                     error output (if any) if the process failed.
-        * `returncode`: return code of the subprocess.
-
+        * stdout: A string mapping from process STDOUT.
     """
     # In the operation implementation, we expect the `shell` parameter to be intercepted by the
     # wrapper and set to False.
@@ -192,14 +198,34 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdi
         raise exceptions.ValueError('"{}" is not found or not executable.'.format(command[0]))
     command[0] = executable
 
+    # The SessionResources concept only exists in the form of the PublishingDataProxy provided as
+    # *output* at run time.
+    resource_manager: gmxapi.operation.SourceResource = typing.cast(gmxapi.operation.DataProxyBase,
+                                           output)._resource_instance
+    assert isinstance(resource_manager, gmxapi.operation.ResourceManager)
+    op_id = resource_manager.operation_id
+    ensemble_member = typing.cast(gmxapi.operation.DataProxyBase,
+                                  output)._client_identifier
+    uid = str(op_id)
+    if ensemble_member:
+        uid += f'_{ensemble_member}'
+    assert uid not in _seen
+    _seen.add(uid)
+
+    _cwd = os.path.abspath(uid)
+    if os.path.exists(_cwd):
+        # Logic for handling previously complete or partially complete work is not yet available.
+        raise UsageError(f'Work directory {_cwd} already exists.')
+    os.mkdir(_cwd)
+
     # TODO: (FR9) Can OS input/output filehandles be a responsibility of
     #  the code providing 'resources'?
 
-    stdout = ''
-    stderr = ''
-    logger.debug('executing subprocess')
+    logger.debug('executing subprocess: %s', ' '.join(str(word) for word in command))
+
     try:
         completed_process = subprocess.run(command,
+                                           cwd=_cwd,
                                            shell=shell,
                                            input=stdin,
                                            check=True,
@@ -209,7 +235,6 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdi
                                            universal_newlines=True
                                            )
         returncode = completed_process.returncode
-        # TODO: Resource management code should manage a safe data object for `output`.
         logger.debug('STDOUT:')
         if completed_process.stderr is not None:
             for line in completed_process.stdout.split('\n'):
@@ -234,6 +259,7 @@ def cli(command: NDArray, shell: bool, output: OutputCollectionDescription, stdi
         returncode = e.returncode
 
     # Publish outputs.
+    output.directory = _cwd
     output.stdout = stdout
     output.stderr = stderr
     output.returncode = returncode
@@ -312,15 +338,30 @@ def commandline_operation(executable=None,
     If you have a use case that requires streaming input or binary input,
     please open an issue or contact the author(s).
 
+    .. versionchanged:: 0.3.0
+        output_files paths are converted to absolute paths at run time.
+
+    If non-absolute paths are provided to *output_files*, paths are resolved relative to the
+    working directory of the command instance (not relative to the working directory of the
+    workflow script).
+
     Output:
         The output node of the resulting operation handle contains
 
+        * ``directory``: filesystem path that was used as the working directory for the subprocess
         * ``file``: the mapping of CLI flags to filename strings resulting from the ``output_files`` kwarg
-        * ``stdout``: A string mapping from process STDOUT.
+        * ``returncode``: return code of the subprocess.
         * ``stderr``: A string mapping from process STDERR; it will be the
                       error output (if any) if the process failed.
-        * ``returncode``: return code of the subprocess.
+        * ``stdout``: A string mapping from process STDOUT.
 
+    .. versionchanged:: 0.3
+        Subprocesses run in directories managed by gmxapi.
+    .. versionadded:: 0.3
+        The *directory* output.
+
+    Working directory names are details of the gmxapi implementation; the naming scheme is not
+    yet specified by the API, but is intended to be related to the operation ID.
     """
 
     # Implementation details: When used in a script, this function returns an
@@ -339,7 +380,7 @@ def commandline_operation(executable=None,
     # Warning: decorating a local function like this is counter to the notion of Operations
     # as portable (importable, serializable/deserializable). The big picture here needs
     # some more consideration.
-    # TODO: (NOW) Distinguish portable Operations from relocatable Futures.
+    # TODO(3139): Distinguish portable Operations from relocatable Futures.
     # There is nothing antithetical about objects implementing gmxapi data interfaces
     # that are only resolvable by a certain Context as long as that Context can convey
     # the results to another Context upon request. Re-instantiating Operations is
@@ -349,14 +390,19 @@ def commandline_operation(executable=None,
     #
     # TODO: (FR4+) Characterize the `file` dictionary key type:
     #  explicitly sequences rather than maybe-string/maybe-sequence-of-strings
-    @gmx.function_wrapper(output={'stdout': str,
-                                  'stderr': str,
-                                  'returncode': int,
-                                  'file': dict})
+    @gmx.function_wrapper(
+        output={
+            'directory': str,
+            'file': dict,
+            'returncode': int,
+            'stderr': str,
+            'stdout': str,
+        })
     def merged_ops(stdout: str = None,
                    stderr: str = None,
                    returncode: int = None,
                    file: dict = None,
+                   directory: str = None,
                    output: OutputCollectionDescription = None):
         assert stdout is not None
         assert stderr is not None
@@ -366,8 +412,14 @@ def commandline_operation(executable=None,
         output.returncode = returncode
         output.stdout = stdout
         output.stderr = stderr
+        output.directory = directory
+        file_map = file.copy()
+        for key, value in file_map.items():
+            if not os.path.isabs(value):
+                value = os.path.abspath(os.path.join(directory, value))
+            file_map[key] = value
         if returncode == 0:
-            output.file = file
+            output.file = file_map
         else:
             output.file = {}
 
@@ -386,7 +438,8 @@ def commandline_operation(executable=None,
                                      filemap_to_flag_list(output_files)])
     shell = gmx.make_constant(False)
     cli_args = {'command': command,
-                'shell': shell}
+                'shell': shell,
+                }
     cli_args.update(**kwargs)
     if stdin is not None:
         # FIXME: No ensemble handling.
@@ -407,6 +460,7 @@ def commandline_operation(executable=None,
     merged_result = merged_ops(stdout=cli_result.output.stdout,
                                stderr=cli_result.output.stderr,
                                returncode=cli_result.output.returncode,
+                               directory=cli_result.output.directory,
                                file=output_files,
                                **kwargs)
 

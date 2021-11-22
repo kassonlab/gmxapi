@@ -55,6 +55,7 @@ __all__ = ['computed_result',
 
 import abc
 import collections
+import collections.abc
 import functools
 import inspect
 import typing
@@ -215,8 +216,6 @@ class DataSourceCollection(collections.OrderedDict):
         #  between source and target Contexts.
         # Preprocessed input should be self-describing gmxapi data types. Structured
         # input must be recursively (depth-first) converted to gmxapi data types.
-        # TODO(#3130): Handle gmxapi Futures stored in list elements.
-        # TODO(#3130): Handle gmxapi Futures stored as dictionary elements!
         if not isinstance(value, valid_source_types):
             if isinstance(value, collections.abc.Iterable):
                 # Iterables here are treated as arrays, but we do not have a robust typing system.
@@ -240,16 +239,6 @@ class DataSourceCollection(collections.OrderedDict):
                 source.reset()
             if hasattr(source, '_reset'):
                 source._reset()
-
-    def __hash__(self):
-        """Provide some sort of unique identifier.
-
-        We need a more deterministic fingerprinting scheme with well-specified
-        uniqueness semantics, but right now we just need something reasonably
-        unique.
-        """
-        hashed_keys_and_values = tuple(hash(entity) for item in self.items() for entity in item)
-        return hash(hashed_keys_and_values)
 
 
 def computed_result(function):
@@ -2823,6 +2812,10 @@ def function_wrapper(output: dict = None):
                 The UID is a detail of the generic Operation that _should_ be independent
                 of the Context details to allow the framework to manage when and where
                 an operation is executed.
+
+                Note:
+                    This implementation creates a new identifier with every call, even if *input*
+                    is the same, because we have not developed our Fingerprinting scheme in gmxapi 0.1+.
 
                 Design notes on further refinement:
                     TODO: Operations should not single-handedly determine their own uniqueness
