@@ -68,26 +68,28 @@ from gmxapi import datamodel
 from gmxapi import exceptions
 from gmxapi import logger as root_logger
 from gmxapi.abc import OperationImplementation, MutableResource, Node
+from gmxapi.exceptions import ApiError
 from gmxapi.typing import _Context, ResultTypeVar, SourceTypeVar, valid_result_types, valid_source_types
-from gmxapi.typing import Future as _Future
+from gmxapi.typing import Future as GenericFuture
 
 # Initialize module-level logger
 logger = root_logger.getChild('operation')
 logger.info('Importing {}'.format(__name__))
 
 
-class ResultDescription:
+class ResultDescription(typing.Generic[ResultTypeVar]):
     """Describe what will be returned when `result()` is called."""
 
-    def __init__(self, dtype=None, width=1):
-        assert isinstance(dtype, type)
-        assert issubclass(dtype, valid_result_types)
+    def __init__(self, dtype: typing.Type[ResultTypeVar] = None, width=1):
         assert isinstance(width, int)
-        self._dtype = dtype
         self._width = width
 
+        assert isinstance(dtype, type)
+        assert issubclass(dtype, valid_result_types)
+        self._dtype = typing.cast(typing.Type[ResultTypeVar], dtype)
+
     @property
-    def dtype(self) -> type:
+    def dtype(self) -> typing.Type[ResultTypeVar]:
         """node output type"""
         return self._dtype
 
@@ -177,8 +179,8 @@ class DataSourceCollection(collections.OrderedDict):
     def __init__(self, **kwargs):
         """Initialize from key/value pairs of named data sources.
 
-        Data sources may be any of the basic gmxapi data types, gmxapi Futures
-        of those types, or gmxapi ensemble data bundles of the above.
+        Data sources may be any of the basic gmxapi data types (or sequences thereof),
+        or gmxapi Futures of those types.
         """
         super(DataSourceCollection, self).__init__()
         for name, value in kwargs.items():
@@ -1294,7 +1296,7 @@ class OperationDetailsBase(OperationImplementation, InputDescription,
 #         """Recreate the Operation at the consuming end of the DataEdge."""
 
 
-class Future(_Future):
+class Future(GenericFuture[ResultTypeVar]):
     """gmxapi data handle.
 
     Future is currently more than a Future right now. (should be corrected / clarified.)
@@ -1307,19 +1309,21 @@ class Future(_Future):
 
     TODO: ``subscribe`` method allows consumers to bind as Observers.
 
-    TODO: extract the abstract class for input inspection?
     Currently abstraction is handled through SourceResource subclassing.
 
     Attributes:
         description (ResultDescription): Describes the result to be obtained from this Future.
 
     """
+    description: ResultDescription
+    name: str
+    resource_manager: SourceResource
 
     def __init__(self, resource_manager: SourceResource, name: str, description: ResultDescription):
         self.name = name
         if not isinstance(description, ResultDescription):
             raise exceptions.ValueError('Need description of requested data.')
-        self.description = description  # type: ResultDescription
+        self.description = description
         self.resource_manager = resource_manager
 
         # Deprecated. We should not "reset" futures, but reconstitute them, but we
@@ -1339,7 +1343,7 @@ class Future(_Future):
         # without more developed data flow fingerprinting.
         return hash((id(self.resource_manager), self.name, self.description, self._number_of_resets))
 
-    def __str__(self):
+    def __repr__(self):
         return '<Future: name={}, description={}>'.format(self.name, self.description)
 
     def result(self) -> ResultTypeVar:
@@ -1661,7 +1665,7 @@ class DataEdge(object):
                 else:
                     raise ApiError(f'Unrecognized source type: {repr(source)}')
 
-    def __str__(self):
+    def __repr__(self):
         return '<DataEdge: source_collection={}, sink_terminal={}>'.format(self.source_collection, self.sink_terminal)
 
     def reset(self):
@@ -3461,10 +3465,10 @@ def join_arrays(*, front: datamodel.NDArray = (), back: datamodel.NDArray = ()) 
 Scalar = typing.TypeVar('Scalar')
 
 
-def concatenate_lists(sublists: list = ()) -> _Future[gmx.datamodel.NDArray]:
+def concatenate_lists(sublists: typing.Sequence[typing.Sequence[Scalar]] = ()) -> GenericFuture[gmx.datamodel.NDArray]:
     """Combine data sources into a single list.
 
-    A trivial data flow restructuring operation.
+    A trivial data flow restructuring helper.
     """
     if isinstance(sublists, (str, bytes)):
         raise exceptions.ValueError('Input must be a list of lists.')
@@ -3477,7 +3481,7 @@ def concatenate_lists(sublists: list = ()) -> _Future[gmx.datamodel.NDArray]:
                                             concatenate_lists(sublists[1:])))
 
 
-def make_constant(value: Scalar) -> _Future:
+def make_constant(value: Scalar) -> GenericFuture[Scalar]:
     """Provide a predetermined value at run time.
 
     This is a trivial operation that provides a (typed) value, primarily for
@@ -3494,7 +3498,7 @@ def make_constant(value: Scalar) -> _Future:
     return future
 
 
-def logical_not(value: bool) -> _Future:
+def logical_not(value: bool) -> GenericFuture:
     """Boolean negation.
 
     If the argument is a gmxapi compatible Data or Future object, a new View or

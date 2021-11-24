@@ -47,6 +47,7 @@ import shutil
 import stat
 
 import gmxapi as gmx
+import gmxapi.operation
 import pytest
 from gmxapi import commandline
 
@@ -158,6 +159,9 @@ def test_file_dependency_chain(cleandir):
                                             arguments=[line1],
                                             input_files={'-i': os.devnull},
                                             output_files={'-o': file1})
+    assert isinstance(filewriter1.output, gmxapi.operation.DataProxyBase)
+    assert filewriter1.output.ensemble_width == 1
+
 
     line2 = 'second line'
     filewriter2 = gmx.commandline_operation(scriptname,

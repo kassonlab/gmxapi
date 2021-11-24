@@ -108,7 +108,7 @@ Note: This module overly specifies the API. As we figure out the relationships.
 
 import typing
 from abc import ABC, abstractmethod
-import collections
+import collections.abc
 from typing import Type, Callable
 
 
@@ -180,7 +180,12 @@ class Future(Resource):
     def result(self) -> typing.Any:
         ...
 
-    # TODO: abstractmethod(subscribe)
+    @classmethod
+    def __subclasshook__(cls, C):
+        if cls is Future:
+            if any("result" in B.__dict__ and callable(B.result) for B in C.__mro__):
+                return True
+        return NotImplemented
 
 
 class MutableResourceSubscriber(ABC):
