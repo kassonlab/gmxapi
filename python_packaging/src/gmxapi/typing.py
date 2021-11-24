@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2019, by the GROMACS development team, led by
+# Copyright (c) 2019,2021, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -48,7 +48,7 @@ ResultTypeVar = TypeVar('ResultTypeVar', *(str, bool, int, float, dict, gmxapi.a
 valid_result_types = ResultTypeVar.__constraints__
 
 SourceTypeVar = TypeVar('SourceTypeVar',
-                        *(str, bool, int, float, dict, gmxapi.abc.NDArray, gmxapi.abc.EnsembleDataSource))
+                        *(str, bool, int, float, dict, gmxapi.abc.NDArray))
 valid_source_types = SourceTypeVar.__constraints__
 
 # Place holder for type annotations of Context objects.

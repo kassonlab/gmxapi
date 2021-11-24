@@ -159,31 +159,6 @@ class OutputData(object):
         self._data = [None] * self._description.width
 
 
-class EnsembleDataSource(gmx.abc.EnsembleDataSource):
-    """A single source of data with ensemble data flow annotations.
-
-    Note that data sources may be Futures.
-
-    Probably slated for removal, per https://gitlab.com/gromacs/gromacs/-/issues/3137.
-    """
-
-    def __init__(self, source=None, width=1, dtype=None):
-        warnings.warn('Ensemble and array dimensions need to be unified in the data model. '
-                      'See https://gitlab.com/gromacs/gromacs/-/issues/3137', DeprecationWarning)
-        self.source = source
-        self.width = width
-        self.dtype = dtype
-
-    def node(self, member: int):
-        return self.source[member]
-
-    def reset(self):
-        protocols = ('reset', '_reset')
-        for protocol in protocols:
-            if hasattr(self.source, protocol):
-                getattr(self.source, protocol)()
-
-
 class DataSourceCollection(collections.OrderedDict):
     """Store and describe input data handles for an operation.
 
@@ -1684,9 +1659,7 @@ class DataEdge(object):
                     else:
                         self.adapters[name] = lambda member, source=source: source.result()[member]
                 else:
-                    assert isinstance(source, EnsembleDataSource)
-                    logger.debug(f'Input {name}:({sink.__name__}) provided by {repr(source)}')
-                    self.adapters[name] = lambda member, source=source: source.node(member)
+                    raise ApiError(f'Unrecognized source type: {repr(source)}')
 
     def __str__(self):
         return '<DataEdge: source_collection={}, sink_terminal={}>'.format(self.source_collection, self.sink_terminal)
