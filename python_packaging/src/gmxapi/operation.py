@@ -720,6 +720,9 @@ class SourceResource(typing.Generic[_OutputDataProxyType, _PublishingDataProxyTy
     # Note: ResourceManager members not yet included:
     # future(), _data, set_result.
 
+    def __init__(self):
+        self._futures = weakref.WeakValueDictionary()
+
     # This might not belong here. Maybe separate out for a OperationHandleManager?
     @abc.abstractmethod
     def data(self) -> _OutputDataProxyType:
@@ -755,7 +758,6 @@ class SourceResource(typing.Generic[_OutputDataProxyType, _PublishingDataProxyTy
         """Ensemble width of the managed resources."""
         ...
 
-    @abc.abstractmethod
     def future(self, name: str, description: ResultDescription) -> 'Future':
         """Get a Future handle for managed data.
 
@@ -765,6 +767,11 @@ class SourceResource(typing.Generic[_OutputDataProxyType, _PublishingDataProxyTy
         In addition to the interface described by gmx.abc.Future, returned objects
         provide the interface described by gmx.operation.Future.
         """
+        key = (name, description.dtype, description.width)
+        if key not in self._futures or self._futures[key] is None:
+            _future = Future(self, name, description)
+            self._futures[key] = _future
+        return self._futures[key]
 
 
 class StaticSourceManager(SourceResource[_OutputDataProxyType, _PublishingDataProxyType]):
@@ -783,6 +790,7 @@ class StaticSourceManager(SourceResource[_OutputDataProxyType, _PublishingDataPr
     """
 
     def __init__(self, *, name: str, proxied_data, width: int, function: typing.Callable):
+        super().__init__()
         assert not isinstance(proxied_data, Future)
         if hasattr(proxied_data, 'width'):
             # Ensemble data source
@@ -851,7 +859,7 @@ class StaticSourceManager(SourceResource[_OutputDataProxyType, _PublishingDataPr
         pass
 
     def future(self, name: str, description: ResultDescription) -> 'Future':
-        return Future(self, name, description=description)
+        return super().future(name, description=description)
 
 
 class ProxyResourceManager(SourceResource[_OutputDataProxyType, _PublishingDataProxyType]):
@@ -870,6 +878,7 @@ class ProxyResourceManager(SourceResource[_OutputDataProxyType, _PublishingDataP
     """
 
     def __init__(self, proxied_future: 'Future', width: int, function: typing.Callable):
+        super().__init__()
         self._done = False
         self._proxied_future = proxied_future
         self._width = width
@@ -914,7 +923,7 @@ class ProxyResourceManager(SourceResource[_OutputDataProxyType, _PublishingDataP
         raise exceptions.ApiError('ProxyResourceManager cannot yet manage a full OutputDataProxy.')
 
     def future(self, name: str, description: ResultDescription):
-        return Future(self, name, description=description)
+        return super().future(name, description=description)
 
 
 class AbstractOperation(typing.Generic[_OutputDataProxyType]):
@@ -1330,18 +1339,6 @@ class Future(GenericFuture[ResultTypeVar]):
         # need to move the data model to a subscription-based system so that we can
         # make Futures properly immutable and issue new ones across subgraph iterations.
         self._number_of_resets = 0
-
-    def __eq__(self, other):
-        # This function is defined because we have defined __hash__().
-        # Before customizing __eq__(), recall that Python objects that compare
-        # equal should hash to the same value.
-        # Please keep the two functions semantically correct.
-        return object.__eq__(self, other)
-
-    def __hash__(self):
-        # We cannot properly determine equivalency beyond the scope of a ResourceManager instance
-        # without more developed data flow fingerprinting.
-        return hash((id(self.resource_manager), self.name, self.description, self._number_of_resets))
 
     def __repr__(self):
         return '<Future: name={}, description={}>'.format(self.name, self.description)
@@ -1817,6 +1814,7 @@ class ResourceManager(SourceResource[_OutputDataProxyType, _PublishingDataProxyT
                  output_context: 'Context'):
         """Initialize a resource manager for the inputs and outputs of an operation.
         """
+        super().__init__()
         # Note: This implementation assumes there is one ResourceManager instance per data source,
         # so we only stash the inputs and dependency information for a single set of resources.
         # TODO: validate input_fingerprint as its interface becomes clear.
@@ -2017,7 +2015,7 @@ class ResourceManager(SourceResource[_OutputDataProxyType, _PublishingDataProxyT
             message = 'Requested Future of type {} is not compatible with available type {}.'
             message = message.format(requested_dtype, available_dtype)
             raise exceptions.ApiError(message)
-        return Future(self, name, description)
+        return super().future(name, description)
 
     def data(self) -> _OutputDataProxyType:
         """Get an adapter to the output resources to access results."""
@@ -3494,7 +3492,7 @@ def make_constant(value: Scalar) -> GenericFuture[Scalar]:
     dtype = type(value)
     source = StaticSourceManager(name='data', proxied_data=value, width=1, function=lambda x: x)
     description = ResultDescription(dtype=dtype, width=1)
-    future = Future(source, 'data', description=description)
+    future = source.future('data', description=description)
     return future
 
 
