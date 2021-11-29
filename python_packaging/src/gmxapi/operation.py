@@ -2715,7 +2715,12 @@ def function_wrapper(output: dict = None):
 
             @classmethod
             def namespace(cls) -> str:
-                return cls.__basename.rstrip('.' + cls.name())
+                suffix = '.' + cls.name()
+                try:
+                    index = cls.__basename.rindex(suffix)
+                except ValueError:
+                    index = None
+                return cls.__basename[:index]
 
             @classmethod
             def director(cls, context: _Context):
