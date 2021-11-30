@@ -43,7 +43,11 @@ import stat
 import tempfile
 
 import gmxapi as gmx
+import pytest
 from gmxapi import commandline_operation
+from gmxapi.exceptions import UsageError
+from gmxapi.mapping import make_mapping, make_mapping_operation
+from gmxapi.operation import current_context
 
 
 def test_scalar():
@@ -76,6 +80,32 @@ def test_list():
     list_result = gmx.join_arrays(front=list_a, back=list_b)
     assert len(list_result.result()) == len(list_a) + 1
     assert tuple(list_result.result()) == tuple(list(list_a) + [42])
+
+
+def test_mapping():
+    source1 = {
+        'spam': True,
+        'eggs': 3
+    }
+    source2 = {
+        'spam': False,
+        'comment': "Doesn't like spam."
+    }
+
+    mapping_operation = make_mapping_operation(source1)
+    assert mapping_operation.namespace().startswith('gmxapi')
+    assert mapping_operation.name().startswith('Mapping')
+    assert hasattr(mapping_operation, 'operation_director')
+    handle1 = mapping_operation.operation_director(**source1, context=current_context())
+    assert hasattr(handle1.output, 'data')
+
+    map1 = handle1.output.data
+    assert all(source1[key] == value for key, value in map1.result().items())
+
+    with pytest.raises(UsageError):
+        mapping_operation.operation_director(**source2, context=current_context())
+
+
 
 
 def test_data_dependence(cleandir):

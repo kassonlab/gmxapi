@@ -50,6 +50,8 @@ import gmxapi as gmx
 
 
 # Configure the `logging` module before proceeding any further.
+from gmxapi.mapping import make_mapping
+
 gmx.logger.setLevel(logging.WARNING)
 
 try:
@@ -168,11 +170,13 @@ def test_extend_simulation_via_checkpoint(spc_water_box, mdrun_kwargs):
     assert gmx.version.has_feature('mdrun_runtime_args')
 
     tpr = gmx.read_tpr(spc_water_box)
-    input1 = gmx.modify_input(tpr,
-                                 parameters={
-                                     'nsteps': 2,
-                                     'nstxout': 2
-                                 })
+    parameters = make_mapping({
+        'nsteps': 2,
+        'nstxout': 2
+    })
+    input1 = gmx.modify_input(
+        tpr,
+        parameters=parameters)
     runtime_args = {
         '-cpo': 'continuation.cpt'
     }

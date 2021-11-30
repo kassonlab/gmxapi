@@ -90,6 +90,18 @@ class NDArray(gmxapi.abc.NDArray, typing.Generic[_T]):
         return len(self._values)
 
 
+class ArrayFuture(gmxapi.abc.Future, typing.Generic[_T]):
+
+    _dtype: typing.Type[_T]
+
+    @property
+    def dtype(self) -> typing.Type[_T]:
+        return self._dtype
+
+    def result(self) -> NDArray[_T]:
+        pass
+
+
 def ndarray(data=None, shape=None, dtype=None):
     """Create an NDArray object from the provided iterable.
 

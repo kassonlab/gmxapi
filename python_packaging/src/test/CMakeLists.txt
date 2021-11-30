@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2019, by the GROMACS development team, led by
+# Copyright (c) 2019,2021, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -65,7 +65,8 @@ endif()
 get_target_property(GMXBIN gmx RUNTIME_OUTPUT_DIRECTORY)
 add_custom_target(gmxapi_pytest
                   COMMAND ${CMAKE_COMMAND} -E env GMXBIN=${GMXBIN}
-                    ${PYTHON_EXECUTABLE} -m pytest --log-cli-level ERROR ${CMAKE_CURRENT_SOURCE_DIR}
+                    ${PYTHON_EXECUTABLE} -m pytest -rA -l --log-cli-level ERROR
+                  ${CMAKE_CURRENT_SOURCE_DIR}
                   DEPENDS _gmxapi
                   WORKING_DIRECTORY ${GMXAPI_PYTHON_STAGING_DIR})
 # The current test fixtures require the `gmx` tool-wrapper executable.

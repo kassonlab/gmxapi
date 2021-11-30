@@ -59,7 +59,6 @@ import collections.abc
 import functools
 import inspect
 import typing
-import warnings
 import weakref
 from contextlib import contextmanager
 
@@ -67,7 +66,9 @@ import gmxapi as gmx
 from gmxapi import datamodel
 from gmxapi import exceptions
 from gmxapi import logger as root_logger
-from gmxapi.abc import OperationImplementation, MutableResource, Node
+from gmxapi.abc import OperationImplementation, MutableResource, NDArray, Node
+from gmxapi.abc import Future as FutureABC
+from gmxapi.datamodel import ArrayFuture
 from gmxapi.exceptions import ApiError
 from gmxapi.typing import _Context, ResultTypeVar, SourceTypeVar, valid_result_types, valid_source_types
 from gmxapi.typing import Future as GenericFuture
@@ -77,15 +78,27 @@ logger = root_logger.getChild('operation')
 logger.info('Importing {}'.format(__name__))
 
 
+try:
+    from mpi4py import MPI
+    rank_number = MPI.COMM_WORLD.Get_rank()
+except ImportError:
+    rank_number = 0
+    MPI = None
+
+
 class ResultDescription(typing.Generic[ResultTypeVar]):
-    """Describe what will be returned when `result()` is called."""
+    """Describe what will be returned when ``result()`` is called.
+
+    Warning:
+         *dtype* may be ``None`` if return type cannot be determined.
+    """
 
     def __init__(self, dtype: typing.Type[ResultTypeVar] = None, width=1):
         assert isinstance(width, int)
         self._width = width
 
-        assert isinstance(dtype, type)
-        assert issubclass(dtype, valid_result_types)
+        if dtype is not None and not (isinstance(dtype, type) and issubclass(dtype, valid_result_types)):
+            raise ApiError(f'dtype {repr(dtype)} is not a valid result type.')
         self._dtype = typing.cast(typing.Type[ResultTypeVar], dtype)
 
     @property
@@ -186,27 +199,34 @@ class DataSourceCollection(collections.OrderedDict):
         for name, value in kwargs.items():
             self[name] = value
 
-    def __setitem__(self, key: str, value: SourceTypeVar) -> None:
+    def __setitem__(self, key: str, item: SourceTypeVar) -> None:
         if not isinstance(key, str):
             raise exceptions.TypeError('Data must be named with str type.')
+
         # TODO(#3139): Encapsulate handling of provided data sources as a detail of the relationship
         #  between source and target Contexts.
-        # Preprocessed input should be self-describing gmxapi data types. Structured
-        # input must be recursively (depth-first) converted to gmxapi data types.
-        if not isinstance(value, valid_source_types):
-            if isinstance(value, collections.abc.Iterable):
-                # Iterables here are treated as arrays, but we do not have a robust typing system.
-                # Warning: In the initial implementation, the iterable may contain Future objects.
-                # TODO(#2993): Revisit as we sort out data shape and Future protocol.
+        if isinstance(item, FutureABC):
+            value = item
+        else:
+            # We check Mapping first, because a Mapping is a Sequence.
+            if isinstance(item, collections.abc.Mapping):
+                # Allow mappings of (possible) Futures to be automatically handled well.
+                value = {}
+                for name, obj in item.items():
+                    value[str(name)] = obj
+            elif isinstance(item, collections.abc.Sequence) \
+                    and not isinstance(item, (str, bytes)):
+                # TODO: Allow sequences of (possible) Futures to be automatically handled well.
                 try:
-                    value = datamodel.ndarray(value)
+                    value = datamodel.ndarray(item)
                 except (exceptions.ValueError, exceptions.TypeError) as e:
-                    raise exceptions.TypeError('Iterable could not be converted to NDArray: {}'.format(value)) from e
-            elif hasattr(value, 'result'):
-                # A Future object.
-                pass
+                    raise exceptions.TypeError('Iterable could not be converted to NDArray: {}'.format(item)) from e
+            elif isinstance(item, valid_source_types):
+                value = item
             else:
-                raise exceptions.ApiError('Cannot process data source {}'.format(value))
+                assert not isinstance(item, valid_source_types)
+                # TODO: Support arbitrary types.
+                raise exceptions.ApiError('Cannot process data source {}'.format(item))
         super().__setitem__(key, value)
 
     def reset(self):
@@ -791,13 +811,11 @@ class StaticSourceManager(SourceResource[_OutputDataProxyType, _PublishingDataPr
 
     def __init__(self, *, name: str, proxied_data, width: int, function: typing.Callable):
         super().__init__()
-        assert not isinstance(proxied_data, Future)
-        if hasattr(proxied_data, 'width'):
-            # Ensemble data source
-            assert hasattr(proxied_data, 'source')
-            self._result = function(proxied_data.source)
-        else:
-            self._result = function(proxied_data)
+        if isinstance(proxied_data, Future):
+            raise ApiError('StaticSourceManager is for local static data, not Futures.')
+        self._result = function(proxied_data)
+        # When width > 1, we expect `function(proxied_data)` to have produced a non-string
+        # Iterable[dtype] of length `width`.
         if width > 1:
             if isinstance(self._result, (str, bytes)):
                 # In this case, do not implicitly broadcast
@@ -841,7 +859,8 @@ class StaticSourceManager(SourceResource[_OutputDataProxyType, _PublishingDataPr
         return True
 
     def get(self, name: str) -> 'OutputData':
-        assert self._data.name == name
+        if name != self._data.name:
+            raise KeyError(f'{repr(self)} does not hold {name}')
         return self._data
 
     def data(self) -> _OutputDataProxyType:
@@ -904,13 +923,16 @@ class ProxyResourceManager(SourceResource[_OutputDataProxyType, _PublishingDataP
         if not self.is_done(name):
             raise exceptions.ProtocolError('Data not ready.')
         result = self.function(self._result)
-        if self._width != 1:
-            # TODO Fix this typing nightmare:
-            #  ResultDescription should be fully knowable and defined when the resource manager is initialized.
+        if self._width > 1:
+            # TODO Strengthen typing for subscripted Futures and data re-shaping.
+            # ResultDescription should be fully knowable and defined when the resource manager
+            # is initialized, but this is not possible when we allow subscripting of Futures for
+            # native `list` and `dict` types, rather than requiring strongly-typed containers.
             data = OutputData(name=self.name, description=ResultDescription(dtype=type(result[0]), width=self._width))
             for member, value in enumerate(result):
                 data.set(value, member)
         else:
+            assert self._width == 1
             data = OutputData(name=self.name, description=ResultDescription(dtype=type(result), width=self._width))
             data.set(result, 0)
         return data
@@ -1389,11 +1411,36 @@ class Future(GenericFuture[ResultTypeVar]):
         return self.description.dtype
 
     def __getitem__(self, item):
-        """Get a more limited view on the Future."""
-        description = ResultDescription(dtype=self.dtype, width=self.description.width)
-        # TODO: Use explicit typing when we have more thorough typing.
-        description._dtype = None
-        if self.description.width == 1:
+        """Get a more limited view on a Future for subscriptable type.
+
+        The result has the same ensemble dimensions as the original Future.
+
+        For ensemble Futures, subscripting is applied to the object of each member, not to the
+        ensemble array dimension. There is not currently a facility to hold Futures for specific
+        non-local ensemble members. (Call *result()* to localize the ensemble data, then index
+        locally.)
+
+        Slicing is not supported.
+
+        See Also:
+            ArrayFuture
+        """
+        element_dtype = None
+
+        if issubclass(self.description.dtype, collections.abc.Mapping):
+            # TODO(#3130): Stronger typed gmxapi Mapping.
+            element_dtype = None
+        elif issubclass(self.description.dtype, NDArray):
+            # TODO(#3130): Use proper data shaping instead of weakly typed containers if possible.
+            # Try to extract dtype for fancier sequence-providers.
+            if hasattr(self.description.dtype, 'dtype'):
+                if isinstance(self.description.dtype.dtype, type):
+                    element_dtype = self.description.dtype.dtype
+                elif callable(self.description.dtype.dtype):
+                    element_dtype = self.description.dtype.dtype()
+
+        description = ResultDescription(dtype=element_dtype, width=self.description.width)
+        if description.width == 1:
             proxy = ProxyResourceManager(self,
                                          width=description.width,
                                          function=lambda value, key=item: value[key])
@@ -3468,7 +3515,8 @@ def join_arrays(*, front: datamodel.NDArray = (), back: datamodel.NDArray = ()) 
 Scalar = typing.TypeVar('Scalar')
 
 
-def concatenate_lists(sublists: typing.Sequence[typing.Sequence[Scalar]] = ()) -> GenericFuture[gmx.datamodel.NDArray]:
+def concatenate_lists(sublists: typing.Sequence[typing.Sequence[Scalar]] = ()) -> ArrayFuture[
+    Scalar]:
     """Combine data sources into a single list.
 
     A trivial data flow restructuring helper.
@@ -3499,6 +3547,17 @@ def make_constant(value: Scalar) -> GenericFuture[Scalar]:
     description = ResultDescription(dtype=dtype, width=1)
     future = source.future('data', description=description)
     return future
+
+
+_T = typing.TypeVar('_T')
+
+
+# def make_sequence(elements: typing.Iterable[typing.Union[_T, GenericFuture[_T]]]) \
+#         -> ArrayFuture[_T]:
+#     """Create an ArrayFuture from a sequence of native or Future data."""
+#     for element in elements:
+#         ...
+
 
 
 def logical_not(value: bool) -> GenericFuture:
