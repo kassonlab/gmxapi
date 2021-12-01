@@ -115,7 +115,7 @@ _input = _op.InputCollectionDescription(
      ])
 
 
-def _standard_node_resource_factory(*args, **kwargs):
+def _standard_node_resource_factory(*args, **kwargs) -> _op.DataSourceCollection:
     """Translate Python UI input to the gmxapi.operation node builder inputs."""
     source_collection = _input.bind(*args, **kwargs)
     logger.info('mdrun input bound as source collection {}'.format(source_collection))
@@ -520,7 +520,7 @@ class RegisteredOperation(_op.OperationImplementation, metaclass=_op.OperationMe
         return 'gmxapi'
 
     @classmethod
-    def director(cls, context: gmxapi.abc.Context) -> _op.OperationDirector:
+    def director(cls, context: gmxapi.abc.Context) -> gmxapi.abc.OperationDirector:
         # Currently, we only have a Directory for the gmxapi.operation.Context
         if isinstance(context, _op.Context):
             return StandardDirector(context)
@@ -541,7 +541,7 @@ class StandardOperationHandle(_op.AbstractOperation):
 
 
 class StandardDirector(gmxapi.abc.OperationDirector):
-    """Direct the instantiation of a read_tpr node in a gmxapi.operation Context.
+    """Direct the instantiation of a mdrun node in a gmxapi.operation Context.
 
     .. todo:: Compose this behavior in a more generic class.
 

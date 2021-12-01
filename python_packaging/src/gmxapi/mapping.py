@@ -51,8 +51,10 @@ import inspect
 import typing
 
 from gmxapi import exceptions
-from gmxapi.exceptions import UsageError
-from .operation import InputCollectionDescription, \
+from gmxapi.exceptions import ApiError, UsageError
+from gmxapi.operation import OperationHandle, _OutputDataProxyType
+
+from .operation import AbstractOperation, InputCollectionDescription, \
     InputPack, OperationDetailsBase, \
     OutputCollectionDescription, \
     ResourceManager, \
@@ -60,7 +62,7 @@ from .operation import InputCollectionDescription, \
     current_context, \
     define_output_data_proxy, \
     define_publishing_data_proxy
-from gmxapi.typing import Future as GenericFuture
+from gmxapi.typing import Future as GenericFuture, OperationDirector, OperationReference, _Op
 
 
 def describe_input(mapping: collections.abc.Mapping) \
@@ -80,6 +82,19 @@ def describe_input(mapping: collections.abc.Mapping) \
                                   default=inspect.Parameter.empty, annotation=_dtype)
         yield key, param
 
+_output_description = OutputCollectionDescription(data=dict)
+MappingOutputDataProxy = define_output_data_proxy(_output_description)
+MappingPublishingDataProxy = define_publishing_data_proxy(_output_description)
+
+
+class MappingOperationResources(typing.NamedTuple):
+    input: dict
+    output: MappingPublishingDataProxy
+
+
+class Mapping(OperationHandle[MappingOutputDataProxy]):
+    """Handle type for Mapping instances."""
+
 
 def make_mapping_operation(mapping: collections.abc.Mapping):
     """Dynamically create an operation to deliver a Mapping.
@@ -97,18 +112,12 @@ def make_mapping_operation(mapping: collections.abc.Mapping):
     # Define the InputCollectionDescription.
     # Get the list of (str, inspect.Parameter) tuples.
     input_collection_description = InputCollectionDescription(describe_input(mapping=mapping))
-    _output_description = OutputCollectionDescription(data=dict)
-    _MappingOutputDataProxy = define_output_data_proxy(_output_description)
-    _MappingPublishingDataProxy = define_publishing_data_proxy(_output_description)
 
     _identifiers = tuple((name, param.annotation) for name, param in
                         input_collection_description.signature.parameters.items())
 
-    class MappingOperationResources(typing.NamedTuple):
-        input: dict
-        output: _MappingPublishingDataProxy
-
-    class Mapping(OperationDetailsBase):
+    class MappingDetails(OperationDetailsBase):
+        # TODO: Check that we actually hash contents and not just identity.
         _basename = 'gmxapi.Mapping' + str(hash(_identifiers))
         __last_uid = 0
 
@@ -127,7 +136,7 @@ def make_mapping_operation(mapping: collections.abc.Mapping):
 
         @classmethod
         def director(cls, context):
-            return cls.operation_director
+            return MappingDirector(context)
 
         @classmethod
         def signature(cls) -> InputCollectionDescription:
@@ -138,7 +147,7 @@ def make_mapping_operation(mapping: collections.abc.Mapping):
             Overrides OperationDetailsBase.signature() to provide an
             implementation for the bound operation.
             """
-            return input_collection_description
+            raise ApiError('We did not intend to use this code path.')
 
         def output_description(self) -> OutputCollectionDescription:
             """Mapping of available outputs and types for an existing Operation node.
@@ -149,7 +158,7 @@ def make_mapping_operation(mapping: collections.abc.Mapping):
             return _output_description
 
         def publishing_data_proxy(self, *,
-                                  instance: SourceResource[_MappingOutputDataProxy, _MappingPublishingDataProxy],
+                                  instance: SourceResource[MappingOutputDataProxy, MappingPublishingDataProxy],
                                   client_id: int
                                   ):
             """Factory for Operation output publishing resources.
@@ -160,11 +169,11 @@ def make_mapping_operation(mapping: collections.abc.Mapping):
             implementation for the bound operation.
             """
             assert isinstance(instance, ResourceManager)
-            return _MappingPublishingDataProxy(instance=instance, client_id=client_id)
+            return MappingPublishingDataProxy(instance=instance, client_id=client_id)
 
-        def output_data_proxy(self, instance: SourceResource[_MappingOutputDataProxy, _MappingPublishingDataProxy]):
+        def output_data_proxy(self, instance: SourceResource[MappingOutputDataProxy, MappingPublishingDataProxy]):
             assert isinstance(instance, ResourceManager)
-            return _MappingOutputDataProxy(instance=instance)
+            return MappingOutputDataProxy(instance=instance)
 
         def __call__(self, resources: MappingOperationResources):
             """Execute the operation with provided resources.
@@ -222,7 +231,7 @@ def make_mapping_operation(mapping: collections.abc.Mapping):
 
         @classmethod
         def resource_director(cls, *, input: InputPack = None,
-                              output: _MappingPublishingDataProxy = None):
+                              output: MappingPublishingDataProxy = None):
             """Directs construction of the Session Resources for the function.
 
             The Session launcher provides the director with all of the resources previously
@@ -257,7 +266,37 @@ def make_mapping_operation(mapping: collections.abc.Mapping):
 
             return resources
 
-    return Mapping
+    class MappingDirector(OperationDirector[MappingDetails]):
+        def __init__(self, context):
+            self.context = context
+
+        def __call__(self, resources, label: typing.Optional[str]) -> Mapping[MappingDetails]:
+            builder = self.context.node_builder(operation=RegisteredOperation, label=label)
+
+            builder.set_resource_factory(SubscriptionSessionResources)
+            builder.set_input_description(StandardInputDescription())
+            builder.set_handle(StandardOperationHandle)
+            # The runner in the gmxapi.operation context is the servicer for the legacy context.
+            builder.set_runner_director(SubscriptionPublishingRunner)
+            builder.set_output_factory(_output_factory)
+            builder.set_resource_manager(ResourceManager)
+
+            # Note: we have not yet done any dispatching based on *resources*. We should
+            # translate the resources provided into the form that the Context can subscribe to
+            # using the dispatching resource_factory. In the second draft, this operation
+            # is dispatched to a SimulationModuleContext, which can be subscribed directly
+            # to sources that are either literal filenames or gmxapi.simulation sources,
+            # while standard Futures can be resolved in the standard context.
+            #
+            assert isinstance(resources, _op.DataSourceCollection)
+            for name, source in resources.items():
+                builder.add_input(name, source)
+
+            handle = builder.build()
+            assert isinstance(handle, StandardOperationHandle)
+            return handle
+
+    return MappingDetails
 
 
 def make_mapping(mapping: typing.Union[collections.abc.Mapping, typing.Sequence[
@@ -290,7 +329,7 @@ def make_mapping(mapping: typing.Union[collections.abc.Mapping, typing.Sequence[
         else:
             raise exceptions.ApiError('Non-default context handling not implemented.')
 
-        handle = _MappingOperation.operation_director(input=mapping, context=context, label=None)
+        handle = _MappingOperation.director(input=mapping, context=context, label=None)
 
         return handle
 

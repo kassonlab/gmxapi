@@ -182,6 +182,11 @@ class Future(Resource):
 
     @classmethod
     def __subclasshook__(cls, C):
+        # TODO: Consolidate Future definitions to a single Protocol or Generic ABC.
+        # TODO: Instead of checking whether objects are Futures, "cast" all objects
+        # to a type with a normative interface, using dispatching functions and/or class method
+        # creation functions (freeing the developers to use "hidden" members for short-circuit
+        # logic, for instance).
         if cls is Future:
             if any("result" in B.__dict__ and callable(B.result) for B in C.__mro__):
                 return True

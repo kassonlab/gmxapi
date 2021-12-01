@@ -37,16 +37,18 @@
 Provides additional support for annotation and static type checking.
 Extends the specifications of the abstract base classes in gmxapi.abc.
 """
-
-from typing import TypeVar, Generic, NewType, Type
+from abc import abstractmethod
+from typing import Optional, TypeVar, Generic, NewType, Type
 
 import gmxapi.abc
+# from gmxapi.abc import Context as AbstractContext
 
 # Use SourceTypeVar and ResultTypeVar for static type hints, annotations, and as a parameter to generics.
 # Use valid_source_types and valid_result_types for run-time type checking.
 ResultTypeVar = TypeVar('ResultTypeVar', *(str, bool, int, float, dict, gmxapi.abc.NDArray))
 valid_result_types = ResultTypeVar.__constraints__
 
+# TODO: What about None?
 SourceTypeVar = TypeVar('SourceTypeVar',
                         *(str, bool, int, float, dict, gmxapi.abc.NDArray))
 valid_source_types = SourceTypeVar.__constraints__
@@ -91,23 +93,52 @@ class OperationReference(gmxapi.abc.OperationReference, Generic[_Op]):
 
     Generic version of AbstractOperationReference, parameterized by operation
     implementation.
+
+    Now that Python 3.7 is required, it will be straightforward to merge the gmxapi.typing and
+    gmxapi.abc modules, which should be a welcome simplification.
     """
 
+    @abstractmethod
+    def run(self):
+        """Assert execution of an operation.
 
-class OperationDirector(Generic[_Op, _Context]):
+        After calling run(), the operation results are guaranteed to be available
+        in the local context.
+        """
+
+    @property
+    @abstractmethod
+    def output(self):
+        """Get a proxy collection to the output of the operation.
+
+        Developer note: The 'output' property exists to isolate the namespace of
+        output data from other operation handle attributes and we should consider
+        whether it is actually necessary or helpful. To facilitate its possible
+        future removal, do not enrich its interface beyond that of a collection
+        of OutputDescriptor attributes. The OutputDataProxy also serves as a Mapping,
+        with keys matching the attributes. We may choose to keep only this aspect
+        of the interface instead of trying to keep track of the set of attributes.
+        """
+        ...
+
+
+# TODO: With Python 3.8+, use typing.Protocol.
+class OperationDirector(Generic[_Op]):
     """Generic abstract operation director.
 
     An operation director is instantiated for a specific operation and context
     by a dispatching factory to add a computational element to the work managed
     by the context.
-
-    Note:
-        This is a generic class, as defined with the Python `typing` module.
-        If used as a base class, re-expression of the TypeVar parameters in class
-        subscripts will cause the derived class to be generic unless regular
-        classes (non-TypeVar) are given. Omission of the subscripts causes `Any`
-        to be bound, which also results in a non-generic subclass.
     """
+    def __call__(self, resources, label: Optional[str]) -> OperationReference[_Op]:
+        """Add an element of work (node) and return a handle to the client.
+
+        Implements the client behavior in terms of the NodeBuilder interface
+        for a NodeBuilder in the target Context. Return a handle to the resulting
+        operation instance (node) that may be specialized to provide additional
+        interface particular to the operation.
+        """
+        ...
 
 
 class OperationImplementation(Generic[_Op], gmxapi.abc.OperationImplementation):
@@ -144,6 +175,6 @@ class OperationImplementation(Generic[_Op], gmxapi.abc.OperationImplementation):
     # TODO: Confirm that this type-checks correctly.
     # We may need to look more at how the type checking is implemented to see how
     # to do this right.
-    def director(self, context: _Context) -> OperationDirector[_Op, _Context]:
+    def director(self, context) -> OperationDirector[_Op]:
         """Factory to get an OperationDirector appropriate for the context."""
         ...

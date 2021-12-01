@@ -50,7 +50,8 @@ import gmxapi as gmx
 
 
 # Configure the `logging` module before proceeding any further.
-from gmxapi.mapping import make_mapping
+# from gmxapi.mapping import make_mapping
+from gmxapi.utility import join_path
 
 gmx.logger.setLevel(logging.WARNING)
 
@@ -170,7 +171,7 @@ def test_extend_simulation_via_checkpoint(spc_water_box, mdrun_kwargs):
     assert gmx.version.has_feature('mdrun_runtime_args')
 
     tpr = gmx.read_tpr(spc_water_box)
-    parameters = make_mapping({
+    parameters = dict({
         'nsteps': 2,
         'nstxout': 2
     })
@@ -182,14 +183,17 @@ def test_extend_simulation_via_checkpoint(spc_water_box, mdrun_kwargs):
     }
     runtime_args.update(mdrun_kwargs)
     md1 = gmx.mdrun(input1, runtime_args=runtime_args)
-    cpt_in = os.path.join(md1.output._work_dir.result(), 'continuation.cpt')
-    if rank_number == 0:
-        assert os.path.exists(cpt_in)
-    input2 = gmx.modify_input(tpr,
-                                 parameters={
-                                     'nsteps': 4,
-                                     'nstxout': 2
-                                 })
+
+    # TODO: Remove this early barrier after debugging.
+    md1.run()
+
+    input2 = gmx.modify_input(
+        tpr,
+        parameters={
+            'nsteps': 4,
+            'nstxout': 2
+        })
+    cpt_in = join_path(md1.output._work_dir, 'continuation.cpt').output.data
     runtime_args = {
         '-cpi': cpt_in,
         '-cpo': 'state.cpt',

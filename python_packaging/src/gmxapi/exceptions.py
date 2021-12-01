@@ -78,6 +78,7 @@ class DataShapeError(Error):
     """
 
 
+# TODO: Change name (MissingImplementationError) to avoid namespace collision.
 class NotImplementedError(Error):
     """Specified feature is not implemented in the current code.
 

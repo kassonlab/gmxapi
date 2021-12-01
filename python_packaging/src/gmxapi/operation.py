@@ -63,13 +63,17 @@ import weakref
 from contextlib import contextmanager
 
 import gmxapi as gmx
+import gmxapi.exceptions
 from gmxapi import datamodel
 from gmxapi import exceptions
 from gmxapi import logger as root_logger
 from gmxapi.abc import OperationImplementation, MutableResource, NDArray, Node
+from gmxapi.abc import OperationReference as AbstractOperationReference
 from gmxapi.abc import Future as FutureABC
+# TODO: Relabel FutureABC as AbstractFuture, unless we can consolidate all gmxapi Future types
+#  into a single Protocol.
 from gmxapi.datamodel import ArrayFuture
-from gmxapi.exceptions import ApiError
+from gmxapi.exceptions import ApiError, UsageError
 from gmxapi.typing import _Context, ResultTypeVar, SourceTypeVar, valid_result_types, valid_source_types
 from gmxapi.typing import Future as GenericFuture
 
@@ -216,8 +220,9 @@ class DataSourceCollection(collections.OrderedDict):
                     value[str(name)] = obj
             elif isinstance(item, collections.abc.Sequence) \
                     and not isinstance(item, (str, bytes)):
-                # TODO: Allow sequences of (possible) Futures to be automatically handled well.
                 try:
+                    # TODO: Allow sequences of (possible) Futures to be automatically handled well.
+                    # Consider relaxing the requirements of ndarray.
                     value = datamodel.ndarray(item)
                 except (exceptions.ValueError, exceptions.TypeError) as e:
                     raise exceptions.TypeError('Iterable could not be converted to NDArray: {}'.format(item)) from e
@@ -438,6 +443,7 @@ class InputCollectionDescription(collections.OrderedDict):
         input_kwargs = collections.OrderedDict()
         if 'input' in kwargs:
             provided_input = kwargs.pop('input')
+            # TODO: If input is a list, try to treat as an ensemble of dict input.
             if provided_input is not None:
                 input_kwargs.update(provided_input)
         # `function` may accept an `output` keyword argument that should not be supplied to the factory.
@@ -948,7 +954,7 @@ class ProxyResourceManager(SourceResource[_OutputDataProxyType, _PublishingDataP
         return super().future(name, description=description)
 
 
-class AbstractOperation(typing.Generic[_OutputDataProxyType]):
+class AbstractOperation(AbstractOperationReference, typing.Generic[_OutputDataProxyType]):
     """Client interface to an operation instance (graph node).
 
     Note that this is a generic abstract class. Subclasses should provide a
@@ -1647,6 +1653,7 @@ class DataEdge(object):
     removed from the interface entirely.
     """
 
+    # TODO: We can separate out these helpers to simplify DataEdge.
     class ConstantResolver(object):
         def __init__(self, value):
             self.value = value
@@ -1654,7 +1661,28 @@ class DataEdge(object):
         def __call__(self, member=None):
             return self.value
 
+    class MappingResolver:
+        def __init__(self, mapping: collections.abc.Mapping):
+            self.source = mapping
+
+        def _resolve(self):
+            for key, value in self.source.items():
+                if hasattr(value, 'result') and callable(value.result):
+                    yield key, value.result()
+                else:
+                    yield key, value
+
+        def __call__(self, member=None) -> dict:
+            return dict(self._resolve())
+
     def __init__(self, source_collection: DataSourceCollection, sink_terminal: SinkTerminal):
+        """Reconcile the provided data source(s) with the advertised inputs.
+
+        DataSourceCollection is constructed with consideration of the named inputs, but not the
+        type or shape. (Currently) this is where type and shape are reconciled.
+        """
+        # from .mapping import make_mapping
+
         # Adapters are callables that transform a source and node ID to local data.
         # Every key in the sink has an adapter.
         self.adapters = {}
@@ -1674,15 +1702,26 @@ class DataEdge(object):
             else:
                 source = source_collection[name]
                 sink = sink_terminal.inputs[name]
-                if isinstance(source, (str, bool, int, float, dict)):
+                if isinstance(source, (str, bool, int, float)):
                     logger.debug(f'Input {name}:({sink.__name__}) provided by a local constant of '
                                  f'type {type(source)}.')
-                    if issubclass(sink, (str, bool, int, float, dict)):
+                    if issubclass(sink, (str, bool, int, float)):
                         self.adapters[name] = self.ConstantResolver(source)
                     else:
-                        assert issubclass(sink, datamodel.NDArray)
-                        # The initial version of NDArray is a primitive local-only container.
-                        self.adapters[name] = self.ConstantResolver(datamodel.ndarray([source]))
+                        if issubclass(sink, (datamodel.NDArray, tuple, list)):
+                            # Allow simple constants to implicitly convert to single-element arrays.
+                            # The initial version of NDArray is a primitive local-only container.
+                            self.adapters[name] = self.ConstantResolver(datamodel.ndarray([source]))
+                        else:
+                            raise UsageError(f'Input {name} of type {sink} cannot accept data '
+                                             f'source {source}')
+                elif isinstance(source, collections.abc.Mapping) and issubclass(sink, dict):
+                    if all(isinstance(value, valid_source_types) for value in source.values()):
+                        logger.debug(f'Input {name}:({sink.__name__}) provided by a local constant of '
+                                     f'type {type(source)}.')
+                        self.adapters[name] = self.ConstantResolver(source)
+                    else:
+                        self.adapters[name] = self.MappingResolver(source)
                 elif isinstance(source, datamodel.NDArray):
                     if issubclass(sink, datamodel.NDArray):
                         # TODO(#3136): shape checking
@@ -1695,6 +1734,7 @@ class DataEdge(object):
                         else:
                             self.adapters[name] = lambda member, source=source: source[member]
                 elif hasattr(source, 'result'):
+                    # TODO: Simplify data model and type checking.
                     # Handle data futures...
                     logger.debug(f'Input {name}:({sink.__name__}) provided by a Future '
                                  f'{source.description}')
@@ -1707,7 +1747,7 @@ class DataEdge(object):
                     else:
                         self.adapters[name] = lambda member, source=source: source.result()[member]
                 else:
-                    raise ApiError(f'Unrecognized source type: {repr(source)}')
+                    raise ApiError(f'Input type {sink} cannot accept source {repr(source)}')
 
     def __repr__(self):
         return '<DataEdge: source_collection={}, sink_terminal={}>'.format(self.source_collection, self.sink_terminal)
@@ -2103,7 +2143,9 @@ class ResourceManager(SourceResource[_OutputDataProxyType, _PublishingDataProxyT
             # Check one level into container objects to confirm that they aren't hiding
             # non-localized data.
             for item in value_list:
-                assert not hasattr(item, 'result')
+                if hasattr(item, 'result'):
+                    raise ApiError(f'{repr(item)} in {repr(self._input_edge)} (key: {key}) '
+                                   f'unexpectedly looks like a Future.')
 
         input_pack = InputPack(kwargs=kwargs)
 
@@ -2410,8 +2452,10 @@ class NodeBuilder(gmx.abc.NodeBuilder):
 
         assert hasattr(self._input_description, 'signature')
         input_sink = SinkTerminal(self._input_description.signature())
+        # This is one place to check.
         input_sink.update(self.sources)
         logger.debug('SinkTerminal configured: {}'.format(SinkTerminal))
+        # This is the other.
         edge = DataEdge(self.sources, input_sink)
         logger.debug('Created data edge {} with Sink {}'.format(edge, edge.sink_terminal))
         # TODO: Fingerprinting: Each operation instance has unique output based on the unique input.
@@ -2630,8 +2674,10 @@ class OperationDirector(object):
         builder.set_handle(OperationHandle)
 
         operation_details = self.operation_details()
+        # With gmxapi.abc.OperationDirector, this is the resource_factory member, which should be
+        # composed instead of hard-coded to self.operation_details().signature().bind.
         node_input_factory = operation_details.signature().bind
-        data_source_collection = node_input_factory(*self.args, **self.kwargs)
+        data_source_collection: DataSourceCollection = node_input_factory(*self.args, **self.kwargs)
         for name, source in data_source_collection.items():
             builder.add_input(name, source)
 
@@ -2667,7 +2713,7 @@ def _make_datastore(output_description: OutputCollectionDescription, ensemble_wi
 
     datastore = collections.OrderedDict()
     for name, dtype in output_description.items():
-        assert isinstance(dtype, type)
+        assert issubclass(dtype, valid_result_types)
         result_description = ResultDescription(dtype=dtype, width=ensemble_width)
         datastore[name] = OutputData(name=name, description=result_description)
     return datastore
