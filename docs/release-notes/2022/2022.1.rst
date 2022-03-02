@@ -40,3 +40,15 @@ Fixes that affect portability
 Miscellaneous
 ^^^^^^^^^^^^^
 
+Workaround for nested MPI-aware code
+""""""""""""""""""""""""""""""""""""
+
+:py:mod:`gmxapi` scripts containing `gmxapi.commandline_operation` tasks could be unusable if a task
+executable automatically detects MPI resources and the script is invoked with an MPI launcher.
+
+The workaround is to increase the isolation of the task environment from the parent process by explicitly
+setting the task environment variables.
+This is now possible with a new *env* key word argument to :py:func:`~gmxapi.commandline_operation`,
+which is simply passed along to `subprocess.run`.
+
+:issue:`4421`
