@@ -1,0 +1,90 @@
+PROJECT_NAME           = @CMAKE_PROJECT_NAME@
+PROJECT_NUMBER         = @GMX_VERSION_STRING_FULL@
+INPUT                  = @CMAKE_SOURCE_DIR@/api/legacy/include
+                         @CMAKE_BINARY_DIR@/api/legacy/include
+FILE_PATTERNS          = *.h *.md
+# CUDA files could be included like this, but currently produce a lot of
+# warnings.
+# FILE_PATTERNS         += *.cuh
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = *cmakein*
+EXCLUDE_SYMBOLS        = YY* yy* _gmx_sel_yy*
+EXCLUDE_SYMBOLS       += __STDC*
+EXCLUDE_SYMBOLS       += TEST TEST_F TEST_P TYPED_TEST_SUITE TYPED_TEST INSTANTIATE_TEST_SUITE_P
+EXCLUDE_SYMBOLS       += MOCK_METHOD* MOCK_CONST_METHOD*
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = @CMAKE_SOURCE_DIR@/api/legacy/include @CMAKE_BINARY_DIR@/api/legacy/include
+STRIP_FROM_INC_PATH    = @CMAKE_SOURCE_DIR@/api/legacy/include @CMAKE_BINARY_DIR@/api/legacy/include
+
+#ENABLED_SECTIONS      += libapi xml
+
+MACRO_EXPANSION        = YES
+# Extract documentation also for code in headers within #ifdef __cplusplus
+PREDEFINED             = __cplusplus
+# This is for cases where \cond does not work, so that #ifndef can also be used.
+# thread_mpi also uses this, but it is now excluded from the documentation.
+PREDEFINED            += DOXYGEN
+# This makes 'static gmx_inline' functions appear better in the documentation.
+PREDEFINED            += gmx_inline=inline
+# This is for parser.cpp to make it produce code that Doxygen understands
+# and that does not have unnecessary function declarations.
+PREDEFINED            += __STDC__ YYMALLOC=malloc YYFREE=free
+
+EXTRA_PACKAGES        += amssymb
+
+JAVADOC_AUTOBRIEF      = YES
+INLINE_INHERITED_MEMB  = YES
+SORT_BY_SCOPE_NAME     = YES
+ALPHABETICAL_INDEX     = YES
+GENERATE_LATEX         = NO
+VERBATIM_HEADERS       = YES
+STRIP_CODE_COMMENTS    = NO
+
+# This includes 'static inline' functions from headers in the documentation.
+EXTRACT_STATIC         = YES
+
+ALIASES               += Gromacs=GROMACS
+ALIASES               += linktodevmanual{2}="<A HREF=\"../../dev-manual/\1.html\">\2</A>"
+ALIASES               += linktodevmanual{3}="<A HREF=\"../../dev-manual/\1.html#\2\">\3</A>"
+
+FORCE_LOCAL_INCLUDES   = YES
+
+OUTPUT_DIRECTORY       = @LEGACYAPI_OUTPUT@
+
+INTERNAL_DOCS          = NO
+HIDE_UNDOC_CLASSES     = NO
+HIDE_FRIEND_COMPOUNDS  = YES
+WARN_LOGFILE           = doxygen-legacy.log
+
+ALIASES               += inpublicapi="\ingroup group_publicapi"
+ALIASES               += inlibraryapi="\ingroup group_libraryapi"
+ALIASES               += libinternal="\xmlonly <libinternal /> \endxmlonly"
+
+PREDEFINED            += F77_FUNC(name,NAME)=name
+
+INTERNAL_DOCS          = NO
+EXTRACT_LOCAL_CLASSES  = YES
+EXTRACT_ANON_NSPACES   = NO
+
+# We don't need the STL classes for our use of the XML,
+# and they generate broken references that would need extra handling
+BUILTIN_STL_SUPPORT    = NO
+WARN_IF_UNDOCUMENTED   = NO
+WARN_LOGFILE           = doxygen-xml.log
+CLASS_DIAGRAMS         = NO
+CLASS_GRAPH            = NO
+COLLABORATION_GRAPH    = NO
+DIRECTORY_GRAPH        = NO
+INCLUDE_GRAPH          = NO
+INCLUDED_BY_GRAPH      = NO
+
+INLINE_INHERITED_MEMB  = NO  # Do not duplicate documentation
+
+GENERATE_HTML          = NO
+GENERATE_XML           = YES
+XML_PROGRAMLISTING     = NO
+
+
+# This is here because some comments that don't produce any useful
+# documentation still contain invalid Doxygen commands...
+ALIASES               += threadsafe=

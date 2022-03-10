@@ -37,9 +37,13 @@
 # gmxapi-cppdocs-dev produces more complete documentation in docs/api-dev
 # with internal interfaces and implementation details.
 
-file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/api-user" GMXAPI_USERDOC_OUTPUT)
+file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/gmxapi" GMXAPI_USERDOC_OUTPUT)
+file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/api-user" GMXAPI1_OUTPUT)
+file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/legacy" LEGACYAPI_OUTPUT)
 file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/api-dev" GMXAPI_DEVDOC_OUTPUT)
 
+file(MAKE_DIRECTORY ${LEGACYAPI_OUTPUT})
+file(MAKE_DIRECTORY ${GMXAPI1_OUTPUT})
 file(MAKE_DIRECTORY ${GMXAPI_USERDOC_OUTPUT})
 file(MAKE_DIRECTORY ${GMXAPI_DEVDOC_OUTPUT})
 
@@ -50,10 +54,14 @@ get_target_property(GMXAPI_BINARY_DIR gmxapi BINARY_DIR)
 ## the list converted to a space-delimited string.
 set(GMXAPI_PUBLIC_HEADERS ${GMXAPI_SOURCE_DIR}/include/gmxapi ${GMXAPI_BINARY_DIR}/include/gmxapi)
 string(REPLACE ";" " " GMXAPI_PUBLIC_HEADERS "${GMXAPI_PUBLIC_HEADERS}")
-configure_file(Doxyfile.in Doxyfile @ONLY)
+configure_file(Doxyfile-gmxapi0.in Doxyfile-gmxapi0 @ONLY)
 
 # Use all gmxapi sources to populate developer docs.
 configure_file(Doxyfile-dev.in Doxyfile-dev @ONLY)
+
+if (GMX_INSTALL_LEGACY_API)
+    configure_file(Doxyfile-legacy.in Doxyfile-legacy @ONLY)
+endif()
 
 ################################
 # C++ external API documentation
@@ -61,10 +69,22 @@ configure_file(Doxyfile-dev.in Doxyfile-dev @ONLY)
 find_package(Doxygen)
 if (DOXYGEN_FOUND)
     add_custom_target( gmxapi-cppdocs
-        COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "Generating API user documentation for ${GMXAPI_USERDOC_OUTPUT}"
-        VERBATIM )
+                       COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile-gmxapi0
+                       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                       COMMENT "Generating API user documentation for ${GMXAPI_USERDOC_OUTPUT}"
+                       VERBATIM )
+    add_custom_target( gmxapi1-cppdocs
+                       COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile
+                       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                       COMMENT "Generating API user documentation for ${GMXAPI1_OUTPUT}"
+                       VERBATIM )
+    if (GMX_INSTALL_LEGACY_API)
+        add_custom_target( legacy-cppdocs
+                           COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile-legacy
+                           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                           COMMENT "Generating API user documentation for ${LEGACYAPI_OUTPUT}"
+                           VERBATIM )
+    endif ()
     add_custom_target( gmxapi-cppdocs-dev
         COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile-dev
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

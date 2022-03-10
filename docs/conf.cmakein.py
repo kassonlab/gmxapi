@@ -432,4 +432,9 @@ intersphinx_timeout = 10
 
 # -- Options for breathe extension ----------------------------------------
 
+breathe_projects = {
+    "gmxapi": "@GMXAPI_USERDOC_OUTPUT@/xml",
+    "gmxapi1": "@GMXAPI1_OUTPUT@/xml",
+    "legacy": "@LEGACYAPI_OUTPUT@/xml"
+}
 breathe_default_project = "gmxapi"

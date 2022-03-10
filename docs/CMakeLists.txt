@@ -526,6 +526,10 @@ if (SPHINX_FOUND)
         # in this context?
     endif ()
 
+    file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/api-user" GMXAPI_USERDOC_OUTPUT)
+    file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/api-user" GMXAPI1_OUTPUT)
+    file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/legacy" LEGACYAPI_OUTPUT)
+
     gmx_configure_version_file(
         conf.cmakein.py ${SPHINX_CONFIG_FILE}
         EXTRA_VARS
@@ -538,7 +542,10 @@ if (SPHINX_FOUND)
             GMX_TNG_MINIMUM_REQUIRED_VERSION
             GMX_SOURCE_DOI_STRING
             GMXAPI_PYTHON_STAGING_DIR
+            GMXAPI_USERDOC_OUTPUT
+            GMXAPI1_OUTPUT
             IMAGE_CONVERT_STRING
+            LEGACYAPI_OUTPUT
             REGRESSIONTEST_VERSION
             REQUIRED_CUDA_COMPUTE_CAPABILITY
             REQUIRED_CUDA_VERSION
@@ -564,6 +571,9 @@ if (SPHINX_FOUND)
     gmx_add_sphinx_source_files(
             FILES
             api/index.rst
+            api/gmxapi.rst
+            api/gmxapi_1.rst
+            api/legacy.rst
             gmxapi/index.rst
             gmxapi/userguide/install.rst
             gmxapi/userguide/usage.rst
@@ -659,7 +669,6 @@ if (SPHINX_FOUND)
     if (GMX_DEVELOPER_BUILD)
         set(SPHINX_CONFIG_OVERRIDES "-Dtodo_include_todos=1")
     endif()
-    file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/api-user" GMXAPI_USERDOC_OUTPUT)
     add_custom_target(webpage-sphinx
         DEPENDS sphinx-programs
         DEPENDS sphinx-input
@@ -673,8 +682,6 @@ if (SPHINX_FOUND)
             -q -b html
             -w sphinx-html.log
             -d "${SPHINX_CACHE_DIR}"
-            # Tell Breathe where to find the Doxygen output
-            -Dbreathe_projects.gmxapi=${GMXAPI_USERDOC_OUTPUT}/xml
             ${SPHINX_CONFIG_OVERRIDES}
             "${SPHINX_INPUT_DIR}"
             "${HTML_OUTPUT_DIR}"
@@ -683,6 +690,9 @@ if (SPHINX_FOUND)
         COMMENT "Building HTML documentation with Sphinx"
         VERBATIM
         )
+    if (GMX_INSTALL_LEGACY_API)
+        add_dependencies(webpage-sphinx legacy-cppdocs)
+    endif ()
 
     add_custom_target(man
         COMMAND
