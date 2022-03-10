@@ -116,6 +116,7 @@ extensions = [
     # Please run linkchecker and inspect the generated
     # docs/html/_modules/index.html page before committing a change that enables
     # 'sphinx.ext.viewcode',
+    'breathe',
     'gmxsphinx'
 ]
 extlinks = {'issue': ('https://gitlab.com/gromacs/gromacs/-/issues/%s',
@@ -428,3 +429,7 @@ autodoc_mock_imports = ['hpccm', 'hpccm.config']
 intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 intersphinx_cache_limit = -1
 intersphinx_timeout = 10
+
+# -- Options for breathe extension ----------------------------------------
+
+breathe_default_project = "gmxapi"

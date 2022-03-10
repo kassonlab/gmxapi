@@ -24,6 +24,7 @@ Welcome to the |Gromacs| documentation!
            user-guide/index
            how-to/index
            reference-manual/index
+           api/index
            gmxapi/index
 	   nblib/index
            dev-manual/index

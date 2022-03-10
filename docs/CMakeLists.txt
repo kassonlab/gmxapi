@@ -563,6 +563,7 @@ if (SPHINX_FOUND)
 
     gmx_add_sphinx_source_files(
             FILES
+            api/index.rst
             gmxapi/index.rst
             gmxapi/userguide/install.rst
             gmxapi/userguide/usage.rst
@@ -658,11 +659,13 @@ if (SPHINX_FOUND)
     if (GMX_DEVELOPER_BUILD)
         set(SPHINX_CONFIG_OVERRIDES "-Dtodo_include_todos=1")
     endif()
+    file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docs/api-user" GMXAPI_USERDOC_OUTPUT)
     add_custom_target(webpage-sphinx
         DEPENDS sphinx-programs
         DEPENDS sphinx-input
         DEPENDS sphinx-image-conversion
         DEPENDS manual
+        DEPENDS gmxapi-cppdocs
         COMMAND
             ${CMAKE_COMMAND} -E make_directory ${SPHINX_INPUT_DIR}/_static
         COMMAND
@@ -670,6 +673,8 @@ if (SPHINX_FOUND)
             -q -b html
             -w sphinx-html.log
             -d "${SPHINX_CACHE_DIR}"
+            # Tell Breathe where to find the Doxygen output
+            -Dbreathe_projects.gmxapi=${GMXAPI_USERDOC_OUTPUT}/xml
             ${SPHINX_CONFIG_OVERRIDES}
             "${SPHINX_INPUT_DIR}"
             "${HTML_OUTPUT_DIR}"
