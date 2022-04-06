@@ -1,7 +1,12 @@
-This is a fork of the [GROMACS project](http://www.gromacs.org/) that demonstrates the latest
+This is a fork of the [GROMACS project](http://www.gromacs.org/) that demonstrates historic and experimental
 gmxapi functionality.
-The forked project lives on GitHub at 
+This forked project lives on GitHub at 
 [https://github.com/kassonlab/gmxapi](https://github.com/kassonlab/gmxapi/).
+The GROMACS repository is at https://gitlab.com/gromacs/gromacs/
+
+Please visit the GROMACS
+[user forums](https://gromacs.bioexcel.eu/tag/gmxapi)
+for questions and discussion.
 
 [![Build Status](https://travis-ci.com/kassonlab/gmxapi.svg?branch=master)](https://travis-ci.com/kassonlab/gmxapi)
 
@@ -12,8 +17,8 @@ See the file `README` in this directory for more information on GROMACS and this
 
 See the file `python_packaging/README.md` for more on the organization of this fork.
 
-Refer to Redmine issue [2045](https://redmine.gromacs.org/issues/2045) for issue
-tracking.
+Refer to https://gitlab.com/gromacs/gromacs/-/issues?sort=updated_desc&state=opened&label_name[]=gmxapi
+for issue tracking.
 
 View gmxapi documentation, including installation instructions,
 at http://gmxapi.org/
