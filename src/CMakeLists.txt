@@ -2,6 +2,11 @@
 # If the libgmxapi dependency is satisfied by allowing setuptools to build GROMACS, it should use GROMACS_DIR to hint
 # the location.
 #
+# Workaround for issue #4563 for GROMACS releases that won't be patched.
+find_package(GROMACS REQUIRED
+             NAMES gromacs gromacs_d
+             HINTS "$ENV{GROMACS_DIR}"
+             )
 # find_package should find gmxapiConfig.cmake if the path to `gmx` is in PATH,
 # if gmxapi_DIR is set to the GROMACS installation directory, or if
 # cmake was invoked with `-DCMAKE_PREFIX_PATH=...` pointing to the GROMACS
