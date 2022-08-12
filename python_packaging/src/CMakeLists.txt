@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2019,2020,2021, by the GROMACS development team, led by
+# Copyright (c) 2019,2020,2021,2022, by the GROMACS development team, led by
 # Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 # and including many others, as listed in the AUTHORS file in the
 # top-level source directory and at http://www.gromacs.org.
@@ -76,6 +76,11 @@ if(POLICY CMP0074) #3.12
 endif()
 
 if(GMXAPI_MASTER_PROJECT)
+    # Workaround for issue #4563 for GROMACS releases that won't be patched.
+    find_package(GROMACS REQUIRED
+                 NAMES gromacs gromacs_mpi gromacs_d gromacs_mpi_d
+                 HINTS "$ENV{GROMACS_DIR}"
+                 )
     find_package(gmxapi 0.2 REQUIRED
                  HINTS "$ENV{GROMACS_DIR}"
                  )
