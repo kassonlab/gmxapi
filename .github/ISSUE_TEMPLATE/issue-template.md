@@ -1,6 +1,6 @@
 ---
 name: Issue template
-about: stale issue tracker
+about: please visit https://www.gromacs.org for the main project 
 title: ''
 labels: ''
 assignees: ''
